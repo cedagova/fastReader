@@ -1,0 +1,133 @@
+package com.cedagova.fastreader.library.ui
+
+import com.cedagova.fastreader.library.Book
+import com.cedagova.fastreader.library.BookStatus
+import com.cedagova.fastreader.library.Catalog
+import com.cedagova.fastreader.library.IngestionState
+import com.cedagova.fastreader.library.ScanTrigger
+import com.cedagova.fastreader.library.SourceAvailability
+import com.cedagova.fastreader.library.SourceOrigin
+import java.text.Normalizer
+import kotlin.math.roundToInt
+
+/**
+ * Everything the library screen renders, derived from the catalog, the current
+ * ingestion state, and what the reader has typed into the search field.
+ *
+ * This is deliberately plain Kotlin with no Android or Compose types: the
+ * filtering, ordering, progress, and state-selection rules behind REQ-001–REQ-005
+ * are proven by fast unit tests, and the Compose layer only lays this out.
+ */
+data class LibraryUiState(
+    val query: String,
+    val books: List<LibraryBookItem>,
+    val content: LibraryContent,
+    val scan: LibraryScan? = null,
+    val failureMessage: String? = null,
+)
+
+/** Which of the three mutually exclusive library bodies to show. */
+enum class LibraryContent {
+    /** No books at all: show the guidance explaining both ways to add them. */
+    EMPTY_LIBRARY,
+
+    /** Books exist but none match the current search. */
+    NO_SEARCH_RESULTS,
+
+    /** The filtered book list. */
+    BOOKS,
+}
+
+/** A folder scan in progress, so the library can show a loading state (REQ-002). */
+data class LibraryScan(
+    val trigger: ScanTrigger,
+    val processed: Int = 0,
+    val total: Int = 0,
+    val currentName: String? = null,
+) {
+    /** Determinate progress, or null while the scan does not yet know how much work it has. */
+    val fraction: Float? get() = if (total > 0) (processed.toFloat() / total).coerceIn(0f, 1f) else null
+
+    val hasCounts: Boolean get() = total > 0
+}
+
+/** One row of the library list. */
+data class LibraryBookItem(
+    val id: String,
+    val title: String,
+    val author: String?,
+    /** Every file name this book is reachable under; search matches on all of them. */
+    val fileNames: List<String>,
+    /** Whole-percent share of the book already read. Zero for every book until increment 002. */
+    val progressPercent: Int,
+    val status: BookStatus,
+    val hasCover: Boolean,
+    /**
+     * The added folder to re-open when this book's access was revoked, or null when
+     * it was picked directly and must be picked again to restore the grant.
+     */
+    val regrantTreeUri: String? = null,
+) {
+    val isReadable: Boolean get() = status == BookStatus.READABLE
+
+    /** The name to show when one is needed; a book is normally reachable from one place. */
+    val fileName: String? get() = fileNames.firstOrNull()
+}
+
+/** Builds the screen state. Pure: same inputs always give the same screen. */
+fun buildLibraryUiState(
+    catalog: Catalog,
+    ingestion: IngestionState,
+    query: String,
+): LibraryUiState {
+    val all = catalog.books
+        .map { book -> book.toItem(catalog.readingStates[book.id]?.progressFraction ?: 0f) }
+        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+    val matches = all.filter { it.matches(query) }
+    val content = when {
+        all.isEmpty() -> LibraryContent.EMPTY_LIBRARY
+        matches.isEmpty() -> LibraryContent.NO_SEARCH_RESULTS
+        else -> LibraryContent.BOOKS
+    }
+    return LibraryUiState(
+        query = query,
+        books = matches,
+        content = content,
+        scan = (ingestion as? IngestionState.Scanning)?.let {
+            LibraryScan(it.trigger, it.processed, it.total, it.currentName)
+        },
+        failureMessage = (ingestion as? IngestionState.Failed)?.message,
+    )
+}
+
+private fun Book.toItem(progressFraction: Float): LibraryBookItem = LibraryBookItem(
+    id = id,
+    title = title,
+    author = author?.takeIf { it.isNotBlank() },
+    fileNames = fileNames,
+    progressPercent = (progressFraction.coerceIn(0f, 1f) * 100).roundToInt(),
+    status = status,
+    hasCover = hasCover,
+    regrantTreeUri = sources
+        .firstOrNull { it.availability == SourceAvailability.PERMISSION_LOST && it.origin == SourceOrigin.FOLDER }
+        ?.folderId,
+)
+
+/**
+ * Live search over title, author, and file name (REQ-003).
+ *
+ * Matching folds case and accents so a Spanish library is searchable from an
+ * English keyboard: typing `garcia` finds `García`.
+ */
+internal fun LibraryBookItem.matches(query: String): Boolean {
+    val needle = fold(query)
+    if (needle.isEmpty()) return true
+    return fold(title).contains(needle) ||
+        author?.let { fold(it).contains(needle) } == true ||
+        fileNames.any { fold(it).contains(needle) }
+}
+
+private fun fold(text: String): String =
+    Normalizer.normalize(text.trim().lowercase(), Normalizer.Form.NFD).replace(COMBINING_MARKS, "")
+
+private val COMBINING_MARKS = Regex("\\p{Mn}+")
