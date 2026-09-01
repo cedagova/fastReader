@@ -412,5 +412,5 @@ baseline; implementation work remains.
 
 ## Publication verification
 
-PLANNING-TODO — recorded after independent content review, issue
-publication, graph reconciliation, and verification.
+Pending — recorded after independent content review, issue publication,
+native graph reconciliation, and graph verification.
