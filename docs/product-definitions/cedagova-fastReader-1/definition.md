@@ -399,18 +399,27 @@ Both use the system document picker; no broad storage permission.
 
 ## Product issue graph
 
-| Key | Kind | Parent | Title | Requirements | Issue |
-| --- | --- | --- | --- | --- | --- |
-| ROOT | ROOT | None | RSVP fast reader for EPUB books | All (umbrella); cross-cutting REQ-050 | https://github.com/cedagova/fastReader/issues/1 |
-| OUT001 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | REQ-001–005; REQ-060 (library surface); REQ-050 | Pending |
-| OUT002 | OUTCOME | ROOT | Core RSVP reading experience | REQ-009–019, REQ-070, REQ-071, REQ-062; REQ-060 (reader controls surface); REQ-050 | Pending |
-| OUT003 | OUTCOME | ROOT | Cue customization and focused mode | REQ-020–023, REQ-030, REQ-061; REQ-060 (settings surface); REQ-050 | Pending |
-| OUT004 | OUTCOME | ROOT | Shareable installable release | REQ-040; REQ-050 | Pending |
+| Key | Kind | Parent | Title | Issue |
+| --- | --- | --- | --- | --- |
+| ROOT | ROOT | None | RSVP fast reader for EPUB books | https://github.com/cedagova/fastReader/issues/1 |
+| OUT001 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | Pending |
+| OUT002 | OUTCOME | ROOT | Core RSVP reading experience | Pending |
+| OUT003 | OUTCOME | ROOT | Cue customization and focused mode | Pending |
+| OUT004 | OUTCOME | ROOT | Shareable installable release | Pending |
 
-Cross-cutting requirements (REQ-050 privacy; REQ-060 accessibility) are
-listed under every outcome whose surface they constrain; each owning
-outcome carries the acceptance for its own surface. Every REQ-### above is
-owned by at least one outcome.
+Requirement ownership (every REQ-### is owned by at least one outcome;
+cross-cutting requirements are listed under every outcome whose surface
+they constrain, and each owner carries the acceptance for its own
+surface):
+
+- **OUT001:** REQ-001, REQ-002, REQ-003, REQ-004, REQ-005; REQ-060
+  (library surface); REQ-050.
+- **OUT002:** REQ-009, REQ-010, REQ-011, REQ-012, REQ-013, REQ-014,
+  REQ-015, REQ-016, REQ-017, REQ-018, REQ-019, REQ-070, REQ-071, REQ-062;
+  REQ-060 (reader-controls surface); REQ-050.
+- **OUT003:** REQ-020, REQ-021, REQ-022, REQ-023, REQ-030, REQ-061;
+  REQ-060 (settings surface); REQ-050.
+- **OUT004:** REQ-040; REQ-050.
 
 ## Publication verification
 
