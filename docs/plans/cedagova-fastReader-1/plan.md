@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/1
 - Planning PR: https://github.com/cedagova/fastReader/pull/7
-- Status: In progress
+- Status: Review
 - Root classification: INCREMENTAL
 - Delivery topology: INCREMENTAL
 - Planner: Planning lead (Claude)
@@ -309,7 +309,10 @@ machine-local and uncommitted per repo policy.
   config (never committed), monotonic versionCode/versionName scheme,
   repeatable release build producing a signed APK attached to a versioned
   GitHub Release obtainable by link (per the owner decision on
-  distribution), minSdk 26 install check, explicit N→N+1 update check
+  distribution; the repository becomes public no later than this increment
+  per the resolved owner decision, and the leaf verifies the APK downloads
+  from its link without authentication), minSdk 26 install check, explicit
+  N→N+1 update check
   proving library/positions/settings survive (REQ-040), and verification
   that the release build requests no network access for reading data
   (REQ-050). Owns REQ-040 and the release-level REQ-050 proof.
@@ -344,7 +347,8 @@ Every definition requirement maps to at least one leaf:
 Root #1 acceptance: the four outcome checkboxes map to INC001–INC004; the
 two-interaction/<3 s launch measure to LEAF204; Spanish/English end-to-end to
 LEAF201 plus increment 002's completion rule; friend-installs-by-link to
-LEAF401 (subject to the visibility decision below). No orphan or overlapping
+LEAF401 (with the repository made public per the resolved owner decision
+below). No orphan or overlapping
 outcome remains: library data/UI split at the store boundary, reader
 timing/UI split at the engine boundary, cue rendering/settings split at the
 preview boundary.
@@ -363,47 +367,24 @@ increment closes. The max-speed smoothness guardrail is checked in increment
 
 ## Assumptions and open questions
 
-**Owner decision brief — release link vs. private repository (blocks
-increment 004 mechanics only).**
+None open. One material decision was raised and resolved during planning:
 
-1. **Problem.** The approved outcome says friends obtain the release by
-   link and install it (REQ-040; owner decision "shareable signed APK via
-   GitHub Releases"). `cedagova/fastReader` is currently **private**, and
-   release assets on a private repository are not reachable by a bare link —
-   a friend would need a GitHub account with repository access. As is, the
-   decided distribution channel cannot satisfy the decided outcome.
-2. **Facts vs. assumptions.** Fact: repo visibility is PRIVATE (GitHub API,
-   2026-09-01); private release assets require authenticated access; no
-   secrets are committed (identity guards and gitignore already enforce
-   this). Assumption: friends should not need GitHub accounts ("without
-   store ceremony" rationale).
-3. **Options.**
-   - **A (recommended): make `cedagova/fastReader` public** before increment
-     004. Release links then work for anyone. Benefit: simplest, exactly the
-     decided channel. Cost/risk: source code becomes public (personal
-     project, no secrets in-repo). Reversibility: can be flipped back to
-     private at any time (existing links stop working). Execution: LEAF401
-     unchanged.
-   - **B: keep source private; add a public releases-only repository**
-     (e.g. `cedagova/fastReader-releases`) that the release step uploads
-     APKs to. Benefit: source stays private with working public links.
-     Cost: a second repository and a cross-repo publish step to maintain.
-     Reversibility: easy. Execution: LEAF401 gains the publish-to-second-
-     repo step; delivery stays `DIRECT` in this repository.
-   - **C: keep private and grant friends collaborator access.** Benefit: no
-     public exposure. Cost: every friend needs a GitHub account and login to
-     download — contradicts the "by link without ceremony" rationale. Not
-     recommended.
-4. **Recommendation.** Option A: this is a personal reader app with guarded
-   identity/secrets hygiene already in place, and it keeps the release path
-   trivial for a solo developer.
-5. **Blocked.** Only LEAF401's acceptance mechanics ("friend can go from
-   link to reading"); increments 001–003 are unaffected.
-6. **To resume:** reply `Choose A`, `Choose B`, or `Choose C`.
+**Owner decision 2026-09-01 — release link vs. private repository:
+`Choose A`.** The repository is currently private (GitHub API, 2026-09-01),
+so release-asset links would not have worked for friends without GitHub
+accounts, conflicting with the decided "signed APK via GitHub Releases, by
+link without ceremony" channel. Options presented: A — make
+`cedagova/fastReader` public before increment 004 (recommended); B — keep
+source private and publish APKs to a public releases-only repository; C —
+grant friends collaborator access. The owner chose **A**: the repository
+will be made public no later than increment 004, and LEAF401's acceptance
+includes verifying the release APK downloads from its link without
+authentication. Making the repository public is an owner-performed (or
+owner-authorized) visibility change, not application code.
 
-No other open questions. All other material choices were resolved by the
-owner in the pinned definition (distribution channel, languages, timing
-package, single-word RSVP, in-place library, accessibility bar).
+All other material choices were resolved by the owner in the pinned
+definition (distribution channel, languages, timing package, single-word
+RSVP, in-place library, accessibility bar).
 
 ## Satisfaction proof
 
