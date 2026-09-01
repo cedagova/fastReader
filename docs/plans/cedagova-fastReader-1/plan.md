@@ -426,5 +426,14 @@ baseline; implementation work remains.
   LEAF202 #11, LEAF203 #12, LEAF204 #13, LEAF301 #14, LEAF302 #15,
   LEAF401 #16. Tracking metadata added to root #1; GROUP/sequence/delivery
   metadata added to increments #3–#6 with definition bodies preserved.
-- `plan validate --phase publication-ready`, `plan reconcile-graph`, and
-  `plan verify-graph` results recorded below/PR #7 after this commit.
+- `plan validate --phase publication-ready`: valid (14 rows, INCREMENTAL).
+- `plan reconcile-graph` 2026-09-01: attached all nine leaf sub-issues under
+  their increments and created the planned dependencies (INC002<-INC001,
+  INC003<-INC002, INC004<-INC003, LEAF102<-LEAF101, LEAF202<-LEAF201,
+  LEAF203<-LEAF201, LEAF203<-LEAF202, LEAF204<-LEAF203, LEAF302<-LEAF301);
+  nothing deleted or reparented.
+- `plan verify-graph` 2026-09-01: graph valid, 14 rows — live native
+  sub-issue tree and blocked-by graph exactly match the manifest.
+- Final exact-head validation (`ready-for-implementation` with --head and
+  --reviewed-head) runs after the official marked approval and is recorded
+  on PR #7.
