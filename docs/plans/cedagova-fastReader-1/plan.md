@@ -151,6 +151,14 @@ frontier):
 
 - **001 Library (#3)** — wave 1: LEAF101 catalog/ingestion; wave 2: LEAF102
   library screen (blocked by LEAF101). Topology `COLLECTOR`.
+  Closure evidence for REQ-004/REQ-005: at 001 completion, position
+  retention is proven at the store level — a seeded reading position
+  survives remove/re-add and missing/restore cycles under automated tests —
+  and library `% read` is structurally present but necessarily 0 for every
+  book until increment 002 exists. The user-visible end-to-end proof
+  (positions written by real reading) is explicitly re-verified in LEAF204
+  before increment 002 closes; increment 001 closes on the store-level
+  evidence.
 - **002 Core RSVP (#4)** — wave 1: LEAF201 content pipeline; wave 2: LEAF202
   timing engine (blocked by LEAF201, shares the token model); wave 3:
   LEAF203 reader screen and playback (blocked by LEAF201, LEAF202); wave 4:
@@ -160,7 +168,10 @@ frontier):
   focused mode; wave 2: LEAF302 settings with live preview (blocked by
   LEAF301). Topology `COLLECTOR`.
 - **004 Shareable release (#6)** — single wave: LEAF401 signed versioned
-  release pipeline. Topology `DIRECT`.
+  release pipeline. Topology `DIRECT`. Non-code prerequisite: the owner
+  makes `cedagova/fastReader` public before this increment's release is
+  published (resolved owner decision `Choose A`); LEAF401 verifies the
+  link works without authentication.
 
 Leaves depend only on siblings inside their own increment; cross-increment
 ordering lives on the increment issues (#4 blocked by #3, #5 by #4, #6 by
@@ -199,6 +210,13 @@ contracts. Internal ownership boundaries the leaves must respect:
   off the main thread, with the loading state from the definition.
 - **Schema drift breaking updates.** Mitigated by AD-3 plus LEAF401's
   explicit N→N+1 preservation check.
+- **Signing-key loss permanently breaks updates.** Android in-place updates
+  (REQ-040) require the same signing key for every future version; a lost
+  keystore after the first shared release means friends can never update
+  without uninstall-and-lose-data. Bound: LEAF401's acceptance includes a
+  documented, verified keystore custody/backup arrangement (offline copy
+  plus recorded credentials in the owner's password manager) before the
+  first release is shared.
 - **Spritz patent trade dress** in guide marks. Mitigated by AD-7; reviewer
   checks the delivered design.
 - **Process-death and foreground-loss edge cases** (REQ-016/REQ-071).
@@ -279,7 +297,14 @@ machine-local and uncommitted per repo policy.
   auto-pause with title, skip-marker display, progress % and time remaining,
   end-of-book state, screen-awake during playback, foreground-loss
   auto-pause at the current word, static-luminance instantaneous text swaps
-  (REQ-062 base), TalkBack for reader controls (REQ-060 reader surface).
+  (REQ-062 base), TalkBack for reader controls (REQ-060 reader surface),
+  and the reader-side book-open loading state: opening a large EPUB shows
+  progress and the app stays responsive (parsing happens off the main
+  thread — LEAF201 exposes the pipeline so LEAF203 can render progress).
+  This leaf is deliberately one delivery unit: playback, the paused context
+  view, and in-book navigation share one reader state machine, and
+  splitting them would ship a reader that can play but not navigate — a
+  meaningless integration boundary.
   Verified by Roborazzi for stable states plus emulator flows (timeout,
   app-switch). Owns REQ-010–REQ-015, REQ-017, REQ-018, REQ-070, REQ-071
   observable behavior.
@@ -324,7 +349,7 @@ Every definition requirement maps to at least one leaf:
 | Requirement | Leaves |
 | --- | --- |
 | REQ-001–REQ-003 (add, folders, search) | LEAF101 (data), LEAF102 (UI) |
-| REQ-004–REQ-005 (progress, removal, missing states) | LEAF101, LEAF102; end-to-end re-proof in LEAF204 |
+| REQ-004–REQ-005 (progress, removal, missing states) | LEAF101, LEAF102 (store-level proof closes increment 001); end-to-end re-proof in LEAF204 |
 | REQ-009 (launch resume) | LEAF204 |
 | REQ-010 (paused context view) | LEAF203, persistence via LEAF204 |
 | REQ-011–REQ-013 (modulation, speed, ramp) | LEAF202 (engine), LEAF203 (observable) |
