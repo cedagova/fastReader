@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/1
 - Planning PR: https://github.com/cedagova/fastReader/pull/7
-- Status: Review
+- Status: Ready for implementation
 - Root classification: INCREMENTAL
 - Delivery topology: INCREMENTAL
 - Planner: Planning lead (Claude)
@@ -245,15 +245,15 @@ machine-local and uncommitted per repo policy.
 | INC002 | GROUP | ROOT | cedagova/fastReader | Core RSVP reading experience | COLLECTOR | INC001 | https://github.com/cedagova/fastReader/issues/4 |
 | INC003 | GROUP | ROOT | cedagova/fastReader | Cue customization and focused mode | COLLECTOR | INC002 | https://github.com/cedagova/fastReader/issues/5 |
 | INC004 | GROUP | ROOT | cedagova/fastReader | Shareable installable release | DIRECT | INC003 | https://github.com/cedagova/fastReader/issues/6 |
-| LEAF101 | LEAF | INC001 | cedagova/fastReader | Book catalog and EPUB ingestion | None | None | Pending |
-| LEAF102 | LEAF | INC001 | cedagova/fastReader | Library screen: list, search, states | None | LEAF101 | Pending |
-| LEAF201 | LEAF | INC002 | cedagova/fastReader | EPUB content pipeline and token stream model | None | None | Pending |
-| LEAF202 | LEAF | INC002 | cedagova/fastReader | RSVP timing engine | None | LEAF201 | Pending |
-| LEAF203 | LEAF | INC002 | cedagova/fastReader | Reader screen and playback | None | LEAF201, LEAF202 | Pending |
-| LEAF204 | LEAF | INC002 | cedagova/fastReader | Continuous persistence and launch resume | None | LEAF203 | Pending |
-| LEAF301 | LEAF | INC003 | cedagova/fastReader | Cue rendering and focused mode | None | None | Pending |
-| LEAF302 | LEAF | INC003 | cedagova/fastReader | Settings with live preview | None | LEAF301 | Pending |
-| LEAF401 | LEAF | INC004 | cedagova/fastReader | Signed versioned release pipeline | None | None | Pending |
+| LEAF101 | LEAF | INC001 | cedagova/fastReader | Book catalog and EPUB ingestion | None | None | https://github.com/cedagova/fastReader/issues/8 |
+| LEAF102 | LEAF | INC001 | cedagova/fastReader | Library screen: list, search, states | None | LEAF101 | https://github.com/cedagova/fastReader/issues/9 |
+| LEAF201 | LEAF | INC002 | cedagova/fastReader | EPUB content pipeline and token stream model | None | None | https://github.com/cedagova/fastReader/issues/10 |
+| LEAF202 | LEAF | INC002 | cedagova/fastReader | RSVP timing engine | None | LEAF201 | https://github.com/cedagova/fastReader/issues/11 |
+| LEAF203 | LEAF | INC002 | cedagova/fastReader | Reader screen and playback | None | LEAF201, LEAF202 | https://github.com/cedagova/fastReader/issues/12 |
+| LEAF204 | LEAF | INC002 | cedagova/fastReader | Continuous persistence and launch resume | None | LEAF203 | https://github.com/cedagova/fastReader/issues/13 |
+| LEAF301 | LEAF | INC003 | cedagova/fastReader | Cue rendering and focused mode | None | None | https://github.com/cedagova/fastReader/issues/14 |
+| LEAF302 | LEAF | INC003 | cedagova/fastReader | Settings with live preview | None | LEAF301 | https://github.com/cedagova/fastReader/issues/15 |
+| LEAF401 | LEAF | INC004 | cedagova/fastReader | Signed versioned release pipeline | None | None | https://github.com/cedagova/fastReader/issues/16 |
 
 ### Planned leaf contracts (summaries; full contracts go to the issues)
 
@@ -418,5 +418,13 @@ baseline; implementation work remains.
 
 ## Publication verification
 
-Pending — recorded after independent content review, issue publication,
-native graph reconciliation, and graph verification.
+- Content review: CHANGES_REQUESTED at `9826356` (3 blockers, 3
+  advisories), all addressed; content confirmed sound at `0352802`
+  (PR #7 reviews by `cedagova-codex-reviewer[bot]`, claim
+  `724412d7-df02-4dcf-b2f5-1ba2b575f4b9`).
+- Leaf issues published 2026-09-01: LEAF101 #8, LEAF102 #9, LEAF201 #10,
+  LEAF202 #11, LEAF203 #12, LEAF204 #13, LEAF301 #14, LEAF302 #15,
+  LEAF401 #16. Tracking metadata added to root #1; GROUP/sequence/delivery
+  metadata added to increments #3–#6 with definition bodies preserved.
+- `plan validate --phase publication-ready`, `plan reconcile-graph`, and
+  `plan verify-graph` results recorded below/PR #7 after this commit.
