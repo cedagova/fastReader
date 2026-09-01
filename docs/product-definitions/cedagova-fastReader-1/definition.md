@@ -3,7 +3,7 @@
 - Product definition issue: https://github.com/cedagova/fastReader/issues/1
 - Product definition PR: https://github.com/cedagova/fastReader/pull/2
 - Requirements brief: Pending
-- Status: Draft ready
+- Status: Reconciling
 - Classification: DECOMPOSE
 - Definition lead: cedagova
 - Started: 2026-09-01
@@ -402,10 +402,10 @@ Both use the system document picker; no broad storage permission.
 | Key | Kind | Parent | Title | Issue |
 | --- | --- | --- | --- | --- |
 | ROOT | ROOT | None | RSVP fast reader for EPUB books | https://github.com/cedagova/fastReader/issues/1 |
-| OUT001 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | Pending |
-| OUT002 | OUTCOME | ROOT | Core RSVP reading experience | Pending |
-| OUT003 | OUTCOME | ROOT | Cue customization and focused mode | Pending |
-| OUT004 | OUTCOME | ROOT | Shareable installable release | Pending |
+| OUT001 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | https://github.com/cedagova/fastReader/issues/3 |
+| OUT002 | OUTCOME | ROOT | Core RSVP reading experience | https://github.com/cedagova/fastReader/issues/4 |
+| OUT003 | OUTCOME | ROOT | Cue customization and focused mode | https://github.com/cedagova/fastReader/issues/5 |
+| OUT004 | OUTCOME | ROOT | Shareable installable release | https://github.com/cedagova/fastReader/issues/6 |
 
 Requirement ownership (every REQ-### is owned by at least one outcome;
 cross-cutting requirements are listed under every outcome whose surface

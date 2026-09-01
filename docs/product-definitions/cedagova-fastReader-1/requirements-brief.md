@@ -42,10 +42,10 @@ non-English UI.
 
 ## Product outcomes
 
-- OUT001 Library: pick, add-folder, search, progress
-- OUT002 Core RSVP reading experience
-- OUT003 Cue customization and focused mode
-- OUT004 Shareable installable release
+- OUT001 Library: pick, add-folder, search, progress — https://github.com/cedagova/fastReader/issues/3
+- OUT002 Core RSVP reading experience — https://github.com/cedagova/fastReader/issues/4
+- OUT003 Cue customization and focused mode — https://github.com/cedagova/fastReader/issues/5
+- OUT004 Shareable installable release — https://github.com/cedagova/fastReader/issues/6
 
 ## Important constraints and success measures
 
