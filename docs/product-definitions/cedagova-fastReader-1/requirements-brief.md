@@ -13,6 +13,8 @@ simple.
 - **Library:** pick individual EPUBs or add folders; books stay where they
   are on the device (nothing is copied); folders rescan on app open plus a
   manual refresh; live search over title/author/filename; per-book progress.
+- **Launch:** the app opens straight into the last-read book's paused
+  view when it can; otherwise the library, with the reason visible.
 - **Reading:** open a book → paused view showing the surrounding paragraph
   with the current word highlighted → play streams single words. Speed
   defaults to 250 WPM (range 100–1000, gentle hint above ~450 where
@@ -25,10 +27,11 @@ simple.
   letter (on by default, toggleable), optional guide marks, font size,
   themes. Bounded customization with live preview.
 - **Focused mode:** one gesture hides everything but the word stream.
-- **Persistence:** position, speed, and settings survive app kills and
-  restarts; progress and time-remaining are always available.
-- **Release:** versioned signed APKs on GitHub Releases, sideloadable by
-  friends; updates never lose data.
+- **Persistence & resilience:** position, speed, and settings survive app
+  kills and restarts; the screen stays awake while playing; leaving the
+  app (switch, call, lock) auto-pauses at the current word.
+- **Release:** a versioned installable release obtainable by link
+  (GitHub Releases per owner decision); in-place updates never lose data.
 
 ## Scope and non-goals
 
@@ -42,7 +45,7 @@ non-English UI.
 - OUT001 Library: pick, add-folder, search, progress
 - OUT002 Core RSVP reading experience
 - OUT003 Cue customization and focused mode
-- OUT004 Shareable signed release on GitHub Releases
+- OUT004 Shareable installable release
 
 ## Important constraints and success measures
 
@@ -54,7 +57,8 @@ non-English UI.
   trade dress.
 - Spanish and English books render and time correctly; basic accessibility
   bar (TalkBack-navigable library/controls/settings; the word stream itself
-  is visual-only and documented as such).
+  is visual-only and documented as such). The stream changes text only —
+  no luminance flashing or animation at any speed.
 
 ## Evidence, assumptions, and uncertainty
 

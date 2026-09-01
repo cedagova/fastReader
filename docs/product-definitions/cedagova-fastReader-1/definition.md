@@ -53,15 +53,16 @@ and read at a controlled high speed with minimal friction.
    two interactions (open app → tap play, book resumes where it left off).
 2. A new DRM-free EPUB on the device can be found, opened, and read without
    leaving the app.
-3. Reading speed is adjustable while reading; the presentation is smooth and
-   uninterrupted at the configured speed.
+3. Reading speed is adjustable while reading; the presentation is smooth
+   at the configured speed, apart from the deliberate pauses defined below.
 4. Visual aids and timing follow published research (pinned in
    [research-rsvp.md](research-rsvp.md)); every aid can be turned off or
    adjusted within a bounded set.
 5. The whole UI can recede: a focused mode showing nothing but the word
    stream (and whatever cues the reader left enabled).
-6. A versioned, signed APK on GitHub Releases installs on any compatible
-   Android device — shareable with friends by link.
+6. A versioned, installable release of the app exists that friends can
+   obtain by link and install on any compatible Android device
+   (distribution via GitHub Releases per owner decision).
 
 ## Product behavior and flows
 
@@ -70,6 +71,16 @@ and read at a controlled high speed with minimal friction.
 Empty state explains the two ways to add books: pick individual EPUB files,
 or add a folder whose EPUBs (including subfolders) appear in the library.
 Both use the system document picker; no broad storage permission.
+
+### App launch
+
+- When a last-read, currently readable book exists, the app launches
+  directly into its paused reader view — satisfying "open app → tap play".
+  One control returns to the library.
+- Otherwise the app launches into the library: on first launch / empty
+  library the guidance state; if the last-read book is missing or its
+  folder permission was lost, the library opens with that book's state
+  visible so the reader understands why reading did not resume.
 
 ### Library
 
@@ -80,8 +91,10 @@ Both use the system document picker; no broad storage permission.
 - List of books with title, author, and cover when the EPUB provides one; a
   placeholder cover otherwise.
 - Simple search filters by title, author, and filename as the reader types.
-- Each book shows reading progress (% read). Tapping a book opens the reader
-  at the saved position.
+- A book reachable both by direct pick and through an added folder appears
+  once in the library.
+- Each book shows reading progress (% read, measured over the book's text).
+  Tapping a book opens the reader at the saved position.
 
 ### Reading (core flow)
 
@@ -114,6 +127,15 @@ Both use the system document picker; no broad storage permission.
 - **Non-streamable content:** images and tables are skipped with a brief
   unobtrusive marker (e.g. "[image skipped]") in the stream; footnote
   markers are dropped (owner decision 2026-09-01).
+- **Front and back matter** (title page, copyright, dedication, etc.)
+  stream like any other chapter in book order; the chapter picker makes
+  skipping them a single action.
+- While the stream is playing, the screen stays awake — playback is
+  exempt from the device screen timeout.
+- Losing the foreground (app switch, incoming call, device lock)
+  auto-pauses at the current word; the stream never advances off-screen.
+  Returning shows the normal paused context view, and resuming applies the
+  usual re-orientation hold.
 - Position, speed, and settings persist continuously across pause, app
   switch, process death, and device restart.
 - Progress while reading: percent and estimated time remaining at the
@@ -129,12 +151,14 @@ Both use the system document picker; no broad storage permission.
 - Bounded customization set: pivot color (small palette), font size,
   light/dark/system theme, guide marks on/off, pause strength. Changes take
   effect immediately with a live preview. No free-form theme engine.
+- A word that would overflow the stream area at the chosen font size (long
+  word, large system font scale) shrinks to fit rather than truncating.
 
 ### Focused mode
 
-- One gesture hides all controls and chrome, leaving only the word stream
-  and enabled cues; one gesture brings controls back. Tap-to-pause still
-  works in focused mode.
+- One gesture hides all controls and chrome — including progress and the
+  speed hint — leaving only the word stream and enabled cues; one gesture
+  brings controls back. Tap-to-pause still works in focused mode.
 
 ### Completion
 
@@ -181,6 +205,12 @@ Both use the system document picker; no broad storage permission.
 
 ### Reading
 
+- **REQ-009** App launch resumes into the paused reader of the last-read
+  book when one is readable; otherwise it opens the library with the
+  reason visible (empty, missing, or permission-lost state).
+  *Accept:* with a book in progress, launch → its paused view in one step;
+  after revoking the folder permission, launch → library showing that book
+  as inaccessible.
 - **REQ-010** Opening a book shows a paused view: surrounding paragraph,
   current word highlighted.
   *Accept:* open any in-progress book → same sentence visible as when last
@@ -239,10 +269,23 @@ Both use the system document picker; no broad storage permission.
 
 ### Release
 
-- **REQ-040** Versioned, signed APK attached to a GitHub Release; installs
-  on minSdk 26+; in-place updates preserve library, positions, settings.
+- **REQ-040** A versioned, installable release obtainable by link installs
+  on Android 8.0+ (minSdk 26); installing a newer version in place
+  preserves library, positions, and settings. (Distribution channel —
+  signed APK on GitHub Releases — is recorded as an owner decision and
+  constraint, not a product requirement.)
   *Accept:* installing version N+1 over N keeps every book and position
   without uninstalling.
+
+### Playback resilience
+
+- **REQ-070** The screen stays awake while the stream is playing.
+  *Accept:* play for longer than the device screen timeout without
+  touching the screen → the stream is still visible and running.
+- **REQ-071** Foreground loss auto-pauses at the current word; the stream
+  never advances while not visible.
+  *Accept:* switch apps mid-stream → returning shows the paused context
+  view at the word that was on screen when the switch happened.
 
 ### Privacy
 
@@ -258,6 +301,13 @@ Both use the system document picker; no broad storage permission.
   started/paused; every control announces a sensible label.
 - **REQ-061** The RSVP word stream itself is visual-only by design; this
   limitation is stated plainly in-app (e.g. in settings/about), not hidden.
+- **REQ-062** Photosensitivity position: word transitions are
+  instantaneous text swaps on a static background — no luminance flashes,
+  fades, or motion animation in the stream at any speed. The display never
+  alternates bright/dark at flash-risk rates, keeping the stream outside
+  WCAG 2.3.1 flash territory even at 1000 WPM.
+  *Accept:* at maximum speed the background and overall luminance are
+  static; only glyphs change.
 
 ## Accessibility and content
 
@@ -269,6 +319,8 @@ Both use the system document picker; no broad storage permission.
 - Assistive-technology bar: basic navigable UI (REQ-060, REQ-061, owner decision
   2026-09-01) — library/controls/settings TalkBack-navigable; the word
   stream is documented as visual-only.
+- Photosensitivity: the stream changes text only — static background, no
+  luminance flashing or animation at any speed (REQ-062).
 
 ## Privacy, security, and policy
 
@@ -347,13 +399,18 @@ Both use the system document picker; no broad storage permission.
 
 ## Product issue graph
 
-| Key | Kind | Parent | Title | Issue |
-| --- | --- | --- | --- | --- |
-| ROOT | ROOT | None | RSVP fast reader for EPUB books | https://github.com/cedagova/fastReader/issues/1 |
-| OUT001 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | Pending |
-| OUT002 | OUTCOME | ROOT | Core RSVP reading experience | Pending |
-| OUT003 | OUTCOME | ROOT | Cue customization and focused mode | Pending |
-| OUT004 | OUTCOME | ROOT | Shareable signed release on GitHub Releases | Pending |
+| Key | Kind | Parent | Title | Requirements | Issue |
+| --- | --- | --- | --- | --- | --- |
+| ROOT | ROOT | None | RSVP fast reader for EPUB books | All (umbrella); cross-cutting REQ-050 | https://github.com/cedagova/fastReader/issues/1 |
+| OUT001 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | REQ-001–005; REQ-060 (library surface); REQ-050 | Pending |
+| OUT002 | OUTCOME | ROOT | Core RSVP reading experience | REQ-009–019, REQ-070, REQ-071, REQ-062; REQ-060 (reader controls surface); REQ-050 | Pending |
+| OUT003 | OUTCOME | ROOT | Cue customization and focused mode | REQ-020–023, REQ-030, REQ-061; REQ-060 (settings surface); REQ-050 | Pending |
+| OUT004 | OUTCOME | ROOT | Shareable installable release | REQ-040; REQ-050 | Pending |
+
+Cross-cutting requirements (REQ-050 privacy; REQ-060 accessibility) are
+listed under every outcome whose surface they constrain; each owning
+outcome carries the acceptance for its own surface. Every REQ-### above is
+owned by at least one outcome.
 
 ## Publication verification
 
