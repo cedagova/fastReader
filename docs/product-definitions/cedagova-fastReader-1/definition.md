@@ -3,7 +3,7 @@
 - Product definition issue: https://github.com/cedagova/fastReader/issues/1
 - Product definition PR: https://github.com/cedagova/fastReader/pull/2
 - Requirements brief: https://github.com/cedagova/fastReader/issues/1#issuecomment-5497469653
-- Status: Reconciling
+- Status: Ready for planning
 - Classification: DECOMPOSE
 - Definition lead: cedagova
 - Started: 2026-09-01
@@ -423,10 +423,12 @@ surface):
 
 ## Publication verification
 
-- Requirements Brief drafted on branch; publication to the root issue
-  happens after content review (`definition publish-brief`).
-- Product-outcome issues OUT001–OUT004 are `Pending` publication until the
-  contract passes review (DECOMPOSE gate 1).
-- Graph verification, exact-head owner approval, and exact-head reviewer
-  approval recorded here once complete.
-- Next action after readiness: `plan https://github.com/cedagova/fastReader/issues/1`.
+- Requirements Brief published:
+  https://github.com/cedagova/fastReader/issues/1#issuecomment-5497469653
+- Product-outcome issues published: OUT001 #3, OUT002 #4, OUT003 #5,
+  OUT004 #6; native sub-issue graph reconciled and verified
+  (`definition verify-graph`: 5 rows valid, 2026-09-01).
+- Gate-1 content review completed at 9ee6ae2 (5 action-required findings,
+  all addressed on this branch); final exact-head review and exact-head
+  owner approval recorded on the PR against the final head.
+- Next action: `plan https://github.com/cedagova/fastReader/issues/1`.
