@@ -79,17 +79,21 @@ class LibraryRepository(
      * when a scan just finished, so returning from the document picker does not
      * immediately trigger a second full scan.
      */
-    suspend fun rescan(trigger: ScanTrigger) {
-        if (trigger == ScanTrigger.APP_OPEN &&
-            lastScanAtEpochMs != 0L &&
-            clock() - lastScanAtEpochMs < minimumRescanIntervalMs
-        ) {
-            return
-        }
-        mutate(trigger) { catalog, progress -> ingestor.rescan(catalog, progress) }
-    }
+    suspend fun rescan(trigger: ScanTrigger) = mutate(
+        trigger = trigger,
+        // Read under the same lock that owns every other mutation.
+        skip = {
+            trigger == ScanTrigger.APP_OPEN &&
+                lastScanAtEpochMs != 0L &&
+                clock() - lastScanAtEpochMs < minimumRescanIntervalMs
+        },
+    ) { catalog, progress -> ingestor.rescan(catalog, progress) }
 
-    /** Removes a catalog entry. The file stays on the device and the position is kept (REQ-004). */
+    /**
+     * Removes a catalog entry. The file stays on the device and the position is
+     * kept (REQ-004). The removal survives folder rescans; picking the file
+     * again, or re-adding its folder, brings the book back.
+     */
     suspend fun removeBook(bookId: String) = mutateCatalog { ingestor.removeBook(it, bookId) }
 
     /** Removes an added folder and the entries only it provided. Files are never touched. */
@@ -131,9 +135,11 @@ class LibraryRepository(
 
     private suspend fun mutate(
         trigger: ScanTrigger,
+        skip: () -> Boolean = { false },
         block: (Catalog, ScanProgress) -> IngestOutcome,
     ) = mutex.withLock {
         if (!ensureLoaded()) return@withLock
+        if (skip()) return@withLock
         _ingestion.value = IngestionState.Scanning(trigger)
         val progress = ScanProgress { processed, total, name ->
             _ingestion.value = IngestionState.Scanning(trigger, processed, total, name)

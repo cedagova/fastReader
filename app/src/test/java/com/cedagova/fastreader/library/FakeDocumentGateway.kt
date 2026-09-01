@@ -19,7 +19,10 @@ class FakeDocumentGateway : DocumentGateway {
         var displayName: String,
         var lastModifiedEpochMs: Long = 1_000,
     ) {
-        val sizeBytes: Long get() = bytes.size.toLong()
+        /** Set to -1 to model a provider that reports no size column. */
+        var sizeOverride: Long? = null
+
+        val sizeBytes: Long get() = sizeOverride ?: bytes.size.toLong()
     }
 
     /** uri -> document. Removing an entry is the file disappearing. */

@@ -278,6 +278,84 @@ class CatalogIngestorTest {
         assertTrue(rescanned.books.single().id != originalId)
     }
 
+    // Removal must stick for a book that lives inside an added folder, or the
+    // next app-open rescan silently puts it back.
+    @Test
+    fun `removing a folder-sourced book survives the next rescan`() {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        gateway.putIntoFolder("tree://books", "tree://books/two.epub", EpubFixtures.spanishEpub(), "two.epub")
+        val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
+        val removedId = added.books.first { it.title == "The Quiet Machine" }.id
+        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(wordIndex = 250)))
+
+        val afterRemove = ingestor.removeBook(seeded, removedId)
+        assertEquals(1, afterRemove.books.size)
+
+        val afterRescan = ingestor.rescan(afterRemove).catalog
+
+        assertEquals("the removed book must not come back", 1, afterRescan.books.size)
+        assertEquals("¿Quién teme a la máquina?", afterRescan.books.single().title)
+        assertTrue("the file is never deleted", gateway.documents.containsKey("tree://books/one.epub"))
+        assertEquals(250, afterRescan.readingStates.getValue(removedId).wordIndex)
+    }
+
+    @Test
+    fun `re-adding the folder brings a removed book back with its position`() {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
+        val removedId = added.books.single().id
+        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(wordIndex = 250)))
+        val afterRemove = ingestor.removeBook(seeded, removedId)
+
+        val afterReAdd = ingestor.addFolder(afterRemove, "tree://books", "Books").catalog
+
+        assertEquals(removedId, afterReAdd.books.single().id)
+        assertTrue(afterReAdd.removedBookIds.isEmpty())
+        assertEquals(250, afterReAdd.readingStates.getValue(removedId).wordIndex)
+    }
+
+    @Test
+    fun `picking a removed book directly brings it back`() {
+        val bytes = EpubFixtures.validEpub()
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", bytes, "one.epub")
+        gateway.putDocument("doc://one", bytes, "one.epub")
+        val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
+        val removedId = added.books.single().id
+        val afterRemove = ingestor.removeBook(added, removedId)
+
+        val afterPick = ingestor.addPickedBooks(afterRemove, listOf("doc://one")).catalog
+
+        assertEquals(removedId, afterPick.books.single().id)
+        assertTrue(afterPick.removedBookIds.isEmpty())
+    }
+
+    @Test
+    fun `a file a provider describes with neither size nor timestamp is always re-inspected`() {
+        gateway.putIntoFolder(
+            "tree://books",
+            "tree://books/one.epub",
+            EpubFixtures.validEpub(),
+            "one.epub",
+            lastModifiedEpochMs = 0,
+        )
+        gateway.documents.getValue("tree://books/one.epub").sizeOverride = -1
+        var inspections = 0
+        val counting = CatalogIngestor(
+            gateway = gateway,
+            covers = covers,
+            inspect = { source ->
+                inspections++
+                com.cedagova.fastreader.epub.EpubInspector.inspect(source)
+            },
+            clock = { now },
+        )
+        val added = counting.addFolder(Catalog(), "tree://books", "Books").catalog
+
+        counting.rescan(added)
+
+        assertEquals("no fingerprint signal means no safe skip", 2, inspections)
+    }
+
     @Test
     fun `removing a folder drops only the entries it provided and never the files`() {
         val shared = EpubFixtures.validEpub()

@@ -159,6 +159,29 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    fun `a removed folder book stays removed across an app-open rescan and a restart`() = runTest {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val repository = repository(FileCatalogStore(file), backgroundScope)
+        repository.addFolder("tree://books", "Books")
+        val bookId = repository.catalog.value.books.single().id
+        repository.updateReadingState(bookId, ReadingState(wordIndex = 250))
+
+        repository.removeBook(bookId)
+        now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
+        repository.rescan(ScanTrigger.APP_OPEN)
+
+        assertTrue("the app-open rescan must not resurrect a removed book", repository.catalog.value.books.isEmpty())
+
+        val restarted = repository(FileCatalogStore(file), backgroundScope)
+        now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
+        restarted.rescan(ScanTrigger.APP_OPEN)
+
+        assertTrue("the removal must survive a restart", restarted.catalog.value.books.isEmpty())
+        assertEquals(250, restarted.readingState(bookId)?.wordIndex)
+    }
+
+    @Test
     fun `a book can be opened for reading in place`() = runTest {
         val bytes = EpubFixtures.validEpub()
         gateway.putDocument("doc://a", bytes, "quiet.epub")

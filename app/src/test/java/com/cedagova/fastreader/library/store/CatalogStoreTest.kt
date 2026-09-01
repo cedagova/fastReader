@@ -53,6 +53,7 @@ class CatalogStoreTest {
         ),
         folders = listOf(BookFolder(id = "content://tree/books", treeUri = "content://tree/books", displayName = "Books")),
         readingStates = mapOf("sha256:abc" to ReadingState(spineIndex = 3, wordIndex = 77, progressFraction = 0.5f)),
+        removedBookIds = setOf("sha256:removed"),
     )
 
     @Test

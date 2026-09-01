@@ -180,6 +180,14 @@ object EpubFixtures {
 
     private fun String.escapeXml(): String = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
+    /**
+     * Fixed entry timestamp. Without it `ZipEntry` stamps the current time, two
+     * fixtures built from the same content differ in their bytes, and anything
+     * that turns on content identity — dedup above all — becomes a coin flip
+     * decided by whether the two calls landed in the same two-second window.
+     */
+    private const val FIXED_ENTRY_TIME_MS = 1_600_000_000_000L
+
     private fun zip(entries: List<Pair<String, ByteArray>>): ByteArray {
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
@@ -189,13 +197,14 @@ object EpubFixtures {
                 size = mimetype.size.toLong()
                 compressedSize = mimetype.size.toLong()
                 crc = CRC32().apply { update(mimetype) }.value
+                time = FIXED_ENTRY_TIME_MS
             }
             zip.putNextEntry(stored)
             zip.write(mimetype)
             zip.closeEntry()
 
             entries.forEach { (name, bytes) ->
-                zip.putNextEntry(ZipEntry(name))
+                zip.putNextEntry(ZipEntry(name).apply { time = FIXED_ENTRY_TIME_MS })
                 zip.write(bytes)
                 zip.closeEntry()
             }

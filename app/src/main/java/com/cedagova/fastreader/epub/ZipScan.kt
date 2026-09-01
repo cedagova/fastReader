@@ -54,34 +54,37 @@ internal object ZipReader {
             val digest = if (computeDigest) MessageDigest.getInstance("SHA-256") else null
             val hashing: InputStream = if (digest != null) DigestInputStream(rawStream, digest) else rawStream
             try {
-                val zip = ZipInputStream(NonClosingInputStream(hashing))
-                while (true) {
-                    val entry = try {
-                        zip.nextEntry ?: break
-                    } catch (error: Exception) {
-                        zipFailure = error.readableMessage()
-                        break
-                    }
-                    if (names.size >= MAX_ENTRIES) {
-                        zipFailure = "archive has more than $MAX_ENTRIES entries"
-                        break
-                    }
-                    val name = entry.name
-                    names += name
-                    if (!entry.isDirectory && collect(name)) {
-                        val bytes = try {
-                            zip.readCapped(maxEntryBytes)
+                // NonClosingInputStream keeps this from closing the digest stream
+                // before the rest of the file has been hashed.
+                ZipInputStream(NonClosingInputStream(hashing)).use { zip ->
+                    while (true) {
+                        val entry = try {
+                            zip.nextEntry ?: break
                         } catch (error: Exception) {
                             zipFailure = error.readableMessage()
                             break
                         }
-                        if (bytes != null) collected[name] = bytes
-                    }
-                    try {
-                        zip.closeEntry()
-                    } catch (error: Exception) {
-                        zipFailure = error.readableMessage()
-                        break
+                        if (names.size >= MAX_ENTRIES) {
+                            zipFailure = "archive has more than $MAX_ENTRIES entries"
+                            break
+                        }
+                        val name = entry.name
+                        names += name
+                        if (!entry.isDirectory && collect(name)) {
+                            val bytes = try {
+                                zip.readCapped(maxEntryBytes)
+                            } catch (error: Exception) {
+                                zipFailure = error.readableMessage()
+                                break
+                            }
+                            if (bytes != null) collected[name] = bytes
+                        }
+                        try {
+                            zip.closeEntry()
+                        } catch (error: Exception) {
+                            zipFailure = error.readableMessage()
+                            break
+                        }
                     }
                 }
             } catch (error: Exception) {

@@ -49,7 +49,13 @@ class CatalogIngestor(
             gateway.persistReadPermission(uri, isTree = false)
             progress.onProgress(index, uris.size, null)
             when (val lookup = gateway.lookup(uri)) {
-                is DocumentLookup.Found -> working.ingest(lookup.ref, SourceOrigin.DIRECT_PICK, folderId = null)
+                is DocumentLookup.Found -> working.ingest(
+                    ref = lookup.ref,
+                    origin = SourceOrigin.DIRECT_PICK,
+                    folderId = null,
+                    // Picking a file is an explicit request for it, so it undoes an earlier removal.
+                    honorRemovals = false,
+                )
                 DocumentLookup.Missing, DocumentLookup.PermissionLost -> working.unavailable++
             }
         }
@@ -85,7 +91,13 @@ class CatalogIngestor(
         if (listing is FolderListing.Listed) {
             listing.documents.forEachIndexed { index, ref ->
                 progress.onProgress(index, listing.documents.size, ref.displayName)
-                working.ingest(ref, SourceOrigin.FOLDER, folderId = treeUri)
+                working.ingest(
+                    ref = ref,
+                    origin = SourceOrigin.FOLDER,
+                    folderId = treeUri,
+                    // Adding the folder asks for its contents, so it undoes earlier removals.
+                    honorRemovals = false,
+                )
             }
             progress.onProgress(listing.documents.size, listing.documents.size, null)
         }
@@ -149,19 +161,27 @@ class CatalogIngestor(
 
         work.forEachIndexed { index, item ->
             progress.onProgress(index, work.size, item.ref.displayName)
-            working.ingest(item.ref, item.origin, item.folderId)
+            working.ingest(item.ref, item.origin, item.folderId, honorRemovals = true)
         }
         progress.onProgress(work.size, work.size, null)
         return working.finish()
     }
 
-    /** Removes a catalog entry. The file is never touched and the position is kept (REQ-004). */
+    /**
+     * Removes a catalog entry. The file is never touched and the position is kept
+     * (REQ-004). The removal is recorded so that a book living inside an added
+     * folder does not reappear on the next rescan; picking the file again, or
+     * re-adding its folder, brings it back.
+     */
     fun removeBook(catalog: Catalog, bookId: String): Catalog {
         val book = catalog.book(bookId) ?: return catalog
         book.sources
             .filter { it.origin == SourceOrigin.DIRECT_PICK }
             .forEach { gateway.releaseReadPermission(it.uri, isTree = false) }
-        return catalog.copy(books = catalog.books.filterNot { it.id == bookId })
+        return catalog.copy(
+            books = catalog.books.filterNot { it.id == bookId },
+            removedBookIds = catalog.removedBookIds + bookId,
+        )
     }
 
     /** Removes an added folder and the entries only it provided. Files are never touched. */
@@ -185,13 +205,19 @@ class CatalogIngestor(
             original.books.forEach { book -> book.sources.forEach { put(it.uri, book.id) } }
         }
 
+        private val removedBookIds = original.removedBookIds.toMutableSet()
+
         var added = 0
         var updated = 0
         var rejected = 0
         var unavailable = 0
 
         fun finish(): IngestOutcome = IngestOutcome(
-            catalog = original.copy(books = books.values.toList(), folders = folders.values.toList()),
+            catalog = original.copy(
+                books = books.values.toList(),
+                folders = folders.values.toList(),
+                removedBookIds = removedBookIds.toSet(),
+            ),
             added = added,
             updated = updated,
             rejected = rejected,
@@ -217,7 +243,12 @@ class CatalogIngestor(
             }
         }
 
-        fun ingest(ref: DocumentRef, origin: SourceOrigin, folderId: String?) {
+        /**
+         * @param honorRemovals true while rescanning, where a book the reader
+         * removed must stay out; false when the reader explicitly asked for this
+         * file or its folder, which undoes the removal.
+         */
+        fun ingest(ref: DocumentRef, origin: SourceOrigin, folderId: String?, honorRemovals: Boolean) {
             val holderId = bookIdByUri[ref.uri]
             val holder = holderId?.let { id -> books[id]?.let { id to it } }
             val knownSource = holder?.second?.sources?.firstOrNull { it.uri == ref.uri }
@@ -258,12 +289,14 @@ class CatalogIngestor(
                 return
             }
 
+            if (honorRemovals && digest in removedBookIds) return
+            removedBookIds.remove(digest)
+
             // The file at this URI may have been replaced by different content.
             if (holder != null && holder.first != digest) {
                 val stripped = holder.second.copy(sources = holder.second.sources.filterNot { it.uri == ref.uri })
                 if (stripped.sources.isEmpty()) {
                     books.remove(holder.first)
-                    stripped.sources.forEach { bookIdByUri.remove(it.uri) }
                 } else {
                     books[holder.first] = stripped
                 }

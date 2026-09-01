@@ -21,6 +21,13 @@ data class Catalog(
      * re-add (REQ-004) and a missing book keeps it while gone (REQ-005).
      */
     val readingStates: Map<String, ReadingState> = emptyMap(),
+    /**
+     * Books the reader removed from the library. A removed book that still sits
+     * inside an added folder would otherwise come straight back on the next
+     * rescan; keeping the decision here makes removal stick until the reader
+     * picks the file again or re-adds its folder.
+     */
+    val removedBookIds: Set<String> = emptySet(),
 ) {
     fun book(id: String): Book? = books.firstOrNull { it.id == id }
 
@@ -93,9 +100,16 @@ data class BookSource(
     val lastModifiedEpochMs: Long = 0,
     val availability: SourceAvailability = SourceAvailability.AVAILABLE,
 ) {
-    /** True when the file looks untouched since it was last inspected. */
-    fun matchesFingerprint(sizeBytes: Long, lastModifiedEpochMs: Long): Boolean =
-        this.sizeBytes == sizeBytes && this.lastModifiedEpochMs == lastModifiedEpochMs
+    /**
+     * True when the file looks untouched since it was last inspected, which is
+     * what lets a rescan skip re-parsing it. A provider that reports neither a
+     * size nor a modification time gives nothing to compare, so such a file is
+     * always re-inspected rather than assumed unchanged.
+     */
+    fun matchesFingerprint(sizeBytes: Long, lastModifiedEpochMs: Long): Boolean {
+        val hasSignal = sizeBytes > 0 || lastModifiedEpochMs > 0
+        return hasSignal && this.sizeBytes == sizeBytes && this.lastModifiedEpochMs == lastModifiedEpochMs
+    }
 }
 
 enum class SourceOrigin { DIRECT_PICK, FOLDER }

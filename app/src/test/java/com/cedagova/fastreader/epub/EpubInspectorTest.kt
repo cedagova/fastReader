@@ -127,6 +127,8 @@ class EpubInspectorTest {
 
     @Test
     fun `identity depends on content, not on the source`() {
+        // The fixtures must be byte-deterministic or this assertion proves nothing.
+        assertTrue(EpubFixtures.validEpub().contentEquals(EpubFixtures.validEpub()))
         val first = inspect(EpubFixtures.validEpub()).contentDigest
         val same = inspect(EpubFixtures.validEpub()).contentDigest
         val other = inspect(EpubFixtures.spanishEpub()).contentDigest
