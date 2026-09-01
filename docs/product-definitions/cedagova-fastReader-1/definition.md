@@ -3,7 +3,7 @@
 - Product definition issue: https://github.com/cedagova/fastReader/issues/1
 - Product definition PR: https://github.com/cedagova/fastReader/pull/2
 - Requirements brief: Pending
-- Status: Needs input
+- Status: Draft ready
 - Classification: DECOMPOSE
 - Definition lead: cedagova
 - Started: 2026-09-01
@@ -251,8 +251,13 @@ Both use the system document picker; no broad storage permission.
 
 ### Accessibility
 
-- PRODUCT-TODO: accessibility bar pending owner decision (TalkBack scope
-  for library/controls; RSVP streaming is inherently visual).
+- **R-A11Y-1** Library, reader controls, and settings are screen-reader
+  (TalkBack) navigable with meaningful labels; touch targets meet Android
+  minimum sizes; UI text respects the system font scale.
+  *Accept:* with TalkBack on, a book can be found, opened, and playback
+  started/paused; every control announces a sensible label.
+- **R-A11Y-2** The RSVP word stream itself is visual-only by design; this
+  limitation is stated plainly in-app (e.g. in settings/about), not hidden.
 
 ## Accessibility and content
 
@@ -261,8 +266,9 @@ Both use the system document picker; no broad storage permission.
 - Font size and themes adjustable within the bounded customization set.
 - In-product copy never promises comprehension at high speeds; the speed
   hint reflects the pinned research honestly.
-- PRODUCT-TODO: assistive-technology bar (see Requirements) pending owner
-  decision.
+- Assistive-technology bar: basic navigable UI (R-A11Y-1/2, owner decision
+  2026-09-01) — library/controls/settings TalkBack-navigable; the word
+  stream is documented as visual-only.
 
 ## Privacy, security, and policy
 
@@ -329,10 +335,15 @@ Both use the system document picker; no broad storage permission.
 | 2026-09-01 | Adopt evidence-backed timing package: 250 WPM default, 100–1000 range, hint above ~450, ramp-up on, research pause multipliers. | Matches published comprehension thresholds and mature-app convention. | R-READ-2/3/4 |
 | 2026-09-01 | Single-word RSVP only in v1; chunking is a non-goal (phrase-boundary only if ever added). | Blind chunks hurt comprehension; phrase detection is significant added scope. | Non-goals |
 | 2026-09-01 | Library reads files in place; folders rescan on app open + manual refresh; removal never deletes files. | No duplicate storage; new books appear automatically. | R-LIB-2/4/5 |
+| 2026-09-01 | Accessibility: basic bar — TalkBack-navigable library/controls/settings, minimum touch targets, system font scale; word stream documented visual-only. | Proportionate for a sideloaded shareable app; friends with assistive tech can still operate the app. | R-A11Y-1/2, R-REL-1 |
 
 ## Remaining uncertainty
 
-- Accessibility bar for the shareable release (owner question pending).
+- Exact visual design of guide marks (must differ from the patented Spritz
+  redicle) — a design-time choice inside R-CUE-2, not a product decision.
+- Exact gesture assignments (hide chrome, sentence rewind) — interaction
+  design within R-CTL-1/R-READ-5; any single-gesture mapping satisfies the
+  contract.
 
 ## Product issue graph
 
