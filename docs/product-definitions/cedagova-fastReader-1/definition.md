@@ -2,7 +2,7 @@
 
 - Product definition issue: https://github.com/cedagova/fastReader/issues/1
 - Product definition PR: https://github.com/cedagova/fastReader/pull/2
-- Requirements brief: Pending
+- Requirements brief: https://github.com/cedagova/fastReader/issues/1#issuecomment-5497469653
 - Status: Reconciling
 - Classification: DECOMPOSE
 - Definition lead: cedagova
