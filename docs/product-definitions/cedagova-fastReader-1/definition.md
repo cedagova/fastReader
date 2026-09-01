@@ -162,101 +162,101 @@ Both use the system document picker; no broad storage permission.
 
 ### Library
 
-- **R-LIB-1** Add individual EPUBs via the system picker.
+- **REQ-001** Add individual EPUBs via the system picker.
   *Accept:* pick three EPUBs → all three appear with title/author, cover or
   placeholder.
-- **R-LIB-2** Add a folder; its EPUBs (recursive) appear; rescan on app
+- **REQ-002** Add a folder; its EPUBs (recursive) appear; rescan on app
   open and on manual refresh.
   *Accept:* copy a new EPUB into an added folder, reopen the app → it
   appears without further action.
-- **R-LIB-3** Live search over title, author, filename.
+- **REQ-003** Live search over title, author, filename.
   *Accept:* typing a partial author name filters the list as typed.
-- **R-LIB-4** Per-book progress; removal never deletes the file.
+- **REQ-004** Per-book progress; removal never deletes the file.
   *Accept:* remove a book → file still present on device; re-adding
   restores its position.
-- **R-LIB-5** Corrupt, DRM, missing, and permission-lost books each show a
+- **REQ-005** Corrupt, DRM, missing, and permission-lost books each show a
   distinct plain-language state; missing books keep their position.
   *Accept:* rename a book's folder → entry shows "missing", position
   retained after restoring the folder.
 
 ### Reading
 
-- **R-READ-1** Opening a book shows a paused view: surrounding paragraph,
+- **REQ-010** Opening a book shows a paused view: surrounding paragraph,
   current word highlighted.
   *Accept:* open any in-progress book → same sentence visible as when last
   paused.
-- **R-READ-2** Play streams single words at the configured speed with the
+- **REQ-011** Play streams single words at the configured speed with the
   research-default modulation; pause strength setting scales extra pauses.
   *Accept:* at 250 WPM a sentence end visibly holds ~3× a normal word;
   setting pause strength "off" makes all words uniform.
-- **R-READ-3** Speed adjustable during playback; default 250, range
+- **REQ-012** Speed adjustable during playback; default 250, range
   100–1000; non-blocking hint above ~450.
   *Accept:* raising speed mid-play changes pacing without a stop; at 500
   WPM the hint is visible and playback continues.
-- **R-READ-4** Ramp-up on by default; re-orientation hold after any
+- **REQ-013** Ramp-up on by default; re-orientation hold after any
   resume, rewind, or jump.
   *Accept:* pressing play starts noticeably slower and reaches target
   within ~30 s.
-- **R-READ-5** Tap pauses with context; while paused: back/forward by
+- **REQ-014** Tap pauses with context; while paused: back/forward by
   sentence and paragraph, chapter picker, progress scrub.
   *Accept:* tap during play → paragraph context with current word
   highlighted; "back one sentence" then play resumes from that sentence.
-- **R-READ-6** Chapter auto-pause with title; image/table skip markers;
+- **REQ-015** Chapter auto-pause with title; image/table skip markers;
   footnote markers dropped.
   *Accept:* reading across a chapter end pauses on a chapter-title screen;
   a book with an inline image streams "[image skipped]" briefly.
-- **R-READ-7** Position, speed, and settings persist continuously.
+- **REQ-016** Position, speed, and settings persist continuously.
   *Accept:* force-stop the app mid-sentence → reopening resumes at the
   same position with the same speed.
-- **R-READ-8** Progress percent and time remaining at current speed while
+- **REQ-017** Progress percent and time remaining at current speed while
   reading.
   *Accept:* doubling the speed roughly halves the displayed time
   remaining.
-- **R-READ-9** Explicit end-of-book state; library shows 100%.
-- **R-READ-10** Spanish and English text renders and times correctly:
+- **REQ-018** Explicit end-of-book state; library shows 100%.
+- **REQ-019** Spanish and English text renders and times correctly:
   accents, ¿¡, dialogue dashes treated as clause punctuation.
   *Accept:* a Spanish novel streams with no mojibake; ¿…? sentences get
   sentence-end pauses.
 
 ### Cues and customization
 
-- **R-CUE-1** Pivot-aligned word with colored pivot letter, on by default,
+- **REQ-020** Pivot-aligned word with colored pivot letter, on by default,
   toggleable; pivot color from a small palette.
   *Accept:* disabling the cue shows plain centered words; color change
   applies immediately.
-- **R-CUE-2** Optional guide marks, visually distinct from Spritz's
+- **REQ-021** Optional guide marks, visually distinct from Spritz's
   patented redicle.
-- **R-CUE-3** Font size and light/dark/system theme.
-- **R-CUE-4** All cue/timing settings show a live preview and a
+- **REQ-022** Font size and light/dark/system theme.
+- **REQ-023** All cue/timing settings show a live preview and a
   reset-to-defaults.
 
 ### Controls and focused mode
 
-- **R-CTL-1** One gesture hides all chrome (focused mode); one gesture
+- **REQ-030** One gesture hides all chrome (focused mode); one gesture
   restores it; tap-to-pause still works.
   *Accept:* in focused mode nothing but the word (and enabled cues) is on
   screen; a tap pauses with context.
 
 ### Release
 
-- **R-REL-1** Versioned, signed APK attached to a GitHub Release; installs
+- **REQ-040** Versioned, signed APK attached to a GitHub Release; installs
   on minSdk 26+; in-place updates preserve library, positions, settings.
   *Accept:* installing version N+1 over N keeps every book and position
   without uninstalling.
 
 ### Privacy
 
-- **R-PRIV-1** Everything on device; no telemetry, no network transmission
+- **REQ-050** Everything on device; no telemetry, no network transmission
   of reading data; file access only via user-granted picks.
 
 ### Accessibility
 
-- **R-A11Y-1** Library, reader controls, and settings are screen-reader
+- **REQ-060** Library, reader controls, and settings are screen-reader
   (TalkBack) navigable with meaningful labels; touch targets meet Android
   minimum sizes; UI text respects the system font scale.
   *Accept:* with TalkBack on, a book can be found, opened, and playback
   started/paused; every control announces a sensible label.
-- **R-A11Y-2** The RSVP word stream itself is visual-only by design; this
+- **REQ-061** The RSVP word stream itself is visual-only by design; this
   limitation is stated plainly in-app (e.g. in settings/about), not hidden.
 
 ## Accessibility and content
@@ -266,7 +266,7 @@ Both use the system document picker; no broad storage permission.
 - Font size and themes adjustable within the bounded customization set.
 - In-product copy never promises comprehension at high speeds; the speed
   hint reflects the pinned research honestly.
-- Assistive-technology bar: basic navigable UI (R-A11Y-1/2, owner decision
+- Assistive-technology bar: basic navigable UI (REQ-060, REQ-061, owner decision
   2026-09-01) — library/controls/settings TalkBack-navigable; the word
   stream is documented as visual-only.
 
@@ -329,20 +329,20 @@ Both use the system document picker; no broad storage permission.
 
 | Date | Decision | Rationale | Affects |
 | --- | --- | --- | --- |
-| 2026-09-01 | Distribution: shareable signed APK via GitHub Releases; Play Store out of scope. | Friends can sideload by link without store ceremony. | Constraints, R-REL-1 |
-| 2026-09-01 | Languages: Spanish + English books handled correctly; app UI English-only. | Owner's library is Spanish/English. | R-READ-10, content |
-| 2026-09-01 | Chapter boundaries auto-pause showing chapter title; images/tables skipped with a marker; footnote markers dropped. | Keeps speed focus while never hiding that content existed. | R-READ-6 |
-| 2026-09-01 | Adopt evidence-backed timing package: 250 WPM default, 100–1000 range, hint above ~450, ramp-up on, research pause multipliers. | Matches published comprehension thresholds and mature-app convention. | R-READ-2/3/4 |
+| 2026-09-01 | Distribution: shareable signed APK via GitHub Releases; Play Store out of scope. | Friends can sideload by link without store ceremony. | Constraints, REQ-040 |
+| 2026-09-01 | Languages: Spanish + English books handled correctly; app UI English-only. | Owner's library is Spanish/English. | REQ-019, content |
+| 2026-09-01 | Chapter boundaries auto-pause showing chapter title; images/tables skipped with a marker; footnote markers dropped. | Keeps speed focus while never hiding that content existed. | REQ-015 |
+| 2026-09-01 | Adopt evidence-backed timing package: 250 WPM default, 100–1000 range, hint above ~450, ramp-up on, research pause multipliers. | Matches published comprehension thresholds and mature-app convention. | REQ-011, REQ-012, REQ-013 |
 | 2026-09-01 | Single-word RSVP only in v1; chunking is a non-goal (phrase-boundary only if ever added). | Blind chunks hurt comprehension; phrase detection is significant added scope. | Non-goals |
-| 2026-09-01 | Library reads files in place; folders rescan on app open + manual refresh; removal never deletes files. | No duplicate storage; new books appear automatically. | R-LIB-2/4/5 |
-| 2026-09-01 | Accessibility: basic bar — TalkBack-navigable library/controls/settings, minimum touch targets, system font scale; word stream documented visual-only. | Proportionate for a sideloaded shareable app; friends with assistive tech can still operate the app. | R-A11Y-1/2, R-REL-1 |
+| 2026-09-01 | Library reads files in place; folders rescan on app open + manual refresh; removal never deletes files. | No duplicate storage; new books appear automatically. | REQ-002, REQ-004, REQ-005 |
+| 2026-09-01 | Accessibility: basic bar — TalkBack-navigable library/controls/settings, minimum touch targets, system font scale; word stream documented visual-only. | Proportionate for a sideloaded shareable app; friends with assistive tech can still operate the app. | REQ-060, REQ-061, REQ-040 |
 
 ## Remaining uncertainty
 
 - Exact visual design of guide marks (must differ from the patented Spritz
-  redicle) — a design-time choice inside R-CUE-2, not a product decision.
+  redicle) — a design-time choice inside REQ-021, not a product decision.
 - Exact gesture assignments (hide chrome, sentence rewind) — interaction
-  design within R-CTL-1/R-READ-5; any single-gesture mapping satisfies the
+  design within REQ-030/REQ-014; any single-gesture mapping satisfies the
   contract.
 
 ## Product issue graph
@@ -350,11 +350,17 @@ Both use the system document picker; no broad storage permission.
 | Key | Kind | Parent | Title | Issue |
 | --- | --- | --- | --- | --- |
 | ROOT | ROOT | None | RSVP fast reader for EPUB books | https://github.com/cedagova/fastReader/issues/1 |
-| O1 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | Pending |
-| O2 | OUTCOME | ROOT | Core RSVP reading experience | Pending |
-| O3 | OUTCOME | ROOT | Cue customization and focused mode | Pending |
-| O4 | OUTCOME | ROOT | Shareable signed release on GitHub Releases | Pending |
+| OUT001 | OUTCOME | ROOT | Library: pick, add-folder, search, progress | Pending |
+| OUT002 | OUTCOME | ROOT | Core RSVP reading experience | Pending |
+| OUT003 | OUTCOME | ROOT | Cue customization and focused mode | Pending |
+| OUT004 | OUTCOME | ROOT | Shareable signed release on GitHub Releases | Pending |
 
 ## Publication verification
 
-PRODUCT-TODO: Record brief publication, graph verification, exact-head review, and next action.
+- Requirements Brief drafted on branch; publication to the root issue
+  happens after content review (`definition publish-brief`).
+- Product-outcome issues OUT001–OUT004 are `Pending` publication until the
+  contract passes review (DECOMPOSE gate 1).
+- Graph verification, exact-head owner approval, and exact-head reviewer
+  approval recorded here once complete.
+- Next action after readiness: `plan https://github.com/cedagova/fastReader/issues/1`.
