@@ -17,31 +17,41 @@ import org.w3c.dom.Node
  */
 internal object SafeXml {
 
-    fun parse(bytes: ByteArray): Document? {
+    fun parse(bytes: ByteArray): Document? = try {
         val factory = DocumentBuilderFactory.newInstance()
         factory.isNamespaceAware = true
         factory.setFeatureQuietly(XMLConstants.FEATURE_SECURE_PROCESSING, true)
         factory.setFeatureQuietly("http://xml.org/sax/features/external-general-entities", false)
         factory.setFeatureQuietly("http://xml.org/sax/features/external-parameter-entities", false)
         factory.setFeatureQuietly("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-        factory.isExpandEntityReferences = false
-        factory.isXIncludeAware = false
-        return try {
+        factory.setQuietly { isExpandEntityReferences = false }
+        // Android's parser refuses this one outright; external entities are already blocked above.
+        factory.setQuietly { isXIncludeAware = false }
+        run {
             val builder = factory.newDocumentBuilder()
             // Never resolve anything external, whatever the document asks for.
             builder.setEntityResolver { _, _ -> org.xml.sax.InputSource(ByteArrayInputStream(ByteArray(0))) }
             builder.setErrorHandler(null)
             builder.parse(ByteArrayInputStream(bytes))
-        } catch (_: Exception) {
-            null
         }
+    } catch (_: Exception) {
+        null
     }
 
     private fun DocumentBuilderFactory.setFeatureQuietly(name: String, value: Boolean) {
+        setQuietly { setFeature(name, value) }
+    }
+
+    /**
+     * Parser implementations differ in what they support — Android's, for one,
+     * throws outright on `setXIncludeAware`. A hardening step that a parser
+     * refuses must not take the whole parse down with it.
+     */
+    private inline fun DocumentBuilderFactory.setQuietly(block: DocumentBuilderFactory.() -> Unit) {
         try {
-            setFeature(name, value)
+            block()
         } catch (_: Exception) {
-            // Not every parser implementation knows every feature; the remaining ones still apply.
+            // The remaining hardening still applies.
         }
     }
 }

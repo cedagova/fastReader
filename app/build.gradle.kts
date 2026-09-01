@@ -37,6 +37,12 @@ android {
         compose = true
     }
 
+    // EPUB fixtures are shared by the JVM tests and the on-device SAF test.
+    sourceSets {
+        getByName("test").java.srcDir("src/sharedTest/java")
+        getByName("androidTest").java.srcDir("src/sharedTest/java")
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -68,5 +74,10 @@ dependencies {
     testImplementation(libs.roborazzi.compose)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.uiautomator)
+
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
