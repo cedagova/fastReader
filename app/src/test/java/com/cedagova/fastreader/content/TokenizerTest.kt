@@ -73,6 +73,65 @@ class TokenizerTest {
     }
 
     @Test
+    fun `the adverb no ends its sentence and advances the sentence ordinal`() {
+        // "No." is one of the most common sentence endings in both languages;
+        // treating it as the "number" abbreviation would delete the ~3.0x
+        // sentence hold (REQ-011) and break "back one sentence" (REQ-014).
+        val spanish = tokenize("¿Vienes conmigo? No. Ella se marchó.")
+
+        assertEquals(Boundary.SENTENCE, spanish.first { it.text == "No" }.boundary)
+        assertEquals(
+            spanish.first { it.text == "No" }.sentenceIndex + 1,
+            spanish.first { it.text == "Ella" }.sentenceIndex,
+        )
+
+        val english = tokenize("I said no. Then I left.")
+        assertEquals(Boundary.SENTENCE, english.first { it.text == "no" }.boundary)
+        assertEquals(
+            english.first { it.text == "no" }.sentenceIndex + 1,
+            english.first { it.text == "Then" }.sentenceIndex,
+        )
+    }
+
+    @Test
+    fun `the numbering sense of no is kept only when a digit follows`() {
+        val tokens = tokenize("Ver No. 5 en la página.")
+
+        assertEquals("No.", tokens[1].text)
+        assertEquals(Boundary.NONE, tokens[1].boundary)
+        assertEquals("5", tokens[2].text)
+    }
+
+    @Test
+    fun `a decimal stays one number token in both notations`() {
+        val english = tokenize("En 1984 había 3.5 millones.")
+        val spanish = tokenize("En 1984 había 3,5 millones.")
+
+        assertEquals(listOf("En", "1984", "había", "3.5", "millones"), english.map { it.text })
+        assertEquals(listOf("En", "1984", "había", "3,5", "millones"), spanish.map { it.text })
+        // No fabricated break inside the number, and one sentence throughout.
+        assertEquals(Boundary.NONE, english.first { it.text == "3.5" }.boundary)
+        assertEquals(Boundary.NONE, spanish.first { it.text == "3,5" }.boundary)
+        assertEquals(1, english.map { it.sentenceIndex }.distinct().size)
+        assertEquals(1, spanish.map { it.sentenceIndex }.distinct().size)
+        assertTrue(
+            WordClass.NUMBER in
+                WordClassifier.classify(english.first { it.text == "3.5" }.text, occurrencesInBook = 1),
+        )
+    }
+
+    @Test
+    fun `a period after a number still ends the sentence`() {
+        val tokens = tokenize("Leí el capítulo 3. Luego dormí.")
+
+        assertEquals(Boundary.SENTENCE, tokens.first { it.text == "3" }.boundary)
+        assertEquals(
+            tokens.first { it.text == "3" }.sentenceIndex + 1,
+            tokens.first { it.text == "Luego" }.sentenceIndex,
+        )
+    }
+
+    @Test
     fun `sentence and paragraph ordinals advance across blocks`() {
         val blocks = listOf(
             ContentBlock.Paragraph("Uno. Dos."),
@@ -118,6 +177,9 @@ class TokenizerTest {
         assertTrue(WordClassifier.isAbbreviation("sra."))
         assertTrue(WordClassifier.isAbbreviation("e.g."))
         assertTrue(WordClassifier.isAbbreviation("U.S."))
+        // The adverb, not the "number" abbreviation.
+        assertFalse(WordClassifier.isAbbreviation("no."))
+        assertTrue(WordClassifier.isNumberingAbbreviation("No"))
         assertFalse(WordClassifier.isAbbreviation("casa."))
         assertFalse(WordClassifier.isAbbreviation("Dr"))
         assertFalse(WordClassifier.isAbbreviation("."))

@@ -32,6 +32,16 @@ internal object Tokenizer {
     private const val WORD_INTERNAL = "'’‘‑-"
 
     /**
+     * Separators that stay inside a number when digits sit on both sides.
+     *
+     * Both are needed and both are already punctuation elsewhere: English writes
+     * `3.5` and Spanish writes `3,5`, so without this the same number splits into
+     * two one-character tokens with a fabricated sentence or clause break between
+     * its halves — and the `NUMBER` class stops describing the token it exists for.
+     */
+    private const val DIGIT_SEPARATORS = ".,"
+
+    /**
      * Splits [blocks] into tokens, continuing the counters in [state] so every
      * spine item of a book contributes to one stream.
      */
@@ -126,6 +136,14 @@ internal object Tokenizer {
      */
     private fun wordEnd(text: String, start: Int): Int {
         var end = runEnd(text, start)
+        // "No. 5" abbreviates "number"; the bare adverb "No." does not, so the
+        // digit has to actually be there.
+        if (end < text.length && text[end] == '.' &&
+            WordClassifier.isNumberingAbbreviation(text.substring(start, end)) &&
+            nextVisibleIsDigit(text, end + 1)
+        ) {
+            return end + 1
+        }
         while (end < text.length && text[end] == '.' &&
             WordClassifier.isAbbreviation(text.substring(start, end + 1))
         ) {
@@ -139,9 +157,28 @@ internal object Tokenizer {
     /** One run of word characters, without trailing internal marks. */
     private fun runEnd(text: String, start: Int): Int {
         var end = start
-        while (end < text.length && text[end].isWordChar()) end++
+        while (end < text.length) {
+            when {
+                text[end].isWordChar() -> end++
+                isInteriorDigitSeparator(text, end) -> end++
+                else -> break
+            }
+        }
         while (end > start && text[end - 1] in WORD_INTERNAL) end--
         return end
+    }
+
+    /** True for the `.` in `3.5` and the `,` in `3,5`, and for nothing else. */
+    private fun isInteriorDigitSeparator(text: String, position: Int): Boolean =
+        text[position] in DIGIT_SEPARATORS &&
+            position > 0 &&
+            text[position - 1].isDigit() &&
+            text.getOrNull(position + 1)?.isDigit() == true
+
+    private fun nextVisibleIsDigit(text: String, from: Int): Boolean {
+        var index = from
+        while (index < text.length && text[index].isSpaceLike()) index++
+        return text.getOrNull(index)?.isDigit() == true
     }
 
     /** The strongest break inside `text[from until to]`. */

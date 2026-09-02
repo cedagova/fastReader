@@ -37,11 +37,21 @@ internal object WordClassifier {
      * abbreviations that actually appear mid-sentence, in both languages the app
      * supports. Dotted initialisms ("U.S.", "e.g.", "J.") are recognised by shape
      * instead, so they need no entries.
+     *
+     * "no" is deliberately absent. It abbreviates "number", but that sense
+     * appears almost only before a digit, while the ordinary adverb "No." ends
+     * sentences constantly in both languages — and listing it here would delete
+     * the sentence pause and the sentence boundary from every one of them. The
+     * numbering sense is recognised by [isNumberingAbbreviation] with the digit
+     * actually present instead. Every other entry is a word that does not stand
+     * alone in prose, so the only cost it carries is the inherent one: a sentence
+     * genuinely ending in "etc." keeps no sentence break, which is what "exempt
+     * from the sentence pause" means.
      */
     private val KNOWN_ABBREVIATIONS = setOf(
         // English
         "mr", "mrs", "ms", "dr", "prof", "rev", "hon", "st", "jr", "sr",
-        "vs", "etc", "cf", "ca", "approx", "no", "vol", "pp", "fig", "ed",
+        "vs", "etc", "cf", "ca", "approx", "vol", "pp", "fig", "ed",
         "eds", "inc", "ltd", "co", "dept", "univ", "ave", "blvd", "mt", "op",
         // Spanish
         "sra", "srta", "dra", "ud", "uds", "vd", "vds", "av", "avda", "núm",
@@ -61,6 +71,14 @@ internal object WordClassifier {
         if (body.any { !it.isLetter() }) return false
         return body.lowercase() in KNOWN_ABBREVIATIONS
     }
+
+    /**
+     * "No. 5", "núm. 12" — the numbering sense of a word that is otherwise
+     * ordinary prose. The caller checks that a digit really follows.
+     */
+    fun isNumberingAbbreviation(body: String): Boolean = body.lowercase() in NUMBERING_ABBREVIATIONS
+
+    private val NUMBERING_ABBREVIATIONS = setOf("no", "nos", "núm", "num", "nro", "nros")
 
     /** `J.`, `U.S.`, `e.g.` — single letters each closed by a period. */
     private fun isDottedInitialism(candidate: String): Boolean {

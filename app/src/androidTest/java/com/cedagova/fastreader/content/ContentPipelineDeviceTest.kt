@@ -54,6 +54,21 @@ class ContentPipelineDeviceTest {
     }
 
     @Test
+    fun periodRuleHoldsOnDevice() {
+        // The period rule leans on Android's `Char.isDigit` as well as its letter
+        // tables, so the sentence adverb and the decimal are re-proven here.
+        val tokens = Tokenizer.tokenize(
+            listOf(ContentBlock.Paragraph("¿Vienes conmigo? No. Había 3,5 millones.")),
+            chapterIndex = 0,
+            state = Tokenizer.StreamState(),
+        ).filterIsInstance<WordToken>()
+
+        assertEquals(Boundary.SENTENCE, tokens.first { it.text == "No" }.boundary)
+        assertEquals("3,5", tokens.first { it.text.startsWith("3") }.text)
+        assertEquals(Boundary.NONE, tokens.first { it.text == "3,5" }.boundary)
+    }
+
+    @Test
     fun latin1ChapterDecodesOnDevice() = runBlocking {
         assertTrue(parse(ContentFixtures.latin1Book()).words().contains("canción"))
     }
