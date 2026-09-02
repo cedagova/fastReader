@@ -2,6 +2,7 @@ package com.cedagova.fastreader.library.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.library.BookStatus
+import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 
 /** Smallest comfortable touch target; Android's accessibility minimum is 48dp (REQ-060). */
@@ -82,7 +84,9 @@ fun LibraryScreen(
     onRefresh: () -> Unit,
     onRemove: (LibraryBookItem) -> Unit,
     onGrantAccess: (LibraryBookItem) -> Unit,
+    onOpen: (LibraryBookItem) -> Unit,
     modifier: Modifier = Modifier,
+    onDismissResumeNotice: () -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
     Scaffold(
@@ -100,6 +104,7 @@ fun LibraryScreen(
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             state.failureMessage?.let { FailureBanner(it) }
+            state.resumeNotice?.let { ResumeNoticeBanner(it, onDismissResumeNotice) }
             state.scan?.let { ScanBanner(it) }
             when (state.content) {
                 LibraryContent.EMPTY_LIBRARY -> EmptyLibrary(
@@ -119,10 +124,60 @@ fun LibraryScreen(
                             books = state.books,
                             onRemove = onRemove,
                             onGrantAccess = onGrantAccess,
+                            onOpen = onOpen,
                             coverLoader = coverLoader,
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Why the app opened here instead of in the book being read (REQ-009).
+ *
+ * The book's own row already carries its state, but a reader who expected to
+ * land back in their book should not have to find the row and infer what
+ * happened, so the reason is said once at the top and dismissed when read.
+ */
+@Composable
+private fun ResumeNoticeBanner(notice: ResumeNotice, onDismiss: () -> Unit) {
+    val title = notice.title ?: stringResource(R.string.library_resume_blocked_unnamed)
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth().testTag("library_resume_notice"),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.library_resume_blocked_title, title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(
+                        when (notice.reason) {
+                            ResumeBlockedReason.MISSING -> R.string.library_resume_blocked_missing
+                            ResumeBlockedReason.PERMISSION_LOST -> R.string.library_resume_blocked_permission_lost
+                            ResumeBlockedReason.UNREADABLE -> R.string.library_resume_blocked_unreadable
+                            ResumeBlockedReason.REMOVED -> R.string.library_resume_blocked_removed
+                            ResumeBlockedReason.NOT_IN_LIBRARY -> R.string.library_resume_blocked_gone
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_resume_notice_dismiss"),
+            ) {
+                Text(stringResource(R.string.library_resume_blocked_dismiss))
             }
         }
     }
@@ -301,6 +356,7 @@ private fun BookList(
     books: List<LibraryBookItem>,
     onRemove: (LibraryBookItem) -> Unit,
     onGrantAccess: (LibraryBookItem) -> Unit,
+    onOpen: (LibraryBookItem) -> Unit,
     coverLoader: CoverLoader,
 ) {
     LazyColumn(
@@ -312,6 +368,7 @@ private fun BookList(
                 book = book,
                 onRemove = { onRemove(book) },
                 onGrantAccess = { onGrantAccess(book) },
+                onOpen = { onOpen(book) },
                 coverLoader = coverLoader,
             )
             HorizontalDivider()
@@ -324,14 +381,25 @@ private fun BookRow(
     book: LibraryBookItem,
     onRemove: () -> Unit,
     onGrantAccess: () -> Unit,
+    onOpen: () -> Unit,
     coverLoader: CoverLoader,
 ) {
     val author = book.author ?: stringResource(R.string.library_unknown_author)
     val statusLine = book.statusLine()
+    val openLabel = stringResource(R.string.library_open, book.title)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 72.dp)
+            // A readable book opens in the reader; the rest already explain in
+            // their status line why there is nothing to open.
+            .then(
+                if (book.isReadable) {
+                    Modifier.clickable(onClickLabel = openLabel, onClick = onOpen)
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("library_book_${book.id}"),
         verticalAlignment = Alignment.Top,

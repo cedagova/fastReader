@@ -4,6 +4,8 @@ import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
+import com.cedagova.fastreader.library.ResumeBlocked
+import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
@@ -25,6 +27,20 @@ data class LibraryUiState(
     val content: LibraryContent,
     val scan: LibraryScan? = null,
     val failureMessage: String? = null,
+    /**
+     * Set when the app opened here instead of in the last-read book (REQ-009), so
+     * the reader is told why reading did not resume rather than being dropped in
+     * the library with no explanation.
+     */
+    val resumeNotice: ResumeNotice? = null,
+)
+
+/** The last-read book the app could not reopen, named so the library can say so. */
+data class ResumeNotice(
+    val bookId: String,
+    /** Null when the book is no longer in the catalog to be named — it was removed. */
+    val title: String?,
+    val reason: ResumeBlockedReason,
 )
 
 /** Which of the three mutually exclusive library bodies to show. */
@@ -59,7 +75,13 @@ data class LibraryBookItem(
     val author: String?,
     /** Every file name this book is reachable under; search matches on all of them. */
     val fileNames: List<String>,
-    /** Whole-percent share of the book already read. Zero for every book until increment 002. */
+    /**
+     * Whole-percent share of the book already read.
+     *
+     * Only a book whose last token has been shown reads 100%: REQ-018 pairs that
+     * number with the end-of-book state, so "99.7%, rounded up" must not claim to
+     * be finished. Everything below rounds normally.
+     */
     val progressPercent: Int,
     val status: BookStatus,
     val hasCover: Boolean,
@@ -96,6 +118,7 @@ fun buildLibraryUiState(
     catalog: Catalog,
     ingestion: IngestionState,
     query: String,
+    resumeBlocked: ResumeBlocked? = null,
 ): LibraryUiState {
     // Sort the way the reader's language does, not by UTF-16 code unit: raw
     // ordering drops every accented initial below Z, which would put Ñuño and
@@ -120,15 +143,38 @@ fun buildLibraryUiState(
             LibraryScan(it.trigger, it.processed, it.total, it.currentName)
         },
         failureMessage = (ingestion as? IngestionState.Failed)?.message,
+        resumeNotice = resumeBlocked?.let {
+            val book = catalog.book(it.bookId)
+            // Granting access again, or restoring the folder, answers the notice:
+            // leaving it up would tell a reader who has just fixed the problem
+            // that it is still there. UNREADABLE is deliberately excluded, because
+            // it is the one reason the catalog cannot contradict — it is recorded
+            // when a book the catalog calls readable turned out not to open, and
+            // hiding the notice on the catalog's say-so would leave the reader
+            // with no explanation at all.
+            if (book?.status == BookStatus.READABLE && it.reason != ResumeBlockedReason.UNREADABLE) {
+                null
+            } else {
+                ResumeNotice(
+                    bookId = it.bookId,
+                    // A removed book has no catalog entry left to take a title
+                    // from; its position survives removal, so the notice still
+                    // has to render.
+                    title = book?.title,
+                    reason = it.reason,
+                )
+            }
+        },
     )
 }
+
 
 private fun Book.toItem(progressFraction: Float): LibraryBookItem = LibraryBookItem(
     id = id,
     title = title,
     author = author?.takeIf { it.isNotBlank() },
     fileNames = fileNames,
-    progressPercent = (progressFraction.coerceIn(0f, 1f) * 100).roundToInt(),
+    progressPercent = progressPercent(progressFraction),
     status = status,
     hasCover = hasCover,
     regrantTreeUri = sources
@@ -148,6 +194,13 @@ internal fun LibraryBookItem.matches(query: String): Boolean {
     return fold(title).contains(needle) ||
         author?.let { fold(it).contains(needle) } == true ||
         fileNames.any { fold(it).contains(needle) }
+}
+
+/** 100% means finished: an unfinished book rounds normally but stops one short of it. */
+private fun progressPercent(fraction: Float): Int {
+    val clamped = fraction.coerceIn(0f, 1f)
+    if (clamped >= 1f) return 100
+    return (clamped * 100).roundToInt().coerceIn(0, 99)
 }
 
 private fun fold(text: String): String =

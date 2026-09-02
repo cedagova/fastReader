@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import com.cedagova.fastreader.library.LibraryGraph
+import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 
@@ -25,12 +26,20 @@ import com.cedagova.fastreader.library.saf.SafDocumentGateway
  * the Roborazzi renders can drive every state directly.
  */
 @Composable
-fun LibraryRoute(graph: LibraryGraph, modifier: Modifier = Modifier) {
+fun LibraryRoute(
+    graph: LibraryGraph,
+    onOpenBook: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    resumeBlocked: ResumeBlocked? = null,
+    onDismissResumeNotice: () -> Unit = {},
+) {
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
     val ingestion by repository.ingestion.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    val state = remember(catalog, ingestion, query) { buildLibraryUiState(catalog, ingestion, query) }
+    val state = remember(catalog, ingestion, query, resumeBlocked) {
+        buildLibraryUiState(catalog, ingestion, query, resumeBlocked)
+    }
     val coverLoader = remember(graph) { CoverStoreLoader(graph.covers) }
 
     val pickBooks = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
@@ -56,6 +65,7 @@ fun LibraryRoute(graph: LibraryGraph, modifier: Modifier = Modifier) {
         onAddFolder = { pickFolder.launch(null) },
         onRefresh = { repository.requestRescan(ScanTrigger.MANUAL_REFRESH) },
         onRemove = { repository.requestRemoveBook(it.id) },
+        onOpen = { onOpenBook(it.id) },
         onGrantAccess = { book ->
             // Re-granting a folder re-adds it at the same tree URI, which restores
             // every book it holds; a directly picked file has to be picked again.
@@ -63,6 +73,7 @@ fun LibraryRoute(graph: LibraryGraph, modifier: Modifier = Modifier) {
             if (tree != null) pickFolder.launch(tree.toUri()) else pickBooks.launch(SafDocumentGateway.PICKER_MIME_TYPES)
         },
         coverLoader = coverLoader,
+        onDismissResumeNotice = onDismissResumeNotice,
         modifier = modifier,
     )
 }

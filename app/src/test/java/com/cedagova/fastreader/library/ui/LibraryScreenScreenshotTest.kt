@@ -15,6 +15,8 @@ import com.cedagova.fastreader.library.BookContentStatus
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.ResumeBlocked
+import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
@@ -91,6 +93,21 @@ class LibraryScreenScreenshotTest {
         )
     }
 
+    /**
+     * REQ-009's second half: the app could not go back to the book being read, so
+     * the library opens saying which book and why, above that book's own state.
+     */
+    @Test
+    fun aLaunchThatCouldNotResumeSaysWhichBookAndWhy() {
+        capture(
+            "library_resume_blocked",
+            state(
+                catalog = failureCatalog(),
+                resumeBlocked = ResumeBlocked("revoked", ResumeBlockedReason.PERMISSION_LOST),
+            ),
+        )
+    }
+
     /** Cramped 720p phone (`Phone_Low_API33`) at a large system font scale. */
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)
@@ -115,6 +132,7 @@ class LibraryScreenScreenshotTest {
                         onRefresh = {},
                         onRemove = {},
                         onGrantAccess = {},
+                        onOpen = {},
                         coverLoader = FakeCovers,
                     )
                 }
@@ -140,7 +158,8 @@ class LibraryScreenScreenshotTest {
         catalog: Catalog,
         ingestion: IngestionState = IngestionState.Idle,
         query: String = "",
-    ) = buildLibraryUiState(catalog, ingestion, query)
+        resumeBlocked: ResumeBlocked? = null,
+    ) = buildLibraryUiState(catalog, ingestion, query, resumeBlocked)
 
     private fun populatedCatalog() = Catalog(
         books = listOf(
