@@ -8,12 +8,13 @@ import com.cedagova.fastreader.content.WordClass
 import com.cedagova.fastreader.content.WordToken
 
 /**
- * The canonical duration table, shared by the JVM unit tests and the on-device
- * test so both assert the *same* numbers.
+ * The canonical duration table.
  *
- * Every expected value below is arithmetic anyone can redo by hand from the
- * documented formula, which is the point of AD-5: the engine's behavior is a
- * table, not a feeling about how fast words go by.
+ * Kept apart from the assertions on purpose: every expected value below is
+ * arithmetic anyone can redo by hand from the documented formula, and reviewing
+ * a table of numbers is a different job from reviewing the properties in
+ * [RsvpTimingEngineTest]. That separation is the point of AD-5 — the engine's
+ * behavior is a table, not a feeling about how fast words go by.
  */
 object TimingScenarios {
 
@@ -61,10 +62,8 @@ object TimingScenarios {
     )
 
     /**
-     * Cases that must hold identically on any JVM and on ART.
-     *
-     * They cover the acceptance criteria of issue #11 plus the failure/edge
-     * behavior it names, and are the exact set the device test replays.
+     * The full duration table: every acceptance criterion of issue #11 plus the
+     * failure and edge behavior it names, as one expected value each.
      */
     val CANONICAL: List<Case> = listOf(
         Case("plain word at 250 WPM", word(), STEADY, RUNNING, 240),
