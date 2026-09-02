@@ -1,3 +1,40 @@
 <resources>
     <string name="app_name">FastReader</string>
+
+    <!-- Library screen -->
+    <string name="library_title">Library</string>
+    <string name="library_refresh">Refresh library</string>
+    <string name="library_add_books">Add books</string>
+    <string name="library_add_folder">Add folder</string>
+
+    <string name="library_search_label">Search books</string>
+    <string name="library_search_placeholder">Title, author, or file name</string>
+    <string name="library_search_clear">Clear search</string>
+
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_intro">There are two ways to add books:</string>
+    <string name="library_empty_pick">Pick individual EPUB files from your device.</string>
+    <string name="library_empty_folder">Add a folder. Every EPUB inside it, including subfolders, appears here, and books you add to that folder later show up the next time you open the app.</string>
+    <string name="library_empty_in_place">Books are read where they are. FastReader never copies, changes, or deletes your files.</string>
+
+    <string name="library_no_results_title">No books match “%1$s”</string>
+    <string name="library_no_results_hint">Search looks at title, author, and file name.</string>
+
+    <string name="library_unknown_author">Unknown author</string>
+    <string name="library_progress">%1$d%% read</string>
+    <string name="library_remove">Remove %1$s from the library. The file stays on your device.</string>
+    <string name="library_grant_access">Grant access</string>
+
+    <string name="library_state_corrupt">Cannot be read. This file is not a valid EPUB.</string>
+    <string name="library_state_drm">Copy protected. FastReader does not open DRM books.</string>
+    <string name="library_state_missing">File missing. It was moved or deleted; your place is kept in case it comes back.</string>
+    <string name="library_state_permission_lost">Access was revoked. Grant access again to read this book.</string>
+
+    <string name="library_scan_app_open">Checking your folders…</string>
+    <string name="library_scan_manual_refresh">Refreshing your library…</string>
+    <string name="library_scan_add_books">Adding books…</string>
+    <string name="library_scan_add_folder">Scanning the folder…</string>
+    <string name="library_scan_counts">%1$d of %2$d</string>
+
+    <string name="library_problem_title">The library could not be updated</string>
 </resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            Debug-only host for the system document picker, used by the on-device
+            Storage Access Framework test. It is absent from release builds.
+        -->
+        <activity
+            android:name=".library.PickerHostActivity"
+            android:exported="false" />
+    </application>
+
+</manifest>
