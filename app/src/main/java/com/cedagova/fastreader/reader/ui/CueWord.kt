@@ -81,13 +81,21 @@ fun CueWord(
     BoxWithConstraints(
         modifier = modifier.semantics { contentDescription = token.text },
     ) {
-        val width = constraints.maxWidth.toFloat()
-        val height = constraints.maxHeight.toFloat()
-        if (width <= 0f || height <= 0f) return@BoxWithConstraints
-
         val baseSize = cues.wordSizeSp.sp
         val baseLineHeight = measurer.measure("Ag", TextStyle(fontSize = baseSize)).size.height.toFloat()
         val markBand = with(density) { if (cues.guideMarksEnabled) GuideMarkBand.toPx() else 0f }
+
+        val width = constraints.maxWidth.toFloat()
+        // An unbounded slot would otherwise centre the word in a region the size of
+        // Int.MAX_VALUE, which is to say off the screen. The reader gives this a
+        // bounded height; a caller that does not gets one line plus the marks.
+        val height = if (constraints.hasBoundedHeight) {
+            constraints.maxHeight.toFloat()
+        } else {
+            baseLineHeight + markBand
+        }
+        if (width <= 0f || height <= 0f || !constraints.hasBoundedWidth) return@BoxWithConstraints
+
         val wordAreaHeight = (height - markBand).coerceAtLeast(1f)
 
         val alignX = width * if (aligned) PIVOT_COLUMN_FRACTION else 0.5f
@@ -262,12 +270,17 @@ private fun anchorIn(layout: TextLayoutResult, pivotOffset: Int?): Float {
 
 private fun annotate(token: ReaderWord, pivotOffset: Int?, pivotColor: Color): AnnotatedString {
     if (pivotOffset == null) return AnnotatedString(token.text)
+    // A character outside the Basic Multilingual Plane is two `Char`s; colouring
+    // one half of it would draw a replacement glyph instead of the letter.
+    val end = if (token.text[pivotOffset].isHighSurrogate() && pivotOffset + 1 < token.text.length) {
+        pivotOffset + 2
+    } else {
+        pivotOffset + 1
+    }
     return buildAnnotatedString {
         append(token.text.substring(0, pivotOffset))
-        withStyle(SpanStyle(color = pivotColor)) {
-            append(token.text.substring(pivotOffset, pivotOffset + 1))
-        }
-        append(token.text.substring(pivotOffset + 1))
+        withStyle(SpanStyle(color = pivotColor)) { append(token.text.substring(pivotOffset, end)) }
+        append(token.text.substring(end))
     }
 }
 

@@ -327,9 +327,16 @@ private fun ReadingSurface(
     word: @Composable (ReaderWord, Modifier) -> Unit,
     modifier: Modifier,
 ) {
-    val label = stringResource(if (state.isStopped) R.string.reader_play else R.string.reader_pause)
-    val focusLabel = stringResource(if (focused) R.string.reader_show_controls else R.string.reader_hide_controls)
     val tappable = state.mode != ReaderMode.FINISHED
+    // At the end of the book a tap does nothing, so it must not announce that it
+    // will play: in focused mode the surface is still long-clickable, and a click
+    // label on a node whose click is a no-op is a lie to a screen reader.
+    val label = if (tappable) {
+        stringResource(if (state.isStopped) R.string.reader_play else R.string.reader_pause)
+    } else {
+        null
+    }
+    val focusLabel = stringResource(if (focused) R.string.reader_show_controls else R.string.reader_hide_controls)
     Column(
         modifier = modifier
             .fillMaxWidth()
