@@ -46,6 +46,25 @@ class LibraryUiStateTest {
     }
 
     @Test
+    fun `titles sort by the reader's alphabet, not by code unit`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.readable("z", "Zola y el naturalismo"),
+                LibraryFixtures.readable("n", "Ñuño de Guzmán"),
+                LibraryFixtures.readable("a", "Álvarez en Madrid"),
+                LibraryFixtures.readable("b", "Beowulf"),
+            ),
+        )
+
+        val titles = buildLibraryUiState(catalog, IngestionState.Idle, "").books.map { it.title }
+
+        // Raw UTF-16 ordering would drop both accented initials below Z.
+        assertTrue("$titles", titles.indexOf("Álvarez en Madrid") < titles.indexOf("Beowulf"))
+        assertTrue("$titles", titles.indexOf("Ñuño de Guzmán") < titles.indexOf("Zola y el naturalismo"))
+        assertEquals("Álvarez en Madrid", titles.first())
+    }
+
+    @Test
     fun `search filters by author as typed (REQ-003)`() {
         val catalog = Catalog(
             books = listOf(
@@ -169,6 +188,23 @@ class LibraryUiStateTest {
         )
 
         assertNull(buildLibraryUiState(catalog, IngestionState.Idle, "").books.single().regrantTreeUri)
+    }
+
+    @Test
+    fun `the cover placeholder skips leading punctuation`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.readable("a", "¿Quién teme a la máquina?"),
+                LibraryFixtures.readable("b", "Dubliners"),
+                LibraryFixtures.readable("c", "…"),
+            ),
+        )
+
+        val byId = buildLibraryUiState(catalog, IngestionState.Idle, "").books.associateBy { it.id }
+
+        assertEquals("Q", byId.getValue("a").coverInitial)
+        assertEquals("D", byId.getValue("b").coverInitial)
+        assertEquals("?", byId.getValue("c").coverInitial)
     }
 
     @Test

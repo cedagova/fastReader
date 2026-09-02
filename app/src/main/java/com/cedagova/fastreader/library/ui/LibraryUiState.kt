@@ -7,6 +7,7 @@ import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
+import java.text.Collator
 import java.text.Normalizer
 import kotlin.math.roundToInt
 
@@ -72,6 +73,14 @@ data class LibraryBookItem(
 
     /** The name to show when one is needed; a book is normally reachable from one place. */
     val fileName: String? get() = fileNames.firstOrNull()
+
+    /**
+     * The glyph the cover placeholder shows. Spanish titles often open with `¿`
+     * or `¡`, and a punctuation mark tells the reader nothing, so this is the
+     * first character that actually carries meaning.
+     */
+    val coverInitial: String
+        get() = title.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
 }
 
 /** Builds the screen state. Pure: same inputs always give the same screen. */
@@ -80,9 +89,15 @@ fun buildLibraryUiState(
     ingestion: IngestionState,
     query: String,
 ): LibraryUiState {
+    // Sort the way the reader's language does, not by UTF-16 code unit: raw
+    // ordering drops every accented initial below Z, which would put Ñuño and
+    // Álvarez under Zola in exactly the Spanish library `matches` folds accents
+    // for. The id breaks ties so a rescan cannot reshuffle equal titles.
+    val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
+    val byTitle = compareBy<LibraryBookItem, String>(collator) { it.title }.thenBy { it.id }
     val all = catalog.books
         .map { book -> book.toItem(catalog.readingStates[book.id]?.progressFraction ?: 0f) }
-        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+        .sortedWith(byTitle)
     val matches = all.filter { it.matches(query) }
     val content = when {
         all.isEmpty() -> LibraryContent.EMPTY_LIBRARY

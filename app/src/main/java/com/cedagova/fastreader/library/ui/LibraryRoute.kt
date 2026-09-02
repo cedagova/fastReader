@@ -43,6 +43,12 @@ fun LibraryRoute(graph: LibraryGraph, modifier: Modifier = Modifier) {
     // Shows the stored catalog even when the app-open rescan is skipped as too recent.
     LaunchedEffect(repository) { repository.load() }
 
+    // A query outlives the books it filtered: remove the last book and the field
+    // is hidden with its text intact, so the next book added would land straight
+    // into a stale filter. An empty library has nothing to search.
+    val libraryIsEmpty = catalog.books.isEmpty()
+    LaunchedEffect(libraryIsEmpty) { if (libraryIsEmpty) query = "" }
+
     LibraryScreen(
         state = state,
         onQueryChange = { query = it },

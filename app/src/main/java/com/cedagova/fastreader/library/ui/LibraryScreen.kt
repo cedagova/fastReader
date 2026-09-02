@@ -411,9 +411,14 @@ private fun Cover(book: LibraryBookItem, coverLoader: CoverLoader) {
     if (bitmap != null) {
         Image(
             bitmap = bitmap,
-            contentDescription = stringResource(R.string.library_cover, book.title),
+            contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(width = 48.dp, height = 64.dp).clip(shape),
+            modifier = Modifier
+                .size(width = 48.dp, height = 64.dp)
+                .clip(shape)
+                // Decorative, like the placeholder: otherwise TalkBack says the
+                // title twice, and only for the books that happen to have art.
+                .clearAndSetSemantics {},
         )
     } else {
         Box(
@@ -426,7 +431,7 @@ private fun Cover(book: LibraryBookItem, coverLoader: CoverLoader) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = book.title.firstOrNull()?.uppercase() ?: "?",
+                text = book.coverInitial,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
