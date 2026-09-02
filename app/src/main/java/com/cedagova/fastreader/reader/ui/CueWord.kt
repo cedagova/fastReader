@@ -191,9 +191,9 @@ fun CueWord(
  * **Why it is drawn this way.** Marks below the text do not sit in the path of
  * the returning eye, and a caret reads as "here" rather than as a bracket. Their
  * size and position depend only on the reading width and on whether the
- * fixed-focus alignment is on — never on the token being drawn — so they are the same pixels on
- * every frame of a running stream and add no per-word change to the AD-6
- * static-luminance surface.
+ * fixed-focus alignment is on — never on the token being drawn — so they are the
+ * same pixels on every frame of a running stream and add no per-word change to
+ * the AD-6 static-luminance surface.
  */
 private fun DrawScope.drawGuideMarks(
     alignX: Float,
