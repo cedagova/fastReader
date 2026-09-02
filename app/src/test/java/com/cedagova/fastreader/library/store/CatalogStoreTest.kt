@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -223,10 +224,14 @@ class CatalogStoreTest {
 
     @Test
     fun `a document with no migration path is reported instead of being guessed at`() {
-        val v1Text = CatalogCodec().encode(sampleCatalog())
-        val codec = CatalogCodec(currentVersion = 4, migrations = emptyMap())
+        val currentText = CatalogCodec().encode(sampleCatalog())
+        // One version past this build, with no way to get there.
+        val codec = CatalogCodec(
+            currentVersion = CatalogSchema.CURRENT_VERSION + 1,
+            migrations = emptyMap(),
+        )
 
-        val decoded = codec.decode(v1Text)
+        val decoded = codec.decode(currentText)
 
         assertTrue(decoded is CatalogDecoding.Damaged)
         assertTrue((decoded as CatalogDecoding.Damaged).message.contains("no migration from"))
@@ -282,7 +287,8 @@ class CatalogStoreTest {
 
         assertEquals(ThemeChoice.SYSTEM, settings.theme)
         assertEquals(FontSize.MEDIUM, settings.fontSize)
-        assertTrue(settings.pivotEnabled)
+        assertTrue(settings.highlightEnabled)
+        assertFalse(settings.focusAlignmentEnabled)
         assertEquals(PivotColor.ACCENT, settings.pivotColor)
         assertTrue(settings.guideMarksEnabled)
         assertEquals(PauseStrength.NORMAL, settings.pauseStrength)
@@ -303,7 +309,8 @@ class CatalogStoreTest {
         assertEquals(PauseStrength.OFF, settings.pauseStrength)
         assertEquals(FontSize.MEDIUM, settings.fontSize)
         assertEquals(PivotColor.ACCENT, settings.pivotColor)
-        assertTrue(settings.pivotEnabled)
+        assertTrue(settings.highlightEnabled)
+        assertFalse(settings.focusAlignmentEnabled)
     }
 
     /**
@@ -331,12 +338,107 @@ class CatalogStoreTest {
         assertEquals(FontSize.LARGE, decoded.catalog.settings.fontSize)
     }
 
+    /**
+     * The real increment 003 → #32 step, over a document a released build wrote.
+     *
+     * `pivotEnabled` did two things; it becomes the highlight, and the alignment
+     * it also carried is turned off — the owner decision this migration exists to
+     * apply. Everything a reader would notice losing has to survive it untouched:
+     * both books, both reading positions with their pipeline versions and speeds,
+     * the last-read book, and every setting the split does not concern.
+     */
+    @Test
+    fun `a version 3 document keeps its library and splits the pivot cue`() {
+        val v3 = """
+            {"schemaVersion":3,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]},
+                      {"id":"sha256:def","title":"El hilo de plata","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9},
+                              "sha256:def":{"bookDigest":"sha256:def","tokenIndex":1201,
+                                            "pipelineVersion":1,"progressFraction":0.25,
+                                            "wpm":320,"updatedAtEpochMs":11}},
+             "lastReadBookId":"sha256:def",
+             "settings":{"theme":"DARK","fontSize":"LARGE","pivotEnabled":true,
+                         "pivotColor":"CRIMSON","guideMarksEnabled":true,
+                         "pauseStrength":"STRONG"}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v3) as CatalogDecoding.Decoded
+
+        assertEquals(3, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+
+        // The library, byte for byte what it was.
+        assertEquals(
+            listOf("The Long Signal", "El hilo de plata"),
+            decoded.catalog.books.map { it.title },
+        )
+        assertEquals("sha256:def", decoded.catalog.lastReadBookId)
+        val first = decoded.catalog.readingStates.getValue("sha256:abc")
+        val second = decoded.catalog.readingStates.getValue("sha256:def")
+        assertEquals(77, first.tokenIndex)
+        assertEquals(400, first.wpm)
+        assertEquals(0.5f, first.progressFraction, 0f)
+        assertEquals(1201, second.tokenIndex)
+        assertEquals(320, second.wpm)
+        assertEquals(0.25f, second.progressFraction, 0f)
+
+        // The cue split, and nothing else about the settings.
+        val settings = decoded.catalog.settings
+        assertTrue(settings.highlightEnabled)
+        assertFalse(settings.focusAlignmentEnabled)
+        assertEquals(ThemeChoice.DARK, settings.theme)
+        assertEquals(FontSize.LARGE, settings.fontSize)
+        assertEquals(PivotColor.CRIMSON, settings.pivotColor)
+        assertTrue(settings.guideMarksEnabled)
+        assertEquals(PauseStrength.STRONG, settings.pauseStrength)
+    }
+
+    /** A reader who had the cue off keeps a plain word: the value is carried, not forced on. */
+    @Test
+    fun `a version 3 document with the pivot cue off migrates to the highlight off`() {
+        val v3 = """
+            {"schemaVersion":3,"books":[],"folders":[],"readingStates":{},
+             "settings":{"pivotEnabled":false,"guideMarksEnabled":false}}
+        """.trimIndent()
+
+        val settings = (CatalogCodec().decode(v3) as CatalogDecoding.Decoded).catalog.settings
+
+        assertFalse(settings.highlightEnabled)
+        assertFalse(settings.focusAlignmentEnabled)
+        assertFalse(settings.guideMarksEnabled)
+    }
+
+    /**
+     * The downgrade guard is unchanged by the bump: a document from a newer schema
+     * is refused rather than rewritten, so an older build cannot cost a reader
+     * their library.
+     */
+    @Test
+    fun `a document from a newer schema than this build is still refused`() {
+        val fromTheFuture = """
+            {"schemaVersion":${CatalogSchema.CURRENT_VERSION + 1},
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],"readingStates":{}}
+        """.trimIndent()
+
+        val decoding = CatalogCodec().decode(fromTheFuture)
+
+        assertTrue(decoding is CatalogDecoding.Newer)
+        assertEquals(CatalogSchema.CURRENT_VERSION + 1, (decoding as CatalogDecoding.Newer).documentVersion)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoding.supportedVersion)
+    }
+
     @Test
     fun `changed settings round trip through the store`() {
         val changed = ReaderSettings(
             theme = ThemeChoice.DARK,
             fontSize = FontSize.EXTRA_LARGE,
-            pivotEnabled = false,
+            highlightEnabled = false,
+            focusAlignmentEnabled = true,
             pivotColor = PivotColor.VIOLET,
             guideMarksEnabled = false,
             pauseStrength = PauseStrength.STRONG,

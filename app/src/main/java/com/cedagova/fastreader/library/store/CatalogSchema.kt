@@ -25,8 +25,12 @@ object CatalogSchema {
      * - **3** — increment 003 (LEAF302): the reader's settings — theme, font size,
      *   pivot cue and its colour, guide marks, pause strength — each with a
      *   documented default that an absent key reads back as.
+     * - **4** — issue #32: the single `pivotEnabled` cue splits into
+     *   `highlightEnabled` (the coloured letter, carried forward from the old
+     *   flag) and `focusAlignmentEnabled` (the off-centre alignment, now opt-in
+     *   and written as `false`).
      */
-    const val CURRENT_VERSION: Int = 3
+    const val CURRENT_VERSION: Int = 4
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -36,6 +40,7 @@ object CatalogSchema {
     val MIGRATIONS: Map<Int, CatalogMigration> = mapOf(
         1 to ReadingStateV2Migration,
         2 to SettingsV3Migration,
+        3 to CueSplitV4Migration,
     )
 }
 

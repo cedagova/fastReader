@@ -74,12 +74,20 @@ private val TouchTarget = 48.dp
  *
  * ## Bounded, exactly as defined
  *
- * Five groups and nothing else: theme (REQ-022), text size (REQ-022), the pivot
- * cue and its palette (REQ-020), guide marks (REQ-021), and pause strength
- * (REQ-011). There is no free-form colour picker, no point-size field, and no
- * per-multiplier timing panel. Every control is a choice from a small fixed set,
- * which is also why they are all radio-style chips or switches rather than
- * sliders.
+ * Five groups and nothing else: theme (REQ-022), text size (REQ-022), the cue set
+ * — letter highlight and its palette, fixed focus letter, guide marks (REQ-020,
+ * REQ-021) — and pause strength (REQ-011). There is no free-form colour picker,
+ * no point-size field, and no per-multiplier timing panel. Every control is a
+ * choice from a small fixed set, which is also why they are all radio-style chips
+ * or switches rather than sliders.
+ *
+ * ## The two cue toggles (#32)
+ *
+ * "Highlight letter" and "Fixed focus letter" used to be one switch. They are
+ * separate choices — one colours a letter, the other moves the word off centre —
+ * and only the first is on by default. Their copy says what each one does to the
+ * page in front of the reader; the internal words for the mechanism ("pivot",
+ * "recognition point") stay in the code and out of the UI.
  *
  * ## REQ-060
  *
@@ -161,21 +169,28 @@ fun SettingsScreen(
 
                 SectionHeading(stringResource(R.string.settings_section_cues))
                 SwitchRow(
-                    label = stringResource(R.string.settings_pivot),
-                    summary = stringResource(R.string.settings_pivot_summary),
-                    checked = settings.pivotEnabled,
-                    onCheckedChange = { onSettingsChange(settings.copy(pivotEnabled = it)) },
-                    tag = "settings_pivot",
+                    label = stringResource(R.string.settings_highlight),
+                    summary = stringResource(R.string.settings_highlight_summary),
+                    checked = settings.highlightEnabled,
+                    onCheckedChange = { onSettingsChange(settings.copy(highlightEnabled = it)) },
+                    tag = "settings_highlight",
                 )
                 // The palette only means anything while the letter it colours is
                 // being drawn, so it goes with the cue rather than staying on
                 // screen as a control that does nothing (REQ-020).
-                if (settings.pivotEnabled) {
+                if (settings.highlightEnabled) {
                     PivotColorRow(
                         selected = settings.pivotColor,
                         onSelect = { onSettingsChange(settings.copy(pivotColor = it)) },
                     )
                 }
+                SwitchRow(
+                    label = stringResource(R.string.settings_focus_alignment),
+                    summary = stringResource(R.string.settings_focus_alignment_summary),
+                    checked = settings.focusAlignmentEnabled,
+                    onCheckedChange = { onSettingsChange(settings.copy(focusAlignmentEnabled = it)) },
+                    tag = "settings_focus_alignment",
+                )
                 SwitchRow(
                     label = stringResource(R.string.settings_guide_marks),
                     summary = stringResource(R.string.settings_guide_marks_summary),
@@ -359,8 +374,8 @@ private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * The bounded pivot palette (REQ-020), as five swatches drawn in the colours they
- * actually produce on the page in front of the reader.
+ * The bounded highlight palette (REQ-020), as five swatches drawn in the colours
+ * they actually produce on the page in front of the reader.
  *
  * A name alone would not do: each entry resolves differently in the light and dark
  * themes, so the swatch is the honest label. The name still travels to TalkBack,
@@ -370,10 +385,13 @@ private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun PivotColorRow(selected: PivotColor, onSelect: (PivotColor) -> Unit) {
     Spacer(Modifier.height(12.dp))
-    Text(text = stringResource(R.string.settings_pivot_color), style = MaterialTheme.typography.bodyLarge)
+    Text(
+        text = stringResource(R.string.settings_highlight_color),
+        style = MaterialTheme.typography.bodyLarge,
+    )
     Spacer(Modifier.height(4.dp))
     FlowRow(
-        modifier = Modifier.fillMaxWidth().selectableGroup().testTag("settings_pivot_color"),
+        modifier = Modifier.fillMaxWidth().selectableGroup().testTag("settings_highlight_color"),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         PivotColor.entries.forEach { entry ->

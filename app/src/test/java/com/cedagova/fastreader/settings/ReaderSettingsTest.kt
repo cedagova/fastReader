@@ -12,11 +12,12 @@ import org.junit.Test
  */
 class ReaderSettingsTest {
 
-    /** The seam to LEAF301: the three cue choices reach the renderer unchanged. */
+    /** The seam to the renderer: the four cue choices reach it unchanged. */
     @Test
-    fun `the cue projection carries exactly the three cue choices`() {
+    fun `the cue projection carries exactly the four cue choices`() {
         val settings = ReaderSettings.DEFAULTS.copy(
-            pivotEnabled = false,
+            highlightEnabled = false,
+            focusAlignmentEnabled = true,
             pivotColor = PivotColor.TEAL,
             guideMarksEnabled = false,
             // Not a cue: it must not leak into the value the renderer is given.
@@ -25,11 +26,41 @@ class ReaderSettingsTest {
 
         val cues = settings.cues
 
-        assertFalse(cues.pivotEnabled)
+        assertFalse(cues.highlightEnabled)
+        assertTrue(cues.focusAlignmentEnabled)
         assertEquals(PivotColor.TEAL, cues.pivotColor)
         assertFalse(cues.guideMarksEnabled)
         // Font size is not a cue, but the word's size is derived from it.
         assertEquals(CueSettings.DEFAULT_WORD_SIZE_SP, cues.wordSizeSp, 0f)
+    }
+
+    /**
+     * The owner decision of #32, as an assertion rather than a comment: the app
+     * ships a centred word with a coloured letter and the marks, and the
+     * off-centre alignment is something a reader has to turn on.
+     */
+    @Test
+    fun `the shipped defaults are a centred word with a highlighted letter`() {
+        assertTrue(ReaderSettings.DEFAULTS.highlightEnabled)
+        assertFalse(ReaderSettings.DEFAULTS.focusAlignmentEnabled)
+        assertTrue(ReaderSettings.DEFAULTS.guideMarksEnabled)
+        assertEquals(CueSettings.DEFAULTS, ReaderSettings.DEFAULTS.cues)
+    }
+
+    /** The two cues are separate choices, so all four combinations are reachable. */
+    @Test
+    fun `the highlight and the alignment move independently`() {
+        val highlightOnly = ReaderSettings.DEFAULTS.cues
+        val alignedOnly = ReaderSettings.DEFAULTS
+            .copy(highlightEnabled = false, focusAlignmentEnabled = true).cues
+        val both = ReaderSettings.DEFAULTS.copy(focusAlignmentEnabled = true).cues
+        val neither = ReaderSettings.DEFAULTS.copy(highlightEnabled = false).cues
+
+        assertEquals(
+            listOf(true to false, false to true, true to true, false to false),
+            listOf(highlightOnly, alignedOnly, both, neither)
+                .map { it.highlightEnabled to it.focusAlignmentEnabled },
+        )
     }
 
     /**
@@ -80,6 +111,8 @@ class ReaderSettingsTest {
         assertTrue(ReaderSettings.DEFAULTS.isDefault)
         assertFalse(ReaderSettings.DEFAULTS.copy(theme = ThemeChoice.DARK).isDefault)
         assertFalse(ReaderSettings.DEFAULTS.copy(guideMarksEnabled = false).isDefault)
+        assertFalse(ReaderSettings.DEFAULTS.copy(highlightEnabled = false).isDefault)
+        assertFalse(ReaderSettings.DEFAULTS.copy(focusAlignmentEnabled = true).isDefault)
         assertFalse(ReaderSettings.DEFAULTS.copy(pauseStrength = PauseStrength.OFF).isDefault)
     }
 

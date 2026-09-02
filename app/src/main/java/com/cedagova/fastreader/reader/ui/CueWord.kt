@@ -33,28 +33,36 @@ import com.cedagova.fastreader.settings.CueSettings
 import com.cedagova.fastreader.settings.PivotColor
 
 /**
- * The cue layer (LEAF301): one streamed token, drawn with the cues the reader has
- * left enabled.
+ * The cue layer: one streamed token, drawn with the cues the reader has left
+ * enabled.
  *
  * This is the presentation slot increment 002 left open in [ReaderScreen]. It
- * replaces the plain centred word with three things and changes nothing else —
+ * replaces the plain centred word with four things and changes nothing else —
  * playback, navigation and layout stay exactly where LEAF203 put them:
  *
- * 1. **Pivot alignment (REQ-020).** The word's recognition point is held at a
- *    fixed column slightly left of centre, so the eye does not travel between
- *    words, and that letter is drawn in the accent colour.
- * 2. **Guide marks (REQ-021).** An optional original mark under that column —
+ * 1. **Letter highlight (REQ-020).** The word's recognition point is drawn in the
+ *    chosen colour, so the eye has a place to land. On by default.
+ * 2. **Fixed focus alignment (REQ-020, opt-in).** The word is shifted so that
+ *    letter sits on a fixed column slightly left of centre instead of being
+ *    centred. **Off by default** — see [CueSettings] for the owner decision.
+ * 3. **Guide marks (REQ-021).** An optional original mark under the column —
  *    see [drawGuideMarks] for the design and how it differs from Spritz's.
- * 3. **Shrink-to-fit.** A word too wide for the space is drawn smaller, never
+ * 4. **Shrink-to-fit.** A word too wide for the space is drawn smaller, never
  *    clipped and never wrapped.
+ *
+ * The highlight and the alignment are independent: a centred word carries its
+ * coloured letter exactly as an aligned one does. Only where the word sits
+ * changes.
  *
  * ## AD-6 — this stays a static-luminance surface
  *
  * Everything drawn here is either a glyph or a mark at a fixed position and
- * fixed size. The pivot column does not move, the guide marks are identical
- * pixels on every frame, there is no animation, no background fill, and no
- * element whose area tracks the word. What changes between two frames at
- * 1000 WPM is glyphs, exactly as it was before cues existed.
+ * fixed size. The column does not move within a session, the guide marks are
+ * identical pixels on every frame, there is no animation, no background fill, and
+ * no element whose area tracks the word. What changes between two frames at
+ * 1000 WPM is glyphs, exactly as it was before cues existed. Centring the word by
+ * default moves the column once, at a setting change; it adds nothing to the
+ * frame path.
  */
 @Composable
 fun CueWord(
@@ -73,9 +81,10 @@ fun CueWord(
     }
 
     // A skip marker is the app talking, not the book (REQ-015): it has no
-    // recognition point, so it is never pivot-aligned and never carries a
+    // recognition point, so it is never aligned on one and never carries a
     // coloured letter.
-    val aligned = cues.pivotEnabled && !token.isSkipMarker
+    val aligned = cues.focusAlignmentEnabled && !token.isSkipMarker
+    val highlighted = cues.highlightEnabled && !token.isSkipMarker
 
     BoxWithConstraints(
         modifier = modifier.semantics { contentDescription = token.text },
@@ -101,9 +110,10 @@ fun CueWord(
         // column the stream is aligned to, which is a property of the layout and
         // of nothing else: it must not move when a skip marker goes past, or the
         // eye's anchor jumps at exactly the moment it is meant to be holding
-        // still for the next real word. The *word* is placed on that column only
-        // when it has a recognition point to put there.
-        val columnX = width * if (cues.pivotEnabled) PIVOT_COLUMN_FRACTION else 0.5f
+        // still for the next real word. Without the opt-in alignment that column
+        // is the centre of the reading width. The *word* is placed on it only
+        // when the alignment is on and it has a recognition point to put there.
+        val columnX = width * if (cues.focusAlignmentEnabled) FOCUS_COLUMN_FRACTION else 0.5f
         val alignX = if (aligned) columnX else width * 0.5f
         val style = TextStyle(
             fontSize = baseSize,
@@ -111,14 +121,20 @@ fun CueWord(
             fontWeight = if (token.isHeading) FontWeight.Bold else FontWeight.Normal,
             color = bodyColor,
         )
-        val pivotOffset = if (aligned) token.pivotOffset() else null
-        val text = annotate(token, pivotOffset, pivotColor)
+        // Two offsets from the one recognition point, because the two cues are
+        // independent. `anchorOffset` is a *placement* constraint and exists only
+        // while the word is being held on the column; `highlightOffset` is the
+        // letter that gets the colour, in either alignment.
+        val recognitionOffset = token.pivotOffset()
+        val anchorOffset = if (aligned) recognitionOffset else null
+        val highlightOffset = if (highlighted) recognitionOffset else null
+        val text = annotate(token, highlightOffset, pivotColor)
 
         val fitted = fitToSpace(
             measurer = measurer,
             text = text,
             style = style,
-            pivotOffset = pivotOffset,
+            pivotOffset = anchorOffset,
             width = width,
             height = wordAreaHeight,
             alignX = alignX,
@@ -174,8 +190,8 @@ fun CueWord(
  *
  * **Why it is drawn this way.** Marks below the text do not sit in the path of
  * the returning eye, and a caret reads as "here" rather than as a bracket. Their
- * size and position depend only on the reading width and on whether the pivot
- * cue is on — never on the token being drawn — so they are the same pixels on
+ * size and position depend only on the reading width and on whether the
+ * fixed-focus alignment is on — never on the token being drawn — so they are the same pixels on
  * every frame of a running stream and add no per-word change to the AD-6
  * static-luminance surface.
  */
@@ -218,9 +234,10 @@ private class FittedWord(val layout: TextLayoutResult, val anchor: Float)
  * absorb hinting and then stops. It is deterministic, which is what lets the
  * overflow golden be a regression gate.
  *
- * With the pivot cue on, "fits" is stricter than "narrower than the box": the
- * part left of the pivot has to fit left of the pivot column and the part right
- * of it right of the column, because the column is fixed.
+ * With the fixed-focus alignment on, "fits" is stricter than "narrower than the
+ * box": [pivotOffset] is then the anchor being held on the column, so the part
+ * left of it has to fit left of the column and the part right of it right of the
+ * column. A centred word has no anchor and only has to fit the box.
  */
 private fun fitToSpace(
     measurer: TextMeasurer,
@@ -269,25 +286,28 @@ private fun measure(
     constraints = Constraints(),
 )
 
-/** Where the alignment column falls inside the drawn word: the pivot glyph's centre. */
+/** Where the alignment column falls inside the drawn word: the anchor glyph's centre. */
 private fun anchorIn(layout: TextLayoutResult, pivotOffset: Int?): Float {
     if (pivotOffset == null) return layout.size.width / 2f
     val box = layout.getBoundingBox(pivotOffset)
     return (box.left + box.right) / 2f
 }
 
-private fun annotate(token: ReaderWord, pivotOffset: Int?, pivotColor: Color): AnnotatedString {
-    if (pivotOffset == null) return AnnotatedString(token.text)
+/** Colours the recognition letter, in whichever alignment the word is drawn. */
+private fun annotate(token: ReaderWord, highlightOffset: Int?, pivotColor: Color): AnnotatedString {
+    if (highlightOffset == null) return AnnotatedString(token.text)
     // A character outside the Basic Multilingual Plane is two `Char`s; colouring
     // one half of it would draw a replacement glyph instead of the letter.
-    val end = if (token.text[pivotOffset].isHighSurrogate() && pivotOffset + 1 < token.text.length) {
-        pivotOffset + 2
+    val end = if (
+        token.text[highlightOffset].isHighSurrogate() && highlightOffset + 1 < token.text.length
+    ) {
+        highlightOffset + 2
     } else {
-        pivotOffset + 1
+        highlightOffset + 1
     }
     return buildAnnotatedString {
-        append(token.text.substring(0, pivotOffset))
-        withStyle(SpanStyle(color = pivotColor)) { append(token.text.substring(pivotOffset, end)) }
+        append(token.text.substring(0, highlightOffset))
+        withStyle(SpanStyle(color = pivotColor)) { append(token.text.substring(highlightOffset, end)) }
         append(token.text.substring(end))
     }
 }
@@ -306,12 +326,15 @@ internal fun PivotColor.resolve(): Color {
 }
 
 /**
- * Where the recognition point sits across the reading width.
+ * Where the recognition point sits across the reading width **when the opt-in
+ * fixed-focus alignment is on**.
  *
- * "Slightly left of centre", per the definition — far enough left that a long
- * word's tail has room, not so far that short words drift to the edge.
+ * "Slightly left of centre" — far enough left that a long word's tail has room,
+ * not so far that short words drift to the edge. With the alignment off, which is
+ * the default, the column is the centre of the reading width instead and this is
+ * unused.
  */
-private const val PIVOT_COLUMN_FRACTION = 0.42f
+private const val FOCUS_COLUMN_FRACTION = 0.42f
 
 private const val GUIDE_RAIL_FRACTION = 0.34f
 

@@ -24,8 +24,10 @@ import org.robolectric.annotation.GraphicsMode
  * The settings surface's UI regression gate (REQ-020, REQ-022, REQ-023, REQ-061).
  *
  * These images are the primary proof of the claims that are *about* what is drawn:
- * that the live preview renders the cue settings above it, that turning the pivot
- * cue off leaves a plain centred word and takes its palette away with it, that a
+ * that the live preview renders the cue settings above it, that the surface opens
+ * with a centred word and the fixed focus letter off (#32), that turning the
+ * highlight off leaves a plain word and takes its palette away with it, that
+ * turning the fixed focus letter on moves the previewed word off centre, that a
  * colour from the palette is really applied, that the rhythm readout states what
  * the chosen pause strength does, and that the visual-only statement is on the
  * page in plain language rather than behind something.
@@ -70,7 +72,7 @@ class SettingsScreenScreenshotTest {
         capture(
             "settings_cues_off",
             ReaderSettings.DEFAULTS.copy(
-                pivotEnabled = false,
+                highlightEnabled = false,
                 guideMarksEnabled = false,
                 pauseStrength = PauseStrength.OFF,
             ),
@@ -78,14 +80,29 @@ class SettingsScreenScreenshotTest {
     }
 
     /**
-     * REQ-020's "color change applies immediately": a palette entry other than the
-     * default, applied to the pivot letter in the preview, with the guide marks
-     * off so the word is the only thing the change can be read from.
+     * #32's opt-in state, in the surface that owns it: both cue switches on, and
+     * the previewed word shifted off centre with the caret under it. Against
+     * `settings_default` this is the whole of what the toggle changes, and it is
+     * the live-preview half of the acceptance — the preview reflects *both*
+     * toggles, not just the highlight.
      */
     @Test
-    fun aColourFromThePaletteIsAppliedToThePivotLetter() {
+    fun turningTheFixedFocusLetterOnMovesThePreviewedWordOffCentre() {
         capture(
-            "settings_pivot_crimson",
+            "settings_focus_alignment_on",
+            ReaderSettings.DEFAULTS.copy(focusAlignmentEnabled = true),
+        )
+    }
+
+    /**
+     * REQ-020's "color change applies immediately": a palette entry other than the
+     * default, applied to the highlighted letter in the preview, with the guide
+     * marks off so the word is the only thing the change can be read from.
+     */
+    @Test
+    fun aColourFromThePaletteIsAppliedToTheHighlightedLetter() {
+        capture(
+            "settings_highlight_crimson",
             ReaderSettings.DEFAULTS.copy(
                 pivotColor = PivotColor.CRIMSON,
                 guideMarksEnabled = false,

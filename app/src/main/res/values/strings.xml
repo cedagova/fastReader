@@ -113,16 +113,18 @@
     <string name="settings_font_extra_large">Largest</string>
 
     <string name="settings_section_cues">Cues</string>
-    <string name="settings_pivot">Pivot cue</string>
-    <string name="settings_pivot_summary">Holds every word on its recognition point and colours that letter.</string>
-    <string name="settings_pivot_color">Pivot colour</string>
+    <string name="settings_highlight">Highlight letter</string>
+    <string name="settings_highlight_summary">Colour one letter in each word to give your eye a place to land.</string>
+    <string name="settings_highlight_color">Highlight colour</string>
     <string name="settings_color_accent">Default</string>
     <string name="settings_color_crimson">Crimson</string>
     <string name="settings_color_amber">Amber</string>
     <string name="settings_color_teal">Teal</string>
     <string name="settings_color_violet">Violet</string>
+    <string name="settings_focus_alignment">Fixed focus letter</string>
+    <string name="settings_focus_alignment_summary">Shift each word so the highlighted letter always lands on the same spot. Off keeps words centered.</string>
     <string name="settings_guide_marks">Guide marks</string>
-    <string name="settings_guide_marks_summary">Draws a rail and a small caret under the alignment column.</string>
+    <string name="settings_guide_marks_summary">Draws a rail and a small caret under the word, marking the spot it lands on.</string>
 
     <string name="settings_section_rhythm">Rhythm</string>
     <string name="settings_pause_strength">Pause strength</string>

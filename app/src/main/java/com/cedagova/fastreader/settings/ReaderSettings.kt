@@ -25,15 +25,15 @@ import kotlinx.serialization.Serializable
  *
  * The definition rules out a free-form theme engine, so every choice here is an
  * enum or a boolean over a small fixed set: three themes, four font sizes, five
- * pivot colours, four pause strengths, two toggles. There is deliberately no
+ * highlight colours, four pause strengths, three toggles. There is deliberately no
  * stored colour value, no stored point size, and no per-multiplier timing panel.
  *
  * ## Why the cue fields are flat rather than a nested [CueSettings]
  *
- * [CueSettings] is LEAF301's *render-time* seam and carries a word size in
+ * [CueSettings] is the *render-time* seam and carries a word size in
  * scale-independent pixels — a derived rendering value rather than a reader's
  * choice. Persisting it whole would put that pixel value in the schema and tie the
- * store to the renderer. The three cue choices a reader actually makes are stored
+ * store to the renderer. The four cue choices a reader actually makes are stored
  * flat, and [cues] reassembles them — with the word size derived from
  * [fontSize] — on the way to the renderer.
  */
@@ -43,11 +43,25 @@ data class ReaderSettings(
     val theme: ThemeChoice = ThemeChoice.SYSTEM,
     /** Text size across the whole app (REQ-022), on top of the device's own font scale. */
     val fontSize: FontSize = FontSize.MEDIUM,
-    /** Pivot-letter alignment with a coloured recognition point (REQ-020). */
-    val pivotEnabled: Boolean = true,
-    /** Which colour that letter is drawn in, from the bounded palette (REQ-020). */
+    /**
+     * Colour the recognition letter of each word (REQ-020). On by default; the
+     * settings screen calls it "Highlight letter".
+     *
+     * Replaces increment 003's `pivotEnabled`, which also moved the word. A
+     * document written before this build migrates that flag here — see
+     * [com.cedagova.fastreader.library.store.CueSplitV4Migration].
+     */
+    val highlightEnabled: Boolean = true,
+    /**
+     * Hold the highlighted letter on a fixed column left of centre instead of
+     * centring the word (REQ-020). **Off by default**; the settings screen calls
+     * it "Fixed focus letter". [CueSettings] carries the owner decision behind
+     * that default.
+     */
+    val focusAlignmentEnabled: Boolean = false,
+    /** Which colour the highlighted letter is drawn in, from the bounded palette (REQ-020). */
     val pivotColor: PivotColor = PivotColor.ACCENT,
-    /** The guide marks under the alignment column (REQ-021). */
+    /** The guide marks under the word's column (REQ-021). */
     val guideMarksEnabled: Boolean = true,
     /**
      * How much extra pause the timing engine applies at sentence, clause and
@@ -70,7 +84,8 @@ data class ReaderSettings(
      * [com.cedagova.fastreader.ui.theme.FastReaderTheme].
      */
     val cues: CueSettings get() = CueSettings(
-        pivotEnabled = pivotEnabled,
+        highlightEnabled = highlightEnabled,
+        focusAlignmentEnabled = focusAlignmentEnabled,
         pivotColor = pivotColor,
         guideMarksEnabled = guideMarksEnabled,
         wordSizeSp = CueSettings.DEFAULT_WORD_SIZE_SP * fontSize.scale,
