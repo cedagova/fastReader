@@ -84,6 +84,18 @@ object EpubInspector {
                 "the book declares no readable content",
             )
         }
+        // A declared spine is not the same as content that is actually present.
+        // An interrupted download keeps mimetype, container.xml and the OPF —
+        // every one of them complete — and loses the text. Reject only when none
+        // of the spine is in the archive, so an oddly written path costs an
+        // acceptance rather than a wrongly rejected book.
+        if (opf.spineCandidatePaths.none { it in scan.entryNameSet }) {
+            return EpubInspection.Rejected(
+                digest,
+                EpubRejectReason.CORRUPT_ARCHIVE,
+                "the book's content is missing from the file, which looks incomplete",
+            )
+        }
 
         val cover = opf.coverPath
             ?.let { path -> ZipReader.readEntry(source, path, MAX_COVER_BYTES)?.let { EpubCover(opf.coverMediaType, it) } }
@@ -131,6 +143,8 @@ object EpubInspector {
 internal class OpfDocument(
     val metadata: EpubMetadata,
     val spinePaths: List<String>,
+    /** Every form a spine item's zip entry could take: decoded, and as written. */
+    val spineCandidatePaths: Set<String>,
     val coverPath: String?,
     val coverMediaType: String?,
 ) {
@@ -148,20 +162,28 @@ internal class OpfDocument(
                     val id = element.attr("id") ?: return@mapNotNull null
                     val href = element.attr("href") ?: return@mapNotNull null
                     val path = EpubPaths.resolve(opfPath, href) ?: return@mapNotNull null
-                    ManifestItem(id, path, element.attr("media-type"), element.attr("properties").orEmpty())
+                    ManifestItem(
+                        id = id,
+                        path = path,
+                        rawPath = EpubPaths.resolve(opfPath, href, decode = false),
+                        mediaType = element.attr("media-type"),
+                        properties = element.attr("properties").orEmpty(),
+                    )
                 }
                 .associateBy { it.id }
 
-            val spinePaths = elements
+            val spineItems = elements
                 .filter { it.hasLocalName("itemref") }
                 .mapNotNull { it.attr("idref") }
-                .mapNotNull { manifestItems[it]?.path }
+                .mapNotNull { manifestItems[it] }
+            val spinePaths = spineItems.map { it.path }
 
             val cover = resolveCover(root, elements, manifestItems)
 
             return OpfDocument(
                 metadata = readMetadata(root, elements),
                 spinePaths = spinePaths,
+                spineCandidatePaths = spineItems.flatMap { listOfNotNull(it.path, it.rawPath) }.toSet(),
                 coverPath = cover?.path,
                 coverMediaType = cover?.mediaType,
             )
@@ -226,6 +248,8 @@ internal class OpfDocument(
 internal data class ManifestItem(
     val id: String,
     val path: String,
+    /** The same href resolved without percent-decoding; equal to [path] unless the href was encoded. */
+    val rawPath: String?,
     val mediaType: String?,
     val properties: String,
 )

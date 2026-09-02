@@ -3,6 +3,7 @@ package com.cedagova.fastreader.epub
 import java.io.ByteArrayInputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -86,6 +87,42 @@ class EpubInspectorTest {
         assertEquals(EpubRejectReason.CORRUPT_ARCHIVE, result.reason)
     }
 
+    // An interrupted download: every surviving entry is complete, the metadata is
+    // perfect, and none of the book's text is in the file.
+    @Test
+    fun `rejects a download interrupted after the package document`() {
+        val bytes = EpubFixtures.interruptedAfterPackageDocument()
+
+        // Nothing about the archive itself looks damaged, which is why this case
+        // slipped through: the reader stops cleanly at an entry boundary.
+        assertEquals(
+            listOf("mimetype", "META-INF/container.xml", "OEBPS/content.opf"),
+            entryNames(bytes),
+        )
+        assertTrue(bytes.size < EpubFixtures.validEpub().size)
+
+        val result = inspect(bytes) as EpubInspection.Rejected
+
+        assertEquals(EpubRejectReason.CORRUPT_ARCHIVE, result.reason)
+        assertTrue("expected a plain-language reason, got: ${result.detail}", result.detail.contains("incomplete"))
+        assertNotNull("a truncated file still needs a stable identity", result.contentDigest)
+    }
+
+    @Test
+    fun `a percent-encoded spine href still resolves to its entry`() {
+        val result = inspect(EpubFixtures.percentEncodedSpineEpub())
+
+        assertTrue("expected a readable book, got $result", result is EpubInspection.Readable)
+        assertEquals("Spaced Out", (result as EpubInspection.Readable).metadata.title)
+    }
+
+    @Test
+    fun `an entry name that is itself percent-encoded is not mistaken for missing content`() {
+        val result = inspect(EpubFixtures.rawEncodedEntryNameEpub())
+
+        assertTrue("expected a readable book, got $result", result is EpubInspection.Readable)
+    }
+
     @Test
     fun `rejects a zip with no EPUB container`() {
         val result = inspect(EpubFixtures.zipWithoutContainer()) as EpubInspection.Rejected
@@ -161,6 +198,18 @@ class EpubInspectorTest {
         val result = inspect(bytes) as EpubInspection.Rejected
 
         assertEquals(EpubRejectReason.INVALID_STRUCTURE, result.reason)
+    }
+
+    private fun entryNames(bytes: ByteArray): List<String> {
+        val names = mutableListOf<String>()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                names += entry.name
+                zip.closeEntry()
+            }
+        }
+        return names
     }
 
     private fun zipOf(vararg entries: Pair<String, ByteArray>): ByteArray {
