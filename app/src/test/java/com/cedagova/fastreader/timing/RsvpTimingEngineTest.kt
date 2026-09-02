@@ -145,6 +145,28 @@ class RsvpTimingEngineTest {
     }
 
     @Test
+    fun wordsInsideAHeadingReadAtNormalSpeed() {
+        // Research puts the >=4x on the *break after* a heading, not on its words.
+        // `isHeading` is presentation information for LEAF203, and the engine
+        // deliberately ignores it.
+        assertEquals(
+            240L,
+            RsvpTimingEngine.durationMillis(word(isHeading = true, text = "Capítulo"), steady, running),
+        )
+    }
+
+    @Test
+    fun pauseStrengthOffStillHonoursTheRampAndTheHold() {
+        // "Off makes all words uniform" is about REQ-011's modulation. Ramp-up and
+        // the re-orientation hold are REQ-013 and are not a pause between words, so
+        // turning modulation off must not silently disable them too.
+        val off = steady.copy(pauseStrength = PauseStrength.OFF, rampEnabled = true)
+
+        assertEquals(300L, RsvpTimingEngine.plainWordMillis(off, TimingState(0L, reorientationPending = false)))
+        assertEquals(3 * 240L, RsvpTimingEngine.durationMillis(word(), off, TimingState(60_000L, true)))
+    }
+
+    @Test
     fun skipMarkersGetADurationLikeAnyOtherToken() {
         val marker = RsvpTimingEngine.durationMillis(skipMarker(), steady, running)
 
