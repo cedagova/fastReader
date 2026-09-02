@@ -144,13 +144,22 @@ fun buildLibraryUiState(
         },
         failureMessage = (ingestion as? IngestionState.Failed)?.message,
         resumeNotice = resumeBlocked?.let {
-            ResumeNotice(
-                bookId = it.bookId,
-                // A removed book has no catalog entry left to take a title from;
-                // its position survives removal, so the notice still has to render.
-                title = catalog.book(it.bookId)?.title,
-                reason = it.reason,
-            )
+            val book = catalog.book(it.bookId)
+            // Granting access again, or restoring the folder, answers the notice.
+            // Leaving it up would tell a reader who has just fixed the problem
+            // that it is still there.
+            if (book?.status == BookStatus.READABLE) {
+                null
+            } else {
+                ResumeNotice(
+                    bookId = it.bookId,
+                    // A removed book has no catalog entry left to take a title
+                    // from; its position survives removal, so the notice still
+                    // has to render.
+                    title = book?.title,
+                    reason = it.reason,
+                )
+            }
         },
     )
 }

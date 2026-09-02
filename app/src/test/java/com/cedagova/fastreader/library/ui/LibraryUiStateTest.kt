@@ -324,6 +324,25 @@ class LibraryUiStateTest {
         assertEquals(ResumeBlockedReason.REMOVED, notice.reason)
     }
 
+    // Found on the emulator: after granting access again the banner still claimed
+    // the book was unreachable, in front of a library that had just recovered it.
+    @Test
+    fun `a resume notice disappears once the book is readable again`() {
+        val catalog = Catalog(
+            books = listOf(LibraryFixtures.readable("regranted", "Down and Out")),
+            lastReadBookId = "regranted",
+        )
+
+        val state = buildLibraryUiState(
+            catalog,
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("regranted", ResumeBlockedReason.PERMISSION_LOST),
+        )
+
+        assertNull(state.resumeNotice)
+    }
+
     @Test
     fun `an ordinary launch shows no resume notice`() {
         assertNull(buildLibraryUiState(Catalog(), IngestionState.Idle, query = "").resumeNotice)
