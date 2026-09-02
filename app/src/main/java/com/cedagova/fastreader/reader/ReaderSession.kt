@@ -102,8 +102,14 @@ data class ReaderSession(
         }
         if (content.tokens[next].chapterIndex != currentToken.chapterIndex) {
             // The new chapter's first word is on screen but held: play() resumes
-            // from it with the re-orientation hold a fresh chapter deserves.
-            return copy(index = next, mode = ReaderMode.CHAPTER_PAUSE, timing = timing.reorienting())
+            // from it with the re-orientation hold a fresh chapter deserves. The
+            // token that ended the previous chapter still counts towards the ramp
+            // clock, like every other token that was actually shown.
+            return copy(
+                index = next,
+                mode = ReaderMode.CHAPTER_PAUSE,
+                timing = timing.afterShowing(shown).reorienting(),
+            )
         }
         return copy(index = next, timing = timing.afterShowing(shown))
     }

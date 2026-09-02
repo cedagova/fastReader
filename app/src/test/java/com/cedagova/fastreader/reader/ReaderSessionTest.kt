@@ -66,6 +66,17 @@ class ReaderSessionTest {
     }
 
     @Test
+    fun `the token that ends a chapter still counts towards the ramp`() {
+        // Every token that was shown advances the ramp clock. A chapter boundary
+        // re-arms the re-orientation hold, which is a different thing from
+        // forgetting the time the last word of the chapter spent on screen.
+        val lastOfChapter = session(4).play()
+        val crossed = lastOfChapter.advance()
+        assertEquals(lastOfChapter.currentDurationMillis, crossed.timing.elapsedPlaybackMillis)
+        assertTrue(crossed.timing.reorientationPending)
+    }
+
+    @Test
     fun `playing on from a chapter pause does not pause again inside the chapter`() {
         val resumed = session(4).play().advance().play().advance()
         assertEquals(ReaderMode.PLAYING, resumed.mode)
