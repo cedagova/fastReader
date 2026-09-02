@@ -550,21 +550,29 @@ private fun ChapterRow(state: ReaderUiState.Reading, onOpenChapters: () -> Unit)
     }
 }
 
-/** REQ-017: progress percent and time remaining at the current speed. */
+/**
+ * REQ-017: progress percent and time remaining at the current speed.
+ *
+ * The two labels each take half the row rather than being pushed apart by
+ * `SpaceBetween`, which at a 2.0 system font scale let them meet with no gap and
+ * render as "54% readUnder a minute left" (REQ-060). Halves cannot collide: the
+ * longer label wraps inside its own half instead.
+ */
 @Composable
 private fun ProgressRow(state: ReaderUiState.Reading) {
-    Row(
-        modifier = Modifier.fillMaxWidth().testTag("reader_progress"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().testTag("reader_progress")) {
         Text(
             text = stringResource(R.string.reader_progress, state.progressPercent),
             style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
         )
+        Spacer(Modifier.width(8.dp))
         Text(
             text = remainingLabel(state.remainingMillis),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
         )
     }
 }

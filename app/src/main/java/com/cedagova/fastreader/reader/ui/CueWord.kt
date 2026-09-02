@@ -74,8 +74,7 @@ fun CueWord(
 
     // A skip marker is the app talking, not the book (REQ-015): it has no
     // recognition point, so it is never pivot-aligned and never carries a
-    // coloured letter. Guide marks stay put, because they mark the column the
-    // next real word will arrive on.
+    // coloured letter.
     val aligned = cues.pivotEnabled && !token.isSkipMarker
 
     BoxWithConstraints(
@@ -98,7 +97,14 @@ fun CueWord(
 
         val wordAreaHeight = (height - markBand).coerceAtLeast(1f)
 
-        val alignX = width * if (aligned) PIVOT_COLUMN_FRACTION else 0.5f
+        // Two columns, and they are not the same thing. The *marks* hold the
+        // column the stream is aligned to, which is a property of the layout and
+        // of nothing else: it must not move when a skip marker goes past, or the
+        // eye's anchor jumps at exactly the moment it is meant to be holding
+        // still for the next real word. The *word* is placed on that column only
+        // when it has a recognition point to put there.
+        val columnX = width * if (cues.pivotEnabled) PIVOT_COLUMN_FRACTION else 0.5f
+        val alignX = if (aligned) columnX else width * 0.5f
         val style = TextStyle(
             fontSize = baseSize,
             fontStyle = if (token.isSkipMarker) FontStyle.Italic else FontStyle.Normal,
@@ -132,7 +138,7 @@ fun CueWord(
             drawText(layout, topLeft = Offset(x, y))
             if (cues.guideMarksEnabled) {
                 drawGuideMarks(
-                    alignX = alignX,
+                    alignX = columnX,
                     railY = wordAreaHeight / 2f + baseLineHeight / 2f + with(density) { GuideMarkGap.toPx() },
                     railWidth = width * GUIDE_RAIL_FRACTION,
                     color = markColor,
@@ -167,9 +173,11 @@ fun CueWord(
  * | Marker shape | a line segment pointing in from each edge | a filled caret standing under the line, like a cursor |
  *
  * **Why it is drawn this way.** Marks below the text do not sit in the path of
- * the returning eye, a caret reads as "here" rather than as a bracket, and both
- * marks have a fixed size and position, so they add no per-word pixel change to
- * the AD-6 static-luminance surface.
+ * the returning eye, and a caret reads as "here" rather than as a bracket. Their
+ * size and position depend only on the reading width and on whether the pivot
+ * cue is on — never on the token being drawn — so they are the same pixels on
+ * every frame of a running stream and add no per-word change to the AD-6
+ * static-luminance surface.
  */
 private fun DrawScope.drawGuideMarks(
     alignX: Float,
