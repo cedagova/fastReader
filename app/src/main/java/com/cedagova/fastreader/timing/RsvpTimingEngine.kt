@@ -73,6 +73,12 @@ object RsvpTimingEngine {
     private val EMPHASIS_CLASSES: Set<WordClass> =
         setOf(WordClass.LONG, WordClass.NUMBER, WordClass.ALL_CAPS, WordClass.RARE)
 
+    /** Warmed up and not re-orienting: the state [estimatedMillis] reasons in. */
+    private val STEADY = TimingState(
+        elapsedPlaybackMillis = RsvpTiming.RAMP_DURATION_MILLIS,
+        reorientationPending = false,
+    )
+
     /**
      * How long [token] is shown, in whole milliseconds, given [settings] and the
      * current [state]. Never less than 1 ms.
@@ -95,6 +101,23 @@ object RsvpTimingEngine {
      */
     fun plainWordMillis(settings: TimingSettings, state: TimingState): Long =
         wordMillis(settings, state).roundToLong().coerceAtLeast(1L)
+
+    /**
+     * How long [tokens] take to stream at steady speed.
+     *
+     * This is the number REQ-017's "time remaining" needs, and it exists here
+     * because nothing else can compute it. LEAF201 deliberately stops at
+     * `wordsRemaining`, noting that "LEAF202 adds its pause multipliers on top" —
+     * and those multipliers are not a rounding error. Streaming a book with the
+     * research defaults costs meaningfully more than `words / wpm`, by an amount
+     * that depends on how the book is punctuated, so a reader told "12 minutes
+     * left" from the naive figure would consistently run over.
+     *
+     * Ramp-up and the re-orientation hold are excluded on purpose: an estimate
+     * for a whole book should not lurch every time the reader jumps.
+     */
+    fun estimatedMillis(tokens: Iterable<Token>, settings: TimingSettings): Long =
+        tokens.sumOf { durationMillis(it, settings, STEADY) }
 
     /**
      * The current speed as a fraction of target, `0.8..1.0` while the ramp
