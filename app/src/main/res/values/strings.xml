@@ -37,4 +37,39 @@
     <string name="library_scan_counts">%1$d of %2$d</string>
 
     <string name="library_problem_title">The library could not be updated</string>
+    <!-- Reader screen -->
+    <string name="reader_back">Back to library</string>
+    <string name="reader_opening">Opening %1$s…</string>
+    <string name="reader_percent">%1$d%%</string>
+    <string name="reader_unavailable_title">This book cannot be read</string>
+
+    <string name="reader_play">Play</string>
+    <string name="reader_pause">Pause</string>
+    <string name="reader_back_sentence">Back one sentence</string>
+    <string name="reader_forward_sentence">Forward one sentence</string>
+    <string name="reader_back_paragraph">Back one paragraph</string>
+    <string name="reader_forward_paragraph">Forward one paragraph</string>
+
+    <string name="reader_chapters">Chapters</string>
+    <string name="reader_close">Close</string>
+    <string name="reader_chapter_position">%1$d of %2$d</string>
+    <string name="reader_chapter_pause_hint">Play to read on.</string>
+
+    <string name="reader_finished_title">You have reached the end of</string>
+    <string name="reader_finished_hint">Use the chapter list or the slider to go back into the book.</string>
+
+    <string name="reader_progress">%1$d%% read</string>
+    <string name="reader_remaining_none">End of book</string>
+    <string name="reader_remaining_under_minute">Under a minute left</string>
+    <string name="reader_remaining_minutes">%1$d min left</string>
+    <string name="reader_remaining_hours">%1$d h %2$d min left</string>
+    <string name="reader_scrub">Position in the book</string>
+
+    <string name="reader_speed_label">Reading speed</string>
+    <string name="reader_speed">%1$d WPM</string>
+    <string name="reader_speed_hint">Above 450 WPM most readers take in less of what they read. Playback continues either way.</string>
+
+    <string name="reader_context_continues">…</string>
+
+    <string name="library_open">Open %1$s</string>
 </resources>
