@@ -34,14 +34,23 @@ object EpubFixtures {
         identifier: String = "urn:uuid:11111111-1111-1111-1111-111111111111",
         withCover: Boolean = true,
         bodyText: String = "One word at a time.",
-    ): ByteArray {
+    ): ByteArray = zip(validEntries(title, author, language, identifier, withCover, bodyText))
+
+    private fun validEntries(
+        title: String = "The Quiet Machine",
+        author: String = "Ada Fielding",
+        language: String = "en",
+        identifier: String = "urn:uuid:11111111-1111-1111-1111-111111111111",
+        withCover: Boolean = true,
+        bodyText: String = "One word at a time.",
+    ): List<Pair<String, ByteArray>> {
         val entries = mutableListOf(
             "META-INF/container.xml" to CONTAINER.toByteArray(Charsets.UTF_8),
             "OEBPS/content.opf" to opf(title, author, language, identifier, withCover).toByteArray(Charsets.UTF_8),
             "OEBPS/chapter1.xhtml" to xhtml(bodyText).toByteArray(Charsets.UTF_8),
         )
         if (withCover) entries += "OEBPS/images/cover.png" to TINY_PNG
-        return zip(entries)
+        return entries
     }
 
     /** A Spanish book: accents and inverted punctuation in title and author. */
@@ -77,11 +86,74 @@ object EpubFixtures {
     /** Bytes that are not a zip at all. */
     fun notAZip(): ByteArray = "this is plain text, not an archive".toByteArray(Charsets.UTF_8)
 
-    /** A zip truncated part way through, as a half-copied download would be. */
+    /** A zip cut in the middle of an entry, so the archive itself fails to read. */
     fun truncatedZip(): ByteArray {
         val whole = validEpub()
         return whole.copyOfRange(0, whole.size / 2)
     }
+
+    /**
+     * A download interrupted right after the package document.
+     *
+     * EPUB writes `mimetype`, then `META-INF/container.xml`, then the OPF, and
+     * only then the content documents, so an interrupted download commonly stops
+     * here. The prefix is a clean sequence of complete entries — `ZipInputStream`
+     * reaches the end without complaining — and it carries perfectly good title
+     * and author metadata for a book whose text is not in the file at all.
+     */
+    fun interruptedAfterPackageDocument(): ByteArray {
+        val (bytes, endOffsets) = zipWithEntryOffsets(validEntries(withCover = true))
+        return bytes.copyOfRange(0, endOffsets.getValue("OEBPS/content.opf"))
+    }
+
+    /**
+     * A book whose spine href is percent-encoded and whose zip entry has the
+     * decoded name — the ordinary way a file with a space in its name is written.
+     * It must stay readable.
+     */
+    fun percentEncodedSpineEpub(): ByteArray = zip(
+        listOf(
+            "META-INF/container.xml" to CONTAINER.toByteArray(Charsets.UTF_8),
+            "OEBPS/content.opf" to """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="pub-id">urn:uuid:encoded</dc:identifier>
+    <dc:title>Spaced Out</dc:title>
+    <dc:creator>Nadia Holt</dc:creator>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="ch1" href="text/chapter%20one.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="ch1"/></spine>
+</package>""".toByteArray(Charsets.UTF_8),
+            "OEBPS/text/chapter one.xhtml" to xhtml("Body").toByteArray(Charsets.UTF_8),
+        ),
+    )
+
+    /**
+     * A book whose zip entry name is itself percent-encoded, so the decoded spine
+     * path does not match it. Unusual, but it must not be mistaken for a
+     * truncated download.
+     */
+    fun rawEncodedEntryNameEpub(): ByteArray = zip(
+        listOf(
+            "META-INF/container.xml" to CONTAINER.toByteArray(Charsets.UTF_8),
+            "OEBPS/content.opf" to """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="pub-id">urn:uuid:rawencoded</dc:identifier>
+    <dc:title>Literally Encoded</dc:title>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="ch1" href="text/chapter%20one.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="ch1"/></spine>
+</package>""".toByteArray(Charsets.UTF_8),
+            "OEBPS/text/chapter%20one.xhtml" to xhtml("Body").toByteArray(Charsets.UTF_8),
+        ),
+    )
 
     /** A readable zip with no EPUB container. */
     fun zipWithoutContainer(): ByteArray = zip(listOf("readme.txt" to "hello".toByteArray(Charsets.UTF_8)))
@@ -188,7 +260,16 @@ object EpubFixtures {
      */
     private const val FIXED_ENTRY_TIME_MS = 1_600_000_000_000L
 
-    private fun zip(entries: List<Pair<String, ByteArray>>): ByteArray {
+    private fun zip(entries: List<Pair<String, ByteArray>>): ByteArray = zipWithEntryOffsets(entries).first
+
+    /**
+     * Builds the archive and reports, per entry name, the byte offset just past
+     * that entry — which is where a download that stopped after it would end.
+     */
+    private fun zipWithEntryOffsets(
+        entries: List<Pair<String, ByteArray>>,
+    ): Pair<ByteArray, Map<String, Int>> {
+        val endOffsets = LinkedHashMap<String, Int>()
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
             val mimetype = "application/epub+zip".toByteArray(Charsets.US_ASCII)
@@ -202,13 +283,17 @@ object EpubFixtures {
             zip.putNextEntry(stored)
             zip.write(mimetype)
             zip.closeEntry()
+            zip.flush()
+            endOffsets["mimetype"] = out.size()
 
             entries.forEach { (name, bytes) ->
                 zip.putNextEntry(ZipEntry(name).apply { time = FIXED_ENTRY_TIME_MS })
                 zip.write(bytes)
                 zip.closeEntry()
+                zip.flush()
+                endOffsets[name] = out.size()
             }
         }
-        return out.toByteArray()
+        return out.toByteArray() to endOffsets
     }
 }

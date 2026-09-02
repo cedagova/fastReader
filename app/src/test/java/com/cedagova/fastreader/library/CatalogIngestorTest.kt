@@ -226,6 +226,22 @@ class CatalogIngestorTest {
         assertEquals(BookStatus.READABLE, byStatus.getValue(BookStatus.READABLE).status)
     }
 
+    // REQ-005: a half-downloaded book must reach the library as unreadable with a
+    // reason, not as a normal book at 0% read.
+    @Test
+    fun `a half-downloaded book is catalogued as corrupt rather than readable`() {
+        gateway.putDocument("doc://partial", EpubFixtures.interruptedAfterPackageDocument(), "half-book.epub")
+
+        val outcome = ingestor.addPickedBooks(Catalog(), listOf("doc://partial"))
+
+        val book = outcome.catalog.books.single()
+        assertEquals(BookStatus.CORRUPT, book.status)
+        assertEquals(BookContentStatus.CORRUPT, book.contentStatus)
+        assertEquals("CORRUPT_ARCHIVE", book.rejectReason)
+        assertTrue(book.rejectDetail!!.contains("incomplete"))
+        assertEquals(1, outcome.rejected)
+    }
+
     @Test
     fun `a rejected book that goes missing reports missing but keeps why it was rejected`() {
         gateway.putDocument("doc://drm", EpubFixtures.drmProtectedEpub(), "locked.epub")

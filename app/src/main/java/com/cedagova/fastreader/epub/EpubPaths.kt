@@ -5,9 +5,16 @@ import java.io.ByteArrayOutputStream
 /** Zip-path helpers for hrefs written inside an OPF. */
 internal object EpubPaths {
 
-    /** Resolves [href] (possibly percent-encoded and relative) against the OPF's directory. */
-    fun resolve(opfPath: String, href: String): String? {
-        val cleaned = decodePercent(href).substringBefore('#').trim()
+    /**
+     * Resolves [href] (possibly percent-encoded and relative) against the OPF's
+     * directory.
+     *
+     * [decode] normally percent-decodes, because a file named `chapter one.xhtml`
+     * is referenced as `chapter%20one.xhtml`. Passing false keeps the literal
+     * form, for the rare archive whose entry names are themselves encoded.
+     */
+    fun resolve(opfPath: String, href: String, decode: Boolean = true): String? {
+        val cleaned = (if (decode) decodePercent(href) else href).substringBefore('#').trim()
         if (cleaned.isEmpty()) return null
         if (cleaned.contains("://")) return null // remote resources are never part of the package
         val base = opfPath.substringBeforeLast('/', missingDelimiterValue = "")
