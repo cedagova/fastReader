@@ -45,9 +45,11 @@ import kotlinx.coroutines.delay
  * one is shown by the mechanism it actually affects rather than by a picture of
  * it:
  *
- * - **Pivot cue, its colour, guide marks, font size** change how the word is
- *   *drawn*, so this draws it with [CueWord] — the same composable the reader
- *   uses, given the same [CueSettings]. There is no second renderer to drift.
+ * - **Letter highlight, its colour, fixed focus letter, guide marks, font size**
+ *   change how the word is *drawn*, so this draws it with [CueWord] — the same
+ *   composable the reader uses, given the same [CueSettings]. There is no second
+ *   renderer to drift, which is why turning the fixed focus letter on moves the
+ *   previewed word off centre here exactly as it does in the book.
  * - **Pause strength** changes the *rhythm*, which a still word cannot show. So
  *   the sample streams: the word changes on the duration
  *   [RsvpTimingEngine] gives that token at the chosen strength, and the reader

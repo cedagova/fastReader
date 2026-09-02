@@ -81,14 +81,27 @@ class SettingsAccessibilityTest {
         ).forEach { expected ->
             assertTrue("no control announces \"$expected\", only $labels", labels.contains(expected))
         }
+        // REQ-060 for the two cue toggles #32 split apart: each announces its own
+        // name and what it does, in the plain wording the screen shows.
         assertTrue(
-            "the pivot switch should name what it toggles, got $labels",
-            labels.any { it.startsWith("Pivot cue.") },
+            "the highlight switch should name what it toggles, got $labels",
+            labels.any { it.startsWith("Highlight letter. Colour one letter") },
+        )
+        assertTrue(
+            "the fixed-focus switch should name what it toggles, got $labels",
+            labels.any { it.startsWith("Fixed focus letter. Shift each word") },
         )
         assertTrue(
             "the guide-marks switch should name what it toggles, got $labels",
             labels.any { it.startsWith("Guide marks.") },
         )
+        // The mechanism's internal vocabulary must not reach a screen reader.
+        listOf("pivot", "ORP", "Spritz").forEach { word ->
+            assertTrue(
+                "no control may announce \"$word\", got $labels",
+                labels.none { it.contains(word, ignoreCase = true) },
+            )
+        }
     }
 
     /** Android's accessibility minimum, in the dp this screen is laid out in. */

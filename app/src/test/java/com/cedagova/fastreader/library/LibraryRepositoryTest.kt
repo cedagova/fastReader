@@ -271,7 +271,8 @@ class LibraryRepositoryTest {
             it.copy(
                 theme = ThemeChoice.LIGHT,
                 fontSize = FontSize.EXTRA_LARGE,
-                pivotEnabled = false,
+                highlightEnabled = false,
+                focusAlignmentEnabled = true,
                 pivotColor = PivotColor.TEAL,
                 guideMarksEnabled = false,
                 pauseStrength = PauseStrength.STRONG,

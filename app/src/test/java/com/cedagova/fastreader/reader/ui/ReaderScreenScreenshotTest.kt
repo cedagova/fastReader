@@ -105,45 +105,59 @@ class ReaderScreenScreenshotTest {
         )
     }
 
-    // --- The cue matrix (LEAF301) -------------------------------------------
+    // --- The cue matrix ------------------------------------------------------
     //
     // One golden per cue combination the reader can be looking at, because a cue
-    // is a *rendering*: whether the pivot letter is coloured and where the word
-    // sits are claims only an image can settle. Playback is identical in all of
-    // them — the same session, the same word — so any difference between two of
+    // is a *rendering*: whether the recognition letter is coloured and where the
+    // word sits are claims only an image can settle. Playback is identical in all
+    // of them — the same session, the same word — so any difference between two of
     // these images is the cue layer and nothing else.
 
-    /** REQ-020 on its own: the word held on its pivot letter, in the accent colour. */
+    /**
+     * #32's acceptance: **Fixed focus letter** on reproduces increment 003's
+     * rendering exactly. Same golden, same bytes, from the two split flags that
+     * replaced the one `pivotEnabled`.
+     */
     @Test
-    fun thePivotCueAloneAlignsTheWordOnAColouredLetter() {
-        capture("reader_cue_pivot", playingAt(12), cues = CueSettings.PIVOT_ONLY)
+    fun theFixedFocusLetterHoldsTheWordOnAColouredLetter() {
+        capture("reader_cue_pivot", playingAt(12), cues = CueSettings.FOCUS_ALIGNED_ONLY)
     }
 
-    /** REQ-020, cue off: "disabling the cue shows plain centered words". */
+    /** REQ-020, highlight off: "disabling the cue shows plain centered words". */
     @Test
-    fun turningThePivotCueOffCentresThePlainWord() {
+    fun turningTheHighlightOffLeavesAPlainCentredWord() {
         capture("reader_cue_off", playingAt(12), cues = CueSettings.NO_CUES)
     }
 
     /**
-     * REQ-021: the guide marks, in the original design the PR documents. This is
-     * also the app's default presentation, so it is what every other reader
-     * golden here shows.
+     * #32's default: the word centred on the screen axis with its recognition
+     * letter coloured and the marks under the centre column. This is what the app
+     * ships with, so it is what every other reader golden here shows.
      */
     @Test
-    fun theGuideMarksSitUnderTheAlignmentColumn() {
-        capture("reader_cue_guide_marks", playingAt(12), cues = CueSettings.ALL_CUES)
+    fun theDefaultPresentationCentresTheWordAndColoursOneLetter() {
+        capture("reader_cue_guide_marks", playingAt(12), cues = CueSettings.DEFAULTS)
     }
 
     @Test
     fun theSameCuesOnADarkPage() {
-        capture("reader_cue_guide_marks_dark", playingAt(12), cues = CueSettings.ALL_CUES, darkTheme = true)
+        capture("reader_cue_guide_marks_dark", playingAt(12), cues = CueSettings.DEFAULTS, darkTheme = true)
+    }
+
+    /**
+     * The opt-in state with the marks on: the word off centre, the caret moved to
+     * the column with it. Side by side with `reader_cue_guide_marks` this is the
+     * whole of what the **Fixed focus letter** toggle does.
+     */
+    @Test
+    fun theFixedFocusLetterMovesTheWordAndTheCaretTogether() {
+        capture("reader_cue_focus_alignment", playingAt(12), cues = CueSettings.ALL_CUES)
     }
 
     /** REQ-030: nothing on screen but the word and the cues left enabled. */
     @Test
     fun focusedModeLeavesOnlyTheStream() {
-        capture("reader_focused", playingAt(12), cues = CueSettings.ALL_CUES, focused = true)
+        capture("reader_focused", playingAt(12), cues = CueSettings.DEFAULTS, focused = true)
     }
 
     /**
@@ -153,26 +167,47 @@ class ReaderScreenScreenshotTest {
      */
     @Test
     fun aTapInFocusedModeStillShowsTheParagraph() {
-        capture("reader_focused_paused", pausedAt(12), cues = CueSettings.ALL_CUES, focused = true)
+        capture("reader_focused_paused", pausedAt(12), cues = CueSettings.DEFAULTS, focused = true)
     }
 
     /**
-     * Overflow: a real 19-letter word from the Spanish fixture, on the smallest
-     * phone in the matrix, at twice the system font scale. It has to shrink, not
-     * truncate and not wrap — and with the pivot cue on it also has to keep its
-     * recognition point on the column, which is the stricter of the two fits.
+     * Overflow at the shipped default: a real 19-letter word from the Spanish
+     * fixture, on the smallest phone in the matrix, at twice the system font
+     * scale. It has to shrink, not truncate and not wrap, and stay centred.
      */
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)
     fun aLongWordAtTwiceTheFontScaleShrinksToFit() {
-        val spanish = ReaderFixtures.spanishNovel
-        val longWord = spanish.tokens.first { it is WordToken && it.text == "extraordinariamente" }.index
         capture(
             "reader_cue_overflow",
-            ReaderBookView(SPANISH_TITLE, spanish).present(ReaderSession(spanish).jumpTo(longWord).play()),
+            overflowState(),
+            cues = CueSettings.DEFAULTS,
+            fontScale = 2f,
+        )
+    }
+
+    /**
+     * The same word with the fixed focus letter on, which is the stricter of the
+     * two fits: the part left of the recognition letter has to fit left of the
+     * column and the part right of it right of the column, because the column
+     * does not move. Byte-identical to increment 003's overflow golden.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun aLongWordStillFitsAroundTheFixedColumn() {
+        capture(
+            "reader_cue_overflow_aligned",
+            overflowState(),
             cues = CueSettings.ALL_CUES,
             fontScale = 2f,
         )
+    }
+
+    private fun overflowState(): ReaderUiState {
+        val spanish = ReaderFixtures.spanishNovel
+        val longWord = spanish.tokens.first { it is WordToken && it.text == "extraordinariamente" }.index
+        return ReaderBookView(SPANISH_TITLE, spanish)
+            .present(ReaderSession(spanish).jumpTo(longWord).play())
     }
 
     /** Cramped 720p phone (`Phone_Low_API33`) at a large system font scale (REQ-060). */
