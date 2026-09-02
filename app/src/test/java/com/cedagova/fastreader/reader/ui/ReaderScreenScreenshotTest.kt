@@ -12,6 +12,8 @@ import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderSession
 import com.cedagova.fastreader.settings.CueSettings
+import com.cedagova.fastreader.settings.FontSize
+import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -191,6 +193,22 @@ class ReaderScreenScreenshotTest {
         capture("reader_landscape", playingAt(12))
     }
 
+    /**
+     * REQ-022: the text-size setting reaches the reader — the streamed word, the
+     * paused paragraph and every control together, not one of them alone. Same
+     * session as `reader_paused`; only the setting differs.
+     *
+     * Both halves of that setting are applied the way [ReaderRoute] applies them:
+     * the theme carries the chrome, and the cue value carries the word, because
+     * Android's font-scale curve is flat at the word's size and would otherwise
+     * leave it exactly as it was.
+     */
+    @Test
+    fun theTextSizeSettingAppliesToTheReader() {
+        val largest = ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE)
+        capture("reader_font_extra_large", pausedAt(12), cues = largest.cues, fontSize = largest.fontSize)
+    }
+
     private fun playingAt(index: Int) = view.present(ReaderSession(book).jumpTo(index).play())
 
     private fun pausedAt(index: Int) = view.present(ReaderSession(book).jumpTo(index))
@@ -202,10 +220,11 @@ class ReaderScreenScreenshotTest {
         fontScale: Float = 1f,
         cues: CueSettings = CueSettings(),
         focused: Boolean = false,
+        fontSize: FontSize = FontSize.MEDIUM,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
-                FastReaderTheme(darkTheme = darkTheme) {
+                FastReaderTheme(darkTheme = darkTheme, fontSize = fontSize) {
                     ReaderScreen(
                         state = state,
                         onBack = {},

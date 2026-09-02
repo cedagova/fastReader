@@ -20,6 +20,7 @@ import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
+import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
@@ -115,15 +116,26 @@ class LibraryScreenScreenshotTest {
         capture("library_compact_large_font", state(failureCatalog()), fontScale = 1.3f)
     }
 
+    /**
+     * REQ-022's other half: the text-size setting is applied by the app's theme,
+     * so it reaches the library as well as the reader. Same catalog and same
+     * screen as `library_populated`; the only difference is the setting.
+     */
+    @Test
+    fun theTextSizeSettingAppliesToTheLibrary() {
+        capture("library_font_extra_large", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
+    }
+
     private fun capture(
         name: String,
         state: LibraryUiState,
         darkTheme: Boolean = false,
         fontScale: Float = 1f,
+        fontSize: FontSize = FontSize.MEDIUM,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
-                FastReaderTheme(darkTheme = darkTheme) {
+                FastReaderTheme(darkTheme = darkTheme, fontSize = fontSize) {
                     LibraryScreen(
                         state = state,
                         onQueryChange = {},

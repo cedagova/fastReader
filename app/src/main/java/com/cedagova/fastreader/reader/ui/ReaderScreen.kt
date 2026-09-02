@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -129,6 +130,8 @@ fun ReaderScreen(
     /** REQ-030: chrome hidden, stream and cues left alone. */
     focused: Boolean = false,
     onToggleFocused: () -> Unit = {},
+    /** Opens the settings screen (LEAF302). Hidden with the rest of the chrome in focused mode. */
+    onOpenSettings: () -> Unit = {},
     word: @Composable (ReaderWord, Modifier) -> Unit = { token, wordModifier ->
         CueWord(token, cues, wordModifier)
     },
@@ -163,6 +166,21 @@ fun ReaderScreen(
                                 .testTag("reader_back"),
                         ) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                    },
+                    actions = {
+                        // Cues and pause strength are things a reader judges while
+                        // actually reading, so settings are one tap from the book
+                        // rather than only from the library (REQ-023).
+                        val settings = stringResource(R.string.settings_open)
+                        IconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier
+                                .size(TouchTarget)
+                                .semantics { contentDescription = settings }
+                                .testTag("reader_settings"),
+                        ) {
+                            Icon(imageVector = Icons.Filled.Settings, contentDescription = null)
                         }
                     },
                 )

@@ -172,7 +172,18 @@ data class ChapterEntry(
 class ReaderBookView(
     val bookTitle: String,
     content: BookContent,
-    pauseStrength: PauseStrength = PauseStrength.NORMAL,
+    /**
+     * The pause strength the time-remaining index was measured at (REQ-017).
+     *
+     * It is a constructor parameter and not a setter because the index *is* a
+     * function of it: displayed time remaining comes from the timing engine's
+     * estimate, which includes pause time, so a book read with `off` finishes
+     * materially sooner than the same book read with `strong`. Changing the
+     * setting mid-book therefore has to build a new view rather than leave a
+     * stale estimate on screen — see
+     * [com.cedagova.fastreader.reader.ReaderViewModel.setPauseStrength].
+     */
+    val pauseStrength: PauseStrength = PauseStrength.NORMAL,
 ) {
 
     private val remaining = RemainingTimeIndex.build(content, pauseStrength)

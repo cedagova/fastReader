@@ -5,6 +5,11 @@ import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
+import com.cedagova.fastreader.settings.FontSize
+import com.cedagova.fastreader.settings.PivotColor
+import com.cedagova.fastreader.settings.ReaderSettings
+import com.cedagova.fastreader.settings.ThemeChoice
+import com.cedagova.fastreader.timing.PauseStrength
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -237,6 +242,70 @@ class LibraryRepositoryTest {
         assertNull(repository.persistenceFailure.value)
         assertTrue(repository.ingestion.value !is IngestionState.Failed)
         assertEquals(121, repository.readingState(bookId)?.tokenIndex)
+    }
+
+    // --- Settings (LEAF302) -------------------------------------------------
+
+    @Test
+    fun `a settings change is stored and survives a restart of the repository`() = runTest {
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.load()
+
+        first.updateSettings { it.copy(theme = ThemeChoice.DARK, pauseStrength = PauseStrength.OFF) }
+
+        val second = repository(FileCatalogStore(file), backgroundScope)
+        second.load()
+
+        assertEquals(ThemeChoice.DARK, second.settings.value.theme)
+        assertEquals(PauseStrength.OFF, second.settings.value.pauseStrength)
+        assertEquals(FontSize.MEDIUM, second.settings.value.fontSize)
+    }
+
+    /** REQ-023: reset restores exactly the documented defaults, not "most of" them. */
+    @Test
+    fun `reset to defaults restores every documented default`() = runTest {
+        val repository = repository(scope = backgroundScope)
+        repository.load()
+        repository.updateSettings {
+            it.copy(
+                theme = ThemeChoice.LIGHT,
+                fontSize = FontSize.EXTRA_LARGE,
+                pivotEnabled = false,
+                pivotColor = PivotColor.TEAL,
+                guideMarksEnabled = false,
+                pauseStrength = PauseStrength.STRONG,
+            )
+        }
+
+        repository.updateSettings { ReaderSettings.DEFAULTS }
+
+        assertEquals(ReaderSettings.DEFAULTS, repository.settings.value)
+        assertTrue(repository.settings.value.isDefault)
+    }
+
+    /**
+     * The definition's persistence guardrail applied to settings: a change that
+     * cannot be written leaves the reader looking at the value that *is* stored,
+     * with the reason on screen — never a control that appears to have taken.
+     */
+    @Test
+    fun `a settings write that fails is loud and does not pretend to have taken`() = runTest {
+        val store = FailableStore(FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")))
+        val repository = repository(store, backgroundScope)
+        repository.load()
+
+        store.failing = true
+        repository.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+
+        assertEquals(ThemeChoice.SYSTEM, repository.settings.value.theme)
+        assertEquals("the disk is full", repository.persistenceFailure.value)
+
+        store.failing = false
+        repository.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+
+        assertEquals(ThemeChoice.DARK, repository.settings.value.theme)
+        assertNull(repository.persistenceFailure.value)
     }
 
     /** Wraps a real store so a write can be made to fail and then recover. */

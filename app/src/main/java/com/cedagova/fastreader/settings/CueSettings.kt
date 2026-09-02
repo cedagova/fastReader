@@ -1,5 +1,7 @@
 package com.cedagova.fastreader.settings
 
+import kotlinx.serialization.Serializable
+
 /**
  * The cue layer's parameters (REQ-020/REQ-021), as plain data.
  *
@@ -57,6 +59,7 @@ data class CueSettings(
  * and each entry has to resolve differently in the light and dark themes. LEAF302
  * owns the picker; these are the values it picks from.
  */
+@Serializable
 enum class PivotColor {
     /** The app's own accent — the theme's primary colour. The default. */
     ACCENT,

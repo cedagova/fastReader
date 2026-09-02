@@ -3,6 +3,7 @@ package com.cedagova.fastreader.library
 import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
+import com.cedagova.fastreader.settings.ReaderSettings
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -40,6 +41,7 @@ class LibraryRepository(
     private val _catalog = MutableStateFlow(Catalog())
     private val _ingestion = MutableStateFlow<IngestionState>(IngestionState.Idle)
     private val _persistenceFailure = MutableStateFlow<String?>(null)
+    private val _settings = MutableStateFlow(ReaderSettings.DEFAULTS)
 
     /**
      * Coalesces reading positions so the reader can report one per word without
@@ -65,6 +67,24 @@ class LibraryRepository(
      * on the reading surface, where the library's own banner is not visible.
      */
     val persistenceFailure: StateFlow<String?> = _persistenceFailure.asStateFlow()
+
+    /**
+     * How the reader wants books presented (LEAF302).
+     *
+     * A projection of [catalog], so there is exactly one source of truth: the
+     * settings screen, the app's theme, the library and the reader all read the
+     * value the store accepted, and a write that fails leaves every one of them
+     * showing what is actually saved while [persistenceFailure] says why.
+     *
+     * It is published by [publish] alongside the catalog rather than derived with
+     * `map(…).stateIn(…)`, because that would put a dispatch between a settings
+     * write landing and the theme changing — one frame of the old theme on every
+     * change, and a value that lags its own catalog in any caller that reads both.
+     *
+     * Its value is [ReaderSettings.DEFAULTS] until [load] has run, which is also
+     * what a device with nothing stored resolves to.
+     */
+    val settings: StateFlow<ReaderSettings> = _settings.asStateFlow()
 
     /** Loads the stored catalog without scanning. Safe to call repeatedly. */
     suspend fun load() = mutex.withLock { ensureLoaded() }
@@ -97,11 +117,11 @@ class LibraryRepository(
         )
         try {
             withContext(ioDispatcher) { store.save(next) }
-            _catalog.value = next
+            publish(next)
         } catch (error: Exception) {
             // Routing still uses the fresher in-memory answer; the write failing
             // is a library problem, not a reason to resume into an unreadable book.
-            _catalog.value = next
+            publish(next)
             val message = error.message ?: "the library could not be updated"
             _ingestion.value = IngestionState.Failed(message)
             _persistenceFailure.value = message
@@ -171,6 +191,25 @@ class LibraryRepository(
     /** Stores the reading position for a book, waiting for the write. */
     suspend fun updateReadingState(bookId: String, state: ReadingState) = writeReadingState(bookId, state)
 
+    /**
+     * Stores a change to the reader's settings (REQ-020 to REQ-023).
+     *
+     * Takes a transform rather than a whole value so two changes made in quick
+     * succession cannot lose one another: each one is applied to whatever the
+     * store currently holds, under the same mutex every other catalog write uses.
+     *
+     * The write is loud on failure like every other one here — [settings] keeps
+     * reporting the value that is actually saved and [persistenceFailure] carries
+     * the reason — so a setting that appears not to take is a store problem the
+     * reader is told about, never a silently discarded preference.
+     */
+    suspend fun updateSettings(transform: (ReaderSettings) -> ReaderSettings) =
+        mutateCatalog { it.copy(settings = transform(it.settings)) }
+
+    /** Fire-and-forget [updateSettings], for the settings screen's callbacks. */
+    fun requestUpdateSettings(transform: (ReaderSettings) -> ReaderSettings): Job =
+        scope.launch { updateSettings(transform) }
+
     /** The retained position for a book, including one that was removed and re-added. */
     fun readingState(bookId: String): ReadingState? = _catalog.value.readingStates[bookId]
 
@@ -229,7 +268,7 @@ class LibraryRepository(
         try {
             val outcome = withContext(ioDispatcher) { block(_catalog.value, progress) }
             withContext(ioDispatcher) { store.save(outcome.catalog) }
-            _catalog.value = outcome.catalog
+            publish(outcome.catalog)
             _persistenceFailure.value = null
             lastScanAtEpochMs = clock()
             _ingestion.value = IngestionState.Completed(
@@ -250,7 +289,7 @@ class LibraryRepository(
         try {
             val next = block(_catalog.value)
             withContext(ioDispatcher) { store.save(next) }
-            _catalog.value = next
+            publish(next)
             _persistenceFailure.value = null
             // A store that has just accepted a write is no longer failing, so the
             // library's banner has to go with the reader's. Without this, one
@@ -268,6 +307,15 @@ class LibraryRepository(
         }
     }
 
+    /**
+     * The one place the catalog becomes visible, so [catalog] and [settings] can
+     * never disagree about which document they describe.
+     */
+    private fun publish(next: Catalog) {
+        _catalog.value = next
+        _settings.value = next.settings
+    }
+
     /** Returns false when the catalog must not be written, leaving the reason in [ingestion]. */
     private suspend fun ensureLoaded(): Boolean {
         blockedMessage?.let {
@@ -278,7 +326,7 @@ class LibraryRepository(
         if (loaded) return true
         return when (val load = withContext(ioDispatcher) { store.load() }) {
             is CatalogLoad.Loaded -> {
-                _catalog.value = load.catalog
+                publish(load.catalog)
                 loaded = true
                 true
             }

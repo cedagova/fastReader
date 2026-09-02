@@ -22,8 +22,11 @@ object CatalogSchema {
      *   index carrying the identity and pipeline version that make it meaningful,
      *   plus the reading speed, and the catalog remembers the last-read book so
      *   launch can resume into it.
+     * - **3** — increment 003 (LEAF302): the reader's settings — theme, font size,
+     *   pivot cue and its colour, guide marks, pause strength — each with a
+     *   documented default that an absent key reads back as.
      */
-    const val CURRENT_VERSION: Int = 2
+    const val CURRENT_VERSION: Int = 3
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -32,6 +35,7 @@ object CatalogSchema {
      */
     val MIGRATIONS: Map<Int, CatalogMigration> = mapOf(
         1 to ReadingStateV2Migration,
+        2 to SettingsV3Migration,
     )
 }
 

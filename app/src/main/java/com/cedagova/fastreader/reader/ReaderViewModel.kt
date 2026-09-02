@@ -81,6 +81,15 @@ class ReaderViewModel(
     private var session: ReaderSession? = null
     private var persistenceFailure: String? = null
 
+    /**
+     * The reader's chosen pause strength (LEAF302). Held here rather than only in
+     * the session because the *time-remaining index* depends on it too, and that
+     * index is rebuilt off the main thread — so the wanted value and the value the
+     * current [ReaderBookView] was built at have to be comparable.
+     */
+    private var pauseStrength: PauseStrength = PauseStrength.NORMAL
+    private var rebuild: Job? = null
+
     init {
         // A failing store must be visible on the reading surface, not only on the
         // library's banner: this is where the reader is when their place is lost.
@@ -107,6 +116,7 @@ class ReaderViewModel(
         if (openBookId != null) persist(flush = true)
         openBookId = bookId
         parse?.cancel()
+        rebuild?.cancel()
         view = null
         session = null
         val title = books.title(bookId)
@@ -128,7 +138,7 @@ class ReaderViewModel(
                 // belongs on the parsing thread, next to the parse, not on the
                 // first frame of the reader.
                 val book = withContext(indexDispatcher) {
-                    ReaderBookView(title, content, PauseStrength.NORMAL)
+                    ReaderBookView(title, content, pauseStrength)
                 }
                 view = book
                 // Resuming lands paused, on the stored word, at the stored speed
@@ -137,9 +147,17 @@ class ReaderViewModel(
                 session = ReaderSession(
                     content = content,
                     index = stored?.resolveIndex(content) ?: 0,
-                    settings = TimingSettings(wpm = stored?.wpm ?: RsvpTiming.DEFAULT_WPM),
+                    settings = TimingSettings(
+                        wpm = stored?.wpm ?: RsvpTiming.DEFAULT_WPM,
+                        pauseStrength = pauseStrength,
+                    ),
                 )
                 publish()
+                // The setting can have changed while this book was parsing, and
+                // the index above was measured at whatever it was when the parse
+                // began. Reconciling here means a book always opens with an
+                // estimate that matches the strength it is about to be read at.
+                rebuildIndexIfStale()
                 // Opening a book is what makes it the last-read one, so launch can
                 // come back to it (REQ-009) even if nothing is read this session.
                 persist(flush = true)
@@ -166,6 +184,57 @@ class ReaderViewModel(
     fun advance() = update(flush = false) { it.advance() }
 
     fun setWpm(wpm: Int) = update { it.withWpm(wpm) }
+
+    /**
+     * Applies the reader's pause-strength setting (REQ-011), mid-book included.
+     *
+     * Two things have to move, and they move at different costs:
+     *
+     * 1. **Playback.** [ReaderSession.withPauseStrength] changes the next word's
+     *    duration immediately — it is one field on an immutable value.
+     * 2. **Time remaining.** [ReaderBookView]'s index is a *sum over the whole
+     *    book* of durations measured at one strength, so it is now wrong and
+     *    cannot be patched. It is rebuilt on [indexDispatcher], one sweep of the
+     *    book, and the screen keeps the old estimate for those few milliseconds
+     *    rather than blanking. Leaving it unrebuilt would show a reader who turned
+     *    pauses off a time remaining that still includes every pause.
+     *
+     * Idempotent: called from a `LaunchedEffect` that re-runs on recomposition,
+     * so an unchanged strength must not start a sweep of the book.
+     */
+    fun setPauseStrength(strength: PauseStrength) {
+        if (strength == pauseStrength) return
+        pauseStrength = strength
+        // Not a position change, so it does not force a durable write of its own;
+        // the next ordinary transition carries it.
+        update(flush = false) { current -> current.withPauseStrength(strength) }
+        rebuildIndexIfStale()
+    }
+
+    /**
+     * Rebuilds the time-remaining index when it no longer matches [pauseStrength].
+     *
+     * The rebuild is cancellable and re-entrant: flicking through all four
+     * strengths starts and drops sweeps rather than queueing them, and the result
+     * is applied only if it still describes the book that is open and the strength
+     * that is still wanted.
+     */
+    private fun rebuildIndexIfStale() {
+        val current = view ?: return
+        val content = session?.content ?: return
+        val wanted = pauseStrength
+        if (current.pauseStrength == wanted) return
+        val bookId = openBookId
+        rebuild?.cancel()
+        rebuild = viewModelScope.launch {
+            val rebuilt = withContext(indexDispatcher) {
+                ReaderBookView(current.bookTitle, content, wanted)
+            }
+            if (openBookId != bookId || pauseStrength != wanted) return@launch
+            view = rebuilt
+            publish()
+        }
+    }
 
     fun backSentence() = update { it.backSentence() }
 

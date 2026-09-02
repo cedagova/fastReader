@@ -32,6 +32,7 @@ fun LibraryRoute(
     modifier: Modifier = Modifier,
     resumeBlocked: ResumeBlocked? = null,
     onDismissResumeNotice: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
@@ -74,6 +75,7 @@ fun LibraryRoute(
         },
         coverLoader = coverLoader,
         onDismissResumeNotice = onDismissResumeNotice,
+        onOpenSettings = onOpenSettings,
         modifier = modifier,
     )
 }

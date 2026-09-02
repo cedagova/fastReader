@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,7 +22,9 @@ import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
 import com.cedagova.fastreader.library.ui.LibraryRoute
 import com.cedagova.fastreader.reader.ui.ReaderRoute
+import com.cedagova.fastreader.settings.ui.SettingsRoute
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.fastreader.ui.theme.isDark
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,7 +32,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val library = (application as FastReaderApplication).library
         setContent {
-            FastReaderTheme {
+            // REQ-022's single application point: the reader's theme and text size
+            // wrap every destination, so both apply to the library and the reader
+            // without either screen knowing the settings exist.
+            val settings by library.repository.settings.collectAsState()
+            FastReaderTheme(darkTheme = settings.theme.isDark(), fontSize = settings.fontSize) {
                 FastReaderApp(library)
             }
         }
@@ -37,10 +44,12 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * The two destinations, and which one a launch lands on (REQ-009).
+ * The three destinations, and which one a launch lands on (REQ-009).
  *
- * Two destinations is not a navigation graph. What is worth spelling out is the
- * *first* one: the app reads the stored catalog before it draws anything, and
+ * Three destinations is not a navigation graph. Settings sit *over* whichever of
+ * the other two opened them — the state that says which book is open is not
+ * cleared — so closing them puts the reader back where they were. What is worth
+ * spelling out is the *first* one: the app reads the stored catalog before it draws anything, and
  * goes straight into the last-read book when that book can still be read. That
  * is what makes "open the app, press play" two interactions rather than three.
  *
@@ -57,6 +66,9 @@ private fun FastReaderApp(library: LibraryGraph) {
     var routedIntoReader by rememberSaveable { mutableStateOf(false) }
     var blockedBookId by rememberSaveable { mutableStateOf<String?>(null) }
     var blockedReason by rememberSaveable { mutableStateOf<String?>(null) }
+    // Settings sit over whichever destination opened them, so closing them returns
+    // the reader to their book rather than to the library.
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(library) {
         if (routed) return@LaunchedEffect
@@ -83,6 +95,8 @@ private fun FastReaderApp(library: LibraryGraph) {
         // spinner that flashes for one frame is worse than nothing.
         !routed -> Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
 
+        settingsOpen -> SettingsRoute(graph = library, onBack = { settingsOpen = false })
+
         openBookId != null -> ReaderRoute(
             graph = library,
             bookId = requireNotNull(openBookId),
@@ -101,6 +115,7 @@ private fun FastReaderApp(library: LibraryGraph) {
                     blockedReason = ResumeBlockedReason.UNREADABLE.name
                 }
             },
+            onOpenSettings = { settingsOpen = true },
         )
 
         else -> LibraryRoute(
@@ -111,6 +126,7 @@ private fun FastReaderApp(library: LibraryGraph) {
                 blockedBookId = null
                 blockedReason = null
             },
+            onOpenSettings = { settingsOpen = true },
         )
     }
 }
