@@ -81,6 +81,14 @@ data class LibraryBookItem(
      */
     val coverInitial: String
         get() = title.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
+
+    /**
+     * The title as the list orders it. Leading punctuation is dropped so
+     * `¿Quién teme a la máquina?` files under Q, where its cover placeholder
+     * already says it is, instead of ahead of every letter.
+     */
+    internal val sortKey: String
+        get() = title.dropWhile { !it.isLetterOrDigit() }.ifEmpty { title }
 }
 
 /** Builds the screen state. Pure: same inputs always give the same screen. */
@@ -94,7 +102,7 @@ fun buildLibraryUiState(
     // Álvarez under Zola in exactly the Spanish library `matches` folds accents
     // for. The id breaks ties so a rescan cannot reshuffle equal titles.
     val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
-    val byTitle = compareBy<LibraryBookItem, String>(collator) { it.title }.thenBy { it.id }
+    val byTitle = compareBy<LibraryBookItem, String>(collator) { it.sortKey }.thenBy { it.id }
     val all = catalog.books
         .map { book -> book.toItem(catalog.readingStates[book.id]?.progressFraction ?: 0f) }
         .sortedWith(byTitle)

@@ -65,6 +65,22 @@ class LibraryUiStateTest {
     }
 
     @Test
+    fun `a title opening with punctuation files under its first letter`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.readable("q", "¿Quién teme a la máquina?"),
+                LibraryFixtures.readable("p", "Pedro Páramo"),
+                LibraryFixtures.readable("r", "Rayuela"),
+            ),
+        )
+
+        val titles = buildLibraryUiState(catalog, IngestionState.Idle, "").books.map { it.title }
+
+        // Not first in the list: the leading inverted question mark is not a letter.
+        assertEquals(listOf("Pedro Páramo", "¿Quién teme a la máquina?", "Rayuela"), titles)
+    }
+
+    @Test
     fun `search filters by author as typed (REQ-003)`() {
         val catalog = Catalog(
             books = listOf(
