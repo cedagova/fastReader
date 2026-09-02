@@ -16,13 +16,18 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.reader.PlaybackScheduler
 import com.cedagova.fastreader.reader.ReaderBooks
 import com.cedagova.fastreader.reader.ReaderMode
+import com.cedagova.fastreader.reader.ReaderPosition
+import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderViewModel
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The reader wired to a real book: catalog bytes in, playback out.
@@ -41,7 +46,7 @@ fun ReaderRoute(
     val repository = graph.repository
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
-            initializer { ReaderViewModel(CatalogBooks(repository)) }
+            initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository)) }
         },
     )
     // Idempotent: after a rotation this finds the book already parsed and the
@@ -80,6 +85,41 @@ private class CatalogBooks(private val repository: LibraryRepository) : ReaderBo
 
     override fun bytes(bookId: String): EpubByteSource =
         EpubByteSource { repository.openBook(bookId) }
+}
+
+/**
+ * The catalog store, as durability needs it (LEAF204).
+ *
+ * The only place the reader's [ReaderPosition] and the catalog's [ReadingState]
+ * meet, so neither package has to know the other's shape.
+ */
+private class CatalogPositions(private val repository: LibraryRepository) : ReaderPositions {
+
+    override val failure: StateFlow<String?> get() = repository.persistenceFailure
+
+    override fun restore(bookId: String): ReaderPosition? {
+        val stored = repository.readingState(bookId) ?: return null
+        return ReaderPosition(
+            position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
+            progressFraction = stored.progressFraction,
+            wpm = stored.wpm,
+        )
+    }
+
+    override fun record(bookId: String, position: ReaderPosition) = repository.recordReadingState(
+        bookId,
+        ReadingState(
+            bookDigest = position.position.bookDigest,
+            tokenIndex = position.position.tokenIndex,
+            pipelineVersion = position.position.pipelineVersion,
+            progressFraction = position.progressFraction,
+            wpm = position.wpm,
+        ),
+    )
+
+    override fun flush() {
+        repository.flushReadingState()
+    }
 }
 
 /**

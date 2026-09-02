@@ -91,6 +91,18 @@ class ReaderScreenScreenshotTest {
         capture("reader_speed_hint", view.present(ReaderSession(book).jumpTo(12).play().withWpm(500)))
     }
 
+    /**
+     * The definition's persistence guardrail: a write failure is visible where the
+     * reader is, and does not stop them reading.
+     */
+    @Test
+    fun aStoreThatCannotSaveSaysSoWithoutStoppingTheReader() {
+        capture(
+            "reader_persistence_problem",
+            pausedAt(12).copy(persistenceFailure = "There is no space left on the device."),
+        )
+    }
+
     /** Cramped 720p phone (`Phone_Low_API33`) at a large system font scale (REQ-060). */
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)

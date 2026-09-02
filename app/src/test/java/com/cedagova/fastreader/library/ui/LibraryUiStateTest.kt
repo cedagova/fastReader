@@ -5,6 +5,8 @@ import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.ResumeBlocked
+import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
@@ -257,5 +259,73 @@ class LibraryUiStateTest {
 
         assertNull(state.scan)
         assertNull(state.failureMessage)
+    }
+
+    // REQ-004/REQ-018: the number the library shows comes from real reading.
+    @Test
+    fun `percent read comes from the stored position and only reaches 100 when finished`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.readable("started", "Started"),
+                LibraryFixtures.readable("nearly", "Nearly"),
+                LibraryFixtures.readable("finished", "Finished"),
+                LibraryFixtures.readable("untouched", "Untouched"),
+            ),
+            readingStates = mapOf(
+                "started" to ReadingState(bookDigest = "started", tokenIndex = 370, progressFraction = 0.37f),
+                // Would round to 100 and claim to be finished; it is not.
+                "nearly" to ReadingState(bookDigest = "nearly", tokenIndex = 9_996, progressFraction = 0.9997f),
+                "finished" to ReadingState(bookDigest = "finished", tokenIndex = 9_999, progressFraction = 1f),
+            ),
+        )
+
+        val percentByTitle = buildLibraryUiState(catalog, IngestionState.Idle, query = "")
+            .books.associate { it.title to it.progressPercent }
+
+        assertEquals(37, percentByTitle.getValue("Started"))
+        assertEquals(99, percentByTitle.getValue("Nearly"))
+        assertEquals(100, percentByTitle.getValue("Finished"))
+        assertEquals(0, percentByTitle.getValue("Untouched"))
+    }
+
+    // REQ-009: the library has to say why it opened here instead of in the book.
+    @Test
+    fun `a blocked resume names the book and the reason`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.unavailable("revoked", "Down and Out", SourceAvailability.PERMISSION_LOST),
+            ),
+            lastReadBookId = "revoked",
+        )
+
+        val state = buildLibraryUiState(
+            catalog,
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("revoked", ResumeBlockedReason.PERMISSION_LOST),
+        )
+
+        val notice = requireNotNull(state.resumeNotice)
+        assertEquals("Down and Out", notice.title)
+        assertEquals(ResumeBlockedReason.PERMISSION_LOST, notice.reason)
+    }
+
+    @Test
+    fun `a blocked resume for a removed book still renders without a title`() {
+        val state = buildLibraryUiState(
+            Catalog(),
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("gone", ResumeBlockedReason.REMOVED),
+        )
+
+        val notice = requireNotNull(state.resumeNotice)
+        assertNull(notice.title)
+        assertEquals(ResumeBlockedReason.REMOVED, notice.reason)
+    }
+
+    @Test
+    fun `an ordinary launch shows no resume notice`() {
+        assertNull(buildLibraryUiState(Catalog(), IngestionState.Idle, query = "").resumeNotice)
     }
 }

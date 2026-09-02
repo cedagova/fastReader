@@ -12,14 +12,27 @@ import kotlinx.serialization.json.JsonObject
  */
 object CatalogSchema {
 
-    const val CURRENT_VERSION: Int = 1
+    /**
+     * Version history:
+     *
+     * - **1** — increment 001: books, folders, removals, and a reading-position
+     *   slot addressed by spine item and word (never written by a released
+     *   reader; nothing streamed words yet).
+     * - **2** — increment 002 (LEAF204): a reading position is a token-stream
+     *   index carrying the identity and pipeline version that make it meaningful,
+     *   plus the reading speed, and the catalog remembers the last-read book so
+     *   launch can resume into it.
+     */
+    const val CURRENT_VERSION: Int = 2
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
-     * produce the next version. Version 1 is the first release, so there is
-     * nothing to migrate yet — later increments add their steps here.
+     * produce the next version. Nothing is ever dropped: a step that cannot carry
+     * a value forward exactly must carry the closest honest equivalent.
      */
-    val MIGRATIONS: Map<Int, CatalogMigration> = emptyMap()
+    val MIGRATIONS: Map<Int, CatalogMigration> = mapOf(
+        1 to ReadingStateV2Migration,
+    )
 }
 
 /** One forward step, from version `n` to version `n + 1`, over the raw document. */

@@ -166,6 +166,7 @@ fun ReaderScreen(
                 is ReaderUiState.Opening -> OpeningBook(state, Modifier.weight(1f))
                 is ReaderUiState.Unavailable -> Unavailable(state, Modifier.weight(1f))
                 is ReaderUiState.Reading -> {
+                    state.persistenceFailure?.let { PersistenceFailureBanner(it) }
                     ReadingSurface(
                         state = state,
                         onTogglePlay = onTogglePlay,
@@ -205,6 +206,31 @@ fun ReaderScreen(
  * The book-open loading state. LEAF201 parses off the main thread and reports one
  * step per spine item, so this is determinate as soon as the spine is known.
  */
+/**
+ * The store is refusing writes, so the reader's place is not being kept.
+ *
+ * Deliberately a banner and not a dialog: nothing here should stop someone
+ * reading. It sits above the reading surface, outside it, so the stream itself
+ * keeps its fixed size and static background (REQ-062, AD-6).
+ */
+@Composable
+private fun PersistenceFailureBanner(message: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        modifier = Modifier.fillMaxWidth().testTag("reader_persistence_problem"),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(
+                text = stringResource(R.string.reader_persistence_problem_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(text = message, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
 @Composable
 private fun OpeningBook(state: ReaderUiState.Opening, modifier: Modifier) {
     Column(

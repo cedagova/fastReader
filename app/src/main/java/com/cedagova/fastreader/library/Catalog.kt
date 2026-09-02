@@ -1,6 +1,8 @@
 package com.cedagova.fastreader.library
 
+import com.cedagova.fastreader.content.ContentPipelineVersion
 import com.cedagova.fastreader.library.store.CatalogSchema
+import com.cedagova.fastreader.timing.RsvpTiming
 import kotlinx.serialization.Serializable
 
 /**
@@ -28,6 +30,12 @@ data class Catalog(
      * picks the file again or re-adds its folder.
      */
     val removedBookIds: Set<String> = emptySet(),
+    /**
+     * The book the reader was last in, so launch can go straight back to it
+     * (REQ-009). Kept even when that book is currently missing or its permission
+     * was lost: the launch routing needs to know *which* book to explain.
+     */
+    val lastReadBookId: String? = null,
 ) {
     fun book(id: String): Book? = books.firstOrNull { it.id == id }
 
@@ -130,13 +138,34 @@ data class BookFolder(
 enum class FolderStatus { AVAILABLE, MISSING, PERMISSION_LOST }
 
 /**
- * Per-book reading position and progress slot. This leaf only stores and returns
- * it; the reader (increment 002) is what writes real values into it.
+ * Where the reader is in one book, and how fast it was going (REQ-016).
+ *
+ * A bare index would not survive the app it is stored by. [tokenIndex] addresses
+ * the AD-4 token stream, and that stream is produced by rules that may change, so
+ * the two facts that make the index *mean* something are stored beside it:
+ *
+ * - [bookDigest] — the content-derived identity (AD-2) the position was taken in.
+ *   The map key is that same digest today, but storing it makes a position
+ *   self-describing rather than only meaningful in the slot it happens to sit in.
+ * - [pipelineVersion] — the tokenization rules the index counts (AD-3). When they
+ *   change, the stored index points at a different word; the reader detects that
+ *   and falls back to [progressFraction] instead of silently resuming somewhere
+ *   else. See `com.cedagova.fastreader.reader.ReaderPosition`.
  */
 @Serializable
 data class ReadingState(
-    val spineIndex: Int = 0,
-    val wordIndex: Int = 0,
+    val bookDigest: String = "",
+    /** Index into the book's token stream — the position itself. */
+    val tokenIndex: Int = 0,
+    /** The tokenization rules [tokenIndex] counts, so a later change is detectable. */
+    val pipelineVersion: Int = ContentPipelineVersion.CURRENT,
+    /** Share of the book already shown, `0f..1f`. The library's "% read", and the
+     *  fallback position when [pipelineVersion] no longer matches. */
     val progressFraction: Float = 0f,
+    /** Reading speed in this book, so resuming restores the pace too (REQ-016). */
+    val wpm: Int = RsvpTiming.DEFAULT_WPM,
     val updatedAtEpochMs: Long = 0,
-)
+) {
+    /** True once the last token of the book has been shown (REQ-018's library 100%). */
+    val isFinished: Boolean get() = progressFraction >= 1f
+}

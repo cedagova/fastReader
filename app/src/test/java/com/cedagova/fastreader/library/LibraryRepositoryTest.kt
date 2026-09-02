@@ -62,13 +62,14 @@ class LibraryRepositoryTest {
         val first = repository(FileCatalogStore(file), backgroundScope)
         first.addPickedBooks(listOf("doc://a"))
         val bookId = first.catalog.value.books.single().id
-        first.updateReadingState(bookId, ReadingState(wordIndex = 512))
+        first.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 512))
 
         val second = repository(FileCatalogStore(file), backgroundScope)
         second.load()
 
         assertEquals(1, second.catalog.value.books.size)
-        assertEquals(512, second.readingState(bookId)?.wordIndex)
+        assertEquals(512, second.readingState(bookId)?.tokenIndex)
+        assertEquals(bookId, second.catalog.value.lastReadBookId)
         assertNotNull(second.coverFile(bookId))
     }
 
@@ -146,16 +147,20 @@ class LibraryRepositoryTest {
         val repository = repository(scope = backgroundScope)
         repository.addPickedBooks(listOf("doc://a"))
         val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(bookId, ReadingState(spineIndex = 1, wordIndex = 900, progressFraction = 0.6f))
+        repository.updateReadingState(
+            bookId,
+            ReadingState(bookDigest = bookId, tokenIndex = 900, progressFraction = 0.6f, wpm = 400),
+        )
 
         repository.removeBook(bookId)
         assertTrue(repository.catalog.value.books.isEmpty())
-        assertEquals(900, repository.readingState(bookId)?.wordIndex)
+        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
 
         repository.addPickedBooks(listOf("doc://a"))
 
         assertEquals(bookId, repository.catalog.value.books.single().id)
-        assertEquals(900, repository.readingState(bookId)?.wordIndex)
+        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
+        assertEquals(400, repository.readingState(bookId)?.wpm)
     }
 
     @Test
@@ -165,7 +170,7 @@ class LibraryRepositoryTest {
         val repository = repository(FileCatalogStore(file), backgroundScope)
         repository.addFolder("tree://books", "Books")
         val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(bookId, ReadingState(wordIndex = 250))
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 250))
 
         repository.removeBook(bookId)
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
@@ -178,7 +183,7 @@ class LibraryRepositoryTest {
         restarted.rescan(ScanTrigger.APP_OPEN)
 
         assertTrue("the removal must survive a restart", restarted.catalog.value.books.isEmpty())
-        assertEquals(250, restarted.readingState(bookId)?.wordIndex)
+        assertEquals(250, restarted.readingState(bookId)?.tokenIndex)
     }
 
     @Test

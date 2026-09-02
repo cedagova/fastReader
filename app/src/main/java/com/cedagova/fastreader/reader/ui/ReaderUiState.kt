@@ -69,6 +69,14 @@ sealed interface ReaderUiState {
         val wpm: Int,
         /** Non-blocking comprehension hint above ~450 WPM (REQ-012). */
         val showSpeedHint: Boolean,
+        /**
+         * Why the reader's place is not being saved, or null when it is.
+         *
+         * The definition's persistence guardrail is that a write failure is never
+         * silent. The library has its own banner for this, but a reader mid-book
+         * is not looking at the library, so the reading surface carries it too.
+         */
+        val persistenceFailure: String? = null,
     ) : ReaderUiState {
 
         /** True while the stream is stopped, whatever stopped it. */
@@ -130,7 +138,7 @@ class ReaderBookView(
     private val chapterEntries = readableChapters.map { ChapterEntry(it.index, it.title) }
 
     /** Builds the screen state. Pure: the same session always gives the same screen. */
-    fun present(session: ReaderSession): ReaderUiState.Reading {
+    fun present(session: ReaderSession, persistenceFailure: String? = null): ReaderUiState.Reading {
         val chapter = session.currentChapter
         return ReaderUiState.Reading(
             bookTitle = bookTitle,
@@ -146,6 +154,7 @@ class ReaderBookView(
             remainingMillis = remaining.millisAfter(session.index, session.settings),
             wpm = session.settings.effectiveWpm,
             showSpeedHint = session.settings.effectiveWpm > SPEED_HINT_WPM,
+            persistenceFailure = persistenceFailure,
         )
     }
 }
