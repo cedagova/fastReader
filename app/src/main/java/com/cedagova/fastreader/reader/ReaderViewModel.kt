@@ -11,53 +11,85 @@ import com.cedagova.fastreader.reader.ui.ReaderUiState
 import com.cedagova.fastreader.timing.PauseStrength
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** How the reader gets at a book, so the ViewModel does not need the catalog's whole API. */
+interface ReaderBooks {
+
+    /** The catalog's title for a book, available before it is parsed. */
+    fun title(bookId: String): String
+
+    /** The book's bytes, read in place (AD-1). */
+    fun bytes(bookId: String): EpubByteSource
+}
+
 /**
- * Holds one open book for as long as the reader is on screen.
+ * Holds the open book for as long as the reader is on screen.
  *
  * A `ViewModel` rather than composition state for one concrete reason: rotating
- * the phone destroys and recreates the activity, and re-parsing a novel every
- * time it turns would be both slow and a lost reading position. Surviving the
+ * the phone destroys and recreates the activity, and re-parsing a novel every time
+ * it turns would be both slow and a lost reading position. Surviving the
  * configuration change here is what makes "rotation preserves position and
  * playback state" true.
  *
- * Everything interesting is delegated: [ReaderSession] owns playback semantics,
- * [ReaderBookView] owns the screen state, and this class owns only the parse, the
- * current session value, and the [ReaderUiState] flow the screen collects.
- * Position is in-session only — durable persistence is LEAF204.
+ * **Exactly one book at a time.** A parsed novel is the largest thing this app
+ * holds in memory, and a `ViewModel` lives until its activity is destroyed, not
+ * until the composable that created it goes away. Keying one per book id would
+ * therefore keep every book opened in a session resident — which the 2 GB device
+ * in the test matrix will not forgive. [open] instead replaces the current book,
+ * dropping the previous token stream and cancelling a parse still in flight.
+ *
+ * Everything interesting is delegated: [ReaderSession] owns playback semantics and
+ * [ReaderBookView] owns the screen state. This class owns the parse, the current
+ * session value, and the [ReaderUiState] flow the screen collects. Position is
+ * in-session only — durable persistence is LEAF204.
  */
 class ReaderViewModel(
-    private val bookTitle: String,
-    private val bytes: EpubByteSource,
+    private val books: ReaderBooks,
     private val pipeline: EpubContentPipeline = EpubContentPipeline(),
     private val indexDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow<ReaderUiState>(ReaderUiState.Opening(bookTitle, null))
+    private val _state = MutableStateFlow<ReaderUiState>(ReaderUiState.Opening("", null))
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
+    private var openBookId: String? = null
+    private var parse: Job? = null
     private var view: ReaderBookView? = null
     private var session: ReaderSession? = null
 
     /** How long the token on screen is shown, or null when nothing is streaming. */
     val currentDurationMillis: Long? get() = session?.takeIf { it.isPlaying }?.currentDurationMillis
 
-    init {
-        viewModelScope.launch { open() }
+    /**
+     * Opens [bookId], unless it is already open.
+     *
+     * Idempotent on purpose: the reader calls it on every composition, and after a
+     * rotation that call must find the book already parsed and the position intact.
+     */
+    fun open(bookId: String) {
+        if (bookId == openBookId) return
+        openBookId = bookId
+        parse?.cancel()
+        view = null
+        session = null
+        val title = books.title(bookId)
+        _state.value = ReaderUiState.Opening(title, null)
+        parse = viewModelScope.launch { parse(bookId, title) }
     }
 
-    private suspend fun open() {
-        val result = pipeline.parse(bytes) { progress ->
-            _state.value = ReaderUiState.Opening(bookTitle, progress.fraction.takeIf { progress.totalItems > 0 })
+    private suspend fun parse(bookId: String, title: String) {
+        val result = pipeline.parse(books.bytes(bookId)) { progress ->
+            _state.value = ReaderUiState.Opening(title, progress.fraction.takeIf { progress.totalItems > 0 })
         }
         when (result) {
             is BookContentResult.Failed ->
-                _state.value = ReaderUiState.Unavailable(bookTitle, result.message())
+                _state.value = ReaderUiState.Unavailable(title, result.message())
 
             is BookContentResult.Parsed -> {
                 val content = result.content
@@ -65,7 +97,7 @@ class ReaderViewModel(
                 // belongs on the parsing thread, next to the parse, not on the
                 // first frame of the reader.
                 val book = withContext(indexDispatcher) {
-                    ReaderBookView(bookTitle, content, PauseStrength.NORMAL)
+                    ReaderBookView(title, content, PauseStrength.NORMAL)
                 }
                 view = book
                 session = ReaderSession(content)

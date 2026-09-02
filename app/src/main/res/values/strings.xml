@@ -51,6 +51,7 @@
     <string name="reader_forward_paragraph">Forward one paragraph</string>
 
     <string name="reader_chapters">Chapters</string>
+    <string name="reader_chapters_of">Chapter list. %1$s, %2$s.</string>
     <string name="reader_close">Close</string>
     <string name="reader_chapter_position">%1$d of %2$d</string>
     <string name="reader_chapter_pause_hint">Play to read on.</string>

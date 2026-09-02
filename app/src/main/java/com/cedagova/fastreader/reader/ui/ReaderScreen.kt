@@ -3,8 +3,10 @@ package com.cedagova.fastreader.reader.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -69,10 +72,17 @@ import kotlin.math.roundToInt
 /** Android's accessibility minimum for an interactive control (REQ-060). */
 private val TouchTarget = 48.dp
 
-/** The word stream's reserved height: two lines at [WordSize], so no word moves the layout. */
-private val WordAreaHeight = 116.dp
-
 private val WordSize = 36.sp
+
+/**
+ * Landscape leaves the reading area about a fifth of the height portrait does, and
+ * a word drawn at [WordSize] there is simply cut in half. Below this much room the
+ * word is drawn at [CompactWordSize] instead. Real shrink-to-fit is LEAF301's; this
+ * is the minimum that keeps every orientation readable.
+ */
+private val CompactWordArea = 96.dp
+
+private val CompactWordSize = 24.sp
 
 /**
  * The reader surface (LEAF203): the paused context view, the word stream, in-book
@@ -135,11 +145,15 @@ fun ReaderScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.size(TouchTarget).testTag("reader_back")) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.reader_back),
-                        )
+                    val back = stringResource(R.string.reader_back)
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(TouchTarget)
+                            .semantics { contentDescription = back }
+                            .testTag("reader_back"),
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                     }
                 },
             )
@@ -263,6 +277,10 @@ private fun ReadingSurface(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
+            // No content description: the word and, when stopped, the paragraph
+            // under it are what a screen reader should read here. `onClickLabel`
+            // still names the action, so the tap target announces "Pause" or
+            // "Play" without hiding the text it covers.
             .then(
                 if (tappable) {
                     Modifier.clickable(onClickLabel = label, onClick = onTogglePlay)
@@ -278,8 +296,11 @@ private fun ReadingSurface(
             // stopped, so pausing reveals the paragraph underneath instead of
             // moving the word the reader is looking at.
             ReaderMode.PLAYING, ReaderMode.PAUSED -> {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    WordArea(state.word, word)
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f).testTag("reader_word"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    word(state.word, Modifier.fillMaxSize())
                 }
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
                     if (state.mode == ReaderMode.PAUSED) PausedContext(state)
@@ -299,42 +320,37 @@ private fun ColumnScope.FullSurface(content: @Composable () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { content() }
 }
 
-/** The fixed-size frame the streamed word lives in; nothing outside it moves as words change. */
-@Composable
-private fun WordArea(token: ReaderWord, word: @Composable (ReaderWord, Modifier) -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxWidth().height(WordAreaHeight).testTag("reader_word"),
-        contentAlignment = Alignment.Center,
-    ) {
-        word(token, Modifier.fillMaxWidth())
-    }
-}
-
 /**
  * The default word presentation for this increment: a plain centred word on the
  * page background (the plan reserves pivot alignment and cues for LEAF301).
  *
  * A skip marker is set apart in italics and the muted colour, because
  * `[image skipped]` is the app talking, not the book (REQ-015).
+ *
+ * Fitting the word to the space is the presenter's job, not the layout's — which
+ * is why the size is decided here, inside the slot LEAF301 replaces, rather than
+ * by a reserved height the reader screen imposes on every presentation.
  */
 @Composable
 fun PlainWord(token: ReaderWord, modifier: Modifier = Modifier) {
-    Text(
-        text = token.text,
-        modifier = modifier,
-        textAlign = TextAlign.Center,
-        fontSize = WordSize,
-        // Two lines are reserved so an unusually long word wraps inside the frame
-        // instead of pushing the layout around. Shrink-to-fit arrives with LEAF301.
-        maxLines = 2,
-        fontStyle = if (token.isSkipMarker) FontStyle.Italic else FontStyle.Normal,
-        fontWeight = if (token.isHeading) FontWeight.Bold else FontWeight.Normal,
-        color = if (token.isSkipMarker) {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        } else {
-            MaterialTheme.colorScheme.onBackground
-        },
-    )
+    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
+        Text(
+            text = token.text,
+            textAlign = TextAlign.Center,
+            fontSize = if (maxHeight < CompactWordArea) CompactWordSize else WordSize,
+            // An unusually long word wraps rather than being cut off. It is rare
+            // enough that two lines is the whole treatment here; shrink-to-fit
+            // arrives with LEAF301.
+            maxLines = 2,
+            fontStyle = if (token.isSkipMarker) FontStyle.Italic else FontStyle.Normal,
+            fontWeight = if (token.isHeading) FontWeight.Bold else FontWeight.Normal,
+            color = if (token.isSkipMarker) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onBackground
+            },
+        )
+    }
 }
 
 /**
@@ -345,7 +361,12 @@ fun PlainWord(token: ReaderWord, modifier: Modifier = Modifier) {
 private fun PausedContext(state: ReaderUiState.Reading) {
     val context = state.context
     Column(
-        modifier = Modifier.fillMaxWidth().testTag("reader_paused"),
+        modifier = Modifier
+            .fillMaxWidth()
+            // Landscape and large font scales can leave less room than the
+            // paragraph needs; scrolling is better than losing the end of it.
+            .verticalScroll(rememberScrollState())
+            .testTag("reader_paused"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (context != null) {
@@ -463,12 +484,15 @@ private fun ReaderControls(
 /** The chapter title doubles as the chapter picker's entry point (REQ-014). */
 @Composable
 private fun ChapterRow(state: ReaderUiState.Reading, onOpenChapters: () -> Unit) {
+    val position = stringResource(R.string.reader_chapter_position, state.chapterNumber, state.chapterCount)
+    val label = stringResource(R.string.reader_chapters_of, state.chapterTitle, position)
     TextButton(
         onClick = onOpenChapters,
         enabled = state.canNavigate && state.chapters.isNotEmpty(),
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = TouchTarget)
+            .semantics { contentDescription = label }
             .testTag("reader_chapters"),
     ) {
         Text(
@@ -479,7 +503,7 @@ private fun ChapterRow(state: ReaderUiState.Reading, onOpenChapters: () -> Unit)
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = stringResource(R.string.reader_chapter_position, state.chapterNumber, state.chapterCount),
+            text = position,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -622,6 +646,12 @@ private fun Transport(
  * One navigation step. Sentence and paragraph differ by how many chevrons are
  * drawn, which keeps every icon inside the core Material set instead of pulling in
  * the extended icon library for four glyphs.
+ *
+ * The label goes on the button rather than on an icon inside it. A `Modifier`
+ * label lands on the same node that carries the click action, so an accessibility
+ * sweep of this screen shows every focusable control naming itself — which the
+ * default arrangement, with the description on a child of the clickable node,
+ * does not.
  */
 @Composable
 private fun StepButton(
@@ -635,14 +665,16 @@ private fun StepButton(
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(TouchTarget).testTag(tag),
+        modifier = Modifier
+            .size(TouchTarget)
+            .semantics { contentDescription = description }
+            .testTag(tag),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
-            repeat(chevrons) { position ->
+            repeat(chevrons) {
                 Icon(
                     imageVector = if (forward) Icons.Filled.KeyboardArrowRight else Icons.Filled.KeyboardArrowLeft,
-                    // The row as a whole is the control; each chevron is decoration.
-                    contentDescription = if (position == 0) description else null,
+                    contentDescription = null,
                 )
             }
         }

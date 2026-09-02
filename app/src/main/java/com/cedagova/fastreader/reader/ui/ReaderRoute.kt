@@ -18,7 +18,9 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.library.LibraryGraph
+import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.reader.PlaybackScheduler
+import com.cedagova.fastreader.reader.ReaderBooks
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderViewModel
 
@@ -37,20 +39,15 @@ fun ReaderRoute(
     modifier: Modifier = Modifier,
 ) {
     val repository = graph.repository
-    val catalog by repository.catalog.collectAsState()
-    val title = catalog.book(bookId)?.title.orEmpty()
-
     val reader = viewModel<ReaderViewModel>(
-        key = bookId,
         factory = viewModelFactory {
-            initializer {
-                ReaderViewModel(
-                    bookTitle = title,
-                    bytes = EpubByteSource { repository.openBook(bookId) },
-                )
-            }
+            initializer { ReaderViewModel(CatalogBooks(repository)) }
         },
     )
+    // Idempotent: after a rotation this finds the book already parsed and the
+    // position intact, and switching books drops the previous one.
+    LaunchedEffect(reader, bookId) { reader.open(bookId) }
+
     val state by reader.state.collectAsState()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
 
@@ -73,6 +70,16 @@ fun ReaderRoute(
         onChapterSelected = reader::jumpToChapter,
         modifier = modifier,
     )
+}
+
+/** The catalog, as the reader needs it: a title now and the book's bytes when asked. */
+private class CatalogBooks(private val repository: LibraryRepository) : ReaderBooks {
+
+    override fun title(bookId: String): String =
+        repository.catalog.value.book(bookId)?.title.orEmpty()
+
+    override fun bytes(bookId: String): EpubByteSource =
+        EpubByteSource { repository.openBook(bookId) }
 }
 
 /**

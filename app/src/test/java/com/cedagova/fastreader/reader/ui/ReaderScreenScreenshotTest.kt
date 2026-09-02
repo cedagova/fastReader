@@ -98,6 +98,17 @@ class ReaderScreenScreenshotTest {
         capture("reader_compact_large_font", pausedAt(12), fontScale = 1.3f)
     }
 
+    /**
+     * Landscape leaves the reading area a fraction of the height, which is where an
+     * emulator pass caught the word being cut in half. This is that regression's
+     * cheap gate.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = LANDSCAPE_PHONE)
+    fun theWordFitsTheShortReadingAreaInLandscape() {
+        capture("reader_landscape", playingAt(12))
+    }
+
     private fun playingAt(index: Int) = view.present(ReaderSession(book).jumpTo(index).play())
 
     private fun pausedAt(index: Int) = view.present(ReaderSession(book).jumpTo(index))
@@ -150,3 +161,6 @@ private const val REFERENCE_PHONE = "w411dp-h914dp-xxhdpi"
 
 /** 720p, 2 GB phone, matching the `Phone_Low_API33` AVD used for cramped layouts. */
 private const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"
+
+/** The reference phone turned on its side: the shortest reading area the app has to fit. */
+private const val LANDSCAPE_PHONE = "w914dp-h411dp-land-xxhdpi"
