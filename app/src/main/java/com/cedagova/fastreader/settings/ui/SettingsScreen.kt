@@ -320,6 +320,12 @@ private fun <T> ChoiceRow(
  * matter here: a chip's default height is below [TouchTarget], and its internal
  * semantics role is the library's to choose, whereas these options are radio
  * buttons inside a [selectableGroup] and must announce themselves as such.
+ *
+ * The label is declared on the selectable node and cleared from the `Text` beneath
+ * it, so exactly one description reaches the accessibility tree per option rather
+ * than a drawn label that happens to be readable. It is the convention the
+ * reader's controls already use, and `SettingsAccessibilityTest` holds every
+ * control on this screen to it.
  */
 @Composable
 private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
@@ -338,11 +344,17 @@ private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .heightIn(min = TouchTarget)
             .clip(RoundedCornerShape(percent = 50))
             .background(container)
+            .semantics { contentDescription = text }
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge, color = content)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = content,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
     }
 }
 
@@ -402,6 +414,12 @@ private fun PivotColorRow(selected: PivotColor, onSelect: (PivotColor) -> Unit) 
  * switch so the touch target is the row's full width and TalkBack focuses one node
  * that names the setting and its state — not a label it cannot act on next to a
  * switch that does not say what it controls.
+ *
+ * The name *and* the summary go into that node's description, and both `Text`s are
+ * cleared from the tree, so the row is announced once and in a fixed order. The
+ * summary is the only place a setting's effect is explained, so it belongs in what
+ * a reader who cannot see it hears, and it should not arrive as a second focus
+ * stop after the name.
  */
 @Composable
 private fun SwitchRow(
@@ -412,24 +430,25 @@ private fun SwitchRow(
     tag: String,
 ) {
     val state = stringResource(if (checked) R.string.settings_on else R.string.settings_off)
+    val description = "$label. $summary"
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = TouchTarget)
+            .semantics {
+                contentDescription = description
+                stateDescription = state
+            }
             .toggleable(
                 value = checked,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             )
             .padding(vertical = 8.dp)
-            // No contentDescription: the label and its summary are real text
-            // inside this merged node, and a description would replace both. Only
-            // the state needs saying, because the switch itself is silent below.
-            .semantics { stateDescription = state }
             .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).clearAndSetSemantics {}) {
             Text(text = label, style = MaterialTheme.typography.bodyLarge)
             Text(
                 text = summary,
