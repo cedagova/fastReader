@@ -6,6 +6,9 @@
 #   scripts/release.sh --publish       build, verify, publish the GitHub Release
 #   scripts/release.sh --publish --prerelease --tag v1.0.0-rc1
 #
+# Publishing tags the current HEAD (override with --target) and refuses to run
+# from a dirty worktree, so the tag always names the code that was built.
+#
 # Every run builds the signed release APK from the current worktree and then
 # proves, on the artifact itself:
 #   * it is signed by the one fastReader release key (pinned certificate SHA-256);
@@ -36,6 +39,8 @@ PUBLISH=0
 PRERELEASE=0
 TAG=""
 NOTES_FILE=""
+TARGET=""
+ALLOW_DIRTY=0
 
 die() { printf 'release: %s\n' "$*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -46,6 +51,8 @@ while [ $# -gt 0 ]; do
     --prerelease) PRERELEASE=1 ;;
     --tag) TAG="${2:?--tag needs a value}"; shift ;;
     --notes-file) NOTES_FILE="${2:?--notes-file needs a value}"; shift ;;
+    --target) TARGET="${2:?--target needs a value}"; shift ;;
+    --allow-dirty) ALLOW_DIRTY=1 ;;
     --gh-command) GH_COMMAND="${2:?--gh-command needs a value}"; shift ;;
     -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
@@ -83,6 +90,13 @@ printf 'versionCode  %s\nversionName  %s\ntag          %s\n' "$VERSION_CODE" "$V
 # --- pre-publish guards ----------------------------------------------------
 if [ "$PUBLISH" -eq 1 ]; then
   step "Pre-publish guards"
+  # The tag must name the exact commit the APK was built from, so the tree has
+  # to be clean and the target has to be this HEAD unless told otherwise.
+  if [ "$ALLOW_DIRTY" -eq 0 ] && [ -n "$(git status --porcelain)" ]; then
+    die "worktree has uncommitted changes; commit them so the tag names the built code (or pass --allow-dirty)"
+  fi
+  [ -n "$TARGET" ] || TARGET="$(git rev-parse HEAD)"
+  printf 'target commit: %s\n' "$TARGET"
   if "$GH_COMMAND" release view "$TAG" --repo "$GITHUB_REPO" >/dev/null 2>&1; then
     die "release $TAG already exists; bump version.properties instead of reusing a tag"
   fi
@@ -148,7 +162,7 @@ else NOTES_ARGS=(--notes "fastReader $VERSION_NAME (versionCode $VERSION_CODE)."
 PRE_ARGS=()
 [ "$PRERELEASE" -eq 1 ] && PRE_ARGS=(--prerelease)
 "$GH_COMMAND" release create "$TAG" "$STAGED" \
-  --repo "$GITHUB_REPO" --title "fastReader $VERSION_NAME" \
+  --repo "$GITHUB_REPO" --title "fastReader $VERSION_NAME" --target "$TARGET" \
   "${NOTES_ARGS[@]}" "${PRE_ARGS[@]}"
 
 # --- prove the link works without repository authentication ----------------

@@ -49,7 +49,8 @@ on the artifact itself:
 | `minSdkVersion` is 26 | REQ-040 — installs on Android 8.0+ |
 | `versionCode`/`versionName` match `version.properties` | The tag, the file, and the artifact cannot drift |
 
-Publishing adds three more gates: the tag must not already exist, a stable
+Publishing adds four more gates: the worktree must be clean and the tag is
+created on that exact `HEAD` commit, the tag must not already exist, a stable
 release's `versionName` must be the highest published one, and the uploaded
 asset is re-downloaded with plain `curl` — no token, no cookies — and compared
 byte-for-byte against the artifact that was just verified. That last step is
@@ -60,6 +61,8 @@ Useful variants:
 ```bash
 ./scripts/release.sh --publish --prerelease --tag v1.1.0-rc1   # pre-release
 ./scripts/release.sh --publish --notes-file notes.md           # custom notes
+./scripts/release.sh --publish --target <sha>                  # tag another commit
+./scripts/release.sh --publish --allow-dirty                   # skip the clean-tree gate
 ```
 
 ## Versioning rule
