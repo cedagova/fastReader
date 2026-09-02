@@ -2,7 +2,9 @@ package com.cedagova.fastreader.reader.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,23 +68,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderMode
+import com.cedagova.fastreader.settings.CueSettings
 import com.cedagova.fastreader.timing.RsvpTiming
 import kotlin.math.roundToInt
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
 private val TouchTarget = 48.dp
-
-private val WordSize = 36.sp
-
-/**
- * Landscape leaves the reading area about a fifth of the height portrait does, and
- * a word drawn at [WordSize] there is simply cut in half. Below this much room the
- * word is drawn at [CompactWordSize] instead. Real shrink-to-fit is LEAF301's; this
- * is the minimum that keeps every orientation readable.
- */
-private val CompactWordArea = 96.dp
-
-private val CompactWordSize = 24.sp
 
 /**
  * The reader surface (LEAF203): the paused context view, the word stream, in-book
@@ -108,11 +99,17 @@ private val CompactWordSize = 24.sp
  *
  * ## The presentation seam
  *
- * [word] draws one streamed token. It is a slot, not a hard-coded `Text`, because
- * LEAF301 replaces exactly this — pivot-letter alignment, the coloured pivot,
- * guide marks, shrink-to-fit — while playback semantics, navigation and this
- * layout stay where they are. Its default, [PlainWord], is the plain centred word
- * the plan specifies for this increment.
+ * [word] draws one streamed token. It is a slot, not a hard-coded `Text`, so the
+ * cue layer — pivot-letter alignment, the coloured pivot, guide marks,
+ * shrink-to-fit — is replaceable without playback semantics, navigation or this
+ * layout moving. Its default is [CueWord], which draws the cues in [cues].
+ *
+ * ## Focused mode (REQ-030)
+ *
+ * [focused] is the whole of it: with it set, the top bar and the entire control
+ * column are not composed, leaving the stream and its cues alone on the page. It
+ * is a parameter rather than session state because it is a property of this
+ * screen, not of the book — which also lets the goldens render it directly.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,35 +125,48 @@ fun ReaderScreen(
     onScrub: (Float) -> Unit,
     onChapterSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    word: @Composable (ReaderWord, Modifier) -> Unit = { token, wordModifier -> PlainWord(token, wordModifier) },
+    cues: CueSettings = CueSettings(),
+    /** REQ-030: chrome hidden, stream and cues left alone. */
+    focused: Boolean = false,
+    onToggleFocused: () -> Unit = {},
+    word: @Composable (ReaderWord, Modifier) -> Unit = { token, wordModifier ->
+        CueWord(token, cues, wordModifier)
+    },
 ) {
     var chapterPickerOpen by remember { mutableStateOf(false) }
+
+    // Focused mode only applies to the reader proper. A book that is still opening
+    // or cannot be opened has no stream to be focused on, and hiding the way back
+    // to the library there would strand the reader on a dead screen.
+    val chromeHidden = focused && state is ReaderUiState.Reading
 
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("reader_screen"),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = state.bookTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                    )
-                },
-                navigationIcon = {
-                    val back = stringResource(R.string.reader_back)
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier
-                            .size(TouchTarget)
-                            .semantics { contentDescription = back }
-                            .testTag("reader_back"),
-                    ) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
-                },
-            )
+            if (!chromeHidden) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = state.bookTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                        )
+                    },
+                    navigationIcon = {
+                        val back = stringResource(R.string.reader_back)
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .size(TouchTarget)
+                                .semantics { contentDescription = back }
+                                .testTag("reader_back"),
+                        ) {
+                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                    },
+                )
+            }
         },
     ) { innerPadding ->
         // Scaffold's inset padding is what keeps the transport controls clear of
@@ -166,24 +176,28 @@ fun ReaderScreen(
                 is ReaderUiState.Opening -> OpeningBook(state, Modifier.weight(1f))
                 is ReaderUiState.Unavailable -> Unavailable(state, Modifier.weight(1f))
                 is ReaderUiState.Reading -> {
-                    state.persistenceFailure?.let { PersistenceFailureBanner(it) }
+                    if (!chromeHidden) state.persistenceFailure?.let { PersistenceFailureBanner(it) }
                     ReadingSurface(
                         state = state,
                         onTogglePlay = onTogglePlay,
+                        onToggleFocused = onToggleFocused,
+                        focused = chromeHidden,
                         word = word,
                         modifier = Modifier.weight(1f),
                     )
-                    ReaderControls(
-                        state = state,
-                        onTogglePlay = onTogglePlay,
-                        onWpmChange = onWpmChange,
-                        onBackSentence = onBackSentence,
-                        onForwardSentence = onForwardSentence,
-                        onBackParagraph = onBackParagraph,
-                        onForwardParagraph = onForwardParagraph,
-                        onScrub = onScrub,
-                        onOpenChapters = { chapterPickerOpen = true },
-                    )
+                    if (!chromeHidden) {
+                        ReaderControls(
+                            state = state,
+                            onTogglePlay = onTogglePlay,
+                            onWpmChange = onWpmChange,
+                            onBackSentence = onBackSentence,
+                            onForwardSentence = onForwardSentence,
+                            onBackParagraph = onBackParagraph,
+                            onForwardParagraph = onForwardParagraph,
+                            onScrub = onScrub,
+                            onOpenChapters = { chapterPickerOpen = true },
+                        )
+                    }
                 }
             }
         }
@@ -289,33 +303,57 @@ private fun Unavailable(state: ReaderUiState.Unavailable, modifier: Modifier) {
  * The reading area: one tap target covering everything above the controls, so
  * "tap to pause" (REQ-014) does not require aiming at a button. It resumes too,
  * except at the end of the book, where play would have nothing to show.
+ *
+ * ## The two gestures (REQ-030)
+ *
+ * A **tap** plays or pauses. A **long press** hides or restores the chrome. They
+ * are the same target on purpose — focused mode leaves nothing else to aim at —
+ * and they cannot collide, because a long press is not a tap: Compose's
+ * `combinedClickable` fires exactly one of them. Neither is a swipe, so neither
+ * competes with the system's edge-swipe navigation, which a reader holding the
+ * phone one-handed will trigger by accident.
+ *
+ * Both are announced. `onClickLabel` and `onLongClickLabel` land on the node that
+ * carries the actions, so TalkBack offers "Pause" and "Hide the controls" on the
+ * reading surface rather than leaving focused mode undiscoverable without sight.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReadingSurface(
     state: ReaderUiState.Reading,
     onTogglePlay: () -> Unit,
+    onToggleFocused: () -> Unit,
+    focused: Boolean,
     word: @Composable (ReaderWord, Modifier) -> Unit,
     modifier: Modifier,
 ) {
-    val label = stringResource(if (state.isStopped) R.string.reader_play else R.string.reader_pause)
     val tappable = state.mode != ReaderMode.FINISHED
+    // At the end of the book a tap does nothing, so it must not announce that it
+    // will play: in focused mode the surface is still long-clickable, and a click
+    // label on a node whose click is a no-op is a lie to a screen reader.
+    val label = if (tappable) {
+        stringResource(if (state.isStopped) R.string.reader_play else R.string.reader_pause)
+    } else {
+        null
+    }
+    val focusLabel = stringResource(if (focused) R.string.reader_show_controls else R.string.reader_hide_controls)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             // No content description: the word and, when stopped, the paragraph
-            // under it are what a screen reader should read here. `onClickLabel`
-            // still names the action, so the tap target announces "Pause" or
-            // "Play" without hiding the text it covers.
-            .then(
-                if (tappable) {
-                    Modifier.clickable(onClickLabel = label, onClick = onTogglePlay)
-                } else {
-                    Modifier
-                },
+            // under it are what a screen reader should read here. The click labels
+            // still name the actions, so the tap target announces them without
+            // hiding the text it covers.
+            .combinedClickable(
+                enabled = tappable || focused,
+                onClickLabel = label,
+                onLongClickLabel = focusLabel,
+                onLongClick = onToggleFocused,
+                onClick = { if (tappable) onTogglePlay() },
             )
             .padding(horizontal = 20.dp)
-            .testTag("reader_surface"),
+            .testTag(if (focused) "reader_surface_focused" else "reader_surface"),
     ) {
         when (state.mode) {
             // The word keeps the same place whether the stream is running or
@@ -347,41 +385,15 @@ private fun ColumnScope.FullSurface(content: @Composable () -> Unit) {
 }
 
 /**
- * The default word presentation for this increment: a plain centred word on the
- * page background (the plan reserves pivot alignment and cues for LEAF301).
- *
- * A skip marker is set apart in italics and the muted colour, because
- * `[image skipped]` is the app talking, not the book (REQ-015).
- *
- * Fitting the word to the space is the presenter's job, not the layout's — which
- * is why the size is decided here, inside the slot LEAF301 replaces, rather than
- * by a reserved height the reader screen imposes on every presentation.
- */
-@Composable
-fun PlainWord(token: ReaderWord, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text(
-            text = token.text,
-            textAlign = TextAlign.Center,
-            fontSize = if (maxHeight < CompactWordArea) CompactWordSize else WordSize,
-            // An unusually long word wraps rather than being cut off. It is rare
-            // enough that two lines is the whole treatment here; shrink-to-fit
-            // arrives with LEAF301.
-            maxLines = 2,
-            fontStyle = if (token.isSkipMarker) FontStyle.Italic else FontStyle.Normal,
-            fontWeight = if (token.isHeading) FontWeight.Bold else FontWeight.Normal,
-            color = if (token.isSkipMarker) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.onBackground
-            },
-        )
-    }
-}
-
-/**
  * The paused view (REQ-010): the paragraph the reader stopped in, with the current
  * word marked, so the thread can be picked back up before playing again.
+ *
+ * The paragraph is rebuilt from each token's own text and the exact separator that
+ * followed it, so it reads as the book sets it — `—¿Quién teme a la máquina?
+ * —preguntó ella—.`, not the bare word list increment 002 showed here. That is
+ * the whole reason [com.cedagova.fastreader.content.WordToken] carries its
+ * punctuation: a paused reader is reading prose, and prose without its
+ * punctuation is materially harder to pick a thread up from.
  */
 @Composable
 private fun PausedContext(state: ReaderUiState.Reading) {
@@ -400,13 +412,15 @@ private fun PausedContext(state: ReaderUiState.Reading) {
             val ellipsis = stringResource(R.string.reader_context_continues)
             val paragraph = buildAnnotatedString {
                 if (context.truncatedStart) append("$ellipsis ")
-                context.words.forEachIndexed { offset, text ->
-                    if (offset > 0) append(" ")
+                context.words.forEachIndexed { offset, entry ->
                     if (offset == context.currentOffset) {
-                        withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) { append(text) }
+                        withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) {
+                            append(entry.text)
+                        }
                     } else {
-                        append(text)
+                        append(entry.text)
                     }
+                    append(entry.gapAfter)
                 }
                 if (context.truncatedEnd) append(" $ellipsis")
             }
@@ -536,21 +550,29 @@ private fun ChapterRow(state: ReaderUiState.Reading, onOpenChapters: () -> Unit)
     }
 }
 
-/** REQ-017: progress percent and time remaining at the current speed. */
+/**
+ * REQ-017: progress percent and time remaining at the current speed.
+ *
+ * The two labels each take half the row rather than being pushed apart by
+ * `SpaceBetween`, which at a 2.0 system font scale let them meet with no gap and
+ * render as "54% readUnder a minute left" (REQ-060). Halves cannot collide: the
+ * longer label wraps inside its own half instead.
+ */
 @Composable
 private fun ProgressRow(state: ReaderUiState.Reading) {
-    Row(
-        modifier = Modifier.fillMaxWidth().testTag("reader_progress"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().testTag("reader_progress")) {
         Text(
             text = stringResource(R.string.reader_progress, state.progressPercent),
             style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
         )
+        Spacer(Modifier.width(8.dp))
         Text(
             text = remainingLabel(state.remainingMillis),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
         )
     }
 }

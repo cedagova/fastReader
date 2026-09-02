@@ -7,6 +7,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -27,6 +30,7 @@ import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderViewModel
+import com.cedagova.fastreader.settings.CueSettings
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -48,6 +52,12 @@ fun ReaderRoute(
      * only the caller knows that (LEAF204).
      */
     onCannotOpen: (String) -> Unit = {},
+    /**
+     * The cue layer's parameters (REQ-020/REQ-021). Defaulted here and passed
+     * straight through: LEAF302 replaces this default with the reader's stored
+     * settings, and its live preview is the same value changing.
+     */
+    cues: CueSettings = CueSettings(),
 ) {
     val repository = graph.repository
     val reader = viewModel<ReaderViewModel>(
@@ -69,7 +79,15 @@ fun ReaderRoute(
     PauseWhenBackgrounded(reader)
     PlaybackLoop(reader, playing)
 
-    BackHandler(onBack = onBack)
+    // REQ-030. Screen state, not session state: it belongs to this reader view, so
+    // leaving the book and coming back starts unfocused, while a rotation — which
+    // does not change what the reader asked for — keeps it.
+    var focused by rememberSaveable { mutableStateOf(false) }
+
+    // Back leaves focused mode before it leaves the book. Without this the only
+    // way out of a chrome-less screen is the long press, and a reader who does not
+    // know that gesture is stuck looking at a bare word.
+    BackHandler { if (focused) focused = false else onBack() }
 
     ReaderScreen(
         state = state,
@@ -83,6 +101,9 @@ fun ReaderRoute(
         onScrub = reader::scrubTo,
         onChapterSelected = reader::jumpToChapter,
         modifier = modifier,
+        cues = cues,
+        focused = focused,
+        onToggleFocused = { focused = !focused },
     )
 }
 

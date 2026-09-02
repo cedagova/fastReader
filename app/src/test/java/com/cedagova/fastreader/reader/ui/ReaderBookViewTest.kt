@@ -28,13 +28,40 @@ class ReaderBookViewTest {
 
     @Test
     fun `REQ-010 the paused view is the paragraph around the current word`() {
-        // Paragraph 3 runs 7..16: "The machine waited patient and extraordinarily
-        // quiet Ada watched it".
+        // Paragraph 3 runs 7..16.
         val context = at(12).context!!
-        assertEquals(book.tokens.subList(7, 17).map { it.displayText }, context.words)
-        assertEquals("extraordinarily", context.words[context.currentOffset])
+        assertEquals(book.tokens.subList(7, 17).map { it.displayText }, context.words.map { it.text })
+        assertEquals("extraordinarily", context.words[context.currentOffset].text)
         assertFalse(context.truncatedStart)
         assertFalse(context.truncatedEnd)
+    }
+
+    /**
+     * The paused paragraph is prose, so it has to read like prose. Increment 002
+     * showed this paragraph as a word list with every mark stripped; the exact
+     * source sentence is the assertion, because "close enough" here is what let
+     * that through.
+     */
+    @Test
+    fun `the paused paragraph is rebuilt with the punctuation the book prints`() {
+        val context = at(12).context!!
+        assertEquals(
+            "The machine waited, patient and extraordinarily quiet. Ada watched it.",
+            context.words.joinToString("") { it.text + it.gapAfter },
+        )
+    }
+
+    /** REQ-019: the Spanish shapes — `¿`, `¡`, and dialogue dashes — survive too. */
+    @Test
+    fun `a Spanish dialogue paragraph reads as the book sets it`() {
+        val spanish = ReaderFixtures.spanishNovel
+        val spanishView = ReaderBookView("¿Quién teme a la máquina?", spanish)
+        val respondio = spanish.tokens.first { it is WordToken && it.text == "respondió" }.index
+        val paragraph = spanishView.present(ReaderSession(spanish).jumpTo(respondio))
+        assertEquals(
+            "—Muy bien, gracias —respondió ella—. La máquina es extraordinariamente silenciosa.",
+            paragraph.context!!.words.joinToString("") { it.text + it.gapAfter },
+        )
     }
 
     @Test
