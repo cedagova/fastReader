@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import com.cedagova.fastreader.library.LibraryGraph
+import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 
@@ -29,12 +30,16 @@ fun LibraryRoute(
     graph: LibraryGraph,
     onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
+    resumeBlocked: ResumeBlocked? = null,
+    onDismissResumeNotice: () -> Unit = {},
 ) {
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
     val ingestion by repository.ingestion.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    val state = remember(catalog, ingestion, query) { buildLibraryUiState(catalog, ingestion, query) }
+    val state = remember(catalog, ingestion, query, resumeBlocked) {
+        buildLibraryUiState(catalog, ingestion, query, resumeBlocked)
+    }
     val coverLoader = remember(graph) { CoverStoreLoader(graph.covers) }
 
     val pickBooks = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
@@ -68,6 +73,7 @@ fun LibraryRoute(
             if (tree != null) pickFolder.launch(tree.toUri()) else pickBooks.launch(SafDocumentGateway.PICKER_MIME_TYPES)
         },
         coverLoader = coverLoader,
+        onDismissResumeNotice = onDismissResumeNotice,
         modifier = modifier,
     )
 }

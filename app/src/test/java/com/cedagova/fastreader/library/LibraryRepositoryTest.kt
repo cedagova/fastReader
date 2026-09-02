@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -62,13 +63,14 @@ class LibraryRepositoryTest {
         val first = repository(FileCatalogStore(file), backgroundScope)
         first.addPickedBooks(listOf("doc://a"))
         val bookId = first.catalog.value.books.single().id
-        first.updateReadingState(bookId, ReadingState(wordIndex = 512))
+        first.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 512))
 
         val second = repository(FileCatalogStore(file), backgroundScope)
         second.load()
 
         assertEquals(1, second.catalog.value.books.size)
-        assertEquals(512, second.readingState(bookId)?.wordIndex)
+        assertEquals(512, second.readingState(bookId)?.tokenIndex)
+        assertEquals(bookId, second.catalog.value.lastReadBookId)
         assertNotNull(second.coverFile(bookId))
     }
 
@@ -146,16 +148,20 @@ class LibraryRepositoryTest {
         val repository = repository(scope = backgroundScope)
         repository.addPickedBooks(listOf("doc://a"))
         val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(bookId, ReadingState(spineIndex = 1, wordIndex = 900, progressFraction = 0.6f))
+        repository.updateReadingState(
+            bookId,
+            ReadingState(bookDigest = bookId, tokenIndex = 900, progressFraction = 0.6f, wpm = 400),
+        )
 
         repository.removeBook(bookId)
         assertTrue(repository.catalog.value.books.isEmpty())
-        assertEquals(900, repository.readingState(bookId)?.wordIndex)
+        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
 
         repository.addPickedBooks(listOf("doc://a"))
 
         assertEquals(bookId, repository.catalog.value.books.single().id)
-        assertEquals(900, repository.readingState(bookId)?.wordIndex)
+        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
+        assertEquals(400, repository.readingState(bookId)?.wpm)
     }
 
     @Test
@@ -165,7 +171,7 @@ class LibraryRepositoryTest {
         val repository = repository(FileCatalogStore(file), backgroundScope)
         repository.addFolder("tree://books", "Books")
         val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(bookId, ReadingState(wordIndex = 250))
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 250))
 
         repository.removeBook(bookId)
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
@@ -178,7 +184,7 @@ class LibraryRepositoryTest {
         restarted.rescan(ScanTrigger.APP_OPEN)
 
         assertTrue("the removal must survive a restart", restarted.catalog.value.books.isEmpty())
-        assertEquals(250, restarted.readingState(bookId)?.wordIndex)
+        assertEquals(250, restarted.readingState(bookId)?.tokenIndex)
     }
 
     @Test
@@ -203,5 +209,45 @@ class LibraryRepositoryTest {
         repository.addFolder("tree://books")
 
         assertEquals("My Books", repository.catalog.value.folders.single().displayName)
+    }
+
+    /**
+     * The definition's guardrail is that a write failure is loud, not that it is
+     * permanent. Positions are written continuously now, so a transient failure is
+     * something a reader can easily hit; leaving both banners up after the store
+     * started working again would make the app look broken.
+     */
+    @Test
+    fun `a write failure is loud on both surfaces and clears when writing works again`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val store = FailableStore(FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")))
+        val repository = repository(store, backgroundScope)
+        repository.addPickedBooks(listOf("doc://a"))
+        val bookId = repository.catalog.value.books.single().id
+
+        store.failing = true
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 120))
+
+        assertEquals("the disk is full", repository.persistenceFailure.value)
+        assertEquals("the disk is full", (repository.ingestion.value as IngestionState.Failed).message)
+
+        store.failing = false
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 121))
+
+        assertNull(repository.persistenceFailure.value)
+        assertTrue(repository.ingestion.value !is IngestionState.Failed)
+        assertEquals(121, repository.readingState(bookId)?.tokenIndex)
+    }
+
+    /** Wraps a real store so a write can be made to fail and then recover. */
+    private class FailableStore(private val delegate: CatalogStore) : CatalogStore {
+        var failing = false
+
+        override fun load(): CatalogLoad = delegate.load()
+
+        override fun save(catalog: Catalog) {
+            if (failing) throw IOException("the disk is full")
+            delegate.save(catalog)
+        }
     }
 }

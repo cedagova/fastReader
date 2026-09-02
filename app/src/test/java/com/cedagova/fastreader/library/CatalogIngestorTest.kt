@@ -127,19 +127,19 @@ class CatalogIngestorTest {
         val added = ingestor.addPickedBooks(Catalog(), listOf("doc://a")).catalog
         val bookId = added.books.single().id
         val seeded = added.copy(
-            readingStates = mapOf(bookId to ReadingState(spineIndex = 2, wordIndex = 412, progressFraction = 0.37f)),
+            readingStates = mapOf(bookId to ReadingState(bookDigest = bookId, tokenIndex = 412, progressFraction = 0.37f)),
         )
 
         val afterRemove = ingestor.removeBook(seeded, bookId)
 
         assertTrue(afterRemove.books.isEmpty())
         assertTrue("the file must never be deleted", gateway.documents.containsKey("doc://a"))
-        assertEquals(412, afterRemove.readingStates.getValue(bookId).wordIndex)
+        assertEquals(412, afterRemove.readingStates.getValue(bookId).tokenIndex)
 
         val afterReAdd = ingestor.addPickedBooks(afterRemove, listOf("doc://a")).catalog
 
         assertEquals(bookId, afterReAdd.books.single().id)
-        assertEquals(412, afterReAdd.readingStates.getValue(bookId).wordIndex)
+        assertEquals(412, afterReAdd.readingStates.getValue(bookId).tokenIndex)
         assertEquals(0.37f, afterReAdd.readingStates.getValue(bookId).progressFraction, 0.0001f)
     }
 
@@ -149,14 +149,14 @@ class CatalogIngestorTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
         val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
         val bookId = added.books.single().id
-        val seeded = added.copy(readingStates = mapOf(bookId to ReadingState(wordIndex = 99)))
+        val seeded = added.copy(readingStates = mapOf(bookId to ReadingState(bookDigest = bookId, tokenIndex = 99)))
 
         gateway.missingFolders += "tree://books"
         val whileMissing = ingestor.rescan(seeded).catalog
 
         assertEquals(BookStatus.MISSING, whileMissing.books.single().status)
         assertEquals(FolderStatus.MISSING, whileMissing.folders.single().status)
-        assertEquals(99, whileMissing.readingStates.getValue(bookId).wordIndex)
+        assertEquals(99, whileMissing.readingStates.getValue(bookId).tokenIndex)
 
         gateway.missingFolders -= "tree://books"
         val restored = ingestor.rescan(whileMissing).catalog
@@ -164,7 +164,7 @@ class CatalogIngestorTest {
         assertEquals(BookStatus.READABLE, restored.books.single().status)
         assertEquals(FolderStatus.AVAILABLE, restored.folders.single().status)
         assertEquals(bookId, restored.books.single().id)
-        assertEquals(99, restored.readingStates.getValue(bookId).wordIndex)
+        assertEquals(99, restored.readingStates.getValue(bookId).tokenIndex)
     }
 
     @Test
@@ -302,7 +302,7 @@ class CatalogIngestorTest {
         gateway.putIntoFolder("tree://books", "tree://books/two.epub", EpubFixtures.spanishEpub(), "two.epub")
         val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
         val removedId = added.books.first { it.title == "The Quiet Machine" }.id
-        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(wordIndex = 250)))
+        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(bookDigest = removedId, tokenIndex = 250)))
 
         val afterRemove = ingestor.removeBook(seeded, removedId)
         assertEquals(1, afterRemove.books.size)
@@ -312,7 +312,7 @@ class CatalogIngestorTest {
         assertEquals("the removed book must not come back", 1, afterRescan.books.size)
         assertEquals("¿Quién teme a la máquina?", afterRescan.books.single().title)
         assertTrue("the file is never deleted", gateway.documents.containsKey("tree://books/one.epub"))
-        assertEquals(250, afterRescan.readingStates.getValue(removedId).wordIndex)
+        assertEquals(250, afterRescan.readingStates.getValue(removedId).tokenIndex)
     }
 
     @Test
@@ -320,14 +320,14 @@ class CatalogIngestorTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
         val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
         val removedId = added.books.single().id
-        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(wordIndex = 250)))
+        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(bookDigest = removedId, tokenIndex = 250)))
         val afterRemove = ingestor.removeBook(seeded, removedId)
 
         val afterReAdd = ingestor.addFolder(afterRemove, "tree://books", "Books").catalog
 
         assertEquals(removedId, afterReAdd.books.single().id)
         assertTrue(afterReAdd.removedBookIds.isEmpty())
-        assertEquals(250, afterReAdd.readingStates.getValue(removedId).wordIndex)
+        assertEquals(250, afterReAdd.readingStates.getValue(removedId).tokenIndex)
     }
 
     @Test

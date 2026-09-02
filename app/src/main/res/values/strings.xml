@@ -42,6 +42,10 @@
     <string name="reader_opening">Opening %1$s…</string>
     <string name="reader_percent">%1$d%%</string>
     <string name="reader_unavailable_title">This book cannot be read</string>
+    <string name="reader_unavailable_source">This book could not be opened. The file may have been moved or deleted.</string>
+    <string name="reader_unavailable_corrupt">This file is damaged and cannot be read.</string>
+    <string name="reader_unavailable_invalid">This file is not a usable EPUB.</string>
+    <string name="reader_unavailable_empty">There is no text to read in this book.</string>
 
     <string name="reader_play">Play</string>
     <string name="reader_pause">Pause</string>
@@ -71,6 +75,17 @@
     <string name="reader_speed_hint">Above 450 WPM most readers take in less of what they read. Playback continues either way.</string>
 
     <string name="reader_context_continues">…</string>
+
+    <string name="reader_persistence_problem_title">Your place is not being saved</string>
+
+    <string name="library_resume_blocked_title">Could not go back to %1$s</string>
+    <string name="library_resume_blocked_missing">Its file was moved or deleted. Your place is kept in case it comes back.</string>
+    <string name="library_resume_blocked_permission_lost">Access to its folder was revoked. Grant access again to carry on reading.</string>
+    <string name="library_resume_blocked_unreadable">It could not be opened. The file may have been moved, deleted, or damaged.</string>
+    <string name="library_resume_blocked_removed">You removed it from your library. Your place is kept if you add it again.</string>
+    <string name="library_resume_blocked_gone">It is no longer in your library. Your place is kept if it comes back.</string>
+    <string name="library_resume_blocked_dismiss">Dismiss</string>
+    <string name="library_resume_blocked_unnamed">your last book</string>
 
     <string name="library_open">Open %1$s</string>
 </resources>

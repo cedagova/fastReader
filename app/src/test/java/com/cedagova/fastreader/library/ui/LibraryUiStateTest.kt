@@ -5,6 +5,8 @@ import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.ResumeBlocked
+import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
@@ -257,5 +259,118 @@ class LibraryUiStateTest {
 
         assertNull(state.scan)
         assertNull(state.failureMessage)
+    }
+
+    // REQ-004/REQ-018: the number the library shows comes from real reading.
+    @Test
+    fun `percent read comes from the stored position and only reaches 100 when finished`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.readable("started", "Started"),
+                LibraryFixtures.readable("nearly", "Nearly"),
+                LibraryFixtures.readable("finished", "Finished"),
+                LibraryFixtures.readable("untouched", "Untouched"),
+            ),
+            readingStates = mapOf(
+                "started" to ReadingState(bookDigest = "started", tokenIndex = 370, progressFraction = 0.37f),
+                // Would round to 100 and claim to be finished; it is not.
+                "nearly" to ReadingState(bookDigest = "nearly", tokenIndex = 9_996, progressFraction = 0.9997f),
+                "finished" to ReadingState(bookDigest = "finished", tokenIndex = 9_999, progressFraction = 1f),
+            ),
+        )
+
+        val percentByTitle = buildLibraryUiState(catalog, IngestionState.Idle, query = "")
+            .books.associate { it.title to it.progressPercent }
+
+        assertEquals(37, percentByTitle.getValue("Started"))
+        assertEquals(99, percentByTitle.getValue("Nearly"))
+        assertEquals(100, percentByTitle.getValue("Finished"))
+        assertEquals(0, percentByTitle.getValue("Untouched"))
+    }
+
+    // REQ-009: the library has to say why it opened here instead of in the book.
+    @Test
+    fun `a blocked resume names the book and the reason`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.unavailable("revoked", "Down and Out", SourceAvailability.PERMISSION_LOST),
+            ),
+            lastReadBookId = "revoked",
+        )
+
+        val state = buildLibraryUiState(
+            catalog,
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("revoked", ResumeBlockedReason.PERMISSION_LOST),
+        )
+
+        val notice = requireNotNull(state.resumeNotice)
+        assertEquals("Down and Out", notice.title)
+        assertEquals(ResumeBlockedReason.PERMISSION_LOST, notice.reason)
+    }
+
+    @Test
+    fun `a blocked resume for a removed book still renders without a title`() {
+        val state = buildLibraryUiState(
+            Catalog(),
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("gone", ResumeBlockedReason.REMOVED),
+        )
+
+        val notice = requireNotNull(state.resumeNotice)
+        assertNull(notice.title)
+        assertEquals(ResumeBlockedReason.REMOVED, notice.reason)
+    }
+
+    // Found on the emulator: after granting access again the banner still claimed
+    // the book was unreachable, in front of a library that had just recovered it.
+    @Test
+    fun `a resume notice disappears once the book is readable again`() {
+        val catalog = Catalog(
+            books = listOf(LibraryFixtures.readable("regranted", "Down and Out")),
+            lastReadBookId = "regranted",
+        )
+
+        val state = buildLibraryUiState(
+            catalog,
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("regranted", ResumeBlockedReason.PERMISSION_LOST),
+        )
+
+        assertNull(state.resumeNotice)
+    }
+
+    /**
+     * The one reason the catalog cannot answer. A file deleted out from under a
+     * directly-picked book still queries as available, so launch routes into it
+     * and the *open* is what fails. Suppressing the notice on the catalog's word
+     * would leave that reader with a library that looks perfectly fine and no
+     * explanation of why their book did not open.
+     */
+    @Test
+    fun `an unreadable notice survives a catalog that still calls the book readable`() {
+        val catalog = Catalog(
+            books = listOf(LibraryFixtures.readable("ghost", "A Deleted Book")),
+            lastReadBookId = "ghost",
+        )
+
+        val state = buildLibraryUiState(
+            catalog,
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("ghost", ResumeBlockedReason.UNREADABLE),
+        )
+
+        val notice = requireNotNull(state.resumeNotice)
+        assertEquals("A Deleted Book", notice.title)
+        assertEquals(ResumeBlockedReason.UNREADABLE, notice.reason)
+    }
+
+    @Test
+    fun `an ordinary launch shows no resume notice`() {
+        assertNull(buildLibraryUiState(Catalog(), IngestionState.Idle, query = "").resumeNotice)
     }
 }
