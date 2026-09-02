@@ -115,6 +115,7 @@ class LibraryScreenScreenshotTest {
                         onRefresh = {},
                         onRemove = {},
                         onGrantAccess = {},
+                        onOpen = {},
                         coverLoader = FakeCovers,
                     )
                 }

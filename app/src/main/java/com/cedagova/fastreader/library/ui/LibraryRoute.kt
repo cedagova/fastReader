@@ -25,7 +25,11 @@ import com.cedagova.fastreader.library.saf.SafDocumentGateway
  * the Roborazzi renders can drive every state directly.
  */
 @Composable
-fun LibraryRoute(graph: LibraryGraph, modifier: Modifier = Modifier) {
+fun LibraryRoute(
+    graph: LibraryGraph,
+    onOpenBook: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
     val ingestion by repository.ingestion.collectAsState()
@@ -56,6 +60,7 @@ fun LibraryRoute(graph: LibraryGraph, modifier: Modifier = Modifier) {
         onAddFolder = { pickFolder.launch(null) },
         onRefresh = { repository.requestRescan(ScanTrigger.MANUAL_REFRESH) },
         onRemove = { repository.requestRemoveBook(it.id) },
+        onOpen = { onOpenBook(it.id) },
         onGrantAccess = { book ->
             // Re-granting a folder re-adds it at the same tree URI, which restores
             // every book it holds; a directly picked file has to be picked again.

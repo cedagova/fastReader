@@ -2,6 +2,7 @@ package com.cedagova.fastreader.library.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,6 +83,7 @@ fun LibraryScreen(
     onRefresh: () -> Unit,
     onRemove: (LibraryBookItem) -> Unit,
     onGrantAccess: (LibraryBookItem) -> Unit,
+    onOpen: (LibraryBookItem) -> Unit,
     modifier: Modifier = Modifier,
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
@@ -119,6 +121,7 @@ fun LibraryScreen(
                             books = state.books,
                             onRemove = onRemove,
                             onGrantAccess = onGrantAccess,
+                            onOpen = onOpen,
                             coverLoader = coverLoader,
                         )
                     }
@@ -301,6 +304,7 @@ private fun BookList(
     books: List<LibraryBookItem>,
     onRemove: (LibraryBookItem) -> Unit,
     onGrantAccess: (LibraryBookItem) -> Unit,
+    onOpen: (LibraryBookItem) -> Unit,
     coverLoader: CoverLoader,
 ) {
     LazyColumn(
@@ -312,6 +316,7 @@ private fun BookList(
                 book = book,
                 onRemove = { onRemove(book) },
                 onGrantAccess = { onGrantAccess(book) },
+                onOpen = { onOpen(book) },
                 coverLoader = coverLoader,
             )
             HorizontalDivider()
@@ -324,14 +329,25 @@ private fun BookRow(
     book: LibraryBookItem,
     onRemove: () -> Unit,
     onGrantAccess: () -> Unit,
+    onOpen: () -> Unit,
     coverLoader: CoverLoader,
 ) {
     val author = book.author ?: stringResource(R.string.library_unknown_author)
     val statusLine = book.statusLine()
+    val openLabel = stringResource(R.string.library_open, book.title)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 72.dp)
+            // A readable book opens in the reader; the rest already explain in
+            // their status line why there is nothing to open.
+            .then(
+                if (book.isReadable) {
+                    Modifier.clickable(onClickLabel = openLabel, onClick = onOpen)
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("library_book_${book.id}"),
         verticalAlignment = Alignment.Top,
