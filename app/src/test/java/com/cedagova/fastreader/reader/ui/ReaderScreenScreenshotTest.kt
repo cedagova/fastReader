@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.content.ContentFailureReason
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderSession
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
@@ -49,10 +50,7 @@ class ReaderScreenScreenshotTest {
     fun aBookThatCannotBeReadExplainsWhyInPlainLanguage() {
         capture(
             "reader_unavailable",
-            ReaderUiState.Unavailable(
-                BOOK_TITLE,
-                "This file is damaged and is not a readable EPUB: damaged archive: unexpected end of stream",
-            ),
+            ReaderUiState.Unavailable(BOOK_TITLE, ContentFailureReason.CORRUPT_ARCHIVE),
         )
     }
 

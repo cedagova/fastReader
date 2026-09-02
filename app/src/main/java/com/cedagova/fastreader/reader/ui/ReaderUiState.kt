@@ -1,6 +1,9 @@
 package com.cedagova.fastreader.reader.ui
 
+import androidx.annotation.StringRes
+import com.cedagova.fastreader.R
 import com.cedagova.fastreader.content.BookContent
+import com.cedagova.fastreader.content.ContentFailureReason
 import com.cedagova.fastreader.content.SkipMarkerToken
 import com.cedagova.fastreader.content.Token
 import com.cedagova.fastreader.content.WordToken
@@ -35,10 +38,20 @@ sealed interface ReaderUiState {
         val fraction: Float?,
     ) : ReaderUiState
 
-    /** The book could not be turned into a stream; [message] is LEAF201's plain-language reason. */
+    /**
+     * The book could not be turned into a stream.
+     *
+     * The *reason* travels, not a sentence. LEAF201's failures carry a technical
+     * detail — `open failed: ENOENT`, `unexpected end of stream` — that is useful
+     * for diagnosis and is not reader copy, and once launch can route straight
+     * into a book (LEAF204) this screen is the first thing the app shows. Keeping
+     * the state typed means there is nowhere for an interpolated exception to
+     * live: [com.cedagova.fastreader.reader.ui.messageRes] maps each reason to a
+     * plain-language string, in the register of the library's own states.
+     */
     data class Unavailable(
         override val bookTitle: String,
-        val message: String,
+        val reason: ContentFailureReason,
     ) : ReaderUiState
 
     /** The reader proper. */
@@ -85,6 +98,15 @@ sealed interface ReaderUiState {
         /** In-book navigation is offered while stopped (REQ-014), never mid-stream. */
         val canNavigate: Boolean get() = isStopped
     }
+}
+
+/** Plain-language copy for a book that could not be opened. One string per reason, no detail. */
+@StringRes
+fun ContentFailureReason.messageRes(): Int = when (this) {
+    ContentFailureReason.UNREADABLE_SOURCE -> R.string.reader_unavailable_source
+    ContentFailureReason.CORRUPT_ARCHIVE -> R.string.reader_unavailable_corrupt
+    ContentFailureReason.INVALID_STRUCTURE -> R.string.reader_unavailable_invalid
+    ContentFailureReason.NO_READABLE_CONTENT -> R.string.reader_unavailable_empty
 }
 
 /** One token as the screen draws it. The presentation slot LEAF301 replaces consumes this. */

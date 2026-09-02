@@ -145,10 +145,14 @@ fun buildLibraryUiState(
         failureMessage = (ingestion as? IngestionState.Failed)?.message,
         resumeNotice = resumeBlocked?.let {
             val book = catalog.book(it.bookId)
-            // Granting access again, or restoring the folder, answers the notice.
-            // Leaving it up would tell a reader who has just fixed the problem
-            // that it is still there.
-            if (book?.status == BookStatus.READABLE) {
+            // Granting access again, or restoring the folder, answers the notice:
+            // leaving it up would tell a reader who has just fixed the problem
+            // that it is still there. UNREADABLE is deliberately excluded, because
+            // it is the one reason the catalog cannot contradict — it is recorded
+            // when a book the catalog calls readable turned out not to open, and
+            // hiding the notice on the catalog's say-so would leave the reader
+            // with no explanation at all.
+            if (book?.status == BookStatus.READABLE && it.reason != ResumeBlockedReason.UNREADABLE) {
                 null
             } else {
                 ResumeNotice(

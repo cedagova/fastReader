@@ -52,6 +52,9 @@ class MainActivity : ComponentActivity() {
 private fun FastReaderApp(library: LibraryGraph) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Whether the reader on screen was chosen by the launch routing rather than
+    // by the reader tapping a row. It decides who owns a book that will not open.
+    var routedIntoReader by rememberSaveable { mutableStateOf(false) }
     var blockedBookId by rememberSaveable { mutableStateOf<String?>(null) }
     var blockedReason by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -63,7 +66,10 @@ private fun FastReaderApp(library: LibraryGraph) {
         library.repository.load()
         library.repository.refreshLastReadBook()
         when (val destination = launchDestination(library.repository.catalog.value)) {
-            is LaunchDestination.Reader -> openBookId = destination.bookId
+            is LaunchDestination.Reader -> {
+                openBookId = destination.bookId
+                routedIntoReader = true
+            }
             is LaunchDestination.Library -> {
                 blockedBookId = destination.blocked?.bookId
                 blockedReason = destination.blocked?.reason?.name
@@ -80,7 +86,21 @@ private fun FastReaderApp(library: LibraryGraph) {
         openBookId != null -> ReaderRoute(
             graph = library,
             bookId = requireNotNull(openBookId),
-            onBack = { openBookId = null },
+            onBack = { openBookId = null; routedIntoReader = false },
+            // A book the reader chose from the library keeps the reader's own
+            // explanation on screen: they picked it, and its row already said
+            // what it is. A book the *launch* chose is different — nobody asked
+            // for it, and a dead screen with a back arrow is the first thing the
+            // app would show. That case goes back to the library, which can say
+            // which book failed and offer removal or a re-grant (REQ-009).
+            onCannotOpen = { failed ->
+                if (routedIntoReader) {
+                    routedIntoReader = false
+                    openBookId = null
+                    blockedBookId = failed
+                    blockedReason = ResumeBlockedReason.UNREADABLE.name
+                }
+            },
         )
 
         else -> LibraryRoute(

@@ -42,6 +42,12 @@ fun ReaderRoute(
     bookId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * The book turned out not to be openable. Reported, not acted on: whether a
+     * dead reader is the right screen depends on how the reader got here, and
+     * only the caller knows that (LEAF204).
+     */
+    onCannotOpen: (String) -> Unit = {},
 ) {
     val repository = graph.repository
     val reader = viewModel<ReaderViewModel>(
@@ -55,6 +61,9 @@ fun ReaderRoute(
 
     val state by reader.state.collectAsState()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
+
+    val unavailable = state as? ReaderUiState.Unavailable
+    LaunchedEffect(unavailable, bookId) { if (unavailable != null) onCannotOpen(bookId) }
 
     KeepScreenOn(playing)
     PauseWhenBackgrounded(reader)

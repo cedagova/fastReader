@@ -343,6 +343,32 @@ class LibraryUiStateTest {
         assertNull(state.resumeNotice)
     }
 
+    /**
+     * The one reason the catalog cannot answer. A file deleted out from under a
+     * directly-picked book still queries as available, so launch routes into it
+     * and the *open* is what fails. Suppressing the notice on the catalog's word
+     * would leave that reader with a library that looks perfectly fine and no
+     * explanation of why their book did not open.
+     */
+    @Test
+    fun `an unreadable notice survives a catalog that still calls the book readable`() {
+        val catalog = Catalog(
+            books = listOf(LibraryFixtures.readable("ghost", "A Deleted Book")),
+            lastReadBookId = "ghost",
+        )
+
+        val state = buildLibraryUiState(
+            catalog,
+            IngestionState.Idle,
+            query = "",
+            resumeBlocked = ResumeBlocked("ghost", ResumeBlockedReason.UNREADABLE),
+        )
+
+        val notice = requireNotNull(state.resumeNotice)
+        assertEquals("A Deleted Book", notice.title)
+        assertEquals(ResumeBlockedReason.UNREADABLE, notice.reason)
+    }
+
     @Test
     fun `an ordinary launch shows no resume notice`() {
         assertNull(buildLibraryUiState(Catalog(), IngestionState.Idle, query = "").resumeNotice)

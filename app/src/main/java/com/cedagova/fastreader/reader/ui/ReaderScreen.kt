@@ -278,7 +278,7 @@ private fun Unavailable(state: ReaderUiState.Unavailable, modifier: Modifier) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = state.message,
+            text = stringResource(state.reason.messageRes()),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

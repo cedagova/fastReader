@@ -3,7 +3,6 @@ package com.cedagova.fastreader.reader
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cedagova.fastreader.content.BookContentResult
-import com.cedagova.fastreader.content.ContentFailureReason
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.reader.ui.ReaderBookView
@@ -121,7 +120,7 @@ class ReaderViewModel(
         }
         when (result) {
             is BookContentResult.Failed ->
-                _state.value = ReaderUiState.Unavailable(title, result.message())
+                _state.value = ReaderUiState.Unavailable(title, result.reason)
 
             is BookContentResult.Parsed -> {
                 val content = result.content
@@ -208,19 +207,5 @@ class ReaderViewModel(
         val book = view ?: return
         val current = session ?: return
         _state.value = book.present(current, persistenceFailure)
-    }
-
-    private fun BookContentResult.Failed.message(): String = when (reason) {
-        ContentFailureReason.UNREADABLE_SOURCE ->
-            "The file could not be read: $detail"
-
-        ContentFailureReason.CORRUPT_ARCHIVE ->
-            "This file is damaged and is not a readable EPUB: $detail"
-
-        ContentFailureReason.INVALID_STRUCTURE ->
-            "This file is not a usable EPUB: $detail"
-
-        ContentFailureReason.NO_READABLE_CONTENT ->
-            "There is no text to read in this book: $detail"
     }
 }
