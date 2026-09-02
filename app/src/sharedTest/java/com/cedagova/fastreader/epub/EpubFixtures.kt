@@ -203,6 +203,13 @@ object EpubFixtures {
         ),
     )
 
+    /**
+     * Builds an EPUB-shaped archive from raw entries: `mimetype` stored first,
+     * then everything given, with fixed timestamps so identical content produces
+     * identical bytes. Shared with the content-pipeline fixtures.
+     */
+    fun buildArchive(entries: List<Pair<String, ByteArray>>): ByteArray = zip(entries)
+
     private fun baseEntries(): List<Pair<String, ByteArray>> = listOf(
         "META-INF/container.xml" to CONTAINER.toByteArray(Charsets.UTF_8),
         "OEBPS/content.opf" to opf("Locked Book", "Unknown", "en", "urn:uuid:locked", withCover = false)
