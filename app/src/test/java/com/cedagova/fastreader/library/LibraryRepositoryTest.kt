@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -208,5 +209,45 @@ class LibraryRepositoryTest {
         repository.addFolder("tree://books")
 
         assertEquals("My Books", repository.catalog.value.folders.single().displayName)
+    }
+
+    /**
+     * The definition's guardrail is that a write failure is loud, not that it is
+     * permanent. Positions are written continuously now, so a transient failure is
+     * something a reader can easily hit; leaving both banners up after the store
+     * started working again would make the app look broken.
+     */
+    @Test
+    fun `a write failure is loud on both surfaces and clears when writing works again`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val store = FailableStore(FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")))
+        val repository = repository(store, backgroundScope)
+        repository.addPickedBooks(listOf("doc://a"))
+        val bookId = repository.catalog.value.books.single().id
+
+        store.failing = true
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 120))
+
+        assertEquals("the disk is full", repository.persistenceFailure.value)
+        assertEquals("the disk is full", (repository.ingestion.value as IngestionState.Failed).message)
+
+        store.failing = false
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 121))
+
+        assertNull(repository.persistenceFailure.value)
+        assertTrue(repository.ingestion.value !is IngestionState.Failed)
+        assertEquals(121, repository.readingState(bookId)?.tokenIndex)
+    }
+
+    /** Wraps a real store so a write can be made to fail and then recover. */
+    private class FailableStore(private val delegate: CatalogStore) : CatalogStore {
+        var failing = false
+
+        override fun load(): CatalogLoad = delegate.load()
+
+        override fun save(catalog: Catalog) {
+            if (failing) throw IOException("the disk is full")
+            delegate.save(catalog)
+        }
     }
 }

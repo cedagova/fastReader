@@ -252,6 +252,13 @@ class LibraryRepository(
             withContext(ioDispatcher) { store.save(next) }
             _catalog.value = next
             _persistenceFailure.value = null
+            // A store that has just accepted a write is no longer failing, so the
+            // library's banner has to go with the reader's. Without this, one
+            // transient write failure would leave "the library could not be
+            // updated" on screen until the next folder scan — and since positions
+            // are written continuously now, that is a banner a reader could easily
+            // provoke and never be able to clear.
+            if (_ingestion.value is IngestionState.Failed) _ingestion.value = IngestionState.Idle
         } catch (error: Exception) {
             // Loud on both surfaces: the library banner and, while reading, the
             // reader's own. A write that fails silently is a lost position.
