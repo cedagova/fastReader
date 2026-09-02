@@ -111,11 +111,47 @@ sealed interface Token {
     val boundary: Boundary
 
     val displayText: String
+
+    /**
+     * What separates this token from the next one in the source text.
+     *
+     * Normally a single space. It is `""` where the book glued two tokens
+     * together (`the thing—a very odd one`), and it carries the odd free-standing
+     * mark (`he left — and never returned`). Concatenating
+     * `displayText + gapAfter` across a paragraph reproduces the paragraph.
+     */
+    val gapAfter: String get() = " "
 }
 
-/** A single word of book text, exactly as it should be shown. */
+/**
+ * A single word of book text.
+ *
+ * ## Why punctuation is carried, not discarded
+ *
+ * [text] is the word's letters and digits alone — that is what the pivot cue
+ * aligns on and what [WordClass] describes. The marks around it are kept
+ * separately so the book can be rendered as written:
+ *
+ * - [leading] is punctuation glued to the front of the word with no space between
+ *   — Spanish `¿`/`¡`, an opening quote, a dialogue dash;
+ * - [trailing] is punctuation glued to the end — a full stop, `?`, a closing
+ *   dash;
+ * - [gapAfter] is whatever separates this token's [trailing] from the next
+ *   token's [leading], normally a single space.
+ *
+ * Concatenating `leading + text + trailing + gapAfter` across a paragraph
+ * reproduces its source text exactly, which is what makes the paused context view
+ * read like the book instead of like a word list. Increment 002 dropped these
+ * runs, so `—¿Quién teme a la máquina? —preguntó ella—.` was shown as
+ * "Quién teme a la máquina preguntó ella".
+ *
+ * None of this moves a stored position: the same words still produce the same
+ * token count in the same order with the same indices, so
+ * [ContentPipelineVersion.CURRENT] does not change.
+ */
 data class WordToken(
     override val index: Int,
+    /** The word itself: letters and digits, no surrounding punctuation. */
     val text: String,
     override val chapterIndex: Int,
     override val paragraphIndex: Int,
@@ -124,8 +160,26 @@ data class WordToken(
     val classes: Set<WordClass> = emptySet(),
     /** True for every word inside an `<h1>`–`<h6>`, so the reader can style it. */
     val isHeading: Boolean = false,
+    /** Punctuation attached to the front of [text] with no space between. */
+    val leading: String = "",
+    /** Punctuation attached to the end of [text] with no space between. */
+    val trailing: String = "",
+    /** What separates this token from the next one's [leading]. Normally `" "`. */
+    override val gapAfter: String = " ",
 ) : Token {
-    override val displayText: String get() = text
+
+    /** The word as the book prints it, punctuation included. */
+    override val displayText: String get() = if (leading.isEmpty() && trailing.isEmpty()) {
+        text
+    } else {
+        leading + text + trailing
+    }
+
+    /** Offset in [displayText] where [text] starts — the pivot cue measures from here. */
+    val coreStart: Int get() = leading.length
+
+    /** Offset in [displayText] just past [text]. */
+    val coreEnd: Int get() = leading.length + text.length
 }
 
 /**

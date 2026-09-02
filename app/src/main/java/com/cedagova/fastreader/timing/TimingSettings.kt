@@ -1,5 +1,7 @@
 package com.cedagova.fastreader.timing
 
+import kotlinx.serialization.Serializable
+
 /**
  * The RSVP timing constants, all traced to the pinned research
  * (`docs/product-definitions/cedagova-fastReader-1/research-rsvp.md` at
@@ -82,6 +84,7 @@ object RsvpTiming {
  * exactly REQ-011's acceptance ("setting pause strength 'off' makes all words
  * uniform").
  */
+@Serializable
 enum class PauseStrength(val extraPauseScale: Double) {
     /** No modulation at all: uniform word durations. */
     OFF(0.0),

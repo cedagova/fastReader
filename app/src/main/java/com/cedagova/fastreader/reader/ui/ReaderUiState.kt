@@ -109,24 +109,47 @@ fun ContentFailureReason.messageRes(): Int = when (this) {
     ContentFailureReason.NO_READABLE_CONTENT -> R.string.reader_unavailable_empty
 }
 
-/** One token as the screen draws it. The presentation slot LEAF301 replaces consumes this. */
+/**
+ * One token as the screen draws it.
+ *
+ * [text] is what appears — the word with the punctuation the book prints around
+ * it. [coreStart] and [coreEnd] bracket the letters inside it, because the pivot
+ * cue is a property of the *word*: in `—¿Quién` the recognition point is a letter
+ * of "Quién", never the dash or the inverted question mark.
+ */
 data class ReaderWord(
     val text: String,
     /** A skip marker rather than book text, so it can be set apart (REQ-015). */
     val isSkipMarker: Boolean = false,
     /** Part of an `<h1>`–`<h6>`. */
     val isHeading: Boolean = false,
+    /** Offset in [text] where the word's own letters begin. */
+    val coreStart: Int = 0,
+    /** Offset in [text] just past the word's own letters. */
+    val coreEnd: Int = text.length,
 )
 
 /** The paused context view: the current paragraph, and which token in it is current. */
 data class ReaderContext(
-    val words: List<String>,
+    val words: List<ContextWord>,
     /** Index into [words] of the token the reader is on. */
     val currentOffset: Int,
     /** The paragraph continues before the first shown token. */
     val truncatedStart: Boolean = false,
     /** The paragraph continues after the last shown token. */
     val truncatedEnd: Boolean = false,
+)
+
+/**
+ * One token of the paused paragraph, with the exact separator that followed it.
+ *
+ * Joining every [text] with its [gapAfter] rebuilds the paragraph as the book
+ * sets it — including the cases a plain space would get wrong, such as an em dash
+ * with no space around it.
+ */
+data class ContextWord(
+    val text: String,
+    val gapAfter: String = " ",
 )
 
 /** One row of the chapter picker (REQ-014). */
@@ -149,7 +172,18 @@ data class ChapterEntry(
 class ReaderBookView(
     val bookTitle: String,
     content: BookContent,
-    pauseStrength: PauseStrength = PauseStrength.NORMAL,
+    /**
+     * The pause strength the time-remaining index was measured at (REQ-017).
+     *
+     * It is a constructor parameter and not a setter because the index *is* a
+     * function of it: displayed time remaining comes from the timing engine's
+     * estimate, which includes pause time, so a book read with `off` finishes
+     * materially sooner than the same book read with `strong`. Changing the
+     * setting mid-book therefore has to build a new view rather than leave a
+     * stale estimate on screen — see
+     * [com.cedagova.fastreader.reader.ReaderViewModel.setPauseStrength].
+     */
+    val pauseStrength: PauseStrength = PauseStrength.NORMAL,
 ) {
 
     private val remaining = RemainingTimeIndex.build(content, pauseStrength)
@@ -193,7 +227,12 @@ private const val CONTEXT_RADIUS = 45
 const val SPEED_HINT_WPM = 450
 
 private fun Token.toReaderWord(): ReaderWord = when (this) {
-    is WordToken -> ReaderWord(text = text, isHeading = isHeading)
+    is WordToken -> ReaderWord(
+        text = displayText,
+        isHeading = isHeading,
+        coreStart = coreStart,
+        coreEnd = coreEnd,
+    )
     is SkipMarkerToken -> ReaderWord(text = label, isSkipMarker = true)
     else -> ReaderWord(text = displayText)
 }
@@ -203,7 +242,12 @@ private fun ReaderSession.contextView(): ReaderContext {
     val from = maxOf(paragraph.first, index - CONTEXT_RADIUS)
     val to = minOf(paragraph.last, index + CONTEXT_RADIUS)
     return ReaderContext(
-        words = (from..to).map { content.tokens[it].displayText },
+        words = (from..to).map {
+            val token = content.tokens[it]
+            // The last shown token's own gap is dropped: the window ends there, and
+            // the screen adds the "continues" ellipsis if the paragraph goes on.
+            ContextWord(token.displayText, if (it == to) "" else token.gapAfter)
+        },
         currentOffset = index - from,
         truncatedStart = from > paragraph.first,
         truncatedEnd = to < paragraph.last,

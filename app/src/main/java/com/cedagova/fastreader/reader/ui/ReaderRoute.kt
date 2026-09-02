@@ -7,6 +7,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -48,8 +51,15 @@ fun ReaderRoute(
      * only the caller knows that (LEAF204).
      */
     onCannotOpen: (String) -> Unit = {},
+    /** Opens the settings screen (LEAF302), so cues can be changed while reading. */
+    onOpenSettings: () -> Unit = {},
 ) {
     val repository = graph.repository
+    // The stored settings drive the cue layer LEAF301 built and the timing engine
+    // LEAF202 built. This is the whole of "live preview" outside the settings
+    // screen: the reader is drawn from the same value the settings screen writes,
+    // so a change made mid-book is on screen as soon as the store accepts it.
+    val settings by repository.settings.collectAsState()
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
             initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository)) }
@@ -58,6 +68,10 @@ fun ReaderRoute(
     // Idempotent: after a rotation this finds the book already parsed and the
     // position intact, and switching books drops the previous one.
     LaunchedEffect(reader, bookId) { reader.open(bookId) }
+
+    // REQ-011 mid-book: this both changes the next word's duration and rebuilds
+    // the time-remaining index, which is a function of pause strength.
+    LaunchedEffect(reader, settings.pauseStrength) { reader.setPauseStrength(settings.pauseStrength) }
 
     val state by reader.state.collectAsState()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
@@ -69,7 +83,15 @@ fun ReaderRoute(
     PauseWhenBackgrounded(reader)
     PlaybackLoop(reader, playing)
 
-    BackHandler(onBack = onBack)
+    // REQ-030. Screen state, not session state: it belongs to this reader view, so
+    // leaving the book and coming back starts unfocused, while a rotation — which
+    // does not change what the reader asked for — keeps it.
+    var focused by rememberSaveable { mutableStateOf(false) }
+
+    // Back leaves focused mode before it leaves the book. Without this the only
+    // way out of a chrome-less screen is the long press, and a reader who does not
+    // know that gesture is stuck looking at a bare word.
+    BackHandler { if (focused) focused = false else onBack() }
 
     ReaderScreen(
         state = state,
@@ -83,6 +105,10 @@ fun ReaderRoute(
         onScrub = reader::scrubTo,
         onChapterSelected = reader::jumpToChapter,
         modifier = modifier,
+        cues = settings.cues,
+        focused = focused,
+        onToggleFocused = { focused = !focused },
+        onOpenSettings = onOpenSettings,
     )
 }
 

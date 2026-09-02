@@ -76,6 +76,9 @@
 
     <string name="reader_context_continues">…</string>
 
+    <string name="reader_hide_controls">Hide the controls</string>
+    <string name="reader_show_controls">Show the controls</string>
+
     <string name="reader_persistence_problem_title">Your place is not being saved</string>
 
     <string name="library_resume_blocked_title">Could not go back to %1$s</string>
@@ -88,4 +91,54 @@
     <string name="library_resume_blocked_unnamed">your last book</string>
 
     <string name="library_open">Open %1$s</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_open">Settings</string>
+    <string name="settings_back">Back</string>
+
+    <string name="settings_preview_label">Preview of the word stream, showing your current settings</string>
+    <string name="settings_rhythm">At %1$d WPM a plain word holds %2$d ms and a sentence end %3$d ms.</string>
+    <string name="settings_rhythm_uniform">At %1$d WPM every word holds %2$d ms, with no extra pause anywhere.</string>
+
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_font_size">Text size</string>
+    <string name="settings_font_small">Small</string>
+    <string name="settings_font_medium">Medium</string>
+    <string name="settings_font_large">Large</string>
+    <string name="settings_font_extra_large">Largest</string>
+
+    <string name="settings_section_cues">Cues</string>
+    <string name="settings_pivot">Pivot cue</string>
+    <string name="settings_pivot_summary">Holds every word on its recognition point and colours that letter.</string>
+    <string name="settings_pivot_color">Pivot colour</string>
+    <string name="settings_color_accent">Default</string>
+    <string name="settings_color_crimson">Crimson</string>
+    <string name="settings_color_amber">Amber</string>
+    <string name="settings_color_teal">Teal</string>
+    <string name="settings_color_violet">Violet</string>
+    <string name="settings_guide_marks">Guide marks</string>
+    <string name="settings_guide_marks_summary">Draws a rail and a small caret under the alignment column.</string>
+
+    <string name="settings_section_rhythm">Rhythm</string>
+    <string name="settings_pause_strength">Pause strength</string>
+    <string name="settings_pause_summary">How much longer the stream holds at commas, full stops and paragraph ends.</string>
+    <string name="settings_pause_off">Off</string>
+    <string name="settings_pause_subtle">Subtle</string>
+    <string name="settings_pause_normal">Normal</string>
+    <string name="settings_pause_strong">Strong</string>
+
+    <string name="settings_on">On</string>
+    <string name="settings_off">Off</string>
+
+    <string name="settings_reset">Reset to defaults</string>
+
+    <string name="settings_section_about">About this reader</string>
+    <string name="settings_visual_only">The word stream is visual only. FastReader shows one word at a time on the screen; it never reads a book aloud, and there is no audio or text-to-speech anywhere in the app. Everything around the stream — the library, the reader controls, and this screen — is labelled for TalkBack, but the stream itself has to be seen.</string>
+
+    <string name="settings_problem_title">Your settings are not being saved</string>
 </resources>

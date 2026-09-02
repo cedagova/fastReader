@@ -21,6 +21,9 @@ object ReaderFixtures {
     /** EPUB 3, four chapters, an inline image, a table, and a footnote reference. */
     val englishNovel: BookContent by lazy { parse(ContentFixtures.englishNovel()) }
 
+    /** EPUB 2, Spanish: inverted punctuation, accents and dialogue dashes. */
+    val spanishNovel: BookContent by lazy { parse(ContentFixtures.spanishNovel()) }
+
     /** A download that stopped after chapter one: chapters two and three are gaps. */
     val interrupted: BookContent by lazy { parse(ContentFixtures.interruptedMidBook()) }
 

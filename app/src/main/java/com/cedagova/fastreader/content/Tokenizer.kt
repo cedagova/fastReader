@@ -82,16 +82,28 @@ internal object Tokenizer {
         val text = block.text
         val words = ArrayList<WordToken>()
         var index = 0
+        var leading = ""
 
         while (index < text.length) {
             val runStart = index
             while (index < text.length && !text[index].isLetterOrDigit()) index++
             if (index >= text.length) break
 
-            if (words.isNotEmpty()) {
+            val run = text.substring(runStart, index)
+            if (words.isEmpty()) {
+                // Nothing precedes this word, so the whole glued run — a dialogue
+                // dash, a `¿`, an opening quote — belongs in front of it.
+                leading = run.takeLastWhile { !it.isSpaceLike() }
+            } else {
                 val previous = words.last()
                 val boundary = maxOf(previous.boundary, boundaryIn(text, runStart, index))
-                words[words.lastIndex] = previous.copy(boundary = boundary)
+                val trailing = run.gluedPrefix()
+                leading = run.gluedSuffix()
+                words[words.lastIndex] = previous.copy(
+                    boundary = boundary,
+                    trailing = trailing,
+                    gapAfter = run.substring(trailing.length, run.length - leading.length),
+                )
                 if (boundary >= Boundary.SENTENCE) state.sentenceIndex++
             }
 
@@ -111,6 +123,7 @@ internal object Tokenizer {
                 sentenceIndex = state.sentenceIndex,
                 boundary = Boundary.NONE,
                 isHeading = block.isHeading,
+                leading = leading,
             )
         }
 
@@ -122,8 +135,31 @@ internal object Tokenizer {
         val closing = if (block.isHeading) Boundary.HEADING else Boundary.PARAGRAPH
         words[words.lastIndex] = last.copy(
             boundary = maxOf(maxOf(last.boundary, boundaryIn(text, tail, text.length)), closing),
+            trailing = text.substring(tail).gluedPrefix(),
+            gapAfter = "",
         )
         return words
+    }
+
+    /**
+     * Splitting one run of punctuation between the word before it and the word
+     * after it.
+     *
+     * The run `? —` in `—¿Quién teme a la máquina? —preguntó ella—.` holds both
+     * the question mark that closes one clause and the dash that opens the next,
+     * and the space between them says which is which: whatever is glued to the
+     * preceding word ([gluedPrefix]) closes it, whatever is glued to the following
+     * word ([gluedSuffix]) opens that one, and the middle is the gap. A run with
+     * no space at all — the em dash in `the thing—a very odd one` — is entirely
+     * the preceding word's, which is what keeps the two halves glued when the
+     * paragraph is put back together.
+     */
+    private fun String.gluedPrefix(): String = takeWhile { !it.isSpaceLike() }
+
+    private fun String.gluedSuffix(): String {
+        val prefix = gluedPrefix()
+        if (prefix.length == length) return ""
+        return takeLastWhile { !it.isSpaceLike() }
     }
 
     /**

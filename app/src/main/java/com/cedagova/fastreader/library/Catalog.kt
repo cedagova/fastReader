@@ -2,6 +2,7 @@ package com.cedagova.fastreader.library
 
 import com.cedagova.fastreader.content.ContentPipelineVersion
 import com.cedagova.fastreader.library.store.CatalogSchema
+import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.timing.RsvpTiming
 import kotlinx.serialization.Serializable
 
@@ -36,6 +37,13 @@ data class Catalog(
      * was lost: the launch routing needs to know *which* book to explain.
      */
     val lastReadBookId: String? = null,
+    /**
+     * How the reader wants books presented (REQ-020 to REQ-023), stored with the
+     * library rather than beside it so one document, one write and one migration
+     * chain cover everything the app remembers. Absent in a document written
+     * before schema 3; every field then reads back as its documented default.
+     */
+    val settings: ReaderSettings = ReaderSettings(),
 ) {
     fun book(id: String): Book? = books.firstOrNull { it.id == id }
 
