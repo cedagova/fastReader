@@ -147,6 +147,12 @@ internal class OpfDocument(
     val spineCandidatePaths: Set<String>,
     val coverPath: String?,
     val coverMediaType: String?,
+    /** Spine items in reading order, with the manifest detail the content pipeline needs. */
+    val spineItems: List<ManifestItem> = emptyList(),
+    /** EPUB 3 navigation document, when the manifest declares one. */
+    val navPath: String? = null,
+    /** EPUB 2 NCX table of contents, when the spine or manifest points at one. */
+    val ncxPath: String? = null,
 ) {
     companion object {
 
@@ -186,7 +192,30 @@ internal class OpfDocument(
                 spineCandidatePaths = spineItems.flatMap { listOfNotNull(it.path, it.rawPath) }.toSet(),
                 coverPath = cover?.path,
                 coverMediaType = cover?.mediaType,
+                spineItems = spineItems,
+                navPath = resolveNav(manifestItems),
+                ncxPath = resolveNcx(elements, manifestItems),
             )
+        }
+
+        /** EPUB 3 marks its navigation document with `properties="nav"`. */
+        private fun resolveNav(manifestItems: Map<String, ManifestItem>): String? =
+            manifestItems.values
+                .firstOrNull { item -> item.properties.split(Regex("\\s+")).any { it == "nav" } }
+                ?.path
+
+        /**
+         * EPUB 2 points at its NCX from `<spine toc="...">`. Some books omit that
+         * attribute and only declare the media type, so both are accepted.
+         */
+        private fun resolveNcx(elements: List<Element>, manifestItems: Map<String, ManifestItem>): String? {
+            elements.firstOrNull { it.hasLocalName("spine") }
+                ?.attr("toc")
+                ?.let { manifestItems[it] }
+                ?.let { return it.path }
+            return manifestItems.values
+                .firstOrNull { it.mediaType.equals("application/x-dtbncx+xml", ignoreCase = true) }
+                ?.path
         }
 
         private fun readMetadata(root: Element, elements: List<Element>): EpubMetadata {
