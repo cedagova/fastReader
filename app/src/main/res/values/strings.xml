@@ -76,6 +76,9 @@
 
     <string name="reader_context_continues">…</string>
 
+    <string name="reader_hide_controls">Hide the controls</string>
+    <string name="reader_show_controls">Show the controls</string>
+
     <string name="reader_persistence_problem_title">Your place is not being saved</string>
 
     <string name="library_resume_blocked_title">Could not go back to %1$s</string>
