@@ -30,7 +30,6 @@ import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderViewModel
-import com.cedagova.fastreader.settings.CueSettings
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -52,14 +51,15 @@ fun ReaderRoute(
      * only the caller knows that (LEAF204).
      */
     onCannotOpen: (String) -> Unit = {},
-    /**
-     * The cue layer's parameters (REQ-020/REQ-021). Defaulted here and passed
-     * straight through: LEAF302 replaces this default with the reader's stored
-     * settings, and its live preview is the same value changing.
-     */
-    cues: CueSettings = CueSettings(),
+    /** Opens the settings screen (LEAF302), so cues can be changed while reading. */
+    onOpenSettings: () -> Unit = {},
 ) {
     val repository = graph.repository
+    // The stored settings drive the cue layer LEAF301 built and the timing engine
+    // LEAF202 built. This is the whole of "live preview" outside the settings
+    // screen: the reader is drawn from the same value the settings screen writes,
+    // so a change made mid-book is on screen as soon as the store accepts it.
+    val settings by repository.settings.collectAsState()
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
             initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository)) }
@@ -68,6 +68,10 @@ fun ReaderRoute(
     // Idempotent: after a rotation this finds the book already parsed and the
     // position intact, and switching books drops the previous one.
     LaunchedEffect(reader, bookId) { reader.open(bookId) }
+
+    // REQ-011 mid-book: this both changes the next word's duration and rebuilds
+    // the time-remaining index, which is a function of pause strength.
+    LaunchedEffect(reader, settings.pauseStrength) { reader.setPauseStrength(settings.pauseStrength) }
 
     val state by reader.state.collectAsState()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
@@ -101,9 +105,10 @@ fun ReaderRoute(
         onScrub = reader::scrubTo,
         onChapterSelected = reader::jumpToChapter,
         modifier = modifier,
-        cues = cues,
+        cues = settings.cues,
         focused = focused,
         onToggleFocused = { focused = !focused },
+        onOpenSettings = onOpenSettings,
     )
 }
 

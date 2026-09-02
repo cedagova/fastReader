@@ -7,6 +7,11 @@ import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.SourceOrigin
+import com.cedagova.fastreader.settings.FontSize
+import com.cedagova.fastreader.settings.PivotColor
+import com.cedagova.fastreader.settings.ReaderSettings
+import com.cedagova.fastreader.settings.ThemeChoice
+import com.cedagova.fastreader.timing.PauseStrength
 import com.cedagova.fastreader.timing.RsvpTiming
 import java.io.File
 import kotlinx.serialization.json.JsonObject
@@ -152,12 +157,16 @@ class CatalogStoreTest {
             }
             JsonObject(document + ("books" to kotlinx.serialization.json.JsonArray(books)))
         }
-        val codec = CatalogCodec(currentVersion = 3, migrations = mapOf(2 to addTitlePrefix))
+        val next = CatalogSchema.CURRENT_VERSION + 1
+        val codec = CatalogCodec(
+            currentVersion = next,
+            migrations = CatalogSchema.MIGRATIONS + (CatalogSchema.CURRENT_VERSION to addTitlePrefix),
+        )
 
         val decoded = codec.decode(currentText) as CatalogDecoding.Decoded
 
-        assertEquals(2, decoded.migratedFrom)
-        assertEquals(3, decoded.catalog.schemaVersion)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.migratedFrom)
+        assertEquals(next, decoded.catalog.schemaVersion)
         assertEquals("v3: ¿Quién teme a la máquina?", decoded.catalog.books.single().title)
         assertEquals(77, decoded.catalog.readingStates.getValue("sha256:abc").tokenIndex)
     }
@@ -226,6 +235,117 @@ class CatalogStoreTest {
     @Test
     fun `a document without a schema version is treated as damaged`() {
         assertTrue(CatalogCodec().decode("""{"books":[]}""") is CatalogDecoding.Damaged)
+    }
+
+    // --- Settings (LEAF302) -------------------------------------------------
+    //
+    // AD-3 for the settings schema, and the promise REQ-040's update-in-place
+    // acceptance rests on: an absent, unknown or unusable key reads back as its
+    // documented default, and none of those cases costs a reader their library.
+
+    /**
+     * The real increment 002 → 003 step. A v2 document predates the settings
+     * surface, so it must keep every book and position it has and read back with
+     * exactly [ReaderSettings.DEFAULTS] — not a blank or a partially filled value.
+     */
+    @Test
+    fun `a version 2 document keeps its library and gains the default settings`() {
+        val v2 = """
+            {"schemaVersion":2,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9}},
+             "lastReadBookId":"sha256:abc"}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v2) as CatalogDecoding.Decoded
+
+        assertEquals(2, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertEquals("The Long Signal", decoded.catalog.books.single().title)
+        assertEquals(77, decoded.catalog.readingStates.getValue("sha256:abc").tokenIndex)
+        assertEquals(400, decoded.catalog.readingStates.getValue("sha256:abc").wpm)
+        assertEquals("sha256:abc", decoded.catalog.lastReadBookId)
+        assertEquals(ReaderSettings.DEFAULTS, decoded.catalog.settings)
+    }
+
+    /** The documented defaults themselves, so a change to one is a change to this test. */
+    @Test
+    fun `the documented defaults are the ones an absent settings block reads back as`() {
+        val withoutSettings = """
+            {"schemaVersion":${CatalogSchema.CURRENT_VERSION},"books":[],"folders":[],"readingStates":{}}
+        """.trimIndent()
+
+        val settings = (CatalogCodec().decode(withoutSettings) as CatalogDecoding.Decoded).catalog.settings
+
+        assertEquals(ThemeChoice.SYSTEM, settings.theme)
+        assertEquals(FontSize.MEDIUM, settings.fontSize)
+        assertTrue(settings.pivotEnabled)
+        assertEquals(PivotColor.ACCENT, settings.pivotColor)
+        assertTrue(settings.guideMarksEnabled)
+        assertEquals(PauseStrength.NORMAL, settings.pauseStrength)
+        assertTrue(settings.isDefault)
+    }
+
+    /** A partially written settings block fills the missing keys, it does not reject the rest. */
+    @Test
+    fun `a settings block with only some keys keeps them and defaults the others`() {
+        val partial = """
+            {"schemaVersion":${CatalogSchema.CURRENT_VERSION},"books":[],"folders":[],"readingStates":{},
+             "settings":{"theme":"DARK","pauseStrength":"OFF"}}
+        """.trimIndent()
+
+        val settings = (CatalogCodec().decode(partial) as CatalogDecoding.Decoded).catalog.settings
+
+        assertEquals(ThemeChoice.DARK, settings.theme)
+        assertEquals(PauseStrength.OFF, settings.pauseStrength)
+        assertEquals(FontSize.MEDIUM, settings.fontSize)
+        assertEquals(PivotColor.ACCENT, settings.pivotColor)
+        assertTrue(settings.pivotEnabled)
+    }
+
+    /**
+     * The case that would otherwise be expensive: a value this build does not
+     * recognise — a colour or theme from a build the reader downgraded from — must
+     * cost that one preference and nothing else. Before
+     * [CatalogCodec.defaultJson] coerced input values it threw, and this codec's
+     * only answer to a throw is `Damaged`, which sets the whole library aside.
+     */
+    @Test
+    fun `an unrecognised setting falls back to its default without losing the library`() {
+        val fromTheFuture = """
+            {"schemaVersion":${CatalogSchema.CURRENT_VERSION},
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],"readingStates":{},
+             "settings":{"theme":"SEPIA","pivotColor":"CHARTREUSE","fontSize":"LARGE"}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(fromTheFuture) as CatalogDecoding.Decoded
+
+        assertEquals("The Long Signal", decoded.catalog.books.single().title)
+        assertEquals(ThemeChoice.SYSTEM, decoded.catalog.settings.theme)
+        assertEquals(PivotColor.ACCENT, decoded.catalog.settings.pivotColor)
+        // The keys it *could* read are still honoured.
+        assertEquals(FontSize.LARGE, decoded.catalog.settings.fontSize)
+    }
+
+    @Test
+    fun `changed settings round trip through the store`() {
+        val changed = ReaderSettings(
+            theme = ThemeChoice.DARK,
+            fontSize = FontSize.EXTRA_LARGE,
+            pivotEnabled = false,
+            pivotColor = PivotColor.VIOLET,
+            guideMarksEnabled = false,
+            pauseStrength = PauseStrength.STRONG,
+        )
+        val store = FileCatalogStore(file)
+
+        store.save(sampleCatalog().copy(settings = changed))
+
+        assertEquals(changed, (store.load() as CatalogLoad.Loaded).catalog.settings)
     }
 
     @Test

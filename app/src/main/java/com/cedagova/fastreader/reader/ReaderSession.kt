@@ -3,6 +3,7 @@ package com.cedagova.fastreader.reader
 import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.Chapter
 import com.cedagova.fastreader.content.Token
+import com.cedagova.fastreader.timing.PauseStrength
 import com.cedagova.fastreader.timing.RsvpTiming
 import com.cedagova.fastreader.timing.RsvpTimingEngine
 import com.cedagova.fastreader.timing.TimingSettings
@@ -164,6 +165,17 @@ data class ReaderSession(
      */
     fun withWpm(wpm: Int): ReaderSession =
         copy(settings = settings.copy(wpm = wpm.coerceIn(RsvpTiming.MIN_WPM, RsvpTiming.MAX_WPM)))
+
+    /**
+     * Changes how much extra pause boundaries get (REQ-011), without moving the
+     * reader or stopping the stream.
+     *
+     * Like [withWpm] this only replaces settings: the ramp clock and the
+     * re-orientation flag are untouched, so adjusting pause strength mid-stream
+     * changes the very next word's duration and nothing else.
+     */
+    fun withPauseStrength(pauseStrength: PauseStrength): ReaderSession =
+        copy(settings = settings.copy(pauseStrength = pauseStrength))
 
     /** The token run [index] belongs to, as `start..end` inclusive — the paused context view. */
     fun runBounds(ordinal: (Token) -> Int): IntRange {

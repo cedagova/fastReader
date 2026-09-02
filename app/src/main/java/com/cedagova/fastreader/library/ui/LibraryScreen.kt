@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -87,6 +88,8 @@ fun LibraryScreen(
     onOpen: (LibraryBookItem) -> Unit,
     modifier: Modifier = Modifier,
     onDismissResumeNotice: () -> Unit = {},
+    /** Opens the settings screen (LEAF302). */
+    onOpenSettings: () -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
     Scaffold(
@@ -97,6 +100,9 @@ fun LibraryScreen(
                 actions = {
                     IconButton(onClick = onRefresh, modifier = Modifier.testTag("library_refresh")) {
                         Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.library_refresh))
+                    }
+                    IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("library_settings")) {
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_open))
                     }
                 },
             )

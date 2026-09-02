@@ -80,9 +80,20 @@ class CatalogCodec(
         /**
          * Lenient about unknown keys so a catalog written by a newer *compatible*
          * build (same version, extra field) still loads instead of being discarded.
+         *
+         * [Json.coerceInputValues] is the same tolerance one level down, and it is
+         * what makes the settings schema's "absent or unusable key reads back as
+         * its documented default" promise hold for a *present* key too. Without it
+         * a single unrecognised enum entry — a pivot colour or theme from a build
+         * the reader downgraded from, or a value a partial write truncated — throws
+         * during decode, and this codec's only answer to a throw is
+         * [CatalogDecoding.Damaged], which sets the whole library aside. One
+         * unreadable preference must never cost a reader their books and their
+         * places; it costs them that one preference, which returns to its default.
          */
         val defaultJson: Json = Json {
             ignoreUnknownKeys = true
+            coerceInputValues = true
             encodeDefaults = true
             prettyPrint = false
         }
