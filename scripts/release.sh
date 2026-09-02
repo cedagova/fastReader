@@ -54,7 +54,7 @@ while [ $# -gt 0 ]; do
     --target) TARGET="${2:?--target needs a value}"; shift ;;
     --allow-dirty) ALLOW_DIRTY=1 ;;
     --gh-command) GH_COMMAND="${2:?--gh-command needs a value}"; shift ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
   shift
@@ -124,7 +124,7 @@ APK="app/build/outputs/apk/release/app-release.apk"
 # --- verify signature ------------------------------------------------------
 step "Verify signature"
 SIGNER_OUTPUT="$("$APKSIGNER" verify --print-certs --verbose "$APK")"
-printf '%s\n' "$SIGNER_OUTPUT" | grep -E 'Verified using v[23] scheme|certificate SHA-256|key size'
+printf '%s\n' "$SIGNER_OUTPUT" | grep -E 'Verified using v[23] scheme|certificate SHA-256|key size' || true
 printf '%s\n' "$SIGNER_OUTPUT" | grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' \
   || die "APK is not v2-signed"
 ACTUAL_CERT="$(printf '%s\n' "$SIGNER_OUTPUT" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)"
@@ -134,7 +134,7 @@ ACTUAL_CERT="$(printf '%s\n' "$SIGNER_OUTPUT" | sed -n 's/.*certificate SHA-256 
 # --- verify the artifact's own manifest ------------------------------------
 step "Verify release manifest"
 BADGING="$("$AAPT2" dump badging "$APK")"
-printf '%s\n' "$BADGING" | grep -E "^package:|^minSdkVersion|^targetSdkVersion|^uses-permission"
+printf '%s\n' "$BADGING" | grep -E "^package:|^minSdkVersion|^targetSdkVersion|^uses-permission" || true
 if printf '%s\n' "$BADGING" | grep -q "uses-permission: name='android.permission.INTERNET'"; then
   die "release APK requests android.permission.INTERNET; reading data must never leave the device (REQ-050)"
 fi
@@ -173,9 +173,11 @@ ASSET_URL="$("$GH_COMMAND" release view "$TAG" --repo "$GITHUB_REPO" \
 printf 'asset URL: %s\n' "$ASSET_URL"
 DOWNLOAD="$(mktemp -t fastreader-release)"
 # No token, no cookies, no netrc: exactly what a friend with the link gets.
-HTTP_CODE="$(curl -sSL --fail-with-body -o "$DOWNLOAD" -w '%{http_code}' "$ASSET_URL")"
-printf 'HTTP %s\n' "$HTTP_CODE"
-[ "$HTTP_CODE" = "200" ] || die "unauthenticated download returned HTTP $HTTP_CODE"
+# `|| true` keeps a transport failure from dying inside the assignment with no
+# explanation; the empty code then fails loudly on the next line.
+HTTP_CODE="$(curl -sSL -o "$DOWNLOAD" -w '%{http_code}' "$ASSET_URL" || true)"
+printf 'HTTP %s\n' "${HTTP_CODE:-<curl failed>}"
+[ "$HTTP_CODE" = "200" ] || die "unauthenticated download returned HTTP ${HTTP_CODE:-<curl failed>}"
 cmp -s "$DOWNLOAD" "$STAGED" || die "downloaded asset differs from the verified artifact"
 "$APKSIGNER" verify --print-certs "$DOWNLOAD" | grep -q "$EXPECTED_CERT_SHA256" \
   || die "downloaded asset is not signed by the pinned release key"
