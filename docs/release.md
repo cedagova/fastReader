@@ -65,6 +65,26 @@ Useful variants:
 ./scripts/release.sh --publish --allow-dirty                   # skip the clean-tree gate
 ```
 
+## Testing the release script itself
+
+The publish path cannot be rehearsed against real GitHub, so it has its own
+shell-level test:
+
+```bash
+./scripts/test-release-publish.sh
+```
+
+It runs the real `scripts/release.sh --publish` under `/bin/bash` inside a
+throwaway sandbox with stubbed `gradlew`, `apksigner`, `aapt2`, `java`, `gh`,
+and `curl`. Nothing is built, signed, published, or downloaded; it asserts that
+both the stable and the `--prerelease` path reach `gh release create` and that
+only the pre-release one passes `--prerelease`.
+
+Run it after any edit to `scripts/release.sh`. It exists because macOS ships
+bash 3.2, where `set -u` rejects the expansion of an *empty* array: that broke
+every stable publish while `--prerelease`, whose array was populated, kept
+working (#30).
+
 ## Versioning rule
 
 `version.properties` at the repository root is the single source of truth;

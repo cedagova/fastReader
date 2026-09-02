@@ -161,9 +161,13 @@ if [ -n "$NOTES_FILE" ]; then NOTES_ARGS=(--notes-file "$NOTES_FILE")
 else NOTES_ARGS=(--notes "fastReader $VERSION_NAME (versionCode $VERSION_CODE)."); fi
 PRE_ARGS=()
 [ "$PRERELEASE" -eq 1 ] && PRE_ARGS=(--prerelease)
+# `${PRE_ARGS[@]+...}` because macOS ships bash 3.2, where `set -u` treats an
+# empty array's expansion as an unbound variable. Without the guard every
+# stable (non-`--prerelease`) publish aborts here. NOTES_ARGS is assigned a
+# non-empty value on both branches above, so it needs no guard.
 "$GH_COMMAND" release create "$TAG" "$STAGED" \
   --repo "$GITHUB_REPO" --title "fastReader $VERSION_NAME" --target "$TARGET" \
-  "${NOTES_ARGS[@]}" "${PRE_ARGS[@]}"
+  "${NOTES_ARGS[@]}" "${PRE_ARGS[@]+"${PRE_ARGS[@]}"}"
 
 # --- prove the link works without repository authentication ----------------
 step "Verify unauthenticated download"
