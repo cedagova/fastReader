@@ -87,6 +87,24 @@ class LaunchDestinationTest {
         )
     }
 
+    /**
+     * Found on the emulator. Identity is the content digest (AD-2), so replacing a
+     * book's file in place makes it a different book and the old entry disappears
+     * without anyone removing anything. Saying "you removed it" would be untrue.
+     */
+    @Test
+    fun `a last-read book that vanished without being removed says so neutrally`() {
+        val catalog = Catalog(
+            lastReadBookId = "sha256:a",
+            readingStates = mapOf("sha256:a" to ReadingState(bookDigest = "sha256:a", tokenIndex = 42)),
+        )
+
+        assertEquals(
+            LaunchDestination.Library(ResumeBlocked("sha256:a", ResumeBlockedReason.NOT_IN_LIBRARY)),
+            launchDestination(catalog),
+        )
+    }
+
     @Test
     fun `a last-read id with nothing behind it at all opens a plain library`() {
         assertEquals(

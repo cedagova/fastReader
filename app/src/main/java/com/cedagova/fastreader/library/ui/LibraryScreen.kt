@@ -166,6 +166,7 @@ private fun ResumeNoticeBanner(notice: ResumeNotice, onDismiss: () -> Unit) {
                             ResumeBlockedReason.PERMISSION_LOST -> R.string.library_resume_blocked_permission_lost
                             ResumeBlockedReason.UNREADABLE -> R.string.library_resume_blocked_unreadable
                             ResumeBlockedReason.REMOVED -> R.string.library_resume_blocked_removed
+                            ResumeBlockedReason.NOT_IN_LIBRARY -> R.string.library_resume_blocked_gone
                         },
                     ),
                     style = MaterialTheme.typography.bodyMedium,

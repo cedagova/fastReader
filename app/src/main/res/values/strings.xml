@@ -83,6 +83,7 @@
     <string name="library_resume_blocked_permission_lost">Access to its folder was revoked. Grant access again to carry on reading.</string>
     <string name="library_resume_blocked_unreadable">It could not be opened. The file may have been moved, deleted, or damaged.</string>
     <string name="library_resume_blocked_removed">You removed it from your library. Your place is kept if you add it again.</string>
+    <string name="library_resume_blocked_gone">It is no longer in your library. Your place is kept if it comes back.</string>
     <string name="library_resume_blocked_dismiss">Dismiss</string>
     <string name="library_resume_blocked_unnamed">your last book</string>
 

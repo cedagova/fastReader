@@ -34,8 +34,18 @@ enum class ResumeBlockedReason {
     /** The file is there but unusable — damaged, or copy protected. */
     UNREADABLE,
 
-    /** The book is no longer in the library at all; it was removed (REQ-004). */
+    /** The reader removed the book from the library; its position is kept (REQ-004). */
     REMOVED,
+
+    /**
+     * The book is no longer in the library and was not removed by the reader.
+     *
+     * Reachable without anyone doing anything wrong: identity is content-derived
+     * (AD-2), so a file edited or replaced in place becomes a *different* book and
+     * the old entry disappears on the next scan. Telling that reader "you removed
+     * it" would be plainly untrue.
+     */
+    NOT_IN_LIBRARY,
 }
 
 /**
@@ -49,11 +59,12 @@ fun launchDestination(catalog: Catalog): LaunchDestination {
     val bookId = catalog.lastReadBookId ?: return LaunchDestination.Library()
     val book = catalog.book(bookId)
         ?: return LaunchDestination.Library(
-            // A position survives removal (REQ-004), so the id can outlive the entry.
-            if (catalog.readingStates.containsKey(bookId)) {
-                ResumeBlocked(bookId, ResumeBlockedReason.REMOVED)
-            } else {
-                null
+            // A position survives removal (REQ-004), so the id can outlive the
+            // entry. Only the removal record proves it was the reader's doing.
+            when {
+                !catalog.readingStates.containsKey(bookId) -> null
+                bookId in catalog.removedBookIds -> ResumeBlocked(bookId, ResumeBlockedReason.REMOVED)
+                else -> ResumeBlocked(bookId, ResumeBlockedReason.NOT_IN_LIBRARY)
             },
         )
     val reason = when (book.status) {
