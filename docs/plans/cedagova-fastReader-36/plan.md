@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/36
 - Planning PR: https://github.com/cedagova/fastReader/pull/40
-- Status: Review
+- Status: Ready for implementation
 - Root classification: INCREMENTAL
 - Delivery topology: INCREMENTAL
 - Planner: Planning lead (Claude)
@@ -392,22 +392,22 @@ design (D3), which the privacy copy states.
 | ROOT | TRACKING | None | cedagova/fastReader | Consumer-ready FastReader: v1.1.0 shippable to strangers, then v1.2.0 reading depth | INCREMENTAL | None | https://github.com/cedagova/fastReader/issues/36 |
 | INC001 | GROUP | ROOT | cedagova/fastReader | v1.1.0: shippable to strangers | COLLECTOR | None | https://github.com/cedagova/fastReader/issues/38 |
 | INC002 | GROUP | ROOT | cedagova/fastReader | v1.2.0: reading-experience depth | COLLECTOR | INC001 | https://github.com/cedagova/fastReader/issues/39 |
-| LEAF501 | LEAF | INC001 | cedagova/fastReader | Repository shell: hosted checks, MIT license, v1 documents on main | None | None | Pending |
-| LEAF502 | LEAF | INC001 | cedagova/fastReader | Launcher icon and theme-correct first frame | None | None | Pending |
-| LEAF503 | LEAF | INC001 | cedagova/fastReader | Reader open path: identity as input, no whole-file read | None | None | Pending |
-| LEAF504 | LEAF | INC001 | cedagova/fastReader | Open with and share-sheet entry for EPUB files | None | LEAF503 | Pending |
-| LEAF505 | LEAF | INC001 | cedagova/fastReader | Folder list, folder removal and undo for removed books | None | None | Pending |
-| LEAF506 | LEAF | INC001 | cedagova/fastReader | Version, check for updates, backup exclusion and privacy statement | None | None | Pending |
-| LEAF507 | LEAF | INC001 | cedagova/fastReader | Focused-mode speed gesture | None | None | Pending |
-| LEAF508 | LEAF | INC001 | cedagova/fastReader | Bundled English and Spanish sample | None | LEAF503 | Pending |
-| LEAF509 | LEAF | INC001 | cedagova/fastReader | README, cue-set check, v1.1.0 release and update proof | None | LEAF501, LEAF502, LEAF504, LEAF505, LEAF506, LEAF507, LEAF508 | Pending |
-| LEAF601 | LEAF | INC002 | cedagova/fastReader | Toolchain and library refresh with goldens re-recorded | None | None | Pending |
-| LEAF602 | LEAF | INC002 | cedagova/fastReader | Chapter control: pause setting and front-matter skip | None | LEAF601 | Pending |
-| LEAF603 | LEAF | INC002 | cedagova/fastReader | Library order and return-to-app rescan | None | LEAF602 | Pending |
-| LEAF604 | LEAF | INC002 | cedagova/fastReader | Tablet and landscape layouts | None | LEAF601 | Pending |
-| LEAF605 | LEAF | INC002 | cedagova/fastReader | Crash report offered on next launch | None | LEAF601 | Pending |
-| LEAF606 | LEAF | INC002 | cedagova/fastReader | Spanish interface | None | LEAF602, LEAF603, LEAF604, LEAF605 | Pending |
-| LEAF607 | LEAF | INC002 | cedagova/fastReader | v1.2.0 release and update proof | None | LEAF606 | Pending |
+| LEAF501 | LEAF | INC001 | cedagova/fastReader | Repository shell: hosted checks, MIT license, v1 documents on main | None | None | https://github.com/cedagova/fastReader/issues/41 |
+| LEAF502 | LEAF | INC001 | cedagova/fastReader | Launcher icon and theme-correct first frame | None | None | https://github.com/cedagova/fastReader/issues/42 |
+| LEAF503 | LEAF | INC001 | cedagova/fastReader | Reader open path: identity as input, no whole-file read | None | None | https://github.com/cedagova/fastReader/issues/43 |
+| LEAF504 | LEAF | INC001 | cedagova/fastReader | Open with and share-sheet entry for EPUB files | None | LEAF503 | https://github.com/cedagova/fastReader/issues/44 |
+| LEAF505 | LEAF | INC001 | cedagova/fastReader | Folder list, folder removal and undo for removed books | None | None | https://github.com/cedagova/fastReader/issues/45 |
+| LEAF506 | LEAF | INC001 | cedagova/fastReader | Version, check for updates, backup exclusion and privacy statement | None | None | https://github.com/cedagova/fastReader/issues/46 |
+| LEAF507 | LEAF | INC001 | cedagova/fastReader | Focused-mode speed gesture | None | None | https://github.com/cedagova/fastReader/issues/47 |
+| LEAF508 | LEAF | INC001 | cedagova/fastReader | Bundled English and Spanish sample | None | LEAF503 | https://github.com/cedagova/fastReader/issues/48 |
+| LEAF509 | LEAF | INC001 | cedagova/fastReader | README, cue-set check, v1.1.0 release and update proof | None | LEAF501, LEAF502, LEAF504, LEAF505, LEAF506, LEAF507, LEAF508 | https://github.com/cedagova/fastReader/issues/49 |
+| LEAF601 | LEAF | INC002 | cedagova/fastReader | Toolchain and library refresh with goldens re-recorded | None | None | https://github.com/cedagova/fastReader/issues/50 |
+| LEAF602 | LEAF | INC002 | cedagova/fastReader | Chapter control: pause setting and front-matter skip | None | LEAF601 | https://github.com/cedagova/fastReader/issues/51 |
+| LEAF603 | LEAF | INC002 | cedagova/fastReader | Library order and return-to-app rescan | None | LEAF602 | https://github.com/cedagova/fastReader/issues/52 |
+| LEAF604 | LEAF | INC002 | cedagova/fastReader | Tablet and landscape layouts | None | LEAF601 | https://github.com/cedagova/fastReader/issues/53 |
+| LEAF605 | LEAF | INC002 | cedagova/fastReader | Crash report offered on next launch | None | LEAF601 | https://github.com/cedagova/fastReader/issues/54 |
+| LEAF606 | LEAF | INC002 | cedagova/fastReader | Spanish interface | None | LEAF602, LEAF603, LEAF604, LEAF605 | https://github.com/cedagova/fastReader/issues/55 |
+| LEAF607 | LEAF | INC002 | cedagova/fastReader | v1.2.0 release and update proof | None | LEAF606 | https://github.com/cedagova/fastReader/issues/56 |
 
 ### Planned leaf contracts (summaries; full contracts go to the issues)
 
@@ -652,5 +652,25 @@ baseline; implementation work remains.
 
 ## Publication verification
 
-Pending: content review on this candidate, then issue publication, graph
-reconciliation and verification are recorded here.
+- Content review: CHANGES_REQUESTED at `3e80737` (2 actionable, 4
+  non-blocking), all addressed; content confirmed sound at `ad482de`
+  (PR #40 reviews by `cedagova-codex-reviewer[bot]`, claim
+  `d30296ad-cee8-462e-baf8-f2c4f47da152`).
+- Leaf issues published 2026-09-05: LEAF501 #41, LEAF502 #42, LEAF503 #43,
+  LEAF504 #44, LEAF505 #45, LEAF506 #46, LEAF507 #47, LEAF508 #48,
+  LEAF509 #49, LEAF601 #50, LEAF602 #51, LEAF603 #52, LEAF604 #53,
+  LEAF605 #54, LEAF606 #55, LEAF607 #56. Tracking metadata added to root
+  #36; GROUP/sequence/delivery metadata added to increments #38 and #39
+  with their definition bodies preserved.
+- `plan validate --phase publication-ready`: valid (19 rows, INCREMENTAL).
+- `plan reconcile-graph` 2026-09-05: attached all sixteen leaf sub-issues
+  under their increments and created the planned dependencies
+  (INC002<-INC001; LEAF504<-LEAF503; LEAF508<-LEAF503; LEAF509<-LEAF501,
+  502, 504, 505, 506, 507, 508; LEAF602<-LEAF601; LEAF603<-LEAF602;
+  LEAF604<-LEAF601; LEAF605<-LEAF601; LEAF606<-LEAF602, 603, 604, 605;
+  LEAF607<-LEAF606); nothing deleted or reparented.
+- `plan verify-graph` 2026-09-05: graph valid, 19 rows — live native
+  sub-issue tree and blocked-by graph exactly match the manifest.
+- Final exact-head validation (`ready-for-implementation` with --head and
+  --reviewed-head) runs after the official marked approval and is recorded
+  on PR #40.
