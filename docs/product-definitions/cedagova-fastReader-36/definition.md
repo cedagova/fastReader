@@ -2,8 +2,8 @@
 
 - Product definition issue: https://github.com/cedagova/fastReader/issues/36
 - Product definition PR: https://github.com/cedagova/fastReader/pull/37
-- Requirements brief: Pending
-- Status: Reconciling
+- Requirements brief: https://github.com/cedagova/fastReader/issues/36#issuecomment-5555054300
+- Status: Ready for planning
 - Classification: DECOMPOSE
 - Definition lead: cedagova
 - Started: 2026-09-05
