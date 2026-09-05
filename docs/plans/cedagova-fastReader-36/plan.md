@@ -125,8 +125,9 @@ the previous published release. System-level shape:
 1. **Book identity stays the whole-file SHA-256** (no migration, so REQ-113
    and REQ-208 keep every position). What changes is *who computes it*: the
    reader's open path takes identity as an input — the catalog id for a
-   library book, a digest computed once by the external-open path for a
-   book outside the catalog — and never re-hashes. The content pipeline
+   library book; for a book outside the catalog, a digest computed once by
+   the external-open path *after* first text, never before it — and never
+   re-hashes. The content pipeline
    reads only the container, package, navigation and spine entries it
    needs, through the archive's directory rather than by streaming the
    whole file, so image payload is never read (REQ-110).
@@ -197,9 +198,13 @@ constrained by the invariants and acceptance below.
   positions. The reader never recomputes it: identity is an input to the
   open contract. REQ-110's cost is removed by not hashing on open and by
   reading only needed archive entries through the archive directory.
-  Consequence: an external open with session-only access still computes the
-  digest once to key its position; that one hash is outside REQ-110's
-  measured library-book path and is accepted.
+  REQ-110 is unqualified and applies to every open path, including "Open
+  with" from the Files app (the root's stranger flow). An external open
+  therefore never hashes before first text either: the reader starts
+  streaming from the handed-over bytes, and the whole-file digest that keys
+  `readingStates` and matches a later catalog add is computed once, off the
+  open path, after streaming has begun; the position is recorded under it
+  as soon as it is known. LEAF504 owns that deferred computation.
 - **AD-9 — Non-catalog books in the reader.** The reader's open contract is
   (bytes source, identity, origin). Origin distinguishes library, external-
   keepable (already added), external-session-only (notice + "Add to
@@ -242,8 +247,9 @@ constrained by the invariants and acceptance below.
 - **AD-16 — Schema evolution continues under v1 AD-3.** New persisted fields
   (chapter pause, library order, per-book front-matter-offer-shown) each get
   a documented default and one forward migration step; leaves that bump the
-  schema in the same increment serialize through the collector (the second
-  rebases onto the first's version). Existing readers see defaults that
+  schema in the same increment land in a fixed order expressed as a native
+  dependency (LEAF603 after LEAF602), so the shipped chain is
+  deterministic. Existing readers see defaults that
   reproduce v1 behaviour (pause on; order recently read).
 - **AD-17 — Release identity.** v1.1.0 is versionCode 3 and v1.2.0 is
   versionCode 4 via `version.properties`; both are cut with the existing
@@ -268,17 +274,21 @@ frontier). Leaves depend only on siblings inside their own increment.
   - Completion rule: `main` builds and is green in CI; every REQ-101..113
     acceptance recorded on its leaf; v1.1.0 published from `main` with the
     update-over-published-v1.0.1 evidence; `Fixed focus letter` still
-    opt-in (D1). The owner then performs the definition's unaided
-    stranger test and records the result on #38 (human-performed measure;
-    see Acceptance coverage).
+    opt-in (D1). The owner's unaided stranger test is **not** a gate on
+    closing #38 or on starting increment 002: it is a human-performed
+    measure recorded by the owner on root #36 whenever it is run after
+    v1.1.0 is published, and it is part of the tracking root's closure
+    (see Acceptance coverage).
 - **002 v1.2.0 (#39)** — topology `COLLECTOR`.
   - wave 1: LEAF601 toolchain and library refresh with goldens re-recorded.
-  - wave 2: LEAF602 chapter control; LEAF603 library order and rescan;
-    LEAF604 tablet and landscape layouts; LEAF605 crash report (each
-    blocked by LEAF601).
-  - wave 3: LEAF606 Spanish interface (blocked by LEAF602, LEAF603, LEAF604,
+  - wave 2: LEAF602 chapter control; LEAF604 tablet and landscape layouts;
+    LEAF605 crash report (each blocked by LEAF601).
+  - wave 3: LEAF603 library order and rescan (blocked by LEAF602, so the
+    two schema bumps of this increment land in one fixed order: LEAF602
+    first, LEAF603 second).
+  - wave 4: LEAF606 Spanish interface (blocked by LEAF602, LEAF603, LEAF604,
     LEAF605 — it translates every string those leaves add).
-  - wave 4: LEAF607 v1.2.0 release and update proof (blocked by LEAF606).
+  - wave 5: LEAF607 v1.2.0 release and update proof (blocked by LEAF606).
   - Completion rule: `main` green in CI on the refreshed toolchain; every
     REQ-201..208 acceptance recorded; v1.2.0 published with the update-
     over-published-v1.1.0 evidence showing defaults for the new settings.
@@ -300,12 +310,16 @@ contracts. Internal boundaries the leaves must respect:
 - **Catalog and settings schema (AD-3/AD-16):** LEAF505 uses existing
   removal semantics and adds no schema field unless undo needs one; LEAF602
   adds chapter-pause and the per-book front-matter flag; LEAF603 adds the
-  persisted order. Version bumps serialize through the collector.
+  persisted order after it (native dependency), so the chain is fixed.
 - **Theme mirror (AD-10):** written by the settings write path (LEAF502
   owns the mirror; the settings screen from v1 keeps writing the catalog).
 - **Manifest:** LEAF502 (icon, theme, splash), LEAF504 (intent filters,
   launch mode), LEAF506 (backup attributes). Three leaves touch the
   manifest in different elements; the collector resolves textual overlap.
+- **Settings screen:** LEAF506 adds the version, update and privacy rows
+  (wave 1); LEAF508 adds the sample entry (wave 2); LEAF602 and LEAF603 add
+  their rows in increment 002. Each adds its own section to the v1 screen
+  and changes no existing row.
 - **Strings:** every leaf adds English strings; LEAF606 owns `values-es`
   and the missing-translation gate. Before LEAF606, lint must not fail on
   missing translations (no `values-es` exists yet).
@@ -389,7 +403,7 @@ design (D3), which the privacy copy states.
 | LEAF509 | LEAF | INC001 | cedagova/fastReader | README, cue-set check, v1.1.0 release and update proof | None | LEAF501, LEAF502, LEAF504, LEAF505, LEAF506, LEAF507, LEAF508 | Pending |
 | LEAF601 | LEAF | INC002 | cedagova/fastReader | Toolchain and library refresh with goldens re-recorded | None | None | Pending |
 | LEAF602 | LEAF | INC002 | cedagova/fastReader | Chapter control: pause setting and front-matter skip | None | LEAF601 | Pending |
-| LEAF603 | LEAF | INC002 | cedagova/fastReader | Library order and return-to-app rescan | None | LEAF601 | Pending |
+| LEAF603 | LEAF | INC002 | cedagova/fastReader | Library order and return-to-app rescan | None | LEAF602 | Pending |
 | LEAF604 | LEAF | INC002 | cedagova/fastReader | Tablet and landscape layouts | None | LEAF601 | Pending |
 | LEAF605 | LEAF | INC002 | cedagova/fastReader | Crash report offered on next launch | None | LEAF601 | Pending |
 | LEAF606 | LEAF | INC002 | cedagova/fastReader | Spanish interface | None | LEAF602, LEAF603, LEAF604, LEAF605 | Pending |
@@ -489,8 +503,11 @@ design (D3), which the privacy copy states.
   focus letter on → install published v1.1.0 in place → same books,
   position, colour and toggle; evidence under `docs/evidence/`. Owns
   REQ-111 (README half), REQ-112, REQ-113 and the release-level REQ-106
-  (version equals tag) and REQ-303 proofs. Validation: the release script's
-  own gates plus the recorded update flow.
+  (version equals tag), REQ-110 (the LEAF503 protocol re-run on the
+  published v1.1.0 artifact as a release gate: illustrated within 25% of
+  stripped, neither slower than v1.0.1) and REQ-303 proofs. Validation:
+  the release script's own gates plus the recorded update and open-time
+  flows.
 - **LEAF601 — Toolchain and library refresh.** AGP, Gradle wrapper, Kotlin,
   Compose BOM, AndroidX, Robolectric, Roborazzi, coroutines, serialization
   to current stable (or pinned with a recorded reason); `compileSdk`/
@@ -555,7 +572,7 @@ design (D3), which the privacy copy states.
 | REQ-107 backup exclusion and privacy statement | LEAF506 (manifest, in-app copy, release-notes text), LEAF504 (session-only clause), LEAF509 (release notes) |
 | REQ-108 focused-mode speed gesture | LEAF507 |
 | REQ-109 bundled sample | LEAF508 (on LEAF503's open contract) |
-| REQ-110 open time independent of image payload | LEAF503 |
+| REQ-110 open time independent of image payload | LEAF503 (mechanism and first measurement), LEAF504 (external path never hashes before first text), LEAF509 (re-measured on the published artifact as a release gate) |
 | REQ-111 MIT license and README | LEAF501 (license), LEAF509 (README) |
 | REQ-112 v1.0.1 cue set unchanged | LEAF509 (check), constraint on every 001 leaf |
 | REQ-113 update over published v1.0.1 | LEAF509 |
@@ -577,8 +594,9 @@ rules; (2) one person outside the project reaches a playing stream unaided
 from the release link → made possible by LEAF509 (published link, README
 install steps) on top of LEAF502/LEAF504/LEAF508; the observation itself is
 a human-performed success measure that no agent can execute, so it is
-recorded by the owner on #38 after v1.1.0 is published and is part of the
-tracking root's closure, not a gate on merging any leaf; (3) update in place
+recorded by the owner on root #36 after v1.1.0 is published and is part of
+the tracking root's closure — **not** a gate on closing #38 or on starting
+increment 002; (3) update in place
 keeps everything → LEAF509 (v1.0.1→v1.1.0), LEAF607 (v1.1.0→v1.2.0);
 (4) D1–D6 recorded with dates and the D1 residual risk → already satisfied
 by the pinned definition (PR #37 `da4394c`, decision table); no leaf.
@@ -618,6 +636,14 @@ as the hosted check (AD-13; free for this public repository), and
 Owner-provided test inputs (not decisions): the largest owned illustrated
 EPUB (≥50 MB) for REQ-110, made available to the implementation lead on the
 reference emulator; the unaided stranger test after v1.1.0 is published.
+
+Surfaced for the owner, not blocking: the recorded delivery constraint
+places the **v1** definition and plan on `main` (LEAF501). #36's own
+definition (PR #37) and this plan (PR #40) will likewise live only on
+open-then-closed PR branches. This plan does not extend the constraint on
+its own; if the owner wants #36's documents on `main` too, saying so before
+increment 001 starts lets LEAF501 absorb it, and afterwards it is a small
+follow-up.
 
 ## Satisfaction proof
 
