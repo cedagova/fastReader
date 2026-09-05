@@ -42,8 +42,8 @@ collections, metadata editing, remote telemetry.
 
 ## Product outcomes
 
-- OUT005 v1.1.0: shippable to strangers (REQ-101 to REQ-113) — Pending
-- OUT006 v1.2.0: reading-experience depth (REQ-201 to REQ-208) — Pending
+- OUT005 v1.1.0: shippable to strangers (REQ-101 to REQ-113) — https://github.com/cedagova/fastReader/issues/38
+- OUT006 v1.2.0: reading-experience depth (REQ-201 to REQ-208) — https://github.com/cedagova/fastReader/issues/39
 
 Cross-cutting REQ-301 to REQ-303 carry the v1 accessibility, static-
 luminance and on-device guardrails onto every new surface.

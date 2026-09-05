@@ -3,7 +3,7 @@
 - Product definition issue: https://github.com/cedagova/fastReader/issues/36
 - Product definition PR: https://github.com/cedagova/fastReader/pull/37
 - Requirements brief: Pending
-- Status: Under review
+- Status: Reconciling
 - Classification: DECOMPOSE
 - Definition lead: cedagova
 - Started: 2026-09-05
@@ -94,10 +94,10 @@ Choosing it opens the book in the reader. When the source grants access
 the app can keep, the book is added to the library exactly like a picked
 one. When the source grants access for this session only, the book opens
 and reads normally but is **not** added to the library; the reader screen
-carries one dismissible line saying the book was opened from another app
-and offering "Add to library", which launches the picker. The reading
-position is kept by the book's own identity, so adding it later resumes
-where the reader stopped.
+carries one dismissible line saying the book was opened from another app,
+that only the reading position will be remembered, and offering "Add to
+library", which launches the picker. The reading position is kept by the
+book's own identity, so adding it later resumes where the reader stopped.
 
 **Library housekeeping.** The library lists every added folder with its
 status and lets the reader remove one. Removal names how many books will
@@ -217,7 +217,8 @@ content.
 - **REQ-107** Nothing FastReader stores (library, positions, settings,
   cover cache) participates in the device's own backup (D3), and the
   privacy statement in the app and in the release notes says so along
-  with everything else that leaves the device.
+  with everything else that leaves the device and what is kept locally
+  after a session-only open (the reading position only).
   *Accept:* a device backup taken after adding books contains no
   FastReader data; every sentence of the statement maps to a manifest
   declaration or an observed behaviour.
@@ -236,11 +237,11 @@ content.
   Settings.
 - **REQ-110** Opening a book takes time proportional to its text, not to
   its file size.
-  *Accept:* the v1.0.1 tap-to-paused-reader time is recorded first on the
-  reference device for (a) the largest owned illustrated EPUB, at least
-  50 MB, and (b) a copy of the same book with its images removed. In
-  v1.1.0, (a) opens within 25% of (b), and no book opens slower than its
-  v1.0.1 recording.
+  *Accept:* tap-to-paused-reader time is recorded on the reference device
+  for (a) the largest owned illustrated EPUB, at least 50 MB, and (b) a
+  copy of the same book with its images removed, first on v1.0.1 and then
+  on v1.1.0. On v1.1.0, (a) opens within 25% of (b) measured on that same
+  build, and neither opens slower than its own v1.0.1 recording.
 - **REQ-111** The repository carries the MIT license (D2) and a README
   with screenshots, install steps, the privacy statement, and a statement
   that the app is distributed by link for personal use with a link to
@@ -352,7 +353,9 @@ content.
   listing is a public launch and is gated on #33 (D6). Nothing in this
   definition is a legal opinion.
 - File access remains limited to documents the reader picks or hands to
-  the app; a session-only external open is never silently persisted.
+  the app. A session-only external open persists no access and no library
+  row; the only thing kept is the reading position, keyed by the book's
+  own identity, and the notice on the reader screen says so.
 
 ## Success measures and guardrails
 
@@ -453,8 +456,8 @@ content.
 | Key | Kind | Parent | Title | Issue |
 | --- | --- | --- | --- | --- |
 | ROOT | ROOT | None | Consumer-ready FastReader: v1.1.0 shippable to strangers, then v1.2.0 reading depth | https://github.com/cedagova/fastReader/issues/36 |
-| OUT005 | OUTCOME | ROOT | v1.1.0: shippable to strangers | Pending |
-| OUT006 | OUTCOME | ROOT | v1.2.0: reading-experience depth | Pending |
+| OUT005 | OUTCOME | ROOT | v1.1.0: shippable to strangers | https://github.com/cedagova/fastReader/issues/38 |
+| OUT006 | OUTCOME | ROOT | v1.2.0: reading-experience depth | https://github.com/cedagova/fastReader/issues/39 |
 
 Keys continue the v1 definition's OUT001 to OUT004 so the two graphs do
 not collide. Requirement ownership: OUT005 owns REQ-101 to REQ-113;
@@ -462,7 +465,8 @@ OUT006 owns REQ-201 to REQ-208; REQ-301 to REQ-303 constrain both.
 
 ## Publication verification
 
-Gate 1 content review at `46ca38f` requested changes (six findings, all
-addressed in this head). Outcome issues, the Requirements Brief comment,
-graph reconciliation and verification, owner approval and the final
-exact-head review follow.
+Gate 1 content review at `46ca38f` requested changes (six findings);
+delta review at `86283a5` found them resolved (content sound) with two
+one-clause fixes carried in this head. Outcome issues published: OUT005
+#38, OUT006 #39. The Requirements Brief comment, graph reconciliation and
+verification, owner approval and the final exact-head review follow.
