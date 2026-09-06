@@ -3,17 +3,18 @@
     The launcher icon's foreground layer (REQ-101).
 
     It draws what the app actually is rather than a book or a pair of glasses:
-    one word held on a fixed spot, its recognition letter picked out, with the
-    guide marks above and below the column it lands on — the same three elements
-    the reader sees on the reading surface (REQ-020, REQ-021).
+    one word held on a fixed spot with its recognition letter picked out, over the
+    rail and caret that mark the column it lands on — the same three elements the
+    reader sees on the reading surface (REQ-020, REQ-021).
 
-    108x108dp with the content inside the 66dp safe circle, because an adaptive
-    icon's foreground is masked and parallaxed: the widest point is the word
-    rail at 26dp from centre, the tallest the carets at 22dp.
+    108x108dp with every point inside the 66dp safe circle, because an adaptive
+    icon's foreground is masked and parallaxed: the farthest points are the ends
+    of the word at 31dp from centre and the ends of the rail at 31dp.
 
-    The focus block is deliberately *taller* than the rail rather than a
-    different colour. That keeps the silhouette readable in the monochrome layer,
-    where every path collapses to one tint.
+    The recognition letter is drawn *taller* than the word rather than in the
+    highlight colour. That keeps the silhouette readable in the monochrome layer,
+    where every path collapses to one tint, and at the size a launcher actually
+    draws this, where a colour that small is a smudge.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -21,27 +22,25 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Guide caret above the focus column. -->
-    <path
-        android:fillColor="@color/icon_ink"
-        android:pathData="M54,40 L48,32 L60,32 Z" />
-
     <!-- The word, split around the letter the eye lands on. -->
     <path
         android:fillColor="@color/icon_ink"
-        android:pathData="M30,50 L42,50 A4,4 0 0 1 42,58 L30,58 A4,4 0 0 1 30,50 Z" />
+        android:pathData="M29,41 L41,41 A5,5 0 0 1 41,51 L29,51 A5,5 0 0 1 29,41 Z" />
     <path
         android:fillColor="@color/icon_ink"
-        android:pathData="M66,50 L78,50 A4,4 0 0 1 78,58 L66,58 A4,4 0 0 1 66,50 Z" />
+        android:pathData="M67,41 L79,41 A5,5 0 0 1 79,51 L67,51 A5,5 0 0 1 67,41 Z" />
 
-    <!-- The recognition letter, standing proud of the rail. -->
+    <!-- The recognition letter, standing proud of the word. -->
     <path
         android:fillColor="@color/icon_ink"
-        android:pathData="M52,44 L56,44 A2,2 0 0 1 58,46 L58,62 A2,2 0 0 1 56,64 L52,64 A2,2 0 0 1 50,62 L50,46 A2,2 0 0 1 52,44 Z" />
+        android:pathData="M52,35 L56,35 A3,3 0 0 1 59,38 L59,54 A3,3 0 0 1 56,57 L52,57 A3,3 0 0 1 49,54 L49,38 A3,3 0 0 1 52,35 Z" />
 
-    <!-- Guide caret below it. -->
+    <!-- The guide marks: a caret on the column the word lands on, over its rail. -->
     <path
         android:fillColor="@color/icon_ink"
-        android:pathData="M54,68 L48,76 L60,76 Z" />
+        android:pathData="M54,61 L49,67 L59,67 Z" />
+    <path
+        android:fillColor="@color/icon_ink"
+        android:pathData="M30,69 L78,69 A2,2 0 0 1 78,73 L30,73 A2,2 0 0 1 30,69 Z" />
 
 </vector>

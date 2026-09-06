@@ -131,6 +131,42 @@ macOS-recorded goldens verified green unmodified on the runner, and inverting
   `app/build.gradle.kts`. Without it, editing a golden left the task up to date
   and `verifyRoborazziDebug` passed over a changed reference image.
 
+### Proving a claim about frames, not screenshots
+
+Some acceptance is about what is on screen *during* a transition — "no light
+frame during launch" — where a screenshot proves nothing, because the frame you
+have to rule out is the one you did not happen to catch. The loop that does
+work:
+
+```bash
+adb shell screenrecord --time-limit 8 --size 540x1200 /sdcard/rec.mp4 &
+adb shell am start -n <package>/<activity>          # while it records
+adb pull /sdcard/rec.mp4
+ffprobe -v error -f lavfi -i "movie=rec.mp4,signalstats" \
+  -show_entries frame=pts_time:frame_tags=lavfi.signalstats.YAVG -of csv=p=0
+```
+
+That prints one average-luminance value per captured frame, which turns "no
+light frame" into a number to compare against — and `ffmpeg -vf
+"select=...,tile=12x1"` turns the same file into a filmstrip a human can read in
+one glance. Two things make it trustworthy:
+
+- **Record smaller than the display.** At full 1080x2400 the emulator's encoder
+  falls behind and leaves 40 ms gaps between captured frames; `--size 540x1200`
+  brings the median gap down to ~20 ms on a 60 Hz display.
+- **Stretch the transition.** `adb shell settings put global
+  animator_duration_scale 5.0` (and `window_`/`transition_animation_scale`)
+  spreads a 250 ms launch over more than a second, so a single wrong frame
+  becomes tens of captured frames instead of one that sampling could miss. Put
+  the scales back to `1.0` afterwards.
+
+### Resource-folder quirk
+
+`mipmap-anydpi` without a version qualifier does not link: `aapt2` reports
+`resource mipmap/ic_launcher not found`. With `minSdk 26`, put an adaptive-icon
+XML in plain `mipmap/` — lint's `ObsoleteSdkInt` is right that `-v26` is
+redundant, and its suggested `mipmap-anydpi` is the one form that fails.
+
 The hosted job runs each check even when an earlier one failed, so one red run
 shows every problem. It carries no secrets and no signing material — release
 signing and publication stay local in `scripts/release.sh` (see
