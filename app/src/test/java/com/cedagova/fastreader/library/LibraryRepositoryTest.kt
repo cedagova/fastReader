@@ -409,6 +409,41 @@ class LibraryRepositoryTest {
     }
 
     /**
+     * A damaged catalog is set aside and the app carries on with an empty one,
+     * reported as `Loaded`, not `Blocked`. Sweeping against that would release
+     * every grant the reader has — and a grant cannot be taken again except
+     * through the picker, so it would make the preserved document unrecoverable
+     * even if repaired.
+     */
+    @Test
+    fun `a recovered catalog never triggers the grant sweep`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.addFolder("tree://books", "Books")
+        first.addPickedBooks(listOf("doc://a"))
+        assertTrue("doc://a" in gateway.persistedGrants)
+
+        // The stored document is corrupted, as an interrupted write would leave it.
+        file.writeText("{ this is not a catalog")
+        val store = FileCatalogStore(file)
+        val recovered = repository(store, backgroundScope)
+        recovered.load()
+
+        assertTrue("the catalog is empty after recovery", recovered.catalog.value.books.isEmpty())
+        assertTrue(
+            "a recovery must keep every grant, got ${gateway.releasedGrants}",
+            gateway.releasedGrants.isEmpty(),
+        )
+        assertTrue("doc://a" in gateway.persistedGrants)
+        assertTrue("tree://books" in gateway.persistedGrants)
+        assertTrue(
+            "the damaged document must be kept",
+            file.parentFile!!.listFiles()!!.any { it.name.contains("damaged") },
+        )
+    }
+
+    /**
      * Re-picking the file inside the window puts the book back by another route.
      * The expiring timer must not then release a grant the library is using.
      */

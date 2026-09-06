@@ -352,10 +352,23 @@ class LibraryRepository(
      * closes that window and any grant an earlier crash orphaned.
      *
      * It runs exactly once per process, from the first successful load, which is
-     * necessarily before this process can have a removal pending. It runs only
-     * on a load that produced a real catalog: sweeping against the empty catalog
-     * of a *blocked* store would release the grant for every book in the
-     * library.
+     * necessarily before this process can have a removal pending.
+     *
+     * It runs only on a load that produced a *genuine* catalog. Two loads report
+     * an empty one without meaning the library is empty, and sweeping against
+     * either would release the grant for every book the reader has:
+     *
+     * - a **blocked** store, which refuses to be read at all; and
+     * - a **recovered** one, where a damaged document was set aside under
+     *   `recoveredFrom` and the app carried on with an empty catalog. That path
+     *   exists to make corruption survivable — the document is kept, not
+     *   deleted. A grant cannot be taken again except by sending the reader back
+     *   through the document picker, so releasing them here would destroy the
+     *   access the set-aside document describes and make it unrecoverable even
+     *   if repaired. Grants orphaned before the corruption simply wait for the
+     *   next clean load.
+     *
+     * A migrated catalog is a real one and needs no such guard.
      *
      * A grant that cannot be enumerated or given back is a housekeeping miss,
      * not a reason to refuse to show the library, so it does not fail the load.
@@ -462,7 +475,10 @@ class LibraryRepository(
             is CatalogLoad.Loaded -> {
                 publish(load.catalog)
                 loaded = true
-                withContext(ioDispatcher) { releaseOrphanedGrants(load.catalog) }
+                // Not on a recovery: see [releaseOrphanedGrants].
+                if (load.recoveredFrom == null) {
+                    withContext(ioDispatcher) { releaseOrphanedGrants(load.catalog) }
+                }
                 true
             }
 
