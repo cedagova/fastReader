@@ -340,6 +340,42 @@ class LibraryRepository(
     }
 
     /**
+     * Gives back every long-lived grant the catalog no longer references.
+     *
+     * [releaseGrantsNoLongerNeeded] only runs while the process that removed the
+     * book is alive. A reader who removes a book and then swipes the app away
+     * inside the undo window leaves the row gone from the stored catalog and the
+     * grant still held, with nothing left in memory that knows about it — and
+     * Android caps how many persisted grants an app may hold, so that leak
+     * eventually stops the reader from adding books at all. The platform's own
+     * list is the only record that survives, so reconciling against it at load
+     * closes that window and any grant an earlier crash orphaned.
+     *
+     * It runs exactly once per process, from the first successful load, which is
+     * necessarily before this process can have a removal pending. It runs only
+     * on a load that produced a real catalog: sweeping against the empty catalog
+     * of a *blocked* store would release the grant for every book in the
+     * library.
+     *
+     * A grant that cannot be enumerated or given back is a housekeeping miss,
+     * not a reason to refuse to show the library, so it does not fail the load.
+     */
+    private fun releaseOrphanedGrants(catalog: Catalog) {
+        try {
+            val referenced = HashSet<String>()
+            catalog.books.forEach { book -> book.sources.forEach { referenced += it.uri } }
+            catalog.folders.forEach { referenced += it.treeUri }
+            gateway.persistedReadPermissions()
+                .filterNot { it in referenced }
+                // Neither gateway distinguishes a tree from a document when
+                // giving a grant back; a sweep cannot know which an orphan is.
+                .forEach { gateway.releaseReadPermission(it, isTree = false) }
+        } catch (_: Exception) {
+            // Deliberately quiet: see above.
+        }
+    }
+
+    /**
      * Gives back only the grants nothing in the catalog still uses.
      *
      * Re-picking the same file inside the undo window brings the book back with
@@ -426,6 +462,7 @@ class LibraryRepository(
             is CatalogLoad.Loaded -> {
                 publish(load.catalog)
                 loaded = true
+                withContext(ioDispatcher) { releaseOrphanedGrants(load.catalog) }
                 true
             }
 

@@ -348,6 +348,67 @@ class LibraryRepositoryTest {
     }
 
     /**
+     * The undo window only exists in memory. A reader who removes a book and
+     * then leaves the app takes the timer with them, and the baseline released
+     * that grant synchronously — so without reconciling at load, deferring the
+     * release would leak a persisted grant permanently, and Android caps how
+     * many an app may hold.
+     */
+    @Test
+    fun `a grant orphaned by a process that died inside the undo window is released at the next load`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.addPickedBooks(listOf("doc://a"))
+        val bookId = first.catalog.value.books.single().id
+
+        first.removeBook(bookId)
+        // The window is still open: nothing has given the grant back yet.
+        assertTrue(gateway.releasedGrants.isEmpty())
+        assertTrue("doc://a" in gateway.persistedGrants)
+
+        // A new process over the same store, as after the app was swiped away.
+        repository(FileCatalogStore(file), backgroundScope).load()
+
+        assertEquals(listOf("doc://a"), gateway.releasedGrants)
+        assertTrue("doc://a" !in gateway.persistedGrants)
+    }
+
+    /** The sweep must not touch a grant the library is actually using. */
+    @Test
+    fun `the load sweep keeps every grant the catalog still references`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.spanishEpub(), "one.epub")
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.addPickedBooks(listOf("doc://a"))
+        first.addFolder("tree://books", "Books")
+
+        repository(FileCatalogStore(file), backgroundScope).load()
+
+        assertTrue("nothing in use may be released, got ${gateway.releasedGrants}", gateway.releasedGrants.isEmpty())
+    }
+
+    /**
+     * A store that refuses to load reports an empty catalog. Sweeping against it
+     * would release the grant for every book the reader owns.
+     */
+    @Test
+    fun `a blocked store never triggers the grant sweep`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        gateway.persistReadPermission("doc://a", isTree = false)
+        val blocking = object : CatalogStore {
+            override fun load() = CatalogLoad.Blocked("catalog was written by a newer version of the app")
+            override fun save(catalog: Catalog) = Unit
+        }
+
+        repository(blocking, backgroundScope).load()
+
+        assertTrue("a blocked load must not release anything", gateway.releasedGrants.isEmpty())
+        assertTrue("doc://a" in gateway.persistedGrants)
+    }
+
+    /**
      * Re-picking the file inside the window puts the book back by another route.
      * The expiring timer must not then release a grant the library is using.
      */

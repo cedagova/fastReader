@@ -40,6 +40,9 @@ class SafDocumentGateway(context: Context) : DocumentGateway {
         }
     }
 
+    override fun persistedReadPermissions(): List<String> =
+        resolver.persistedUriPermissions.filter { it.isReadPermission }.map { it.uri.toString() }
+
     override fun lookup(uri: String): DocumentLookup {
         val parsed = uri.toUri()
         if (!hasReadGrant(parsed)) return DocumentLookup.PermissionLost

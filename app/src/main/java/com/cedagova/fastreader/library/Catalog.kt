@@ -62,6 +62,12 @@ data class Catalog(
      * added folder, is not counted. This is the number the removal confirmation
      * names, and it is derived from the same sources removal itself drops, so
      * the count and the outcome cannot drift apart.
+     *
+     * The emptiness guard is what makes `all` mean what it says: with no source
+     * at all it would vacuously hold and count a book this folder never
+     * provided. Ingestion always attaches a source and removal drops a book that
+     * runs out of them, so no such entry is reachable today; the guard keeps the
+     * count honest if one ever becomes so.
      */
     fun booksOnlyFrom(folderId: String): List<Book> = books.filter { book ->
         book.sources.isNotEmpty() && book.sources.all { it.folderId == folderId }
