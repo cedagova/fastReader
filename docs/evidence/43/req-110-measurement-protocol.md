@@ -145,6 +145,17 @@ it must not be compared against a published APK: it opened both books in 0.30 s,
 a constant offset over the release build that is the build type and not the
 book.
 
+### Positions across the update
+
+Separately from timing, the identity invariant was proven end to end on the same
+AVD. On the published v1.0.1: a book at 3 % read, mid-paragraph, at 725 WPM.
+Then this branch's release APK installed **in place** — same key, no data clear
+— and launched. The reader came back on the same word, at 3 % read, at 725 WPM.
+
+![Before: published v1.0.1, 3 % read at 725 WPM](position-before-update-published-v1.0.1-phone-mid-api36.png)
+
+![After: this branch installed in place, same word, same 3 % and 725 WPM](position-after-update-this-build-phone-mid-api36.png)
+
 ### What is proven without that measurement
 
 The mechanism the measurement depends on is unit-tested exactly, in
