@@ -1,0 +1,64 @@
+# The repository's hosted gate. Runs the same three loops the agent guide
+# defines (docs/agent-first-development.md): isolated tests, the rendered-UI
+# golden diff, and static analysis. Any failure turns the run red.
+#
+# The golden step is a hard gate: tolerances are never loosened to make this job
+# pass. See docs/agent-first-development.md for the platform the goldens are
+# recorded on.
+#
+# No secrets and no signing material: release signing and publication stay
+# local in scripts/release.sh.
+name: checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: unit tests, goldens, lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the commit under test
+        uses: actions/checkout@v4
+
+      # Gradle 8.x cannot run on JDK 25; the project pins JDK 21 everywhere.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Each check runs even when an earlier one failed, so one run reports
+      # every problem instead of only the first. Any failed step fails the job.
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Roborazzi golden verification
+        if: ${{ !cancelled() }}
+        run: ./gradlew --no-daemon verifyRoborazziDebug
+
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: ./gradlew --no-daemon lint
+
+      # Failure reports and the actual/diff PNGs, so a red run can be diagnosed
+      # without re-running anything locally.
+      - name: Upload reports and golden diffs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: checks-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            app/build/reports/
+            app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+          retention-days: 14
