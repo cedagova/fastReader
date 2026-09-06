@@ -48,6 +48,24 @@ data class Catalog(
     fun book(id: String): Book? = books.firstOrNull { it.id == id }
 
     fun folder(id: String): BookFolder? = folders.firstOrNull { it.id == id }
+
+    /** Every book this folder currently provides, at any depth beneath it. */
+    fun booksIn(folderId: String): List<Book> =
+        books.filter { book -> book.sources.any { it.folderId == folderId } }
+
+    /**
+     * The books that would leave the library if this folder were removed — the
+     * ones it *alone* provides (REQ-104).
+     *
+     * A book reachable from anywhere else keeps that other source and stays, so
+     * a file that was also picked directly, or that also sits inside a second
+     * added folder, is not counted. This is the number the removal confirmation
+     * names, and it is derived from the same sources removal itself drops, so
+     * the count and the outcome cannot drift apart.
+     */
+    fun booksOnlyFrom(folderId: String): List<Book> = books.filter { book ->
+        book.sources.isNotEmpty() && book.sources.all { it.folderId == folderId }
+    }
 }
 
 /** A book in the catalog, identified by content rather than by where it lives (AD-2). */

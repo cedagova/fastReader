@@ -92,6 +92,38 @@
 
     <string name="library_open">Open %1$s</string>
 
+    <!-- Undo a book removal (REQ-105) -->
+    <string name="library_undo_removed">Removed “%1$s”. The file stays on your device and your place is kept.</string>
+    <string name="library_undo">Undo</string>
+    <string name="library_undo_label">Undo removing %1$s</string>
+
+    <!-- Added folders (REQ-104) -->
+    <string name="library_folders_open">Added folders</string>
+    <plurals name="library_folders_open_count">
+        <item quantity="one">Added folders (1)</item>
+        <item quantity="other">Added folders (%1$d)</item>
+    </plurals>
+    <string name="folders_title">Added folders</string>
+    <string name="folders_back">Back to the library</string>
+    <string name="folders_intro">Every EPUB inside these folders is in your library. Removing a folder here never touches the files inside it.</string>
+    <plurals name="folders_book_count">
+        <item quantity="one">1 book in your library</item>
+        <item quantity="other">%1$d books in your library</item>
+    </plurals>
+    <string name="folders_status_missing">Folder missing. It was moved, renamed, or deleted.</string>
+    <string name="folders_status_permission_lost">Access was revoked. Add the folder again to read its books.</string>
+    <string name="folders_remove">Remove %1$s</string>
+    <string name="folders_remove_title">Remove “%1$s”?</string>
+    <plurals name="folders_remove_count">
+        <item quantity="one">1 book will leave your library.</item>
+        <item quantity="other">%1$d books will leave your library.</item>
+    </plurals>
+    <string name="folders_remove_none">No books will leave your library.</string>
+    <string name="folders_remove_kept">No file is deleted or changed, and your place in every book is kept.</string>
+    <string name="folders_remove_confirm">Remove folder</string>
+    <string name="folders_remove_cancel">Cancel</string>
+    <string name="folders_empty">You have not added any folders yet.</string>
+
     <!-- Settings screen -->
     <string name="settings_title">Settings</string>
     <string name="settings_open">Settings</string>

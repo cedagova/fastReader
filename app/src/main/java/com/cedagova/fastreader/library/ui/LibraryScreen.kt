@@ -49,8 +49,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -90,6 +92,10 @@ fun LibraryScreen(
     onDismissResumeNotice: () -> Unit = {},
     /** Opens the settings screen (LEAF302). */
     onOpenSettings: () -> Unit = {},
+    /** Opens the added-folder list (REQ-104). */
+    onOpenFolders: () -> Unit = {},
+    /** Takes back the removal the undo banner is offering (REQ-105). */
+    onUndoRemove: () -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
     Scaffold(
@@ -111,11 +117,14 @@ fun LibraryScreen(
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             state.failureMessage?.let { FailureBanner(it) }
             state.resumeNotice?.let { ResumeNoticeBanner(it, onDismissResumeNotice) }
+            state.undoNotice?.let { UndoBanner(it, onUndoRemove) }
             state.scan?.let { ScanBanner(it) }
             when (state.content) {
                 LibraryContent.EMPTY_LIBRARY -> EmptyLibrary(
                     onAddBooks = onAddBooks,
                     onAddFolder = onAddFolder,
+                    folderCount = state.folders.size,
+                    onOpenFolders = onOpenFolders,
                 )
 
                 LibraryContent.NO_SEARCH_RESULTS,
@@ -123,6 +132,7 @@ fun LibraryScreen(
                 -> {
                     SearchField(query = state.query, onQueryChange = onQueryChange)
                     AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder)
+                    FoldersEntry(count = state.folders.size, onOpenFolders = onOpenFolders)
                     if (state.content == LibraryContent.NO_SEARCH_RESULTS) {
                         NoSearchResults(state.query)
                     } else {
@@ -189,6 +199,66 @@ private fun ResumeNoticeBanner(notice: ResumeNotice, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * The removal the reader can still take back (REQ-105).
+ *
+ * A banner rather than a snackbar, for the same reason every other library state
+ * is one: it is reachable from a [LibraryUiState] value, so the goldens can
+ * prove the copy and the control instead of a timing-dependent overlay. It says
+ * what happened to the *file* as well as to the row, because "removed" is
+ * exactly the word a reader would fear meant deleted.
+ */
+@Composable
+private fun UndoBanner(notice: UndoNotice, onUndo: () -> Unit) {
+    val undoLabel = stringResource(R.string.library_undo_label, notice.title)
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth().testTag("library_undo"),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.library_undo_removed, notice.title),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = onUndo,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_undo_action")
+                    .semantics { contentDescription = undoLabel },
+            ) {
+                Text(stringResource(R.string.library_undo))
+            }
+        }
+    }
+}
+
+/**
+ * The way into the added-folder list (REQ-104).
+ *
+ * Only shown once a folder exists: with none, the list would be a dead end, and
+ * "Add folder" is already on the screen right above it.
+ */
+@Composable
+private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit) {
+    if (count == 0) return
+    TextButton(
+        onClick = onOpenFolders,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .defaultMinSize(minHeight = TouchTarget)
+            .testTag("library_open_folders"),
+    ) {
+        Text(pluralStringResource(R.plurals.library_folders_open_count, count, count))
+    }
+}
+
 @Composable
 private fun FailureBanner(message: String) {
     Surface(
@@ -248,7 +318,12 @@ private fun ScanBanner(scan: LibraryScan) {
 }
 
 @Composable
-private fun EmptyLibrary(onAddBooks: () -> Unit, onAddFolder: () -> Unit) {
+private fun EmptyLibrary(
+    onAddBooks: () -> Unit,
+    onAddFolder: () -> Unit,
+    folderCount: Int,
+    onOpenFolders: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -268,6 +343,19 @@ private fun EmptyLibrary(onAddBooks: () -> Unit, onAddFolder: () -> Unit) {
         Bullet(stringResource(R.string.library_empty_folder))
         Spacer(Modifier.height(4.dp))
         AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder, horizontalPadding = 0.dp)
+        // An added folder with nothing readable in it still has to be reachable,
+        // or the only way to take it back out would be to add a book first.
+        if (folderCount > 0) {
+            TextButton(
+                onClick = onOpenFolders,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = TouchTarget)
+                    .testTag("library_open_folders"),
+            ) {
+                Text(pluralStringResource(R.plurals.library_folders_open_count, folderCount, folderCount))
+            }
+        }
         Text(
             text = stringResource(R.string.library_empty_in_place),
             style = MaterialTheme.typography.bodyMedium,

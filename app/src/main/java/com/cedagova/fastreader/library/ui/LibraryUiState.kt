@@ -3,7 +3,9 @@ package com.cedagova.fastreader.library.ui
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
+import com.cedagova.fastreader.library.FolderStatus
 import com.cedagova.fastreader.library.IngestionState
+import com.cedagova.fastreader.library.RemovedBook
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
@@ -33,7 +35,17 @@ data class LibraryUiState(
      * the library with no explanation.
      */
     val resumeNotice: ResumeNotice? = null,
+    /**
+     * The added folders (REQ-104). Drives the entry into the folder list, which
+     * is only worth offering once there is a folder to manage.
+     */
+    val folders: List<LibraryFolderItem> = emptyList(),
+    /** Set while a removal can still be taken back (REQ-105). */
+    val undoNotice: UndoNotice? = null,
 )
+
+/** The book just removed, while undo is on offer (REQ-105). */
+data class UndoNotice(val bookId: String, val title: String)
 
 /** The last-read book the app could not reopen, named so the library can say so. */
 data class ResumeNotice(
@@ -113,12 +125,31 @@ data class LibraryBookItem(
         get() = title.dropWhile { !it.isLetterOrDigit() }.ifEmpty { title }
 }
 
+/**
+ * One added folder, as the folder list shows it (REQ-104).
+ *
+ * Carries both counts because they answer different questions: [bookCount] is
+ * how much of the library this folder accounts for, and [removedBookCount] is
+ * what removing it would actually cost — the books it alone provides. They
+ * differ exactly when a book is also reachable from somewhere else.
+ */
+data class LibraryFolderItem(
+    val id: String,
+    val displayName: String,
+    val status: FolderStatus,
+    val bookCount: Int,
+    val removedBookCount: Int,
+) {
+    val isAvailable: Boolean get() = status == FolderStatus.AVAILABLE
+}
+
 /** Builds the screen state. Pure: same inputs always give the same screen. */
 fun buildLibraryUiState(
     catalog: Catalog,
     ingestion: IngestionState,
     query: String,
     resumeBlocked: ResumeBlocked? = null,
+    undoableRemoval: RemovedBook? = null,
 ): LibraryUiState {
     // Sort the way the reader's language does, not by UTF-16 code unit: raw
     // ordering drops every accented initial below Z, which would put Ñuño and
@@ -165,6 +196,24 @@ fun buildLibraryUiState(
                 )
             }
         },
+        folders = buildFolderItems(catalog),
+        undoNotice = undoableRemoval?.let { UndoNotice(it.bookId, it.title) },
+    )
+}
+
+/**
+ * The added folders as the library and the folder list both show them (REQ-104).
+ *
+ * Pure, and derived from the same sources removal itself drops, so the number
+ * the confirmation names and the rows that actually disappear cannot drift.
+ */
+fun buildFolderItems(catalog: Catalog): List<LibraryFolderItem> = catalog.folders.map { folder ->
+    LibraryFolderItem(
+        id = folder.id,
+        displayName = folder.displayName,
+        status = folder.status,
+        bookCount = catalog.booksIn(folder.id).size,
+        removedBookCount = catalog.booksOnlyFrom(folder.id).size,
     )
 }
 

@@ -10,6 +10,7 @@ import java.io.InputStream
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +35,7 @@ class LibraryRepository(
     private val ioDispatcher: CoroutineDispatcher,
     private val clock: () -> Long = System::currentTimeMillis,
     private val minimumRescanIntervalMs: Long = DEFAULT_MINIMUM_RESCAN_INTERVAL_MS,
+    private val undoWindowMs: Long = DEFAULT_UNDO_WINDOW_MS,
     positionFlushIntervalMs: Long = ReadingPositionWriter.DEFAULT_INTERVAL_MILLIS,
 ) {
 
@@ -42,6 +44,16 @@ class LibraryRepository(
     private val _ingestion = MutableStateFlow<IngestionState>(IngestionState.Idle)
     private val _persistenceFailure = MutableStateFlow<String?>(null)
     private val _settings = MutableStateFlow(ReaderSettings.DEFAULTS)
+
+    /**
+     * The book removal that can still be taken back, and the timer that ends the
+     * offer. Held under [undoMutex] rather than [mutex] so claiming the pending
+     * removal never nests inside a catalog write, which would deadlock.
+     */
+    private val undoMutex = Mutex()
+    private var pendingRemoval: Book? = null
+    private var undoTimer: Job? = null
+    private val _undoableRemoval = MutableStateFlow<RemovedBook?>(null)
 
     /**
      * Coalesces reading positions so the reader can report one per word without
@@ -85,6 +97,12 @@ class LibraryRepository(
      * what a device with nothing stored resolves to.
      */
     val settings: StateFlow<ReaderSettings> = _settings.asStateFlow()
+
+    /**
+     * The book the reader has just removed, while taking it back is still on
+     * offer (REQ-105). Null once [undoRemoveBook] ran or the window elapsed.
+     */
+    val undoableRemoval: StateFlow<RemovedBook?> = _undoableRemoval.asStateFlow()
 
     /** Loads the stored catalog without scanning. Safe to call repeatedly. */
     suspend fun load() = mutex.withLock { ensureLoaded() }
@@ -170,10 +188,41 @@ class LibraryRepository(
      * Removes a catalog entry. The file stays on the device and the position is
      * kept (REQ-004). The removal survives folder rescans; picking the file
      * again, or re-adding its folder, brings the book back.
+     *
+     * For a short window afterwards the removal can be taken back with
+     * [undoRemoveBook] (REQ-105). Until that window closes the book's read
+     * grants are still held, so undo restores a row that is genuinely readable
+     * rather than one whose file the app can no longer open.
      */
-    suspend fun removeBook(bookId: String) = mutateCatalog { ingestor.removeBook(it, bookId) }
+    suspend fun removeBook(bookId: String) {
+        var removed: Book? = null
+        mutateCatalog { catalog ->
+            removed = catalog.book(bookId)
+            if (removed == null) catalog else ingestor.removeBook(catalog, bookId)
+        }
+        val book = removed ?: return
+        // A write that failed left the book on screen; offering to undo a removal
+        // that did not happen would be a lie the reader could tap.
+        if (_catalog.value.book(bookId) != null) return
+        offerUndo(book)
+    }
 
-    /** Removes an added folder and the entries only it provided. Files are never touched. */
+    /**
+     * Puts back the book the reader has just removed, with its position and
+     * progress (REQ-105). Does nothing once the window has closed.
+     */
+    suspend fun undoRemoveBook() {
+        val timer = undoTimer
+        val book = claimPendingRemoval(null) ?: return
+        timer?.cancel()
+        mutateCatalog { ingestor.restoreBook(it, book) }
+    }
+
+    /**
+     * Removes an added folder and the entries only it provided
+     * ([Catalog.booksOnlyFrom]). Files are never touched and every position is
+     * kept, including those of the books that left (REQ-104, REQ-004).
+     */
     suspend fun removeFolder(folderId: String) = mutateCatalog { ingestor.removeFolder(it, folderId) }
 
     /**
@@ -252,7 +301,60 @@ class LibraryRepository(
 
     fun requestRemoveBook(bookId: String) = scope.launch { removeBook(bookId) }
 
+    fun requestUndoRemoveBook() = scope.launch { undoRemoveBook() }
+
     fun requestRemoveFolder(folderId: String) = scope.launch { removeFolder(folderId) }
+
+    /**
+     * Starts the undo window for [book] and closes any window still open, which
+     * makes that earlier removal final.
+     */
+    private suspend fun offerUndo(book: Book) {
+        val superseded = undoMutex.withLock {
+            val previous = pendingRemoval
+            val previousTimer = undoTimer
+            pendingRemoval = book
+            _undoableRemoval.value = RemovedBook(book.id, book.title)
+            undoTimer = scope.launch {
+                delay(undoWindowMs)
+                finaliseRemoval(book.id)
+            }
+            previousTimer?.cancel()
+            previous
+        }
+        superseded?.let { releaseGrantsNoLongerNeeded(it) }
+    }
+
+    /** The undo window closed: the removal stands and its grants can go back. */
+    private suspend fun finaliseRemoval(bookId: String) {
+        val book = claimPendingRemoval(bookId) ?: return
+        releaseGrantsNoLongerNeeded(book)
+    }
+
+    /**
+     * Takes the pending removal, if it is still there and is the expected one.
+     * Whoever claims it owns finishing it, so the timer and undo cannot both act.
+     */
+    private suspend fun claimPendingRemoval(expectedBookId: String?): Book? = undoMutex.withLock {
+        val book = pendingRemoval
+        if (book == null || (expectedBookId != null && book.id != expectedBookId)) return@withLock null
+        pendingRemoval = null
+        _undoableRemoval.value = null
+        book
+    }
+
+    /**
+     * Gives back only the grants nothing in the catalog still uses.
+     *
+     * Re-picking the same file inside the undo window brings the book back with
+     * its grant; the timer must not then release a permission the library is
+     * relying on. There is no suspension point after the claim, so a cancelled
+     * timer cannot stop half-way through this.
+     */
+    private fun releaseGrantsNoLongerNeeded(book: Book) {
+        val stillUsed = _catalog.value.book(book.id)?.sources?.mapTo(HashSet()) { it.uri }.orEmpty()
+        ingestor.releaseGrants(book.sources.filterNot { it.uri in stillUsed })
+    }
 
     private suspend fun mutate(
         trigger: ScanTrigger,
@@ -342,8 +444,19 @@ class LibraryRepository(
 
     companion object {
         const val DEFAULT_MINIMUM_RESCAN_INTERVAL_MS = 2_000L
+
+        /**
+         * How long taking a removal back stays on offer (REQ-105's "short time").
+         * Long enough to read the sentence and reach the control at a large font
+         * size, short enough that the library is not left in two minds about
+         * whether a book is in it.
+         */
+        const val DEFAULT_UNDO_WINDOW_MS = 8_000L
     }
 }
+
+/** A book whose removal can still be taken back, named so the library can say which. */
+data class RemovedBook(val bookId: String, val title: String)
 
 private fun DocumentLookup.availability(): SourceAvailability = when (this) {
     is DocumentLookup.Found -> SourceAvailability.AVAILABLE

@@ -1,9 +1,12 @@
 package com.cedagova.fastreader.library.ui
 
 import com.cedagova.fastreader.library.BookContentStatus
+import com.cedagova.fastreader.library.BookFolder
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
+import com.cedagova.fastreader.library.FolderStatus
 import com.cedagova.fastreader.library.IngestionState
+import com.cedagova.fastreader.library.RemovedBook
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
@@ -372,5 +375,75 @@ class LibraryUiStateTest {
     @Test
     fun `an ordinary launch shows no resume notice`() {
         assertNull(buildLibraryUiState(Catalog(), IngestionState.Idle, query = "").resumeNotice)
+    }
+
+    /**
+     * REQ-104's two counts. The folder holds three books, but only two of them
+     * would leave with it: the third was also picked directly and keeps that
+     * source. The confirmation names the second number, not the first.
+     */
+    @Test
+    fun `a folder reports what it holds and what removing it would cost (REQ-104)`() {
+        val catalog = Catalog(
+            folders = listOf(BookFolder(id = "tree://novels", treeUri = "tree://novels", displayName = "Novels")),
+            books = listOf(
+                LibraryFixtures.inFolder("a", "Ficciones", "tree://novels"),
+                LibraryFixtures.inFolder("b", "Rayuela", "tree://novels"),
+                LibraryFixtures.inFolder("c", "Dubliners", "tree://novels", alsoPickedDirectly = true),
+            ),
+        )
+
+        val folder = buildLibraryUiState(catalog, IngestionState.Idle, query = "").folders.single()
+
+        assertEquals("Novels", folder.displayName)
+        assertEquals(3, folder.bookCount)
+        assertEquals(2, folder.removedBookCount)
+        assertTrue(folder.isAvailable)
+    }
+
+    /** A folder whose books all live somewhere else too costs nothing to remove. */
+    @Test
+    fun `a folder that provides no book of its own would remove none`() {
+        val catalog = Catalog(
+            folders = listOf(BookFolder(id = "tree://copy", treeUri = "tree://copy", displayName = "Copy")),
+            books = listOf(LibraryFixtures.inFolder("a", "Ficciones", "tree://copy", alsoPickedDirectly = true)),
+        )
+
+        val folder = buildLibraryUiState(catalog, IngestionState.Idle, query = "").folders.single()
+
+        assertEquals(1, folder.bookCount)
+        assertEquals(0, folder.removedBookCount)
+    }
+
+    @Test
+    fun `a folder that is no longer reachable keeps its status (REQ-104)`() {
+        val catalog = Catalog(
+            folders = listOf(
+                BookFolder("tree://gone", "tree://gone", "Moved", status = FolderStatus.MISSING),
+                BookFolder("tree://revoked", "tree://revoked", "Revoked", status = FolderStatus.PERMISSION_LOST),
+            ),
+        )
+
+        val statuses = buildLibraryUiState(catalog, IngestionState.Idle, query = "").folders.map { it.status }
+
+        assertEquals(listOf(FolderStatus.MISSING, FolderStatus.PERMISSION_LOST), statuses)
+    }
+
+    @Test
+    fun `the undo offer names the book it would bring back (REQ-105)`() {
+        val state = buildLibraryUiState(
+            Catalog(books = listOf(LibraryFixtures.readable("a", "Ficciones"))),
+            IngestionState.Idle,
+            query = "",
+            undoableRemoval = RemovedBook("gone", "Rayuela"),
+        )
+
+        assertEquals("Rayuela", state.undoNotice?.title)
+        assertEquals("gone", state.undoNotice?.bookId)
+    }
+
+    @Test
+    fun `no removal on offer means no undo banner`() {
+        assertNull(buildLibraryUiState(Catalog(), IngestionState.Idle, query = "").undoNotice)
     }
 }
