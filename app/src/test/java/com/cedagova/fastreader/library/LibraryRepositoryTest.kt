@@ -327,6 +327,27 @@ class LibraryRepositoryTest {
     }
 
     /**
+     * Removing the folder a pending removal came from takes its last source with
+     * it. Nothing rescans a folder that is no longer added, so bringing that row
+     * back would leave a book that looks readable and never opens.
+     */
+    @Test
+    fun `undo brings back nothing when the folder the book came from is gone too`() = runTest {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addFolder("tree://books", "Books")
+        val bookId = repository.catalog.value.books.single().id
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 640))
+
+        repository.removeBook(bookId)
+        repository.removeFolder("tree://books")
+        repository.undoRemoveBook()
+
+        assertTrue("no orphaned row may come back", repository.catalog.value.books.isEmpty())
+        assertEquals("the position still outlives it (REQ-004)", 640, repository.readingState(bookId)?.tokenIndex)
+    }
+
+    /**
      * Re-picking the file inside the window puts the book back by another route.
      * The expiring timer must not then release a grant the library is using.
      */

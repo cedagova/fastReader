@@ -205,14 +205,20 @@ class CatalogIngestor(
      *
      * The position is not restored here because removal never took it: reading
      * states are keyed by book id and outlive the entry (REQ-004).
+     *
+     * A source whose folder was removed in the meantime is dropped rather than
+     * brought back: nothing rescans an orphaned folder id, so restoring one
+     * would put back a row that claims to be readable and never stops claiming
+     * it. With no source left there is no book to restore.
      */
     fun restoreBook(catalog: Catalog, book: Book): Catalog {
+        val sources = book.sources.filter { it.folderId == null || catalog.folder(it.folderId) != null }
+        if (sources.isEmpty()) return catalog
         val existing = catalog.book(book.id)
         val restored = when (existing) {
-            null -> book
+            null -> book.copy(sources = sources)
             else -> existing.copy(
-                sources = existing.sources +
-                    book.sources.filterNot { old -> existing.sources.any { it.uri == old.uri } },
+                sources = existing.sources + sources.filterNot { old -> existing.sources.any { it.uri == old.uri } },
             )
         }
         val books = when (existing) {
