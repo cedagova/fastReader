@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The launcher icon's foreground layer (REQ-101).
+
+    It draws what the app actually is rather than a book or a pair of glasses:
+    one word held on a fixed spot, its recognition letter picked out, with the
+    guide marks above and below the column it lands on — the same three elements
+    the reader sees on the reading surface (REQ-020, REQ-021).
+
+    108x108dp with the content inside the 66dp safe circle, because an adaptive
+    icon's foreground is masked and parallaxed: the widest point is the word
+    rail at 26dp from centre, the tallest the carets at 22dp.
+
+    The focus block is deliberately *taller* than the rail rather than a
+    different colour. That keeps the silhouette readable in the monochrome layer,
+    where every path collapses to one tint.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Guide caret above the focus column. -->
+    <path
+        android:fillColor="@color/icon_ink"
+        android:pathData="M54,40 L48,32 L60,32 Z" />
+
+    <!-- The word, split around the letter the eye lands on. -->
+    <path
+        android:fillColor="@color/icon_ink"
+        android:pathData="M30,50 L42,50 A4,4 0 0 1 42,58 L30,58 A4,4 0 0 1 30,50 Z" />
+    <path
+        android:fillColor="@color/icon_ink"
+        android:pathData="M66,50 L78,50 A4,4 0 0 1 78,58 L66,58 A4,4 0 0 1 66,50 Z" />
+
+    <!-- The recognition letter, standing proud of the rail. -->
+    <path
+        android:fillColor="@color/icon_ink"
+        android:pathData="M52,44 L56,44 A2,2 0 0 1 58,46 L58,62 A2,2 0 0 1 56,64 L52,64 A2,2 0 0 1 50,62 L50,46 A2,2 0 0 1 52,44 Z" />
+
+    <!-- Guide caret below it. -->
+    <path
+        android:fillColor="@color/icon_ink"
+        android:pathData="M54,68 L48,76 L60,76 Z" />
+
+</vector>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The launcher icon's monochrome layer (REQ-101).
+
+    The same geometry as ic_launcher_foreground, flattened to one ink. The system
+    replaces this fill with the themed-icon tint, so the shape has to survive
+    without colour: that is why the recognition letter is drawn taller than the
+    word rail instead of in the highlight colour.
+
+    Kept as a separate file rather than reusing the foreground with a tint,
+    because a themed icon and the full-colour icon are drawn by different code
+    paths and a shared drawable would tie their fills together.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Guide caret above the focus column. -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M54,40 L48,32 L60,32 Z" />
+
+    <!-- The word, split around the letter the eye lands on. -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M30,50 L42,50 A4,4 0 0 1 42,58 L30,58 A4,4 0 0 1 30,50 Z" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M66,50 L78,50 A4,4 0 0 1 78,58 L66,58 A4,4 0 0 1 66,50 Z" />
+
+    <!-- The recognition letter, standing proud of the rail. -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M52,44 L56,44 A2,2 0 0 1 58,46 L58,62 A2,2 0 0 1 56,64 L52,64 A2,2 0 0 1 50,62 L50,46 A2,2 0 0 1 52,44 Z" />
+
+    <!-- Guide caret below it. -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M54,68 L48,76 L60,76 Z" />
+
+</vector>

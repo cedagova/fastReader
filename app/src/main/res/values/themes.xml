@@ -1,3 +1,56 @@
-<resources>
-    <style name="Theme.FastReader" parent="android:Theme.Material.Light.NoActionBar" />
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The window themes, which are the app's *first frame* (REQ-102, AD-10).
+
+    Three themes, not one, because the reader's choice is three-valued and only
+    one of the three can be expressed by resource qualifiers:
+
+    - `Theme.FastReader` follows the device, through `values-night`. It is the
+      manifest default and what "System" launches into.
+    - `Theme.FastReader.Light` and `Theme.FastReader.Dark` ignore the device.
+      `MainActivity` selects one of them from the pre-Compose theme mirror before
+      `super.onCreate` creates the window, which is what makes an explicit Dark
+      choice survive a cold start on a light device.
+
+    The shared `Base.*` styles hold the actual items so the day/night pair and
+    the two forced variants can never drift apart. This mirrors AppCompat's own
+    `Base.Theme.AppCompat` layout: a dotted child name with an explicit `parent`
+    takes the explicit parent, so `Theme.FastReader.Light` does not inherit from
+    `Theme.FastReader`.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Base.Theme.FastReader.Light" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- The frame the system paints before the first composed frame. -->
+        <item name="android:windowBackground">@color/page_light</item>
+        <item name="android:colorBackground">@color/page_light</item>
+        <!-- Edge to edge from the very first frame, so nothing shifts when
+             enableEdgeToEdge() runs a moment later. -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+        <!-- API 31+ draws the launcher icon on this; keeping it equal to
+             windowBackground makes splash and first frame one continuous colour. -->
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/page_light</item>
+    </style>
+
+    <style name="Base.Theme.FastReader.Dark" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/page_dark</item>
+        <item name="android:colorBackground">@color/page_dark</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/page_dark</item>
+    </style>
+
+    <!-- Follows the device. `values-night` re-points this at the dark base. -->
+    <style name="Theme.FastReader" parent="Base.Theme.FastReader.Light" />
+
+    <!-- Ignore the device: the reader asked for this one. -->
+    <style name="Theme.FastReader.Light" parent="Base.Theme.FastReader.Light" />
+
+    <style name="Theme.FastReader.Dark" parent="Base.Theme.FastReader.Dark" />
+
 </resources>
