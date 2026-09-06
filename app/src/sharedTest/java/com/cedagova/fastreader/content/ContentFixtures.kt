@@ -2,6 +2,7 @@ package com.cedagova.fastreader.content
 
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.epub.EpubFixtures
+import com.cedagova.fastreader.epub.TestByteChannel
 import java.io.ByteArrayInputStream
 import java.nio.charset.Charset
 
@@ -15,7 +16,35 @@ import java.nio.charset.Charset
  */
 object ContentFixtures {
 
-    fun source(bytes: ByteArray): EpubByteSource = EpubByteSource { ByteArrayInputStream(bytes) }
+    /**
+     * The bytes as the reader normally sees them: seekable, so the pipeline takes
+     * the central-directory path it takes on a real device.
+     */
+    fun source(bytes: ByteArray): EpubByteSource = object : EpubByteSource {
+        override fun open() = ByteArrayInputStream(bytes)
+
+        override fun openChannel() = TestByteChannel(bytes)
+    }
+
+    /**
+     * The bytes with no seekable view, so the pipeline falls back to one forward
+     * pass — what a provider serving a document through a pipe gives it.
+     */
+    fun streamingSource(bytes: ByteArray): EpubByteSource = EpubByteSource { ByteArrayInputStream(bytes) }
+
+    /** The seekable source plus the channel it hands out, so a test can read [TestByteChannel.bytesRead]. */
+    fun watchedSource(
+        bytes: ByteArray,
+        poisoned: List<IntRange> = emptyList(),
+    ): Pair<EpubByteSource, () -> Long> {
+        val channels = mutableListOf<TestByteChannel>()
+        val source = object : EpubByteSource {
+            override fun open() = ByteArrayInputStream(bytes)
+
+            override fun openChannel() = TestByteChannel(bytes, poisoned).also { channels += it }
+        }
+        return source to { channels.sumOf { it.bytesRead } }
+    }
 
     private const val CONTAINER = """<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -203,6 +232,68 @@ object ContentFixtures {
                 ).utf8(),
         ),
     )
+
+    /**
+     * A book shaped like the one REQ-110 is about: a little text, a lot of
+     * pictures.
+     *
+     * The images are pseudo-random so the archive cannot compress them away —
+     * [imageCount] × [imageBytes] really is what the file weighs — and they are
+     * declared in the manifest but never in the spine, exactly as a real
+     * illustrated book's plates are. Opening it must cost the chapters.
+     *
+     * The returned spans (see [EpubFixtures.buildArchiveWithSpans]) say where each
+     * image sits in the file, which is what lets a test forbid reading them.
+     */
+    fun illustratedNovel(
+        imageCount: Int = 4,
+        imageBytes: Int = 1024 * 1024,
+        withImages: Boolean = true,
+    ): Pair<ByteArray, Map<String, IntRange>> {
+        val chapters = (1..3).map { index ->
+            "OEBPS/chapter$index.xhtml" to page(
+                "<h1>Chapter $index</h1><p>The plate opposite shows nothing at all. </p>" +
+                    "<p>A second paragraph, so the chapter has more than one sentence in it.</p>",
+            )
+        }
+        val images = if (withImages) {
+            (1..imageCount).map { index -> "OEBPS/images/plate$index.jpg" to incompressible(imageBytes, index) }
+        } else {
+            emptyList()
+        }
+        val manifest = chapters.mapIndexed { index, (_, _) ->
+            """<item id="c$index" href="chapter${index + 1}.xhtml" media-type="application/xhtml+xml"/>"""
+        } + images.mapIndexed { index, (_, _) ->
+            """<item id="p$index" href="images/plate${index + 1}.jpg" media-type="image/jpeg"/>"""
+        }
+        val opf = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="pub-id">urn:uuid:illustrated</dc:identifier>
+    <dc:title>Plates and Pages</dc:title>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    ${manifest.joinToString("\n    ")}
+  </manifest>
+  <spine>${chapters.indices.joinToString("") { """<itemref idref="c$it"/>""" }}</spine>
+</package>"""
+
+        // Images first, so a forward pass has to read past every one of them
+        // before it reaches a single chapter — the shape that makes the two
+        // strategies measurably different.
+        return EpubFixtures.buildArchiveWithSpans(
+            listOf("META-INF/container.xml" to CONTAINER.utf8(), "OEBPS/content.opf" to opf.utf8()) +
+                images +
+                chapters,
+        )
+    }
+
+    /** Bytes a deflater cannot shrink, so a fixture's declared size is its real size. */
+    private fun incompressible(size: Int, seed: Int): ByteArray {
+        val random = java.util.Random(seed.toLong())
+        return ByteArray(size).also { random.nextBytes(it) }
+    }
 
     private fun minimalOpf(identifier: String, hrefs: List<String>): String {
         val items = hrefs.mapIndexed { index, href ->

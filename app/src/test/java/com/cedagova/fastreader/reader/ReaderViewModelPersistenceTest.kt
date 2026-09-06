@@ -3,9 +3,7 @@ package com.cedagova.fastreader.reader
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.TokenPosition
-import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.reader.ui.ReaderUiState
-import java.io.ByteArrayInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -175,10 +173,13 @@ class ReaderViewModelPersistenceTest {
         val leftAt = positions.recorded.last().position.tokenIndex
         assertTrue(leftAt > 0)
 
-        reader.open("second")
+        reader.openLibraryBook(ReaderFixtures.SECOND_BOOK_ID)
         advanceUntilIdle()
 
-        assertEquals(leftAt, positions.recordedFor("first").last().position.tokenIndex)
+        assertEquals(
+            leftAt,
+            positions.recordedFor(ReaderFixtures.ENGLISH_NOVEL_ID).last().position.tokenIndex,
+        )
     }
 
     private fun TestScope.openedReader(): ReaderViewModel {
@@ -188,7 +189,7 @@ class ReaderViewModelPersistenceTest {
             pipeline = EpubContentPipeline(Dispatchers.Unconfined),
             indexDispatcher = Dispatchers.Unconfined,
         )
-        reader.open("first")
+        reader.openLibraryBook(ReaderFixtures.ENGLISH_NOVEL_ID)
         advanceUntilIdle()
         return reader
     }
@@ -196,9 +197,11 @@ class ReaderViewModelPersistenceTest {
     private object FixtureBooks : ReaderBooks {
         private val bytes by lazy { ContentFixtures.englishNovel() }
 
-        override fun title(bookId: String) = "The Long Signal"
-
-        override fun bytes(bookId: String) = EpubByteSource { ByteArrayInputStream(bytes) }
+        override fun libraryBook(bookId: String) = BookOpenRequest.library(
+            bookId = bookId,
+            title = "The Long Signal",
+            bytes = ContentFixtures.source(bytes),
+        )
     }
 
     private class RecordingPositions : ReaderPositions {
