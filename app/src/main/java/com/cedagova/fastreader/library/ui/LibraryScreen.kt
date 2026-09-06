@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -113,11 +115,11 @@ fun LibraryScreen(
                 },
             )
         },
+        bottomBar = { state.undoNotice?.let { UndoBar(it, onUndoRemove) } },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             state.failureMessage?.let { FailureBanner(it) }
             state.resumeNotice?.let { ResumeNoticeBanner(it, onDismissResumeNotice) }
-            state.undoNotice?.let { UndoBanner(it, onUndoRemove) }
             state.scan?.let { ScanBanner(it) }
             when (state.content) {
                 LibraryContent.EMPTY_LIBRARY -> EmptyLibrary(
@@ -202,31 +204,29 @@ private fun ResumeNoticeBanner(notice: ResumeNotice, onDismiss: () -> Unit) {
 /**
  * The removal the reader can still take back (REQ-105).
  *
- * A banner rather than a snackbar, for the same reason every other library state
- * is one: it is reachable from a [LibraryUiState] value, so the goldens can
- * prove the copy and the control instead of a timing-dependent overlay. It says
+ * Anchored to the bottom of the screen rather than stacked with the banners at
+ * the top: a book removed from the end of a long list would put a top banner
+ * off-screen, and an offer that expires in eight seconds is worth nothing if the
+ * reader has to scroll to find it.
+ *
+ * It is a plain [Snackbar] driven by [LibraryUiState] rather than a
+ * `SnackbarHostState`, so it stays as testable as every other library state:
+ * the goldens prove the copy and the control instead of a timing-dependent
+ * overlay, and the window itself is the repository's to keep. The sentence says
  * what happened to the *file* as well as to the row, because "removed" is
  * exactly the word a reader would fear meant deleted.
  */
 @Composable
-private fun UndoBanner(notice: UndoNotice, onUndo: () -> Unit) {
+private fun UndoBar(notice: UndoNotice, onUndo: () -> Unit) {
     val undoLabel = stringResource(R.string.library_undo_label, notice.title)
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.fillMaxWidth().testTag("library_undo"),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.library_undo_removed, notice.title),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
+    Snackbar(
+        modifier = Modifier.padding(12.dp).testTag("library_undo"),
+        action = {
             TextButton(
                 onClick = onUndo,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.inversePrimary,
+                ),
                 modifier = Modifier
                     .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
                     .testTag("library_undo_action")
@@ -234,7 +234,9 @@ private fun UndoBanner(notice: UndoNotice, onUndo: () -> Unit) {
             ) {
                 Text(stringResource(R.string.library_undo))
             }
-        }
+        },
+    ) {
+        Text(stringResource(R.string.library_undo_removed, notice.title))
     }
 }
 
