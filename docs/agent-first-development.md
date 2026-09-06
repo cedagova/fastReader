@@ -40,7 +40,16 @@ Rules that make the loops work:
   web, etc.) gives the agent eyes at unit-test speed. Wire it before writing
   the first screen.
 - **Committed golden images are the UI regression gate.** Record on change,
-  verify on every run; a diff is a finding, not noise.
+  verify on every run; a diff is a finding, not noise. Goldens must be
+  reproducible on the machine that verifies them; when the recording machine
+  and the gate disagree, make the gate's platform authoritative (or pin a
+  matching image) — never widen the comparison tolerance to make a diff go
+  away.
+- **Goldens must be a declared input of the verify task.** Otherwise the build
+  tool sees an unchanged source tree, skips the task as up to date, and reports
+  a green gate over a reference image that changed.
+- **The hosted gate runs the same loops, not a subset.** Loops 1–3 run on every
+  push and pull request, and any failure is red.
 - **Loop 4 must capture, not assume.** Launch headless, screenshot the actual
   screen, read the actual crash log. The agent inspects the artifact — never
   reports "it should work now."
@@ -100,4 +109,32 @@ Rules that make the loops work:
 | Rendered UI | Roborazzi: `./gradlew recordRoborazziDebug` → PNGs + goldens in `app/screenshots/`; `verifyRoborazziDebug` is the regression gate |
 | Real runtime | AVD matrix (`Phone_Low_API33` … `Tablet_Mid_API36`): `emulator -avd <name> -no-window` → poll `sys.boot_completed` → `./gradlew installDebug` → `adb shell am start` → `adb exec-out screencap -p` → `adb logcat -d -s AndroidRuntime:E` → `adb emu kill` |
 | Flows | `adb shell input tap/swipe/text` today; Maestro when flows warrant it |
+| Hosted gate | `.github/workflows/checks.yml` on GitHub Actions (`ubuntu-latest`, free tier): `testDebugUnitTest`, `verifyRoborazziDebug`, `lint` on every push and pull request |
 | Machine-local config | `local.properties` (`sdk.dir=$HOME/Library/Android/sdk`); `JAVA_HOME` must be JDK 21 — Gradle 8.x cannot run on Android Studio's bundled Java 25 |
+
+### Goldens and the hosted gate
+
+Roborazzi renders through Robolectric's native graphics, and the goldens in
+`app/screenshots/` are **byte-reproducible on both the macOS arm64 development
+machine and the `ubuntu-latest` runner**. That was measured, not assumed: the
+macOS-recorded goldens verified green unmodified on the runner, and inverting
+0.07% of the pixels of one golden turned the same job red. So:
+
+- **Record goldens anywhere** (`./gradlew recordRoborazziDebug`) and commit
+  them; the hosted job verifies the same bytes.
+- **If that ever stops holding** — a Robolectric, Roborazzi, AGP or runner
+  image bump makes the runner render differently — the runner becomes the
+  golden-recording platform (record on it and commit its output, or pin a
+  runner image that matches). Re-measure and update this section. Do **not**
+  raise the comparison tolerance or mark the golden job optional.
+- `app/screenshots/` is declared as an input of the unit-test task in
+  `app/build.gradle.kts`. Without it, editing a golden left the task up to date
+  and `verifyRoborazziDebug` passed over a changed reference image.
+
+The hosted job runs each check even when an earlier one failed, so one red run
+shows every problem. It carries no secrets and no signing material — release
+signing and publication stay local in `scripts/release.sh` (see
+[release.md](release.md)). Requiring the check before merge is a repository
+setting, not part of the workflow: **Settings → Branches → add a branch
+protection rule for `main` → Require status checks to pass → select
+`unit tests, goldens, lint`.**
