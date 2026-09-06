@@ -30,7 +30,9 @@ import java.util.zip.Inflater
  *   truncated one);
  * - ZIP64, signalled either by the record's sentinel values or by an entry whose
  *   sizes or offset are `0xFFFFFFFF`;
- * - a multi-disk (spanned) archive.
+ * - a multi-disk (spanned) archive;
+ * - more entries than [ZipReader.MAX_ENTRIES], which is where the streaming
+ *   reader gives up, so the two agree on what is too big.
  *
  * Refusing is never a failure: it hands the archive to the streaming reader,
  * which reaches the same answer by reading more.
@@ -91,11 +93,15 @@ internal class ZipDirectory private constructor(
             header.short(28)
 
         val compressed = readAt(dataOffset, entry.compressedSize.toInt()) ?: return null
-        return when (entry.method) {
+        val bytes = when (entry.method) {
             METHOD_STORED -> compressed.takeIf { it.size <= maxBytes }
             METHOD_DEFLATED -> inflate(compressed, maxBytes)
             else -> null
-        }
+        } ?: return null
+        // Short of what the directory promised means the entry is damaged. Return
+        // null rather than the prefix: half a chapter of XHTML is worse than a
+        // recorded gap, and it is what the streaming reader would report too.
+        return bytes.takeIf { it.size.toLong() == entry.uncompressedSize }
     }
 
     private fun inflate(compressed: ByteArray, maxBytes: Long): ByteArray? {
@@ -180,6 +186,12 @@ internal class ZipDirectory private constructor(
             val directory = read(channel, directoryOffset, directorySize.toInt()) ?: return null
             val names = ArrayList<String>(entryCount)
             val entries = LinkedHashMap<String, Entry>(entryCount)
+
+            // The streaming reader refuses an archive with more entries than this,
+            // so the directory reader must too: an archive that one accepts and the
+            // other rejects would open or fail depending on whether its source
+            // happened to be seekable.
+            if (entryCount > ZipReader.MAX_ENTRIES) return null
 
             var cursor = 0
             while (names.size < entryCount) {

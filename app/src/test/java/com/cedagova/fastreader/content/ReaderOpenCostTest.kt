@@ -132,6 +132,22 @@ class ReaderOpenCostTest {
         assertTrue(content.gaps.all { it.reason == GapReason.MISSING_FROM_ARCHIVE })
     }
 
+    @Test
+    fun `an entry shorter than the directory promises becomes a gap, not half a chapter`() = runTest {
+        // The directory is the only thing the seeking reader trusts, so an entry
+        // that does not deliver what the directory declares is damaged. Half a
+        // chapter of XHTML read as if it were whole would be a silent hole in the
+        // book; a recorded gap is what the streaming reader would produce.
+        val (bytes, _) = ContentFixtures.illustratedNovel(imageCount = 1, imageBytes = 1024)
+        val forged = withOverstatedSize(bytes, "OEBPS/chapter1.xhtml", extraBytes = 512)
+
+        val content = parsed(ContentFixtures.source(forged))
+
+        assertEquals(1, content.gaps.size)
+        assertEquals(0, content.gaps.single().chapterIndex)
+        assertEquals(listOf("Chapter 2", "Chapter 3"), content.chapters.drop(1).map { it.title })
+    }
+
     // --- Identity is an input, never derived (AD-8) ---
 
     @Test
@@ -179,6 +195,30 @@ class ReaderOpenCostTest {
 
     // --- helpers ---
 
+    /**
+     * Adds [extraBytes] to one entry's uncompressed-size field in the central
+     * directory, leaving its data alone — an archive whose table lies about how
+     * big an entry is.
+     */
+    private fun withOverstatedSize(bytes: ByteArray, entryName: String, extraBytes: Int): ByteArray {
+        val patched = bytes.copyOf()
+        val name = entryName.toByteArray(Charsets.UTF_8)
+        for (index in 0..(patched.size - CENTRAL_HEADER_BYTES - name.size)) {
+            val signature = patched[index] == 0x50.toByte() && patched[index + 1] == 0x4B.toByte() &&
+                patched[index + 2] == 0x01.toByte() && patched[index + 3] == 0x02.toByte()
+            if (!signature) continue
+            val nameStart = index + CENTRAL_HEADER_BYTES
+            if (!patched.copyOfRange(nameStart, nameStart + name.size).contentEquals(name)) continue
+            val field = index + UNCOMPRESSED_SIZE_OFFSET
+            var declared = 0
+            for (byte in 0 until 4) declared = declared or ((patched[field + byte].toInt() and 0xFF) shl (8 * byte))
+            val overstated = declared + extraBytes
+            for (byte in 0 until 4) patched[field + byte] = (overstated shr (8 * byte)).toByte()
+            return patched
+        }
+        throw AssertionError("no central-directory record for $entryName")
+    }
+
     private fun bytesReadOpening(bytes: ByteArray): Long {
         val (source, readSoFar) = ContentFixtures.watchedSource(bytes)
         kotlinx.coroutines.runBlocking { pipeline.parse(source, identity) }
@@ -201,6 +241,9 @@ class ReaderOpenCostTest {
         tokens.filterIsInstance<WordToken>().map { it.text }
 
     private companion object {
+        const val CENTRAL_HEADER_BYTES = 46
+        const val UNCOMPRESSED_SIZE_OFFSET = 24
+
         const val CONTAINER = """<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
