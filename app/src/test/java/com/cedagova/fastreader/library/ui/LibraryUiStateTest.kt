@@ -398,7 +398,7 @@ class LibraryUiStateTest {
         assertEquals("Novels", folder.displayName)
         assertEquals(3, folder.bookCount)
         assertEquals(2, folder.removedBookCount)
-        assertTrue(folder.isAvailable)
+        assertEquals(FolderStatus.AVAILABLE, folder.status)
     }
 
     /** A folder whose books all live somewhere else too costs nothing to remove. */

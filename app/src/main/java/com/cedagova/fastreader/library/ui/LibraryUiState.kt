@@ -139,9 +139,7 @@ data class LibraryFolderItem(
     val status: FolderStatus,
     val bookCount: Int,
     val removedBookCount: Int,
-) {
-    val isAvailable: Boolean get() = status == FolderStatus.AVAILABLE
-}
+)
 
 /** Builds the screen state. Pure: same inputs always give the same screen. */
 fun buildLibraryUiState(

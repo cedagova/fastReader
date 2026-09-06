@@ -96,7 +96,7 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit = {},
     /** Opens the added-folder list (REQ-104). */
     onOpenFolders: () -> Unit = {},
-    /** Takes back the removal the undo banner is offering (REQ-105). */
+    /** Takes back the removal the undo snackbar is offering (REQ-105). */
     onUndoRemove: () -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
@@ -247,13 +247,13 @@ private fun UndoBar(notice: UndoNotice, onUndo: () -> Unit) {
  * "Add folder" is already on the screen right above it.
  */
 @Composable
-private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit) {
+private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit, horizontalPadding: Dp = 16.dp) {
     if (count == 0) return
     TextButton(
         onClick = onOpenFolders,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = horizontalPadding)
             .defaultMinSize(minHeight = TouchTarget)
             .testTag("library_open_folders"),
     ) {
@@ -347,17 +347,7 @@ private fun EmptyLibrary(
         AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder, horizontalPadding = 0.dp)
         // An added folder with nothing readable in it still has to be reachable,
         // or the only way to take it back out would be to add a book first.
-        if (folderCount > 0) {
-            TextButton(
-                onClick = onOpenFolders,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = TouchTarget)
-                    .testTag("library_open_folders"),
-            ) {
-                Text(pluralStringResource(R.plurals.library_folders_open_count, folderCount, folderCount))
-            }
-        }
+        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders, horizontalPadding = 0.dp)
         Text(
             text = stringResource(R.string.library_empty_in_place),
             style = MaterialTheme.typography.bodyMedium,
