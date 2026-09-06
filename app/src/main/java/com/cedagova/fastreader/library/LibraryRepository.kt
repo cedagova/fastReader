@@ -51,8 +51,7 @@ class LibraryRepository(
      * removal never nests inside a catalog write, which would deadlock.
      */
     private val undoMutex = Mutex()
-    private var pendingRemoval: Book? = null
-    private var undoTimer: Job? = null
+    private var pendingRemoval: PendingRemoval? = null
     private val _undoableRemoval = MutableStateFlow<RemovedBook?>(null)
 
     /**
@@ -212,10 +211,9 @@ class LibraryRepository(
      * progress (REQ-105). Does nothing once the window has closed.
      */
     suspend fun undoRemoveBook() {
-        val timer = undoTimer
-        val book = claimPendingRemoval(null) ?: return
-        timer?.cancel()
-        mutateCatalog { ingestor.restoreBook(it, book) }
+        val pending = claimPendingRemoval(null) ?: return
+        pending.timer.cancel()
+        mutateCatalog { ingestor.restoreBook(it, pending.book) }
     }
 
     /**
@@ -312,35 +310,33 @@ class LibraryRepository(
     private suspend fun offerUndo(book: Book) {
         val superseded = undoMutex.withLock {
             val previous = pendingRemoval
-            val previousTimer = undoTimer
-            pendingRemoval = book
-            _undoableRemoval.value = RemovedBook(book.id, book.title)
-            undoTimer = scope.launch {
+            val timer = scope.launch {
                 delay(undoWindowMs)
-                finaliseRemoval(book.id)
+                // This coroutine *is* the timer, so it claims but never cancels.
+                claimPendingRemoval(book.id)?.let { releaseGrantsNoLongerNeeded(it.book) }
             }
-            previousTimer?.cancel()
+            pendingRemoval = PendingRemoval(book, timer)
+            _undoableRemoval.value = RemovedBook(book.id, book.title)
+            previous?.timer?.cancel()
             previous
         }
-        superseded?.let { releaseGrantsNoLongerNeeded(it) }
-    }
-
-    /** The undo window closed: the removal stands and its grants can go back. */
-    private suspend fun finaliseRemoval(bookId: String) {
-        val book = claimPendingRemoval(bookId) ?: return
-        releaseGrantsNoLongerNeeded(book)
+        superseded?.let { releaseGrantsNoLongerNeeded(it.book) }
     }
 
     /**
      * Takes the pending removal, if it is still there and is the expected one.
-     * Whoever claims it owns finishing it, so the timer and undo cannot both act.
+     * Whoever claims it owns finishing it, so the timer and undo cannot both
+     * act, and the claim carries its own timer so no caller has to guess which
+     * job it is cancelling.
      */
-    private suspend fun claimPendingRemoval(expectedBookId: String?): Book? = undoMutex.withLock {
-        val book = pendingRemoval
-        if (book == null || (expectedBookId != null && book.id != expectedBookId)) return@withLock null
+    private suspend fun claimPendingRemoval(expectedBookId: String?): PendingRemoval? = undoMutex.withLock {
+        val pending = pendingRemoval
+        if (pending == null || (expectedBookId != null && pending.book.id != expectedBookId)) {
+            return@withLock null
+        }
         pendingRemoval = null
         _undoableRemoval.value = null
-        book
+        pending
     }
 
     /**
@@ -457,6 +453,9 @@ class LibraryRepository(
 
 /** A book whose removal can still be taken back, named so the library can say which. */
 data class RemovedBook(val bookId: String, val title: String)
+
+/** The removed entry and the job that will make its removal final. */
+private class PendingRemoval(val book: Book, val timer: Job)
 
 private fun DocumentLookup.availability(): SourceAvailability = when (this) {
     is DocumentLookup.Found -> SourceAvailability.AVAILABLE
