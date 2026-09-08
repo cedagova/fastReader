@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   The API 26-30 half of AD-11.
+
   `android:allowBackup="false"` already stops every form of backup on those
   levels, so nothing here changes behaviour today. It exists so the exclusion is
   stated in both of the platform's vocabularies rather than resting on one
@@ -8,9 +9,20 @@
   an edit that looks harmless, this file still keeps the app's data out of a
   pre-Android-12 backup. `res/xml/data_extraction_rules.xml` is the same
   statement for API 31+, where the attribute genuinely is not enough.
-  Excluding `root` with path "." covers the whole internal data directory.
+
+  As there, every domain is listed: they are siblings, not a hierarchy, so
+  excluding `root` on its own would leave `files/`, `databases/` and
+  `shared_prefs/` in the backup. This schema requires a `path`; "." is the whole
+  domain.
 -->
 <full-backup-content>
     <exclude domain="root" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="." />
     <exclude domain="external" path="." />
+    <exclude domain="device_root" path="." />
+    <exclude domain="device_file" path="." />
+    <exclude domain="device_database" path="." />
+    <exclude domain="device_sharedpref" path="." />
 </full-backup-content>

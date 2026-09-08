@@ -104,11 +104,27 @@ class AppVersionTest {
         listOf("cloud-backup", "device-transfer").forEach { section ->
             assertTrue("$section is missing", rules.contains("<$section>"))
         }
-        listOf("root", "device_root", "external").forEach { domain ->
+        // Every domain, in both sections. The domains are siblings rather than a
+        // hierarchy: a build excluding only `root` still handed files/ and
+        // shared_prefs/ to the backup transport on the emulator, so a shortened
+        // list here is a silent regression rather than a tidier file.
+        val domains = listOf(
+            "root", "file", "database", "sharedpref", "external",
+            "device_root", "device_file", "device_database", "device_sharedpref",
+        )
+        domains.forEach { domain ->
             assertEquals(
-                "the $domain domain should be excluded from both sections",
+                "the $domain domain should be excluded from both extraction sections",
                 2,
                 Regex("""<exclude domain="$domain"\s*/>""").findAll(rules).count(),
+            )
+        }
+        val legacyRules = repositoryFile("app/src/main/res/xml/backup_rules.xml").readText()
+        assertFalse("something has been opted back in", legacyRules.contains("<include"))
+        domains.forEach { domain ->
+            assertTrue(
+                "the $domain domain should be excluded from the API 26-30 rules",
+                legacyRules.contains("""<exclude domain="$domain" path="." />"""),
             )
         }
     }
