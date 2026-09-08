@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -492,19 +493,27 @@ private fun Modifier.speedGesture(onSpeedStep: (Int) -> Unit): Modifier {
     val slower = stringResource(R.string.reader_speed_slower)
     val stepPixels = with(LocalDensity.current) { SpeedStepDistance.toPx() }
     val drag = remember(stepPixels) { SpeedDrag(stepPixels) }
+    // The callback is read through a state holder rather than being a key of the
+    // block below. This screen recomposes on every streamed word — sixteen times a
+    // second at the 1000 WPM ceiling — and `pointerInput` restarts its block, and
+    // so cancels a gesture in progress, whenever a key changes by identity. Today
+    // the caller's lambda happens to be memoized and the drag survives; a single
+    // unstable capture added to it later would silently break dragging at speed
+    // and nowhere else. This makes that impossible rather than lucky.
+    val step by rememberUpdatedState(onSpeedStep)
     return this
         .semantics {
             customActions = listOf(
-                CustomAccessibilityAction(faster) { onSpeedStep(1); true },
-                CustomAccessibilityAction(slower) { onSpeedStep(-1); true },
+                CustomAccessibilityAction(faster) { step(1); true },
+                CustomAccessibilityAction(slower) { step(-1); true },
             )
         }
-        .pointerInput(drag, onSpeedStep) {
+        .pointerInput(drag) {
             detectVerticalDragGestures(
                 onDragStart = { drag.begin() },
                 onVerticalDrag = { _, deltaY ->
                     val steps = drag.drag(deltaY)
-                    if (steps != 0) onSpeedStep(steps)
+                    if (steps != 0) step(steps)
                 },
             )
         }
