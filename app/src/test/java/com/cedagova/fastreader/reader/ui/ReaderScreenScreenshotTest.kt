@@ -285,6 +285,25 @@ class ReaderScreenScreenshotTest {
         )
     }
 
+    /**
+     * REQ-301's font-scale clause for the new copy, at its worst case: the longest
+     * of the two lines, on the 720p phone (`Phone_Low_API33`), at a 2.0 system
+     * font scale. The notice is the only new thing on the page that has text to
+     * lose, and this is where it would lose it.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theGestureHintSurvivesACrampedScreenAtTwiceTheFontScale() {
+        capture(
+            "reader_focused_speed_hint_compact_large_font",
+            playingAt(12),
+            fontScale = 2f,
+            cues = CueSettings.DEFAULTS,
+            focused = true,
+            speedNotice = "Drag up or down to change speed",
+        )
+    }
+
     private fun playingAt(index: Int) = view.present(ReaderSession(book).jumpTo(index).play())
 
     private fun pausedAt(index: Int) = view.present(ReaderSession(book).jumpTo(index))
