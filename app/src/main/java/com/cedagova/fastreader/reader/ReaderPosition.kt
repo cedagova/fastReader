@@ -32,7 +32,24 @@ data class ReaderPosition(
      *    new stream: approximate, but a paragraph or two out beats resuming
      *    somewhere arbitrary, and it never silently reports a wrong exact word.
      * 3. A different book's digest (AD-2) — the position does not belong to this
-     *    content at all and is ignored outright.
+     *    content at all and is ignored outright. This catches a position handed
+     *    to the wrong book, which is a caller mistake.
+     *
+     * ## What case 3 stopped catching in v1.1.0
+     *
+     * Until v1.1.0 the reader hashed the file it was reading, so this comparison
+     * put *what was stored* against *what was just read off disk* and a file
+     * replaced in place at the same URI failed it. Identity is now an input
+     * (AD-8): for a library book both sides are the catalog id, so the
+     * comparison cannot fail and this is no longer a content-change guard.
+     *
+     * A file swapped under an unchanged catalog entry is now caught by the
+     * rescan fingerprint (size and last-modified on [com.cedagova.fastreader
+     * .library.BookSource]) re-keying the book, not here — so between the swap
+     * and the next rescan the reader will resume at the stored index in the new
+     * text. Restoring a real guard needs a second stored signal, which is a
+     * catalog schema change and deliberately not part of the leaf that made this
+     * one stop firing.
      */
     fun resolveIndex(content: BookContent): Int {
         if (content.isEmpty) return 0

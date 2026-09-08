@@ -1,9 +1,11 @@
 package com.cedagova.fastreader.content
 
+import com.cedagova.fastreader.epub.ArchiveOpen
+import com.cedagova.fastreader.epub.EpubArchive
+import com.cedagova.fastreader.epub.EpubArchives
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.epub.EpubPaths
 import com.cedagova.fastreader.epub.OpfDocument
-import com.cedagova.fastreader.epub.ZipReader
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -27,20 +29,63 @@ import kotlinx.coroutines.withContext
  *
  * Parsing runs on [dispatcher] and reports [ContentProgress] per spine item, which
  * is what lets LEAF203 open a large book without blocking the main thread.
+ *
+ * ## Cost of an open (REQ-110, AD-8)
+ *
+ * Two things used to make opening cost the *file* rather than the *book*, and
+ * both are gone:
+ *
+ * 1. The first pass hashed every byte, because the pipeline derived the book's
+ *    identity itself. It no longer derives it — [parse] takes the identity as an
+ *    argument and stamps it onto the result unchanged.
+ * 2. Both passes streamed the archive forward, so reaching a chapter meant
+ *    reading past every picture before it. Entries now come from
+ *    [EpubArchive], which seeks straight to them through the zip central
+ *    directory whenever the source can seek.
+ *
+ * A source that cannot seek still works: it falls back to the forward pass and
+ * costs what it always did. See [EpubByteSource.openChannel].
  */
 class EpubContentPipeline(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
 
+    /**
+     * Reads [source] into a token stream, identified by [identity].
+     *
+     * [identity] is an input, never derived here (AD-8): it becomes
+     * [BookContent.bookDigest] verbatim, which is what stored positions are
+     * matched against. A null identity — an external book whose digest is still
+     * being computed off the open path (#44) — yields an empty digest, so no
+     * stored position resolves onto this parse and the reader starts at the
+     * beginning rather than somewhere arbitrary.
+     */
     suspend fun parse(
         source: EpubByteSource,
+        identity: BookIdentity? = null,
         onProgress: (ContentProgress) -> Unit = {},
     ): BookContentResult = withContext(dispatcher) {
-        val opened = when (val result = openPackage(source)) {
-            is PackageResult.Failed -> return@withContext BookContentResult.Failed(result.reason, result.detail)
-            is PackageResult.Opened -> result
+        val archive = when (val opened = EpubArchives.open(source)) {
+            is ArchiveOpen.Unopenable ->
+                return@withContext BookContentResult.Failed(ContentFailureReason.UNREADABLE_SOURCE, opened.detail)
+
+            is ArchiveOpen.Opened -> opened.archive
         }
-        val opf = opened.opf
+
+        archive.use {
+            parse(archive, identity, onProgress)
+        }
+    }
+
+    private suspend fun parse(
+        archive: EpubArchive,
+        identity: BookIdentity?,
+        onProgress: (ContentProgress) -> Unit,
+    ): BookContentResult {
+        val opf = when (val result = openPackage(archive)) {
+            is PackageResult.Failed -> return BookContentResult.Failed(result.reason, result.detail)
+            is PackageResult.Opened -> result.opf
+        }
 
         val wanted = LinkedHashSet<String>()
         opf.spineItems.forEach { item ->
@@ -50,18 +95,13 @@ class EpubContentPipeline(
         opf.navPath?.let { wanted += it }
         opf.ncxPath?.let { wanted += it }
 
-        val scan = ZipReader.scan(
-            source = source,
-            collect = { it in wanted },
-            maxEntryBytes = MAX_CONTENT_BYTES,
-            computeDigest = false,
-        )
-        scan.openFailure?.let {
-            return@withContext BookContentResult.Failed(ContentFailureReason.UNREADABLE_SOURCE, it)
+        val read = archive.read(select = { it in wanted }, maxBytes = MAX_CONTENT_BYTES)
+        read.unreadable?.let {
+            return BookContentResult.Failed(ContentFailureReason.UNREADABLE_SOURCE, it)
         }
         // Entries already read stay usable: a zip that fails partway through still
         // hands back the chapters it managed to deliver.
-        val entries = HashMap(scan.collected)
+        val entries = HashMap(read.entries)
 
         val titles = readTitles(opf, entries)
         val spineItems = opf.spineItems
@@ -83,8 +123,8 @@ class EpubContentPipeline(
                     gaps += ContentGap(
                         spinePath = item.path,
                         chapterIndex = chapterIndex,
-                        reason = if (scan.zipFailure != null) GapReason.UNREADABLE else GapReason.MISSING_FROM_ARCHIVE,
-                        detail = scan.zipFailure ?: "the file does not contain ${item.path}",
+                        reason = if (read.damage != null) GapReason.UNREADABLE else GapReason.MISSING_FROM_ARCHIVE,
+                        detail = read.damage ?: "the file does not contain ${item.path}",
                     )
                     tokens += missingContentMarker(chapterIndex, state)
                 }
@@ -118,15 +158,15 @@ class EpubContentPipeline(
         }
 
         if (tokens.none { it is WordToken }) {
-            return@withContext BookContentResult.Failed(
+            return BookContentResult.Failed(
                 ContentFailureReason.NO_READABLE_CONTENT,
                 "the book's chapters contain no readable text",
             )
         }
 
-        BookContentResult.Parsed(
+        return BookContentResult.Parsed(
             BookContent(
-                bookDigest = opened.digest,
+                bookDigest = identity?.value.orEmpty(),
                 language = opf.metadata.language,
                 tokens = classify(tokens),
                 chapters = chapters,
@@ -138,35 +178,36 @@ class EpubContentPipeline(
     /**
      * Reads container and package document.
      *
-     * Kept to its own small zip pass so the second pass can ask for exactly the
-     * spine entries; collecting every XHTML file speculatively would hold a whole
-     * book of markup in memory beside the tokens built from it.
+     * Kept to its own read so the second one can ask for exactly the spine
+     * entries; collecting every XHTML file speculatively would hold a whole book
+     * of markup in memory beside the tokens built from it. Under the directory
+     * strategy that is two seeks; under the streaming fallback it is the same two
+     * passes the pipeline always made.
      */
-    private fun openPackage(source: EpubByteSource): PackageResult {
-        val scan = ZipReader.scan(
-            source = source,
-            collect = { name -> name == CONTAINER_PATH || name.endsWith(".opf", ignoreCase = true) },
-            maxEntryBytes = MAX_XML_BYTES,
+    private fun openPackage(archive: EpubArchive): PackageResult {
+        val read = archive.read(
+            select = { name -> name == CONTAINER_PATH || name.endsWith(".opf", ignoreCase = true) },
+            maxBytes = MAX_XML_BYTES,
         )
-        scan.openFailure?.let { return PackageResult.Failed(ContentFailureReason.UNREADABLE_SOURCE, it) }
-        val digest = scan.digest
-            ?: return PackageResult.Failed(ContentFailureReason.UNREADABLE_SOURCE, "the file could not be read")
-        scan.zipFailure?.let {
+        read.unreadable?.let { return PackageResult.Failed(ContentFailureReason.UNREADABLE_SOURCE, it) }
+        read.damage?.let {
             return PackageResult.Failed(ContentFailureReason.CORRUPT_ARCHIVE, "damaged archive: $it")
         }
-        if (scan.entryNames.isEmpty()) {
+        if (read.entryNames.isEmpty()) {
             return PackageResult.Failed(ContentFailureReason.CORRUPT_ARCHIVE, "the file is not a zip archive")
         }
 
-        val container = scan.collected[CONTAINER_PATH]
+        val container = read.entries[CONTAINER_PATH]
             ?: return PackageResult.Failed(ContentFailureReason.INVALID_STRUCTURE, "missing $CONTAINER_PATH")
         val opfPath = rootfilePath(container)
             ?: return PackageResult.Failed(
                 ContentFailureReason.INVALID_STRUCTURE,
                 "no package document declared in $CONTAINER_PATH",
             )
-        val opfBytes = scan.collected[opfPath]
-            ?: ZipReader.readEntry(source, opfPath, MAX_XML_BYTES)
+        // A package document whose name does not end in `.opf` is legal, so the
+        // selective read above can miss it; ask for it by name once it is known.
+        val opfBytes = read.entries[opfPath]
+            ?: archive.read(select = { it == opfPath }, maxBytes = MAX_XML_BYTES).entries[opfPath]
             ?: return PackageResult.Failed(
                 ContentFailureReason.INVALID_STRUCTURE,
                 "package document $opfPath is missing",
@@ -182,11 +223,11 @@ class EpubContentPipeline(
                 "the book declares no readable content",
             )
         }
-        return PackageResult.Opened("sha256:$digest", opf)
+        return PackageResult.Opened(opf)
     }
 
     private sealed interface PackageResult {
-        data class Opened(val digest: String, val opf: OpfDocument) : PackageResult
+        data class Opened(val opf: OpfDocument) : PackageResult
 
         data class Failed(val reason: ContentFailureReason, val detail: String) : PackageResult
     }

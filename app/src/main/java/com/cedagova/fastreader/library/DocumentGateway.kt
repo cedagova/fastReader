@@ -46,6 +46,15 @@ interface DocumentGateway {
     /** Gives back a grant the catalog no longer needs. */
     fun releaseReadPermission(uri: String, isTree: Boolean)
 
+    /**
+     * Every URI the app currently holds a long-lived read grant for.
+     *
+     * The platform's list is the only record of what was taken that outlives the
+     * process, so it is what lets the catalog reconcile grants it stopped using
+     * without ever getting the chance to give them back.
+     */
+    fun persistedReadPermissions(): List<String>
+
     fun lookup(uri: String): DocumentLookup
 
     /** The platform's name for a document or folder, when it has one. */
@@ -57,4 +66,16 @@ interface DocumentGateway {
     /** Opens the document for reading. Callers close the stream. */
     @Throws(java.io.IOException::class)
     fun open(uri: String): InputStream
+
+    /**
+     * A random-access view of the document, or null when this provider cannot
+     * offer one.
+     *
+     * The reader wants it: with a position it can seek to the handful of zip
+     * entries a book's text lives in and never touch its pictures (REQ-110).
+     * Providers that serve a document through a pipe have no position to give,
+     * so null is an ordinary answer and the reader falls back to one forward
+     * pass. Callers close the channel.
+     */
+    fun openSeekable(uri: String): java.nio.channels.SeekableByteChannel? = null
 }

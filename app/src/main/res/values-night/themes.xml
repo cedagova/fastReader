@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    "System" resolved by the platform (AD-10).
+
+    Only the day/night theme is overridden here. `Theme.FastReader.Light` and
+    `Theme.FastReader.Dark` are deliberately absent: they mean "the reader chose
+    this", so the device's night setting must not touch them.
+
+    This file is also what makes the *system splash* correct without any app code
+    running, because the system resolves the manifest theme against the
+    configuration before the process starts.
+-->
+<resources>
+
+    <style name="Theme.FastReader" parent="Base.Theme.FastReader.Dark" />
+
+</resources>

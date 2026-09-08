@@ -22,12 +22,27 @@ import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
 import com.cedagova.fastreader.library.ui.LibraryRoute
 import com.cedagova.fastreader.reader.ui.ReaderRoute
+import com.cedagova.fastreader.settings.SharedPreferencesThemeMirror
 import com.cedagova.fastreader.settings.ui.SettingsRoute
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import com.cedagova.fastreader.ui.theme.isDark
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // AD-10, and the only three lines in the app whose *position* is the
+        // behaviour. `super.onCreate` is where the window is created and its
+        // background is read, so a theme applied after it arrives one frame too
+        // late — which is the white flash REQ-102 forbids. The catalog is JSON on
+        // a background dispatcher and cannot answer this early; the mirror can.
+        val themeMirror = SharedPreferencesThemeMirror(this)
+        val launchTheme = themeMirror.read()
+        setTheme(launchThemeFor(launchTheme))
+        // Idempotent, and normally free. It earns its place when the platform's
+        // app-level night override has drifted from the mirror — cleared app data,
+        // a restored device — where it costs this launch nothing and makes the
+        // *next* cold start's system splash right again.
+        themeMirror.write(launchTheme)
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val library = (application as FastReaderApplication).library

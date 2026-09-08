@@ -28,6 +28,7 @@ import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.reader.PlaybackScheduler
+import com.cedagova.fastreader.reader.BookOpenRequest
 import com.cedagova.fastreader.reader.ReaderBooks
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderPosition
@@ -72,7 +73,7 @@ fun ReaderRoute(
     )
     // Idempotent: after a rotation this finds the book already parsed and the
     // position intact, and switching books drops the previous one.
-    LaunchedEffect(reader, bookId) { reader.open(bookId) }
+    LaunchedEffect(reader, bookId) { reader.openLibraryBook(bookId) }
 
     // REQ-011 mid-book: this both changes the next word's duration and rebuilds
     // the time-remaining index, which is a function of pause strength.
@@ -177,14 +178,23 @@ private data class SpeedNotice(val text: String, val serial: Int)
  */
 private const val SPEED_NOTICE_MILLIS = 1_400L
 
-/** The catalog, as the reader needs it: a title now and the book's bytes when asked. */
+/**
+ * The catalog, as the reader needs it: one open request per book.
+ *
+ * The catalog id it hands over *is* the book's whole-file SHA-256 (AD-2), which
+ * is exactly why the reader never has to compute one (AD-8).
+ */
 private class CatalogBooks(private val repository: LibraryRepository) : ReaderBooks {
 
-    override fun title(bookId: String): String =
-        repository.catalog.value.book(bookId)?.title.orEmpty()
+    override fun libraryBook(bookId: String) = BookOpenRequest.library(
+        bookId = bookId,
+        title = repository.catalog.value.book(bookId)?.title.orEmpty(),
+        bytes = object : EpubByteSource {
+            override fun open() = repository.openBook(bookId)
 
-    override fun bytes(bookId: String): EpubByteSource =
-        EpubByteSource { repository.openBook(bookId) }
+            override fun openChannel() = repository.openBookChannel(bookId)
+        },
+    )
 }
 
 /**

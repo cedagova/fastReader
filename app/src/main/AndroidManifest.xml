@@ -3,11 +3,25 @@
 
     <application
         android:name=".FastReaderApplication"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.FastReader">
+        <!--
+            android:configChanges="uiMode" is load-bearing, not tidying. Changing
+            the theme in Settings pushes an app-level night override so the
+            *system splash* resolves the right way on the next cold start
+            (AD-10) — and that is a configuration change, which without this
+            attribute tears the activity down and rebuilds it in front of a
+            reader who only tapped a radio button. Compose picks the new
+            configuration up without recreation, and the window background the
+            attribute freezes is only ever seen at launch, where it has just been
+            set from the mirror.
+        -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="uiMode"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

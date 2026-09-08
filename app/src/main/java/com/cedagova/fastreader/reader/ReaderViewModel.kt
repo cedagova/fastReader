@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cedagova.fastreader.content.BookContentResult
 import com.cedagova.fastreader.content.EpubContentPipeline
-import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.reader.ui.ReaderBookView
 import com.cedagova.fastreader.reader.ui.ReaderUiState
 import com.cedagova.fastreader.timing.PauseStrength
@@ -22,11 +21,12 @@ import kotlinx.coroutines.withContext
 /** How the reader gets at a book, so the ViewModel does not need the catalog's whole API. */
 interface ReaderBooks {
 
-    /** The catalog's title for a book, available before it is parsed. */
-    fun title(bookId: String): String
-
-    /** The book's bytes, read in place (AD-1). */
-    fun bytes(bookId: String): EpubByteSource
+    /**
+     * The open request for a catalog book: its title, its bytes read in place
+     * (AD-1), and its catalog id as the identity the reader must not recompute
+     * (AD-8).
+     */
+    fun libraryBook(bookId: String): BookOpenRequest
 }
 
 /**
@@ -75,7 +75,7 @@ class ReaderViewModel(
     private val _state = MutableStateFlow<ReaderUiState>(ReaderUiState.Opening("", null))
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
-    private var openBookId: String? = null
+    private var openRequest: BookOpenRequest? = null
     private var parse: Job? = null
     private var view: ReaderBookView? = null
     private var session: ReaderSession? = null
@@ -104,28 +104,37 @@ class ReaderViewModel(
     /** How long the token on screen is shown, or null when nothing is streaming. */
     val currentDurationMillis: Long? get() = session?.takeIf { it.isPlaying }?.currentDurationMillis
 
+    /** Opens the catalog book [bookId], unless it is already open. */
+    fun openLibraryBook(bookId: String) = open(books.libraryBook(bookId))
+
     /**
-     * Opens [bookId], unless it is already open.
+     * Opens the book [request] describes, unless it is already open.
+     *
+     * The one entry to the reader (AD-9). Everything it needs is in the request —
+     * bytes, identity, origin — so nothing here hashes a file or consults the
+     * catalog, and a book handed over from outside the app (#44) or shipped in
+     * the APK (#48) arrives through exactly this call.
      *
      * Idempotent on purpose: the reader calls it on every composition, and after a
      * rotation that call must find the book already parsed and the position intact.
      */
-    fun open(bookId: String) {
-        if (bookId == openBookId) return
+    fun open(request: BookOpenRequest) {
+        if (request.openKey == openRequest?.openKey) return
         // The book being left has to become durable before its session is dropped.
-        if (openBookId != null) persist(flush = true)
-        openBookId = bookId
+        if (openRequest != null) persist(flush = true)
+        openRequest = request
         parse?.cancel()
         rebuild?.cancel()
         view = null
         session = null
-        val title = books.title(bookId)
+        val title = request.title
         _state.value = ReaderUiState.Opening(title, null)
-        parse = viewModelScope.launch { parse(bookId, title) }
+        parse = viewModelScope.launch { parse(request) }
     }
 
-    private suspend fun parse(bookId: String, title: String) {
-        val result = pipeline.parse(books.bytes(bookId)) { progress ->
+    private suspend fun parse(request: BookOpenRequest) {
+        val title = request.title
+        val result = pipeline.parse(request.bytes, request.identity) { progress ->
             _state.value = ReaderUiState.Opening(title, progress.fraction.takeIf { progress.totalItems > 0 })
         }
         when (result) {
@@ -143,7 +152,7 @@ class ReaderViewModel(
                 view = book
                 // Resuming lands paused, on the stored word, at the stored speed
                 // (REQ-010, REQ-016). A book never opens playing.
-                val stored = positions.restore(bookId)
+                val stored = request.positionKey?.let { positions.restore(it) }
                 session = ReaderSession(
                     content = content,
                     index = stored?.resolveIndex(content) ?: 0,
@@ -224,13 +233,13 @@ class ReaderViewModel(
         val content = session?.content ?: return
         val wanted = pauseStrength
         if (current.pauseStrength == wanted) return
-        val bookId = openBookId
+        val openKey = openRequest?.openKey
         rebuild?.cancel()
         rebuild = viewModelScope.launch {
             val rebuilt = withContext(indexDispatcher) {
                 ReaderBookView(current.bookTitle, content, wanted)
             }
-            if (openBookId != bookId || pauseStrength != wanted) return@launch
+            if (openRequest?.openKey != openKey || pauseStrength != wanted) return@launch
             view = rebuilt
             publish()
         }
@@ -259,10 +268,17 @@ class ReaderViewModel(
         persist(flush = flush || !next.isPlaying)
     }
 
+    /**
+     * Records the current position under the open book's identity.
+     *
+     * Silent no-op while that identity is unknown — an external book whose digest
+     * is still being computed (#44). There is nothing to key a position by yet,
+     * and inventing a key would strand it under something no later open matches.
+     */
     private fun persist(flush: Boolean) {
-        val bookId = openBookId ?: return
+        val positionKey = openRequest?.positionKey ?: return
         val current = session ?: return
-        positions.record(bookId, current.toPosition())
+        positions.record(positionKey, current.toPosition())
         if (flush) positions.flush()
     }
 

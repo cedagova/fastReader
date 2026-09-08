@@ -3,12 +3,10 @@ package com.cedagova.fastreader.reader
 import com.cedagova.fastreader.content.Boundary
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
-import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.reader.ui.ReaderUiState
 import com.cedagova.fastreader.timing.PauseStrength
 import com.cedagova.fastreader.timing.RsvpTimingEngine
 import com.cedagova.fastreader.timing.TimingSettings
-import java.io.ByteArrayInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -144,7 +142,7 @@ class ReaderPauseStrengthTest {
             indexDispatcher = Dispatchers.Unconfined,
         )
         reader.setPauseStrength(PauseStrength.OFF)
-        reader.open("first")
+        reader.openLibraryBook(ReaderFixtures.ENGLISH_NOVEL_ID)
         advanceUntilIdle()
 
         val off = (reader.state.value as ReaderUiState.Reading).remainingMillis
@@ -159,7 +157,7 @@ class ReaderPauseStrengthTest {
             pipeline = EpubContentPipeline(Dispatchers.Unconfined),
             indexDispatcher = Dispatchers.Unconfined,
         )
-        reader.open("first")
+        reader.openLibraryBook(ReaderFixtures.ENGLISH_NOVEL_ID)
         advanceUntilIdle()
         return reader
     }
@@ -167,9 +165,11 @@ class ReaderPauseStrengthTest {
     private object FixtureBooks : ReaderBooks {
         private val bytes by lazy { ContentFixtures.englishNovel() }
 
-        override fun title(bookId: String) = "The Long Signal"
-
-        override fun bytes(bookId: String) = EpubByteSource { ByteArrayInputStream(bytes) }
+        override fun libraryBook(bookId: String) = BookOpenRequest.library(
+            bookId = bookId,
+            title = "The Long Signal",
+            bytes = ContentFixtures.source(bytes),
+        )
     }
 
     private class SilentPositions : ReaderPositions {
