@@ -4,6 +4,7 @@ import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.settings.ReaderSettings
+import com.cedagova.fastreader.settings.ThemeMirror
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -34,6 +35,12 @@ class LibraryRepository(
     private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher,
     private val clock: () -> Long = System::currentTimeMillis,
+    /**
+     * Keeps the pre-Compose copy of the theme choice in step with the catalog
+     * (AD-10). Defaults to [ThemeMirror.None], which mirrors nothing: only the
+     * running app needs a real one.
+     */
+    private val themeMirror: ThemeMirror = ThemeMirror.None,
     private val minimumRescanIntervalMs: Long = DEFAULT_MINIMUM_RESCAN_INTERVAL_MS,
     positionFlushIntervalMs: Long = ReadingPositionWriter.DEFAULT_INTERVAL_MILLIS,
 ) {
@@ -301,7 +308,14 @@ class LibraryRepository(
         if (!ensureLoaded()) return@withLock
         try {
             val next = block(_catalog.value)
-            withContext(ioDispatcher) { store.save(next) }
+            withContext(ioDispatcher) {
+                store.save(next)
+                // Catalog first, mirror second, both before anything is published.
+                // A catalog write that throws therefore leaves *both* copies at
+                // the old value, so the two can never disagree about a change
+                // that did not happen (AD-10).
+                themeMirror.write(next.settings.theme)
+            }
             publish(next)
             _persistenceFailure.value = null
             // A store that has just accepted a write is no longer failing, so the
@@ -341,6 +355,11 @@ class LibraryRepository(
             is CatalogLoad.Loaded -> {
                 publish(load.catalog)
                 loaded = true
+                // Re-sync on load, not only on write: this is what repairs a
+                // mirror that a failed write left stale, and what gives an
+                // install whose catalog predates the mirror a correct second
+                // launch instead of a permanently default first frame.
+                withContext(ioDispatcher) { themeMirror.write(load.catalog.settings.theme) }
                 true
             }
 

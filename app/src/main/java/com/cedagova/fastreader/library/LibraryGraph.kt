@@ -5,6 +5,7 @@ import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.store.CatalogCodec
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
+import com.cedagova.fastreader.settings.SharedPreferencesThemeMirror
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,5 +34,6 @@ class LibraryGraph(context: Context, scope: CoroutineScope) {
         covers = covers,
         scope = scope,
         ioDispatcher = Dispatchers.IO,
+        themeMirror = SharedPreferencesThemeMirror(applicationContext),
     )
 }
