@@ -6,6 +6,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -427,6 +428,16 @@ private fun ReadingSurface(
                 // still name the actions, so the tap target announces them without
                 // hiding the text it covers.
                 .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    // No ripple. The default indication tints this entire surface
+                    // for as long as a pointer is down, and the speed drag put that
+                    // on screen *during a running stream* — a whole-page brightness
+                    // change on the one surface REQ-062/REQ-302 promise is static
+                    // apart from glyphs, and an animation on a screen AD-6 says has
+                    // none. Tap and long press lose nothing: each already answers
+                    // with the state change itself, the paragraph appearing or the
+                    // chrome going.
+                    indication = null,
                     enabled = tappable || focused,
                     onClickLabel = label,
                     onLongClickLabel = focusLabel,
