@@ -57,4 +57,16 @@ interface DocumentGateway {
     /** Opens the document for reading. Callers close the stream. */
     @Throws(java.io.IOException::class)
     fun open(uri: String): InputStream
+
+    /**
+     * A random-access view of the document, or null when this provider cannot
+     * offer one.
+     *
+     * The reader wants it: with a position it can seek to the handful of zip
+     * entries a book's text lives in and never touch its pictures (REQ-110).
+     * Providers that serve a document through a pipe have no position to give,
+     * so null is an ordinary answer and the reader falls back to one forward
+     * pass. Callers close the channel.
+     */
+    fun openSeekable(uri: String): java.nio.channels.SeekableByteChannel? = null
 }

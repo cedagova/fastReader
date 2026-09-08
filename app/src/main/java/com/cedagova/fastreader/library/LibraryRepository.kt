@@ -7,6 +7,7 @@ import com.cedagova.fastreader.settings.ReaderSettings
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.nio.channels.SeekableByteChannel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -236,10 +237,22 @@ class LibraryRepository(
      * (increment 002) consumes this instead of holding URIs of its own.
      */
     @Throws(IOException::class)
-    fun openBook(bookId: String): InputStream {
+    fun openBook(bookId: String): InputStream = gateway.open(readableUri(bookId))
+
+    /**
+     * A seekable view of the book's bytes, or null when the provider has none.
+     *
+     * What lets the reader open a book by seeking to its text instead of reading
+     * past its pictures (REQ-110).
+     */
+    @Throws(IOException::class)
+    fun openBookChannel(bookId: String): SeekableByteChannel? = gateway.openSeekable(readableUri(bookId))
+
+    @Throws(IOException::class)
+    private fun readableUri(bookId: String): String {
         val book = _catalog.value.book(bookId) ?: throw IOException("unknown book $bookId")
         val source = book.readableSource ?: throw IOException("no reachable source for ${book.title}")
-        return gateway.open(source.uri)
+        return source.uri
     }
 
     /** Fire-and-forget wrappers for callers without a coroutine scope of their own. */
