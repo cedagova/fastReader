@@ -1,5 +1,6 @@
 package com.cedagova.fastreader
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.cedagova.fastreader.external.incomingBook
 import com.cedagova.fastreader.library.LaunchDestination
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
@@ -22,6 +24,7 @@ import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
 import com.cedagova.fastreader.library.ui.LibraryRoute
 import com.cedagova.fastreader.reader.ui.ReaderRoute
+import com.cedagova.fastreader.reader.ui.ReaderTarget
 import com.cedagova.fastreader.settings.SharedPreferencesThemeMirror
 import com.cedagova.fastreader.settings.ui.SettingsRoute
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
@@ -46,6 +49,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val library = (application as FastReaderApplication).library
+        // Only on a genuine launch (REQ-103). `savedInstanceState` is the exact
+        // discriminator the behaviour needs: null means someone just handed this
+        // app a book, while non-null means the activity is being rebuilt. A
+        // rotation therefore does not re-accept the intent — the open book is
+        // already held by the process-scoped controller — and a rebuild after
+        // process death does not resurrect a session-only book, which is what
+        // sends that reader back to the library with no row and their position
+        // kept.
+        if (savedInstanceState == null) library.acceptIfExternal(intent)
         setContent {
             // REQ-022's single application point: the reader's theme and text size
             // wrap every destination, so both apply to the library and the reader
@@ -56,6 +68,41 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    /**
+     * A second book arrived while the app was running (REQ-103).
+     *
+     * `singleTask` in the manifest is what makes this the normal case rather than
+     * a second process: the running task comes forward and the book is swapped in
+     * place, which is also why [setIntent] matters — a later rebuild of this
+     * activity must see the book that is actually open, not the one it was
+     * launched with.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val library = (application as FastReaderApplication).library
+        library.acceptIfExternal(intent)
+    }
+}
+
+/**
+ * Unpacks an incoming intent and hands any book in it to the controller.
+ *
+ * The whole Android half of the hand-over: which field carries the document and
+ * whether it is one this app may read are [incomingBook]'s to decide, on plain
+ * strings, so both are provable without an emulator.
+ */
+private fun LibraryGraph.acceptIfExternal(intent: Intent?) {
+    if (intent == null) return
+    @Suppress("DEPRECATION")
+    val stream = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+    val book = incomingBook(
+        action = intent.action,
+        dataUri = intent.data?.toString(),
+        streamUri = stream?.toString(),
+    ) ?: return
+    external.accept(book)
 }
 
 /**
@@ -76,6 +123,9 @@ class MainActivity : ComponentActivity() {
 private fun FastReaderApp(library: LibraryGraph) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
+    // A book handed over by another app (REQ-103). Not saved state: it belongs to
+    // the process, and its whole lifetime rule is written down on the controller.
+    val external by library.external.open.collectAsState()
     // Whether the reader on screen was chosen by the launch routing rather than
     // by the reader tapping a row. It decides who owns a book that will not open.
     var routedIntoReader by rememberSaveable { mutableStateOf(false) }
@@ -85,12 +135,33 @@ private fun FastReaderApp(library: LibraryGraph) {
     // the reader to their book rather than to the library.
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
 
+    // An "Open with" outranks everything the app would otherwise be showing: the
+    // reader asked for this book from another app, so the book they were in, the
+    // settings screen they had open, and the launch routing all give way to it.
+    // Clearing them is also what makes closing the external book land in the
+    // library rather than back in whatever it interrupted.
+    LaunchedEffect(external?.uri) {
+        if (external == null) return@LaunchedEffect
+        openBookId = null
+        routedIntoReader = false
+        blockedBookId = null
+        blockedReason = null
+        settingsOpen = false
+        routed = true
+    }
+
     LaunchedEffect(library) {
         if (routed) return@LaunchedEffect
         // Reading the stored catalog and re-checking one book's reachability is the
         // whole cost of this decision: no folder scan, no parse. The reader's book
         // starts parsing as soon as the route resolves.
         library.repository.load()
+        // Resuming into the last-read book would put a second parse behind the
+        // book the reader actually asked for, and then be discarded.
+        if (library.external.handoverPending) {
+            routed = true
+            return@LaunchedEffect
+        }
         library.repository.refreshLastReadBook()
         when (val destination = launchDestination(library.repository.catalog.value)) {
             is LaunchDestination.Reader -> {
@@ -107,14 +178,26 @@ private fun FastReaderApp(library: LibraryGraph) {
 
     when {
         // Blank rather than a spinner: the decision costs a small file read, and a
-        // spinner that flashes for one frame is worse than nothing.
-        !routed -> Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+        // spinner that flashes for one frame is worse than nothing. The same
+        // blank covers the moment between an intent being taken and the book it
+        // names being known, so an "Open with" never shows the library first.
+        !routed || (library.external.handoverPending && external == null) ->
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
 
         settingsOpen -> SettingsRoute(graph = library, onBack = { settingsOpen = false })
 
+        external != null -> ReaderRoute(
+            graph = library,
+            target = ReaderTarget.External(requireNotNull(external)),
+            // There is no row to go back to and nothing of this book is kept but
+            // its position, so leaving it is leaving it entirely (REQ-103).
+            onBack = { library.external.close() },
+            onOpenSettings = { settingsOpen = true },
+        )
+
         openBookId != null -> ReaderRoute(
             graph = library,
-            bookId = requireNotNull(openBookId),
+            target = ReaderTarget.Library(requireNotNull(openBookId)),
             onBack = { openBookId = null; routedIntoReader = false },
             // A book the reader chose from the library keeps the reader's own
             // explanation on screen: they picked it, and its row already said

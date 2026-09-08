@@ -225,14 +225,24 @@ class LibraryRepository(
      * The one place a position reaches the store.
      *
      * Recording a position is also what makes a book the last-read one, which is
-     * what launch resumes into (REQ-009). The id is kept even for a book that is
-     * currently missing or removed, because the launch routing has to name the
-     * book it could not open.
+     * what launch resumes into (REQ-009) — but only for a book the catalog has.
+     * The id is still kept for a book that is currently missing or removed,
+     * because the launch routing has to name the book it could not open; what it
+     * is *not* kept for is a book that was never a library row at all.
+     *
+     * That case is new in v1.1.0: a session-only "Open with" stores a position
+     * under a digest the catalog does not list (REQ-103, AD-9). Making that the
+     * last-read book would send the next launch looking for a row that does not
+     * exist and land the reader on "it is no longer in your library" — a sentence
+     * about a book they never added. Leaving the id alone means the last book
+     * they actually own stays the one launch comes back to, and the external
+     * book's position is kept exactly as the definition says, waiting for the
+     * file to be added.
      */
     private suspend fun writeReadingState(bookId: String, state: ReadingState) = mutateCatalog { catalog ->
         catalog.copy(
             readingStates = catalog.readingStates + (bookId to state.copy(updatedAtEpochMs = clock())),
-            lastReadBookId = bookId,
+            lastReadBookId = if (catalog.book(bookId) != null) bookId else catalog.lastReadBookId,
         )
     }
 

@@ -37,8 +37,20 @@ class FakeDocumentGateway : DocumentGateway {
     /** Grants the reader revoked; every uri under them becomes inaccessible. */
     val revokedGrants = mutableSetOf<String>()
 
+    /** Every uri whose bytes were actually read, so a test can forbid reading them. */
+    val opened = mutableListOf<String>()
+
     val persistedGrants = mutableSetOf<String>()
     val releasedGrants = mutableListOf<String>()
+
+    /**
+     * Documents this provider hands over for one use only.
+     *
+     * The session-only half of REQ-103: an app may share a file without offering
+     * a persistable grant, and `takePersistableUriPermission` then throws. Here it
+     * simply answers false, which is what the real gateway turns that into.
+     */
+    val nonPersistableGrants = mutableSetOf<String>()
 
     fun putDocument(uri: String, bytes: ByteArray, displayName: String, lastModifiedEpochMs: Long = 1_000) {
         documents[uri] = Document(bytes, displayName, lastModifiedEpochMs)
@@ -56,6 +68,7 @@ class FakeDocumentGateway : DocumentGateway {
     }
 
     override fun persistReadPermission(uri: String, isTree: Boolean): Boolean {
+        if (uri in nonPersistableGrants) return false
         persistedGrants += uri
         return true
     }
@@ -89,6 +102,7 @@ class FakeDocumentGateway : DocumentGateway {
     }
 
     override fun open(uri: String): InputStream {
+        opened += uri
         if (isRevoked(uri)) throw IOException("access to the file was revoked")
         val document = documents[uri] ?: throw IOException("no such document $uri")
         return ByteArrayInputStream(document.bytes)

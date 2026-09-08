@@ -81,6 +81,11 @@
 
     <string name="reader_persistence_problem_title">Your place is not being saved</string>
 
+    <!-- REQ-103 / REQ-107: a book handed over by another app, with no library row -->
+    <string name="reader_external_notice">Opened from another app. Only your reading position will be remembered.</string>
+    <string name="reader_external_add">Add to library</string>
+    <string name="reader_external_dismiss">Dismiss</string>
+
     <string name="library_resume_blocked_title">Could not go back to %1$s</string>
     <string name="library_resume_blocked_missing">Its file was moved or deleted. Your place is kept in case it comes back.</string>
     <string name="library_resume_blocked_permission_lost">Access to its folder was revoked. Grant access again to carry on reading.</string>

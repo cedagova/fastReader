@@ -105,6 +105,28 @@ class ReaderScreenScreenshotTest {
         )
     }
 
+    /**
+     * REQ-103's session-only state, and the one image REQ-107's copy claim rests
+     * on: the reader is told, on the reading surface, that this book is not in
+     * their library and that only their place in it is kept.
+     */
+    @Test
+    fun aBookOpenedFromAnotherAppSaysWhatIsAndIsNotKept() {
+        capture("reader_external_notice", pausedAt(12), externalNotice = true)
+    }
+
+    /**
+     * The same notice where it is most likely to break: the smallest phone in the
+     * matrix at a large system font scale, with the sentence and both buttons
+     * still whole above a reading surface that still has room for the paragraph
+     * (REQ-301).
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theNoticeFitsACrampedScreenAtALargeFontScale() {
+        capture("reader_external_notice_compact", pausedAt(12), externalNotice = true, fontScale = 1.3f)
+    }
+
     // --- The cue matrix ------------------------------------------------------
     //
     // One golden per cue combination the reader can be looking at, because a cue
@@ -256,6 +278,7 @@ class ReaderScreenScreenshotTest {
         cues: CueSettings = CueSettings(),
         focused: Boolean = false,
         fontSize: FontSize = FontSize.MEDIUM,
+        externalNotice: Boolean = false,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -273,6 +296,7 @@ class ReaderScreenScreenshotTest {
                         onChapterSelected = {},
                         cues = cues,
                         focused = focused,
+                        externalNotice = externalNotice,
                     )
                 }
             }

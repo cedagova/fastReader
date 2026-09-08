@@ -19,13 +19,91 @@
             attribute freezes is only ever seen at launch, where it has just been
             set from the mirror.
         -->
+        <!--
+            android:launchMode="singleTask" is REQ-103's "without a second
+            process". The reader holds exactly one parsed book, and a book handed
+            over while the app is already running has to replace it rather than
+            start a second copy of the app alongside the first. singleTask brings
+            the existing task forward and delivers the intent to onNewIntent,
+            which is precisely that swap. The app has one activity, so the usual
+            cost of singleTask — clearing everything above it in the task — has
+            nothing to clear.
+        -->
         <activity
             android:name=".MainActivity"
             android:configChanges="uiMode"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                "Open with" for a file whose provider names it correctly. This is
+                the Files app, and every other provider that reports the real
+                type.
+
+                Only content:// is registered, deliberately. file:// would need a
+                storage permission this app does not ask for and http(s):// would
+                need the network permission REQ-303 forbids, so listing either
+                would put FastReader in a chooser for a book it could not then
+                open.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" android:mimeType="application/epub+zip" />
+            </intent-filter>
+
+            <!--
+                The same, for senders that hand an EPUB over under a generic type.
+                Common enough to be the ordinary case rather than an edge: mail
+                clients, chat apps and several download providers report a book as
+                application/octet-stream or as a plain zip.
+
+                Gated on the file name, so FastReader is not offered for every
+                binary on the device. pathAdvancedPattern is a real regular
+                expression and is available from API 26, which is this app's
+                minSdk; the simple-glob pathPattern cannot express
+                case-insensitivity and backtracks badly over a path with several
+                dots in it. The wildcard host is every content authority: a
+                content URI always has one, any provider may hold a book, and a
+                filter that tests a path has to name a host to be well formed.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="content"
+                    android:host="*"
+                    android:mimeType="application/octet-stream"
+                    android:pathAdvancedPattern=".*\.[eE][pP][uU][bB]" />
+                <data
+                    android:scheme="content"
+                    android:host="*"
+                    android:mimeType="application/zip"
+                    android:pathAdvancedPattern=".*\.[eE][pP][uU][bB]" />
+                <data
+                    android:scheme="content"
+                    android:host="*"
+                    android:mimeType="application/x-zip-compressed"
+                    android:pathAdvancedPattern=".*\.[eE][pP][uU][bB]" />
+            </intent-filter>
+
+            <!--
+                The share sheet. Only the EPUB type: a shared document travels in
+                EXTRA_STREAM, so there is no file name in the intent for a
+                manifest filter to test, and registering the generic types here
+                would put FastReader in the share sheet for every binary file a
+                reader ever sent anywhere.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/epub+zip" />
             </intent-filter>
         </activity>
     </application>

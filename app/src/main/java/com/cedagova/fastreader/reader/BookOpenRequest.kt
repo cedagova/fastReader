@@ -57,13 +57,16 @@ enum class BookOrigin {
  * illustrated book paid for fifty megabytes of hashing before the first word.
  * Now the caller says who the book is and the reader believes it.
  *
- * ## For the callers still to be written
+ * ## The callers
  *
- * - "Open with" (#44) builds [EXTERNAL_KEEPABLE] when the catalog already has
- *   the file, and [EXTERNAL_SESSION_ONLY] with `identity = null` when it does
- *   not. In the second case it computes the digest off the open path and is the
- *   owner of however that late identity reaches storage; until it arrives,
- *   [positionKey] is null and this session simply stores no position.
+ * - The library builds [library].
+ * - "Open with" and the share sheet build [external]:
+ *   [BookOrigin.EXTERNAL_KEEPABLE] when the catalog already has the file, and
+ *   [BookOrigin.EXTERNAL_SESSION_ONLY] with `identity = null` when it does not.
+ *   In the second case
+ *   [com.cedagova.fastreader.external.ExternalOpenController] computes the digest
+ *   off the open path and hands it over through [withIdentity]; until it
+ *   arrives, [positionKey] is null and this session simply stores no position.
  * - The bundled sample (#48) builds [SAMPLE] with the identity it computed at
  *   build time and an [EpubByteSource] over the packaged asset. An asset is not
  *   seekable through `AssetManager` unless it is stored uncompressed, so #48
@@ -120,6 +123,47 @@ class BookOpenRequest(
             origin = BookOrigin.LIBRARY,
             title = title,
             openKey = bookId,
+        )
+
+        /**
+         * A book handed over from outside the app (REQ-103).
+         *
+         * The document URI is the [openKey], because it is the only name this
+         * hand-over has: the identity may still be unknown, and two different
+         * files can arrive with the same title. Keying on it is what makes a
+         * rotation re-enter the same open book rather than re-parse it, and what
+         * makes a second "Open with" of a *different* file replace it.
+         */
+        fun external(
+            uri: String,
+            title: String,
+            identity: BookIdentity?,
+            origin: BookOrigin,
+            bytes: EpubByteSource,
+        ) = BookOpenRequest(
+            bytes = bytes,
+            identity = identity,
+            origin = origin,
+            title = title,
+            openKey = uri,
+        )
+    }
+
+    /**
+     * The same request with its identity finally known (AD-8).
+     *
+     * Only ever a null-to-known transition: an identity that is already set is
+     * the one the position of this book is keyed by, and replacing it would
+     * strand that position under a key nothing will look up again.
+     */
+    fun withIdentity(resolved: BookIdentity): BookOpenRequest {
+        check(identity == null) { "identity is already known for $openKey" }
+        return BookOpenRequest(
+            bytes = bytes,
+            identity = resolved,
+            origin = origin,
+            title = title,
+            openKey = openKey,
         )
     }
 }
