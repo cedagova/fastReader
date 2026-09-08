@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Whole-app exclusion from both halves of Android 12+ data extraction (AD-11,
+  D3, REQ-107).
+
+  `android:allowBackup="false"` in the manifest already stops cloud backup and
+  restore everywhere the app runs, and on API 26-30 it stops everything. From
+  API 31 it does *not* stop device-to-device transfer: that path is governed
+  only by this file, so an unexcluded app's library, positions, settings and
+  cover cache would still be copied onto a new phone by the setup wizard.
+
+  Both sections are therefore stated explicitly rather than relying on the
+  attribute. `root` covers the app's internal data directory (files, databases
+  and shared preferences all live under it), `device_root` the same for
+  device-protected storage, and `external` anything the app might ever write to
+  external storage. Nothing is opted back in, and nothing ever should be: an
+  inclusion element anywhere in this file fails AppVersionTest.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="device_root" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="device_root" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
