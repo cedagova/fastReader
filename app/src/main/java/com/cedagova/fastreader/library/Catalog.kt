@@ -179,6 +179,10 @@ enum class FolderStatus { AVAILABLE, MISSING, PERMISSION_LOST }
  * - [bookDigest] — the content-derived identity (AD-2) the position was taken in.
  *   The map key is that same digest today, but storing it makes a position
  *   self-describing rather than only meaningful in the slot it happens to sit in.
+ *   Since v1.1.0 the reader is *handed* this identity rather than deriving it
+ *   from the bytes it reads (AD-8), so comparing it no longer detects a file
+ *   whose content changed under an unchanged catalog entry; the rescan
+ *   fingerprint on [BookSource] does that.
  * - [pipelineVersion] — the tokenization rules the index counts (AD-3). When they
  *   change, the stored index points at a different word; the reader detects that
  *   and falls back to [progressFraction] instead of silently resuming somewhere

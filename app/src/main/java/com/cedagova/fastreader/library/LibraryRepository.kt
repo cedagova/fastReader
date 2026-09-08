@@ -4,9 +4,11 @@ import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.settings.ReaderSettings
+import com.cedagova.fastreader.settings.ThemeMirror
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.nio.channels.SeekableByteChannel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -34,6 +36,12 @@ class LibraryRepository(
     private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher,
     private val clock: () -> Long = System::currentTimeMillis,
+    /**
+     * Keeps the pre-Compose copy of the theme choice in step with the catalog
+     * (AD-10). Defaults to [ThemeMirror.None], which mirrors nothing: only the
+     * running app needs a real one.
+     */
+    private val themeMirror: ThemeMirror = ThemeMirror.None,
     private val minimumRescanIntervalMs: Long = DEFAULT_MINIMUM_RESCAN_INTERVAL_MS,
     private val undoWindowMs: Long = DEFAULT_UNDO_WINDOW_MS,
     positionFlushIntervalMs: Long = ReadingPositionWriter.DEFAULT_INTERVAL_MILLIS,
@@ -283,10 +291,22 @@ class LibraryRepository(
      * (increment 002) consumes this instead of holding URIs of its own.
      */
     @Throws(IOException::class)
-    fun openBook(bookId: String): InputStream {
+    fun openBook(bookId: String): InputStream = gateway.open(readableUri(bookId))
+
+    /**
+     * A seekable view of the book's bytes, or null when the provider has none.
+     *
+     * What lets the reader open a book by seeking to its text instead of reading
+     * past its pictures (REQ-110).
+     */
+    @Throws(IOException::class)
+    fun openBookChannel(bookId: String): SeekableByteChannel? = gateway.openSeekable(readableUri(bookId))
+
+    @Throws(IOException::class)
+    private fun readableUri(bookId: String): String {
         val book = _catalog.value.book(bookId) ?: throw IOException("unknown book $bookId")
         val source = book.readableSource ?: throw IOException("no reachable source for ${book.title}")
-        return gateway.open(source.uri)
+        return source.uri
     }
 
     /** Fire-and-forget wrappers for callers without a coroutine scope of their own. */
@@ -435,7 +455,14 @@ class LibraryRepository(
         if (!ensureLoaded()) return@withLock
         try {
             val next = block(_catalog.value)
-            withContext(ioDispatcher) { store.save(next) }
+            withContext(ioDispatcher) {
+                store.save(next)
+                // Catalog first, mirror second, both before anything is published.
+                // A catalog write that throws therefore leaves *both* copies at
+                // the old value, so the two can never disagree about a change
+                // that did not happen (AD-10).
+                themeMirror.write(next.settings.theme)
+            }
             publish(next)
             _persistenceFailure.value = null
             // A store that has just accepted a write is no longer failing, so the
@@ -475,7 +502,18 @@ class LibraryRepository(
             is CatalogLoad.Loaded -> {
                 publish(load.catalog)
                 loaded = true
-                // Not on a recovery: see [releaseOrphanedGrants].
+                // Re-sync on load, not only on write: this is what repairs a
+                // mirror that a failed write left stale, and what gives an
+                // install whose catalog predates the mirror a correct second
+                // launch instead of a permanently default first frame.
+                // Unconditional, recovery included: a recovered load really does
+                // put the app on the default theme, so the mirror has to say so
+                // or the next cold start opens on the pre-corruption colour.
+                withContext(ioDispatcher) { themeMirror.write(load.catalog.settings.theme) }
+                // The grant sweep is the opposite case and stays guarded: an
+                // empty recovered catalog is no evidence the library is empty,
+                // and a released grant cannot be taken back. See
+                // [releaseOrphanedGrants].
                 if (load.recoveredFrom == null) {
                     withContext(ioDispatcher) { releaseOrphanedGrants(load.catalog) }
                 }

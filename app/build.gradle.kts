@@ -108,6 +108,19 @@ android {
     }
 }
 
+// The committed goldens are read by Roborazzi at compare time but are not part
+// of any source set, so Gradle did not see them as an input: editing a golden
+// left :app:testDebugUnitTest UP-TO-DATE and `verifyRoborazziDebug` reported a
+// green gate over a changed reference image. Declaring the directory makes a
+// golden edit invalidate the task locally and invalidate the build-cache key on
+// CI, so the regression gate always actually runs. This tightens the gate; it
+// changes no tolerance.
+tasks.withType<Test>().configureEach {
+    inputs.dir(layout.projectDirectory.dir("screenshots"))
+        .withPropertyName("roborazziGoldens")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)

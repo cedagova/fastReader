@@ -1,0 +1,29 @@
+Package state either side of the in-place update, Phone_Mid_API36.
+
+Read it for three things:
+
+  firstInstallTime  unchanged  — the app was never uninstalled, so its data
+                                 (catalog, positions, settings) was never cleared
+  lastUpdateTime    moved      — a package really was installed over it
+  codePath          different  — and it is a different APK on disk
+
+versionName stays 1.0.1 in both because this leaf does not bump the version;
+that is #49's release. The APK installed over v1.0.1 is `assembleRelease` of
+leaf/43-reader-open-path, which is why the signature matched and `adb install -r`
+was accepted without a data clear.
+
+=== before the update ===
+captured (host, UTC): 2026-09-06 19:47:26
+    codePath=/data/app/~~K7YU4SsIpdsRDmlWAv3rRg==/com.cedagova.fastreader-H9YIpp2Gp7mV31Av6cD8zg==
+    versionCode=2 minSdk=26 targetSdk=36
+    versionName=1.0.1
+    lastUpdateTime=2026-09-06 13:45:59
+      firstInstallTime=2026-09-06 13:45:59
+
+=== after the in-place update ===
+captured (host, UTC): 2026-09-06 19:49:32
+    codePath=/data/app/~~_fuvVETBX7NFHQ2ktyWsXg==/com.cedagova.fastreader-Whl9_cyLYhyqXIGrOfSCvg==
+    versionCode=2 minSdk=26 targetSdk=36
+    versionName=1.0.1
+    lastUpdateTime=2026-09-06 13:47:43
+      firstInstallTime=2026-09-06 13:45:59

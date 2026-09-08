@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import com.cedagova.fastreader.library.DocumentGateway
@@ -13,6 +14,9 @@ import com.cedagova.fastreader.library.DocumentRef
 import com.cedagova.fastreader.library.FolderListing
 import java.io.IOException
 import java.io.InputStream
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.channels.SeekableByteChannel
 
 /**
  * Storage Access Framework implementation of [DocumentGateway].
@@ -123,6 +127,42 @@ class SafDocumentGateway(context: Context) : DocumentGateway {
             throw IOException("access to the file was revoked", error)
         }
 
+    /**
+     * A seekable view of the document, when the provider is backed by a real file.
+     *
+     * `statSize` is the discriminator: a provider that streams through a pipe
+     * reports -1 and its descriptor cannot be positioned, so asking for a channel
+     * would fail on the first seek rather than here. Everything else — the
+     * `DocumentsProvider` behind Files, Drive's local copies, an installed
+     * SD card — reports a length and gives a positionable descriptor.
+     *
+     * Any failure returns null rather than throwing: the caller has a working
+     * forward stream either way, so an unavailable channel is a slower open, not
+     * an error.
+     */
+    override fun openSeekable(uri: String): SeekableByteChannel? {
+        val descriptor = try {
+            resolver.openFileDescriptor(uri.toUri(), "r")
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        return try {
+            if (descriptor.statSize < 0) {
+                descriptor.close()
+                null
+            } else {
+                DocumentChannel(descriptor)
+            }
+        } catch (_: Exception) {
+            try {
+                descriptor.close()
+            } catch (_: IOException) {
+                // Nothing further to do with a descriptor that will not close.
+            }
+            null
+        }
+    }
+
     override fun displayName(uri: String): String? {
         val parsed = uri.toUri()
         val documentUri = if (DocumentsContract.isTreeUri(parsed)) {
@@ -180,6 +220,32 @@ class SafDocumentGateway(context: Context) : DocumentGateway {
 
     private fun isEpub(displayName: String, mimeType: String?): Boolean =
         displayName.endsWith(EPUB_EXTENSION, ignoreCase = true) || mimeType == EPUB_MIME_TYPE
+
+    /**
+     * A [SeekableByteChannel] over one document descriptor, closing the descriptor
+     * with the channel so a book that is opened and dropped leaves no open fd.
+     */
+    private class DocumentChannel(descriptor: ParcelFileDescriptor) : SeekableByteChannel {
+
+        private val stream = ParcelFileDescriptor.AutoCloseInputStream(descriptor)
+        private val channel: FileChannel = stream.channel
+
+        override fun read(destination: ByteBuffer): Int = channel.read(destination)
+
+        override fun write(source: ByteBuffer): Int = throw UnsupportedOperationException("read-only")
+
+        override fun position(): Long = channel.position()
+
+        override fun position(newPosition: Long): SeekableByteChannel = apply { channel.position(newPosition) }
+
+        override fun size(): Long = channel.size()
+
+        override fun truncate(size: Long): SeekableByteChannel = throw UnsupportedOperationException("read-only")
+
+        override fun isOpen(): Boolean = channel.isOpen
+
+        override fun close() = stream.close()
+    }
 
     companion object {
         const val EPUB_MIME_TYPE = "application/epub+zip"

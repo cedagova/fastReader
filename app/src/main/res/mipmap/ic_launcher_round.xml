@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The adaptive launcher icon (REQ-101): background, foreground and monochrome.
+
+    minSdk is 26, so every supported device can parse and mask this XML. That is
+    also why it lives in plain `mipmap/` rather than the usual
+    `mipmap-anydpi-v26`: that qualifier exists to keep raster fallbacks for
+    older releases, and there are no older releases and no rasters here. The monochrome layer is what themed icons and the
+    Android 13+ launcher tint; without it the launcher falls back to a shrunken
+    copy of the full-colour icon on a themed home screen.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/brand_primary" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>

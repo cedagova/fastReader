@@ -37,7 +37,8 @@ class ContentPipelineDeviceTest {
         val markers = content.tokens.filterIsInstance<SkipMarkerToken>()
         assertEquals(listOf(SkipKind.IMAGE, SkipKind.TABLE), markers.map { it.kind })
         assertFalse(content.words().contains("1"))
-        assertTrue(content.bookDigest.startsWith("sha256:"))
+        // The identity is the one the reader handed over, not one derived here (AD-8).
+        assertEquals(IDENTITY.value, content.bookDigest)
     }
 
     @Test
@@ -99,14 +100,32 @@ class ContentPipelineDeviceTest {
         assertEquals(parse(bytes).tokens, parse(bytes).tokens)
     }
 
+    @Test
+    fun imageEntriesAreNeverReadOnDevice() = runBlocking {
+        // Android's `Inflater` and channel reads, not the desktop JVM's, decide
+        // whether the central-directory path really skips a book's plates.
+        val (bytes, spans) = ContentFixtures.illustratedNovel(imageCount = 2, imageBytes = 256 * 1024)
+        val plates = spans.filterKeys { it.startsWith("OEBPS/images/") }.values.toList()
+        val (source, readSoFar) = ContentFixtures.watchedSource(bytes, poisoned = plates)
+
+        val result = pipeline.parse(source, IDENTITY)
+
+        assertTrue("expected parsed content but got $result", result is BookContentResult.Parsed)
+        assertEquals(
+            listOf("Chapter 1", "Chapter 2", "Chapter 3"),
+            (result as BookContentResult.Parsed).content.chapters.map { it.title },
+        )
+        assertTrue("read ${readSoFar()} of ${bytes.size} bytes", readSoFar() < bytes.size / 20)
+    }
+
     private suspend fun parse(bytes: ByteArray): BookContent {
-        val result = pipeline.parse(ContentFixtures.source(bytes))
+        val result = pipeline.parse(ContentFixtures.source(bytes), IDENTITY)
         assertTrue("expected parsed content but got $result", result is BookContentResult.Parsed)
         return (result as BookContentResult.Parsed).content
     }
 
     private suspend fun failure(bytes: ByteArray): ContentFailureReason {
-        val result = pipeline.parse(ContentFixtures.source(bytes))
+        val result = pipeline.parse(ContentFixtures.source(bytes), IDENTITY)
         assertTrue("expected a failure but got $result", result is BookContentResult.Failed)
         return (result as BookContentResult.Failed).reason
     }
@@ -115,4 +134,8 @@ class ContentPipelineDeviceTest {
 
     private fun BookContent.word(text: String): WordToken =
         tokens.filterIsInstance<WordToken>().first { it.text == text }
+
+    private companion object {
+        val IDENTITY = BookIdentity("sha256:device-fixture")
+    }
 }

@@ -1,0 +1,6 @@
+illustrated-419mb-this-build-cold (cold cache): runs=5 median=0.304 min=0.171 max=0.604
+  run 1: 0.604
+  run 2: 0.304
+  run 3: 0.306
+  run 4: 0.171
+  run 5: 0.290

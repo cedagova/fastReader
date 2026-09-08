@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The handful of colours the platform needs *outside* Compose.
+
+    Everything a reader sees once the app is composing comes from
+    `ui/theme/Theme.kt`. These four exist because three surfaces are drawn by the
+    system before — or entirely without — Compose: the launcher icon, the system
+    splash, and the activity window's own background (the AD-10 first frame).
+    The two page colours are deliberately the same values as the Compose
+    `background`/`surface` in that file; a first frame that differs from the
+    first composed frame is exactly the flash REQ-102 forbids.
+-->
+<resources>
+
+    <!-- FastReader's brand blue; the adaptive icon's background layer. -->
+    <color name="brand_primary">#FF3D5AFE</color>
+
+    <!-- Matches LightColors.background in ui/theme/Theme.kt. -->
+    <color name="page_light">#FFFDFBF7</color>
+
+    <!-- Matches DarkColors.background in ui/theme/Theme.kt. -->
+    <color name="page_dark">#FF121316</color>
+
+    <!-- Drawn on the brand background; the icon's foreground and monochrome ink. -->
+    <color name="icon_ink">#FFFFFFFF</color>
+
+</resources>
