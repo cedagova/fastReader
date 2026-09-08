@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.settings.ReaderSettings
 
@@ -30,6 +31,8 @@ fun SettingsRoute(
     graph: LibraryGraph,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens a text shipped inside the app (REQ-109), which stays reachable here. */
+    onOpenSample: (BundledSample) -> Unit = {},
 ) {
     val repository = graph.repository
     val settings by repository.settings.collectAsState()
@@ -44,5 +47,6 @@ fun SettingsRoute(
         onBack = onBack,
         modifier = modifier,
         persistenceFailure = persistenceFailure,
+        onOpenSample = onOpenSample,
     )
 }

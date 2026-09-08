@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.reader
 
 import com.cedagova.fastreader.content.BookIdentity
+import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.epub.EpubByteSource
 
 /**
@@ -64,11 +65,12 @@ enum class BookOrigin {
  *   not. In the second case it computes the digest off the open path and is the
  *   owner of however that late identity reaches storage; until it arrives,
  *   [positionKey] is null and this session simply stores no position.
- * - The bundled sample (#48) builds [SAMPLE] with the identity it computed at
- *   build time and an [EpubByteSource] over the packaged asset. An asset is not
- *   seekable through `AssetManager` unless it is stored uncompressed, so #48
- *   should either package it uncompressed and hand over a channel, or accept the
- *   streaming fallback — the sample is small enough for either.
+ * - The bundled sample (#48) is [sample]: [SAMPLE], the identity pinned in
+ *   [BundledSample] when the asset was built, and a
+ *   [com.cedagova.fastreader.content.SampleBookSource] over the packaged asset.
+ *   The asset is packaged uncompressed, so that source hands over a real
+ *   channel and the sample reads through the central directory like any other
+ *   book; the streaming fallback stays in place for a packaging regression.
  */
 class BookOpenRequest(
 
@@ -120,6 +122,29 @@ class BookOpenRequest(
             origin = BookOrigin.LIBRARY,
             title = title,
             openKey = bookId,
+        )
+
+        /**
+         * A text shipped inside the APK (#48, REQ-109).
+         *
+         * Everything the reader needs is already decided: the title is the
+         * asset's own `dc:title`, and the identity was computed when the asset
+         * was built and pinned in [BundledSample], so this open path — like every
+         * other one — hashes nothing.
+         *
+         * The identity is real rather than null because the parse stamps it onto
+         * the token stream. It is *not* an invitation to store a position: a
+         * sample has no catalog row, so anything recorded under it would make the
+         * next launch try to resume into a book the library does not have. The
+         * reader's position store drops sample keys
+         * ([BundledSample.isSampleIdentity]).
+         */
+        fun sample(sample: BundledSample, bytes: EpubByteSource) = BookOpenRequest(
+            bytes = bytes,
+            identity = sample.identity,
+            origin = BookOrigin.SAMPLE,
+            title = sample.title,
+            openKey = sample.openKey,
         )
     }
 }

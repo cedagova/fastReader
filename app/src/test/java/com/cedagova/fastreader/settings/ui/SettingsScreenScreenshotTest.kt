@@ -4,7 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.settings.FontSize
@@ -47,7 +49,9 @@ class SettingsScreenScreenshotTest {
 
     /**
      * The screen as a reader first meets it: every default, the preview showing
-     * the cues the app ships with, and the REQ-061 statement at the end.
+     * the cues the app ships with, the sample section that keeps the bundled
+     * texts reachable once the library has real books in it (REQ-109), and the
+     * REQ-061 statement at the end.
      */
     @Test
     fun theWholeSurfaceAtItsDefaults() {
@@ -149,6 +153,8 @@ class SettingsScreenScreenshotTest {
         settings: ReaderSettings,
         darkTheme: Boolean = false,
         fontScale: Float = 1f,
+        /** A test tag to bring into view before capturing, for content below the fold. */
+        scrollTo: String? = null,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -163,6 +169,7 @@ class SettingsScreenScreenshotTest {
                 }
             }
         }
+        scrollTo?.let { composeRule.onNodeWithTag(it).performScrollTo() }
         composeRule.onRoot().captureRoboImage("screenshots/$name.png")
     }
 

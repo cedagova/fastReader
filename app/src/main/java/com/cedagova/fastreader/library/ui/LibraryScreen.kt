@@ -59,9 +59,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
+import com.cedagova.fastreader.ui.SampleOffer
+import com.cedagova.fastreader.ui.rememberSampleOrder
 
 /** Smallest comfortable touch target; Android's accessibility minimum is 48dp (REQ-060). */
 private val TouchTarget = 48.dp
@@ -90,6 +93,14 @@ fun LibraryScreen(
     onDismissResumeNotice: () -> Unit = {},
     /** Opens the settings screen (LEAF302). */
     onOpenSettings: () -> Unit = {},
+    /**
+     * Opens one of the texts shipped inside the app (REQ-109). Offered only while
+     * the library is empty: once there are real books, the sample would be
+     * clutter in front of them and lives in Settings instead.
+     */
+    onOpenSample: (BundledSample) -> Unit = {},
+    /** The samples, in the order this device should see them (Spanish first on a Spanish device). */
+    samples: List<BundledSample> = rememberSampleOrder(),
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
     Scaffold(
@@ -116,6 +127,8 @@ fun LibraryScreen(
                 LibraryContent.EMPTY_LIBRARY -> EmptyLibrary(
                     onAddBooks = onAddBooks,
                     onAddFolder = onAddFolder,
+                    onOpenSample = onOpenSample,
+                    samples = samples,
                 )
 
                 LibraryContent.NO_SEARCH_RESULTS,
@@ -247,8 +260,21 @@ private fun ScanBanner(scan: LibraryScan) {
     }
 }
 
+/**
+ * The screen a stranger meets first: how to get their own books in, and — because
+ * they have none yet and an empty screen is a dead end — something to read right
+ * now (REQ-109).
+ *
+ * The sample comes after the two ways to add books, not before them. Adding a
+ * book is what the app is for; the sample is what to do while you have not.
+ */
 @Composable
-private fun EmptyLibrary(onAddBooks: () -> Unit, onAddFolder: () -> Unit) {
+private fun EmptyLibrary(
+    onAddBooks: () -> Unit,
+    onAddFolder: () -> Unit,
+    onOpenSample: (BundledSample) -> Unit,
+    samples: List<BundledSample>,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -273,6 +299,16 @@ private fun EmptyLibrary(onAddBooks: () -> Unit, onAddFolder: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider()
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.sample_title),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { heading() },
+        )
+        SampleOffer(onOpenSample = onOpenSample, samples = samples)
     }
 }
 
