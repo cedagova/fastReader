@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,8 +26,11 @@ import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.FontSize
+import com.cedagova.fastreader.settings.LibraryOrder
+import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -182,6 +186,36 @@ class LibraryScreenScreenshotTest {
         capture("library_font_extra_large", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
     }
 
+    // --- REQ-203, the library's order ----------------------------------------
+
+    /**
+     * REQ-203's acceptance as an image: exactly the books of `library_populated`,
+     * with the timestamps a reader who has actually been reading leaves behind.
+     * Rayuela was read last and is at the top; the two books never opened are at
+     * the bottom, alphabetically, under the two that were.
+     */
+    @Test
+    fun `the default order puts the book last read at the top`() {
+        capture("library_order_recently_read", state(readCatalog()))
+    }
+
+    /** The control open: the three orders, with a tick on the one in force. */
+    @Test
+    fun `the order control offers three orders and marks the current one`() {
+        capture("library_order_menu", state(readCatalog()), click = "library_order")
+    }
+
+    /**
+     * REQ-301 for the new control, on the smallest screen in the matrix at a large
+     * font scale and with a folder to reach as well. Two controls that will not
+     * fit side by side stack instead of clipping.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theOrderControlSurvivesACrampedScreenAtALargeFontScale() {
+        capture("library_order_compact_large_font", state(folderCatalog()), fontScale = 1.4f)
+    }
+
     // --- REQ-205, the wide layouts -------------------------------------------
     //
     // Three widths, because they are three different questions. 600 dp is the
@@ -241,6 +275,8 @@ class LibraryScreenScreenshotTest {
         fontSize: FontSize = FontSize.MEDIUM,
         /** A test tag to bring into view before capturing, for content below the fold. */
         scrollTo: String? = null,
+        /** A test tag to tap before capturing, for a state that only a tap reaches. */
+        click: String? = null,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -260,7 +296,16 @@ class LibraryScreenScreenshotTest {
             }
         }
         scrollTo?.let { composeRule.onNodeWithTag(it).performScrollTo() }
-        composeRule.onRoot().captureRoboImage("screenshots/$name.png")
+        if (click == null) {
+            composeRule.onRoot().captureRoboImage("screenshots/$name.png")
+            return
+        }
+        // A menu is its own window, so the compose root is no longer unique; the
+        // screen capture is the only one that contains what the tap opened.
+        composeRule.onNodeWithTag(click).performClick()
+        composeRule.mainClock.advanceTimeBy(500)
+        composeRule.waitForIdle()
+        captureScreenRoboImage("screenshots/$name.png")
     }
 
     @Composable
@@ -309,6 +354,22 @@ class LibraryScreenScreenshotTest {
             "dubliners" to ReadingState(progressFraction = 1f),
         ),
     )
+
+    /**
+     * `populatedCatalog` after some reading: Rayuela most recently, Ficciones
+     * before it, and the other two never opened. The stamps are the ones the
+     * position writer leaves, so this is the catalog a real reader would have.
+     */
+    private fun readCatalog() = populatedCatalog().let { catalog ->
+        catalog.copy(
+            settings = ReaderSettings(libraryOrder = LibraryOrder.RECENTLY_READ),
+            readingStates = mapOf(
+                "ficciones" to ReadingState(progressFraction = 0.37f, updatedAtEpochMs = 1_000),
+                "rayuela" to ReadingState(progressFraction = 0.12f, updatedAtEpochMs = 2_000),
+                "dubliners" to ReadingState(progressFraction = 1f),
+            ),
+        )
+    }
 
     private fun failureCatalog() = Catalog(
         books = listOf(

@@ -8,6 +8,7 @@ import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.FontSize
+import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
@@ -441,6 +442,10 @@ class CatalogStoreTest {
 
         val settings = decoded.catalog.settings
         assertTrue("an updating reader keeps v1's chapter pause", settings.chapterPauseEnabled)
+        // The other half of REQ-208's update proof: the same document walks both
+        // of increment 002's steps, so the library comes up ordered by recently
+        // read rather than by v1's alphabet.
+        assertEquals(LibraryOrder.RECENTLY_READ, settings.libraryOrder)
 
         // Nothing else moved.
         assertEquals(listOf("The Long Signal"), decoded.catalog.books.map { it.title })
@@ -472,6 +477,72 @@ class CatalogStoreTest {
         val decoded = CatalogCodec().decode(v4) as CatalogDecoding.Decoded
 
         assertTrue(decoded.catalog.settings.chapterPauseEnabled)
+    }
+
+    /**
+     * REQ-203's update half: a v1.2.0-era document from before the order was a
+     * choice comes up ordered by recently read, with every setting the reader had
+     * already chosen — the chapter pause included — exactly where it was.
+     */
+    @Test
+    fun `a version 5 document reads the library order as recently read`() {
+        val v5 = """
+            {"schemaVersion":5,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9}},
+             "frontMatterOfferedBookIds":["sha256:abc"],
+             "settings":{"theme":"DARK","fontSize":"LARGE","highlightEnabled":false,
+                         "focusAlignmentEnabled":true,"pivotColor":"CRIMSON",
+                         "guideMarksEnabled":false,"pauseStrength":"SUBTLE",
+                         "chapterPauseEnabled":false}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v5) as CatalogDecoding.Decoded
+
+        assertEquals(5, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertEquals(LibraryOrder.RECENTLY_READ, decoded.catalog.settings.libraryOrder)
+
+        // Nothing else moved — including the chapter pause this reader turned off.
+        assertFalse(decoded.catalog.settings.chapterPauseEnabled)
+        assertEquals(ThemeChoice.DARK, decoded.catalog.settings.theme)
+        assertEquals(PauseStrength.SUBTLE, decoded.catalog.settings.pauseStrength)
+        assertEquals(listOf("The Long Signal"), decoded.catalog.books.map { it.title })
+        assertEquals(77, decoded.catalog.readingStates.getValue("sha256:abc").tokenIndex)
+        assertEquals(setOf("sha256:abc"), decoded.catalog.frontMatterOfferedBookIds)
+    }
+
+    /**
+     * The step is total. A document with no settings block at all still migrates,
+     * and the order reads back from the type's own default rather than from a key
+     * the step had to invent.
+     */
+    @Test
+    fun `a version 5 document with no settings block still reads the default order`() {
+        val v5 = """{"schemaVersion":5,"books":[],"folders":[],"readingStates":{}}"""
+
+        val decoded = CatalogCodec().decode(v5) as CatalogDecoding.Decoded
+
+        assertEquals(LibraryOrder.RECENTLY_READ, decoded.catalog.settings.libraryOrder)
+    }
+
+    /**
+     * A `settings` value that is not an object must fall through rather than
+     * throw: a throw inside a step escapes [CatalogCodec.decode]'s guard and would
+     * set the reader's whole library aside over one unusable preference.
+     */
+    @Test
+    fun `a version 5 document whose settings are not an object is not thrown over`() {
+        val v5 = """{"schemaVersion":5,"books":[],"folders":[],"readingStates":{},"settings":"corrupt"}"""
+
+        val decoding = CatalogCodec().decode(v5)
+
+        // Decoding still refuses the document, but as a reported Damaged result the
+        // store recovers from, never as an exception out of the migration chain.
+        assertTrue("$decoding", decoding is CatalogDecoding.Damaged)
     }
 
     /** REQ-202's durable half: which books have already been offered survives a round trip. */

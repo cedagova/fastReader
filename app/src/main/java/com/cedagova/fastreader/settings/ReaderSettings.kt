@@ -25,8 +25,9 @@ import kotlinx.serialization.Serializable
  *
  * The definition rules out a free-form theme engine, so every choice here is an
  * enum or a boolean over a small fixed set: three themes, four font sizes, five
- * highlight colours, four pause strengths, four toggles. There is deliberately no
- * stored colour value, no stored point size, and no per-multiplier timing panel.
+ * highlight colours, four pause strengths, three library orders, four toggles.
+ * There is deliberately no stored colour value, no stored point size, and no
+ * per-multiplier timing panel.
  *
  * ## Why the cue fields are flat rather than a nested [CueSettings]
  *
@@ -70,9 +71,9 @@ data class ReaderSettings(
     val pauseStrength: PauseStrength = PauseStrength.NORMAL,
     /**
      * Stop the stream on the first word of every new chapter (REQ-201). **On by
-     * default**, which is exactly v1's behaviour: increment 003's REQ-015 made
-     * that stop mandatory, and decision D4 turns it into a choice without
-     * changing what an existing reader gets.
+     * default**, which is exactly v1's behaviour: v1's REQ-015 made that stop
+     * mandatory, and decision D4 turns it into a choice without changing what
+     * an existing reader gets.
      *
      * It is not a [pauseStrength] value. Pause strength stretches a word's
      * *duration* and is a timing input; this ends a run outright and is a
@@ -84,6 +85,22 @@ data class ReaderSettings(
      * [com.cedagova.fastreader.library.store.ChapterPauseV5Migration].
      */
     val chapterPauseEnabled: Boolean = true,
+    /**
+     * How the library lists books (REQ-203). **Recently read by default**, which
+     * is what a v1.1.0 reader who never chooses gets: the book they were last in
+     * is the one at the top.
+     *
+     * It lives here, in the reader's settings, rather than in the library's own
+     * screen state, because REQ-203 requires the choice to survive a restart and
+     * this class is already the persisted place a reader's presentation choices
+     * live. It is therefore also part of [isDefault], so reset-to-defaults
+     * (REQ-023) puts the library back to recently read along with everything
+     * else — a sort the reader chose is a setting they changed.
+     *
+     * A document written before schema 6 reads this back as `RECENTLY_READ` —
+     * see [com.cedagova.fastreader.library.store.LibraryOrderV6Migration].
+     */
+    val libraryOrder: LibraryOrder = LibraryOrder.RECENTLY_READ,
 ) {
 
     /**
@@ -131,6 +148,38 @@ enum class ThemeChoice {
 
     /** Follow the device's own light/dark setting. The default. */
     SYSTEM,
+}
+
+/**
+ * How the library orders its books (REQ-203).
+ *
+ * All three are computed from timestamps the catalog already keeps, so choosing
+ * one costs no new stored per-book field: [RECENTLY_READ] reads
+ * `ReadingState.updatedAtEpochMs`, which the position writer stamps on every
+ * write, and [RECENTLY_ADDED] reads `Book.addedAtEpochMs`, stamped when the book
+ * first entered the catalog.
+ *
+ * Every order is total. The two by-time orders put the most recent first and
+ * fall back to [TITLE] for everything they cannot separate — two books read in
+ * the same millisecond, and every book whose timestamp is the `0` that means
+ * "never" — so the list can never reshuffle between two renders of the same
+ * catalog.
+ */
+@Serializable
+enum class LibraryOrder {
+
+    /** Alphabetical, the way the reader's own language sorts. v1's only order. */
+    TITLE,
+
+    /**
+     * Most recently read first, then every book never read, alphabetically. The
+     * default: it puts the book being read at the top without the reader
+     * choosing anything.
+     */
+    RECENTLY_READ,
+
+    /** Most recently added to the library first, then everything added before timestamps were kept. */
+    RECENTLY_ADDED,
 }
 
 /**

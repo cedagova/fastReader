@@ -1,10 +1,6 @@
 package com.cedagova.fastreader.library.ui
 
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.isRoot
-import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -155,31 +151,4 @@ class RemovalAccessibilityTest {
             short.size,
         )
     }
-}
-
-/**
- * Every root, not just the first: a confirmation is its own window, so the
- * dialog's controls are invisible to a sweep that only walks the screen behind it.
- */
-private fun ComposeContentTestRule.actionableNodes(): List<SemanticsNode> =
-    allNodes().filter { it.config.contains(SemanticsActions.OnClick) }
-
-private fun ComposeContentTestRule.allNodes(): List<SemanticsNode> {
-    val out = mutableListOf<SemanticsNode>()
-    fun walk(node: SemanticsNode) {
-        out += node
-        node.children.forEach(::walk)
-    }
-    onAllNodes(isRoot()).fetchSemanticsNodes().forEach(::walk)
-    return out
-}
-
-private fun SemanticsNode.testTag(): String =
-    config.getOrElseNullable(SemanticsProperties.TestTag) { null }.orEmpty()
-
-private fun SemanticsNode.label(): String {
-    val described = config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }
-    if (!described.isNullOrEmpty()) return described.joinToString(" ").trim()
-    val text = config.getOrElseNullable(SemanticsProperties.Text) { null }
-    return text?.joinToString(" ") { it.text }?.trim().orEmpty()
 }

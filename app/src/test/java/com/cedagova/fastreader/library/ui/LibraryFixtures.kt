@@ -15,6 +15,8 @@ internal object LibraryFixtures {
         author: String? = null,
         fileName: String = "$title.epub",
         hasCover: Boolean = false,
+        /** When the book entered the catalog; `0` is "before this was kept" (REQ-203). */
+        addedAtEpochMs: Long = 0,
     ) = Book(
         id = id,
         title = title,
@@ -22,6 +24,7 @@ internal object LibraryFixtures {
         hasCover = hasCover,
         contentStatus = BookContentStatus.READABLE,
         sources = listOf(source("content://books/$id", fileName)),
+        addedAtEpochMs = addedAtEpochMs,
     )
 
     /**

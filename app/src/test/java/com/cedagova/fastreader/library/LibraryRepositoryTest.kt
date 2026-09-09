@@ -15,6 +15,7 @@ import com.cedagova.fastreader.timing.PauseStrength
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -140,8 +141,9 @@ class LibraryRepositoryTest {
 
         gateway.putIntoFolder("tree://books", "tree://books/two.epub", EpubFixtures.spanishEpub(), "two.epub")
 
-        // Same instant as the add: the app-open scan is suppressed so returning from
-        // the picker does not immediately rescan the whole tree.
+        // Same instant as the add, so the scan is inside REQ-204's interval and is
+        // skipped: returning from the picker — or from any app the reader stepped
+        // out to — does not re-list the whole tree.
         repository.rescan(ScanTrigger.APP_OPEN)
         assertEquals(1, repository.catalog.value.books.size)
 
@@ -150,6 +152,34 @@ class LibraryRepositoryTest {
         assertEquals(2, repository.catalog.value.books.size)
     }
 
+    /**
+     * REQ-204's first half, at the level the banner is actually decided: a skipped
+     * app-open rescan publishes no [IngestionState.Scanning] at all — not even for
+     * one emission — so there is nothing for the library to draw a scanning banner
+     * from, and the stored catalog stays on screen behind it.
+     */
+    @Test
+    fun `a rescan skipped for recency publishes no scanning state and keeps the catalog`() = runTest {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addFolder("tree://books", "Books")
+
+        val seen = mutableListOf<IngestionState>()
+        val watching = backgroundScope.launch { repository.ingestion.collect { seen += it } }
+        runCurrent()
+        seen.clear()
+
+        // Well inside the interval: a reader who switched away and came straight back.
+        now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS / 2
+        repository.rescan(ScanTrigger.APP_OPEN)
+        runCurrent()
+        watching.cancel()
+
+        assertTrue("a skipped rescan must not announce a scan: $seen", seen.none { it is IngestionState.Scanning })
+        assertEquals(1, repository.catalog.value.books.size)
+    }
+
+    /** The same instant one tick later is the other side of the same line. */
     @Test
     fun `the app-open scan runs once the debounce window has passed`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
@@ -339,9 +369,11 @@ class LibraryRepositoryTest {
     }
 
     /**
-     * The undo window is longer than the app-open rescan debounce, so a rescan
-     * lands inside it every time the reader removes a book and switches away.
-     * Undo has to survive that without duplicating or losing the row.
+     * A rescan can land inside the undo window — the reader removes a book, steps
+     * out long enough for REQ-204's interval to lapse, and comes back while the
+     * offer still stands. Undo has to survive that without duplicating or losing
+     * the row, so the clock here is moved past the interval deliberately rather
+     * than relying on the two windows overlapping.
      */
     @Test
     fun `undo restores exactly one row even when a rescan runs inside the window`() = runTest {

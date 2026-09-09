@@ -44,6 +44,13 @@
     <string name="library_scan_add_folder">Scanning the folder…</string>
     <string name="library_scan_counts">%1$d of %2$d</string>
 
+    <!-- REQ-203: the library's order, a reader's choice of three -->
+    <string name="library_order_button">Sort: %1$s</string>
+    <string name="library_order_label">Sort books. Currently %1$s.</string>
+    <string name="library_order_title">Title</string>
+    <string name="library_order_recently_read">Recently read</string>
+    <string name="library_order_recently_added">Recently added</string>
+
     <string name="library_problem_title">The library could not be updated</string>
     <!-- Reader screen -->
     <string name="reader_back">Back to library</string>
