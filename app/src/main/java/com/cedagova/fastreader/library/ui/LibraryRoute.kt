@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
+import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
@@ -30,6 +31,8 @@ fun LibraryRoute(
     resumeBlocked: ResumeBlocked? = null,
     onDismissResumeNotice: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    /** Opens a text shipped inside the app, offered while the library is empty (REQ-109). */
+    onOpenSample: (BundledSample) -> Unit = {},
 ) {
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
@@ -85,6 +88,7 @@ fun LibraryRoute(
         coverLoader = coverLoader,
         onDismissResumeNotice = onDismissResumeNotice,
         onOpenSettings = onOpenSettings,
+        onOpenSample = onOpenSample,
         modifier = modifier,
     )
 }
