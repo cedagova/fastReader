@@ -182,6 +182,57 @@ class LibraryScreenScreenshotTest {
         capture("library_font_extra_large", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
     }
 
+    // --- REQ-205, the wide layouts -------------------------------------------
+    //
+    // Three widths, because they are three different questions. 600 dp is the
+    // breakpoint itself, on the one AVD in the matrix built to sit exactly on it.
+    // The landscape phone is the same rule reached the other way — no tablet, just
+    // a device on its side — and it is where height, not width, is scarce. The 10"
+    // tablet is where a rule that only ever adds columns would start looking silly.
+    // Each is captured at the largest font size, because that is the size the
+    // acceptance names and the size a column count can go wrong at.
+
+    /**
+     * The boundary: `Tablet_Low_API33` is exactly 600 dp wide, and this is what it
+     * renders. The header is one row — search beside both add buttons — and the
+     * list is two columns of books instead of one column and 300 dp of nothing.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_BOUNDARY)
+    fun atExactlySixHundredDpTheLibraryUsesTheWidth() {
+        capture("library_tablet", state(populatedCatalog()))
+    }
+
+    /**
+     * The same 600 dp at the largest font size, which is the acceptance's own
+     * wording: nothing clipped. The grid answers it by dropping to one wide column
+     * rather than by shrinking two — a column is added when a whole one fits and
+     * not before — so every title, author and status line is complete.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_BOUNDARY)
+    fun theTabletLibraryIsWholeAtTheLargestFontSize() {
+        capture("library_tablet_large_font", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
+    }
+
+    /**
+     * The reference phone on its side at the largest font size. 914 dp is wide
+     * enough for two columns even at 1.5x, and the one-row header is what keeps
+     * more than a single book on a 411 dp-tall screen.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = LANDSCAPE_PHONE)
+    fun theLandscapeLibraryIsWholeAtTheLargestFontSize() {
+        capture("library_landscape_large_font", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
+    }
+
+    /** `Tablet_Mid_API36`, 10" at 1280 x 800 dp: the width genuinely spent. */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_LARGE)
+    fun aTenInchTabletShowsSeveralBooksAcross() {
+        capture("library_tablet_large", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
+    }
+
     private fun capture(
         name: String,
         state: LibraryUiState,
@@ -319,3 +370,16 @@ internal const val REFERENCE_PHONE = "w411dp-h914dp-xxhdpi"
 
 /** 720p, 2 GB phone, matching the `Phone_Low_API33` AVD used for cramped layouts. */
 internal const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"
+
+/**
+ * The `sw600dp` boundary itself, matching the `Tablet_Low_API33` AVD, which is
+ * exactly 600 dp wide. Every wide-layout claim is made here first: a breakpoint
+ * that is wrong by one dp is wrong only here.
+ */
+internal const val TABLET_BOUNDARY = "w600dp-h960dp-xhdpi"
+
+/** 10" tablet at 2560 x 1600, matching the `Tablet_Mid_API36` AVD: 1280 x 800 dp. */
+internal const val TABLET_LARGE = "w1280dp-h800dp-land-xhdpi"
+
+/** The reference phone turned on its side; the same device the reader's goldens use. */
+internal const val LANDSCAPE_PHONE = "w914dp-h411dp-land-xxhdpi"
