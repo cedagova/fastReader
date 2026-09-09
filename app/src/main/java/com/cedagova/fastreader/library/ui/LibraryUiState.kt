@@ -11,6 +11,7 @@ import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
+import com.cedagova.fastreader.settings.LibraryOrder
 import java.text.Collator
 import java.text.Normalizer
 import kotlin.math.roundToInt
@@ -42,6 +43,12 @@ data class LibraryUiState(
     val folders: List<LibraryFolderItem> = emptyList(),
     /** Set while a removal can still be taken back (REQ-105). */
     val undoNotice: UndoNotice? = null,
+    /**
+     * The order [books] is in, so the control can say which one is on (REQ-203).
+     * It is the reader's stored choice, read from the same catalog the list came
+     * from, so the control and the list can never disagree.
+     */
+    val order: LibraryOrder = LibraryOrder.RECENTLY_READ,
 )
 
 /** The book just removed, while undo is on offer (REQ-105). */
@@ -149,15 +156,10 @@ fun buildLibraryUiState(
     resumeBlocked: ResumeBlocked? = null,
     undoableRemoval: RemovedBook? = null,
 ): LibraryUiState {
-    // Sort the way the reader's language does, not by UTF-16 code unit: raw
-    // ordering drops every accented initial below Z, which would put Ñuño and
-    // Álvarez under Zola in exactly the Spanish library `matches` folds accents
-    // for. The id breaks ties so a rescan cannot reshuffle equal titles.
-    val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
-    val byTitle = compareBy<LibraryBookItem, String>(collator) { it.sortKey }.thenBy { it.id }
+    val order = catalog.settings.libraryOrder
     val all = catalog.books
         .map { book -> book.toItem(catalog.readingStates[book.id]?.progressFraction ?: 0f) }
-        .sortedWith(byTitle)
+        .sortedWith(catalog.comparatorFor(order))
     val matches = all.filter { it.matches(query) }
     val content = when {
         all.isEmpty() -> LibraryContent.EMPTY_LIBRARY
@@ -196,7 +198,48 @@ fun buildLibraryUiState(
         },
         folders = buildFolderItems(catalog),
         undoNotice = undoableRemoval?.let { UndoNotice(it.bookId, it.title) },
+        order = order,
     )
+}
+
+/**
+ * The comparator behind one of REQ-203's three orders.
+ *
+ * Both by-time orders are `compareByDescending(timestamp).then(byTitle)`, which
+ * is what makes them total and what gives the failure behaviour the issue asks
+ * for without a special case: a book that was never read, or was added before
+ * the catalog kept the timestamp, carries `0`, and `0` sorts last under a
+ * descending comparison. So "books never read come after read ones, tie-broken
+ * by title" is the same rule as "two books read in the same millisecond are
+ * alphabetical" rather than a branch of its own.
+ *
+ * Both timestamps are read into a map first. `Catalog.book(id)` is a scan of the
+ * book list, and calling it from inside a comparator would turn a sort into
+ * quadratic work over a library that can hold hundreds of books.
+ */
+private fun Catalog.comparatorFor(order: LibraryOrder): Comparator<LibraryBookItem> {
+    // Sort the way the reader's language does, not by UTF-16 code unit: raw
+    // ordering drops every accented initial below Z, which would put Ñuño and
+    // Álvarez under Zola in exactly the Spanish library `matches` folds accents
+    // for. The id breaks ties so a rescan cannot reshuffle equal titles.
+    val collator = Collator.getInstance().apply { strength = Collator.SECONDARY }
+    val byTitle = compareBy<LibraryBookItem, String>(collator) { it.sortKey }.thenBy { it.id }
+    return when (order) {
+        LibraryOrder.TITLE -> byTitle
+        LibraryOrder.RECENTLY_READ -> {
+            // The position writer stamps this on every write, so "read two words
+            // of it" is exactly what moves a book to the top (REQ-203's
+            // acceptance). A stored state with no timestamp — the field's `0`
+            // default — is a book this catalog cannot say was ever read.
+            val lastRead = readingStates.mapValues { (_, state) -> state.updatedAtEpochMs }
+            compareByDescending<LibraryBookItem> { lastRead[it.id] ?: 0L }.then(byTitle)
+        }
+
+        LibraryOrder.RECENTLY_ADDED -> {
+            val addedAt = books.associate { it.id to it.addedAtEpochMs }
+            compareByDescending<LibraryBookItem> { addedAt[it.id] ?: 0L }.then(byTitle)
+        }
+    }
 }
 
 /**

@@ -178,8 +178,13 @@ class LibraryRepository(
      * Rescans added folders and picked files.
      *
      * [ScanTrigger.MANUAL_REFRESH] always runs; [ScanTrigger.APP_OPEN] is skipped
-     * when a scan just finished, so returning from the document picker does not
-     * immediately trigger a second full scan.
+     * when a scan finished less than [DEFAULT_MINIMUM_RESCAN_INTERVAL_MS] ago, so
+     * returning from the document picker — or from any app the reader stepped out
+     * to — does not re-list every added folder (REQ-204).
+     *
+     * A skipped rescan returns before [IngestionState.Scanning] is ever
+     * published, which is the whole of "no scanning banner": the library keeps
+     * showing the stored catalog and says nothing about a scan that did not run.
      */
     suspend fun rescan(trigger: ScanTrigger) = mutate(
         trigger = trigger,
@@ -561,7 +566,33 @@ class LibraryRepository(
     }
 
     companion object {
-        const val DEFAULT_MINIMUM_RESCAN_INTERVAL_MS = 2_000L
+        /**
+         * How recently a scan must have finished for the app-open rescan to be
+         * skipped (REQ-204's "short interval").
+         *
+         * One minute, chosen against the two things the number has to hold apart.
+         *
+         * The behaviour REQ-204 asks for is the app switch: the reader leaves to
+         * answer a message or look something up and comes back, and re-listing
+         * every added folder for that is work nothing asked for and a scanning
+         * banner over a library that has not changed. A minute covers that trip
+         * comfortably; the 2 s this replaces covered almost none of it, and only
+         * ever stopped the picker's own return from scanning twice.
+         *
+         * The other side is the promise the empty-library copy makes in as many
+         * words — books added to a folder later "show up the next time you open
+         * the app". A reader who genuinely goes to a file manager, finds a book,
+         * copies it and comes back has spent more than a minute doing it, so that
+         * still holds automatically; and REQ-204's own second half means the
+         * refresh control finds it either way, immediately, at any point inside
+         * the interval.
+         *
+         * This is deliberately not persisted. [lastScanAtEpochMs] lives in the
+         * process, so a cold start always scans however recently the last one
+         * ran: the interval can only ever suppress a rescan inside one run of
+         * the app, never across a real relaunch.
+         */
+        const val DEFAULT_MINIMUM_RESCAN_INTERVAL_MS = 60_000L
 
         /**
          * How long taking a removal back stays on offer (REQ-105's "short time").

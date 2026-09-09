@@ -135,6 +135,20 @@ class ReaderSettingsTest {
         assertFalse(ReaderSettings.DEFAULTS.copy(highlightEnabled = false).isDefault)
         assertFalse(ReaderSettings.DEFAULTS.copy(focusAlignmentEnabled = true).isDefault)
         assertFalse(ReaderSettings.DEFAULTS.copy(pauseStrength = PauseStrength.OFF).isDefault)
+        assertFalse(ReaderSettings.DEFAULTS.copy(libraryOrder = LibraryOrder.TITLE).isDefault)
+    }
+
+    /**
+     * REQ-203's default. Recently read, not the alphabet v1 shipped: a reader who
+     * never opens the control still gets the book they were last in at the top.
+     *
+     * The cue assertion beside it is the same check the chapter-pause default
+     * carries — that a new field did not disturb an existing default.
+     */
+    @Test
+    fun `the library ships ordered by recently read`() {
+        assertEquals(LibraryOrder.RECENTLY_READ, ReaderSettings.DEFAULTS.libraryOrder)
+        assertEquals(CueSettings.DEFAULTS, ReaderSettings.DEFAULTS.copy(libraryOrder = LibraryOrder.TITLE).cues)
     }
 
     /** The bounded set the definition allows, so an addition to it is a deliberate change. */
@@ -144,5 +158,6 @@ class ReaderSettingsTest {
         assertEquals(4, FontSize.entries.size)
         assertEquals(5, PivotColor.entries.size)
         assertEquals(4, PauseStrength.entries.size)
+        assertEquals(3, LibraryOrder.entries.size)
     }
 }

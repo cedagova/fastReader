@@ -89,6 +89,7 @@ fun LibraryRoute(
         onDismissResumeNotice = onDismissResumeNotice,
         onOpenSettings = onOpenSettings,
         onOpenSample = onOpenSample,
+        onOrderChange = { repository.requestUpdateSettings { settings -> settings.copy(libraryOrder = it) } },
         modifier = modifier,
     )
 }

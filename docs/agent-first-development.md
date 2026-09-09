@@ -135,6 +135,15 @@ macOS-recorded goldens verified green unmodified on the runner, and inverting
   a device shows. Since the 2026-09 refresh the dim layer is composited into the
   capture, so a dialog golden is darker than its pre-refresh reference and now
   matches the device.
+- **A menu golden needs both a screen capture and a clock nudge.** A popup —
+  `DropdownMenu` as much as `AlertDialog` — is its own window, so
+  `onRoot().captureRoboImage(...)` fails with "expected exactly 1 node but found
+  2" and `captureScreenRoboImage(...)` is the one that composites it. That alone
+  is not enough for a menu: it opens through an enter transition, and a capture
+  taken straight after `performClick()` succeeds and records the screen *without*
+  the menu — a green test and an empty golden. Advance the compose clock
+  (`composeRule.mainClock.advanceTimeBy(500)`, then `waitForIdle()`) before
+  capturing, and look at the PNG.
 
 ### Toolchain refresh notes (2026-09, AGP 9)
 

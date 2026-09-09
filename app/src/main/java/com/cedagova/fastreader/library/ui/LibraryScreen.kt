@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,11 +29,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -48,7 +54,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +70,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -72,6 +82,7 @@ import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
+import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.ui.SampleOffer
 import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WideLayoutMinWidth
@@ -141,6 +152,8 @@ fun LibraryScreen(
     onOpenFolders: () -> Unit = {},
     /** Takes back the removal the undo snackbar is offering (REQ-105). */
     onUndoRemove: () -> Unit = {},
+    /** Stores a new library order (REQ-203). The list re-sorts from the stored value. */
+    onOrderChange: (LibraryOrder) -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
     WidthAware(modifier.fillMaxSize()) { layout ->
@@ -203,7 +216,12 @@ fun LibraryScreen(
                         SearchField(query = state.query, onQueryChange = onQueryChange)
                         AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder)
                     }
-                    FoldersEntry(count = state.folders.size, onOpenFolders = onOpenFolders)
+                    ListControls(
+                        order = state.order,
+                        onOrderChange = onOrderChange,
+                        folderCount = state.folders.size,
+                        onOpenFolders = onOpenFolders,
+                    )
                     if (state.content == LibraryContent.NO_SEARCH_RESULTS) {
                         NoSearchResults(state.query)
                     } else {
@@ -317,16 +335,120 @@ private fun UndoBar(notice: UndoNotice, onUndo: () -> Unit) {
  * Only shown once a folder exists: with none, the list would be a dead end, and
  * "Add folder" is already on the screen right above it.
  */
+/**
+ * The two secondary affordances that sit between the header and the list: how
+ * the list is ordered (REQ-203) and the way into the added folders (REQ-104).
+ *
+ * They share one [FlowRow] rather than taking a row each. The library header is
+ * already three rows deep before the list starts, and on a landscape phone the
+ * whole window is 411 dp tall (REQ-205), so a row that only ever holds one short
+ * control is height the books should have. Side by side when they fit, stacked
+ * when they do not — which is what a large font scale plus a plural folder count
+ * eventually forces, and stacking is the outcome that keeps REQ-301's "nothing
+ * clipped" true without a second breakpoint.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit, horizontalPadding: Dp = 16.dp) {
+private fun ListControls(
+    order: LibraryOrder,
+    onOrderChange: (LibraryOrder) -> Unit,
+    folderCount: Int,
+    onOpenFolders: () -> Unit,
+    horizontalPadding: Dp = 16.dp,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        OrderControl(order = order, onOrderChange = onOrderChange)
+        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders)
+    }
+}
+
+/**
+ * REQ-203's order control: the current order, and a menu of the three.
+ *
+ * A menu rather than three buttons or a segmented row. Three labels laid out
+ * across a 360 dp phone at the largest font size is the shape that clips, and
+ * the reader is choosing one of a small set they rarely change — the case a
+ * menu is for. The button says which order is on, so the answer to "how is this
+ * sorted?" is on screen without opening anything.
+ *
+ * The menu's own state is [rememberSaveable] because the choice it writes goes
+ * through the repository: the menu must survive the recomposition its own tap
+ * causes, and a configuration change while it is open should not silently close
+ * it.
+ */
+@Composable
+private fun OrderControl(order: LibraryOrder, onOrderChange: (LibraryOrder) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val current = order.label()
+    // One label for the whole control, so TalkBack says what the button does and
+    // which order is on rather than reading "Sort colon Recently read".
+    val label = stringResource(R.string.library_order_label, current)
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .defaultMinSize(minHeight = TouchTarget)
+                .testTag("library_order")
+                .semantics { contentDescription = label },
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(stringResource(R.string.library_order_button, current))
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.testTag("library_order_menu"),
+        ) {
+            LibraryOrder.entries.forEach { choice ->
+                val chosen = choice == order
+                DropdownMenuItem(
+                    text = { Text(choice.label()) },
+                    onClick = {
+                        expanded = false
+                        onOrderChange(choice)
+                    },
+                    // A tick on the current order, and the same fact in the
+                    // semantics tree so TalkBack announces it as selected rather
+                    // than describing an icon.
+                    leadingIcon = {
+                        if (chosen) {
+                            Icon(Icons.Filled.Check, contentDescription = null)
+                        } else {
+                            Spacer(Modifier.size(24.dp))
+                        }
+                    },
+                    modifier = Modifier
+                        .testTag("library_order_${choice.name.lowercase()}")
+                        .semantics { selected = chosen },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryOrder.label(): String = stringResource(
+    when (this) {
+        LibraryOrder.TITLE -> R.string.library_order_title
+        LibraryOrder.RECENTLY_READ -> R.string.library_order_recently_read
+        LibraryOrder.RECENTLY_ADDED -> R.string.library_order_recently_added
+    },
+)
+
+@Composable
+private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit) {
     if (count == 0) return
     TextButton(
         onClick = onOpenFolders,
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding)
             .defaultMinSize(minHeight = TouchTarget)
             .testTag("library_open_folders"),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(pluralStringResource(R.plurals.library_folders_open_count, count, count))
     }
@@ -434,7 +556,7 @@ private fun EmptyLibrary(
         AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder, horizontalPadding = 0.dp)
         // An added folder with nothing readable in it still has to be reachable,
         // or the only way to take it back out would be to add a book first.
-        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders, horizontalPadding = 0.dp)
+        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders)
         Text(
             text = stringResource(R.string.library_empty_in_place),
             style = MaterialTheme.typography.bodyMedium,
