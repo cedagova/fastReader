@@ -76,13 +76,28 @@
                 application/octet-stream or as a plain zip.
 
                 Gated on the file name, so FastReader is not offered for every
-                binary on the device. pathAdvancedPattern is a real regular
-                expression and is available from API 26, which is this app's
-                minSdk; the simple-glob pathPattern cannot express
-                case-insensitivity and backtracks badly over a path with several
-                dots in it. The wildcard host is every content authority: a
-                content URI always has one, any provider may hold a book, and a
-                filter that tests a path has to name a host to be well formed.
+                binary on the device. The gate is written twice, because neither
+                form covers this app's whole minSdk range on its own:
+
+                - pathAdvancedPattern is a real regular expression, so one
+                  pattern matches every casing of ".epub". It is API 31. Below
+                  that the manifest parser drops the attribute, and a filter left
+                  with only that gate would have no path constraint at all -
+                  which is exactly the "in the chooser for every binary" outcome
+                  this comment exists to prevent.
+                - pathPattern is API 1 and is the gate that actually holds on API
+                  26-30. Its simple glob cannot express case-insensitivity, so
+                  the two spellings a real file uses get one element each.
+
+                All <data> elements in one intent-filter contribute to the same
+                sets, so these paths are OR-ed with each other and with the three
+                MIME types above them; the pathPattern elements need no mimeType
+                of their own. The cost of the older gate is a mixed-case name
+                like "Book.Epub", which only the API 31+ pattern catches.
+
+                The wildcard host is every content authority: a content URI
+                always has one, any provider may hold a book, and a filter that
+                tests a path has to name a host to be well formed.
             -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -103,6 +118,14 @@
                     android:host="*"
                     android:mimeType="application/x-zip-compressed"
                     android:pathAdvancedPattern=".*\.[eE][pP][uU][bB]" />
+                <data
+                    android:scheme="content"
+                    android:host="*"
+                    android:pathPattern=".*\\.epub" />
+                <data
+                    android:scheme="content"
+                    android:host="*"
+                    android:pathPattern=".*\\.EPUB" />
             </intent-filter>
 
             <!--
