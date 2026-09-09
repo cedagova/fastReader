@@ -194,6 +194,42 @@ one glance. Two things make it trustworthy:
   becomes tens of captured frames instead of one that sampling could miss. Put
   the scales back to `1.0` afterwards.
 
+### Inducing a crash on a device
+
+Debug builds carry `com.cedagova.fastreader.debug.CrashInducerActivity`, which
+throws in `onCreate` and does nothing else. It is in `src/debug`, so neither the
+class nor its manifest entry exists in a release build, and
+`CrashInducerIsDebugOnlyTest` keeps it there.
+
+```bash
+adb shell am start -n com.cedagova.fastreader/com.cedagova.fastreader.debug.CrashInducerActivity
+adb logcat -d -s AndroidRuntime:E                              # the crash was delivered
+adb shell run-as com.cedagova.fastreader cat files/crash/report.txt
+adb shell am start -n com.cedagova.fastreader/.MainActivity    # the offer, once
+```
+
+It is exported, because `am start` runs as the shell user and the shell may only
+start an activity another uid has exported.
+
+Two things about the run itself:
+
+- **Crashing twice in a row brings up the platform's own "FastReader keeps
+  stopping" dialog**, on top of the app. Dismiss it (`Close app`) and
+  `am force-stop` before relaunching, or the screenshot is of that dialog.
+- **The task restarts itself.** When the inducer crashes above a live
+  `MainActivity`, the system rebuilds the process and resumes the activity
+  underneath — so the app can be back on screen, offer and all, before the
+  `am start` that was meant to relaunch it. Check with `pidof`, not the clock.
+
+### What a shared crash report may contain
+
+Anything that reaches `files/crash/report.txt` is something a reader can hand to
+another app, so the renderer in `crash/CrashReport.kt` keeps a closed shape:
+fixed header lines, exception *types*, and call sites — no exception messages at
+all, and every interpolated value filtered to characters that cannot spell a
+path. Adding a field means adding its line shape to `CrashReportTest`'s
+allow-list, which is the point at which to ask what that field could carry.
+
 ### Resource-folder quirk
 
 `mipmap-anydpi` without a version qualifier does not link: `aapt2` reports
