@@ -1,0 +1,17 @@
+{
+  "label": "external-illustrated-52mb",
+  "runs": 7,
+  "cold": true,
+  "intervals": [
+    1.5946,
+    1.5552,
+    1.5535,
+    1.5987,
+    1.5694,
+    1.5846,
+    1.5801
+  ],
+  "median": 1.5801,
+  "min": 1.5535,
+  "max": 1.5987
+}

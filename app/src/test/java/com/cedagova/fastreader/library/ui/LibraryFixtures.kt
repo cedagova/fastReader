@@ -24,6 +24,26 @@ internal object LibraryFixtures {
         sources = listOf(source("content://books/$id", fileName)),
     )
 
+    /**
+     * A book provided by a folder, optionally also picked directly — the second
+     * source is what keeps it in the library when that folder is removed.
+     */
+    fun inFolder(
+        id: String,
+        title: String,
+        folderId: String,
+        fileName: String = "$title.epub",
+        alsoPickedDirectly: Boolean = false,
+    ) = Book(
+        id = id,
+        title = title,
+        contentStatus = BookContentStatus.READABLE,
+        sources = listOfNotNull(
+            source("content://tree/$id", fileName, SourceOrigin.FOLDER, folderId),
+            if (alsoPickedDirectly) source("content://picked/$id", fileName) else null,
+        ),
+    )
+
     fun rejected(
         id: String,
         title: String,

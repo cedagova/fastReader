@@ -210,6 +210,27 @@ object EpubFixtures {
      */
     fun buildArchive(entries: List<Pair<String, ByteArray>>): ByteArray = zip(entries)
 
+    /**
+     * The same archive, plus the byte span each entry occupies — its local header
+     * and its data.
+     *
+     * Lets a test poison an entry at the file level: corrupt those bytes, or make
+     * a channel throw on them, and any reader that touches the entry fails, while
+     * a reader that seeks past it does not notice.
+     */
+    fun buildArchiveWithSpans(
+        entries: List<Pair<String, ByteArray>>,
+    ): Pair<ByteArray, Map<String, IntRange>> {
+        val (bytes, endOffsets) = zipWithEntryOffsets(entries)
+        val spans = LinkedHashMap<String, IntRange>()
+        var start = 0
+        endOffsets.forEach { (name, end) ->
+            spans[name] = start until end
+            start = end
+        }
+        return bytes to spans
+    }
+
     private fun baseEntries(): List<Pair<String, ByteArray>> = listOf(
         "META-INF/container.xml" to CONTAINER.toByteArray(Charsets.UTF_8),
         "OEBPS/content.opf" to opf("Locked Book", "Unknown", "en", "urn:uuid:locked", withCover = false)

@@ -51,14 +51,19 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.reader.ui.resolve
+import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
 import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.fastreader.ui.SampleOffer
+import com.cedagova.fastreader.ui.rememberSampleOrder
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
 private val TouchTarget = 48.dp
@@ -89,6 +94,15 @@ private val TouchTarget = 48.dp
  * page in front of the reader; the internal words for the mechanism ("pivot",
  * "recognition point") stay in the code and out of the UI.
  *
+ * ## About (#46)
+ *
+ * The last section is not a set of choices: it states which build this is
+ * (REQ-106), offers the one outbound action in the app — handing the releases
+ * page to a browser — and says in plain sentences what stays on the device and
+ * what leaves it (REQ-107). It is stateless in the same way the rest of the
+ * screen is: the version arrives as a value, and whether the hand-off found a
+ * browser arrives as a flag, so both states are reachable from a golden.
+ *
  * ## REQ-060
  *
  * The choice rows are [selectableGroup]s, so TalkBack announces "2 of 4" and
@@ -104,11 +118,27 @@ fun SettingsScreen(
     onSettingsChange: (ReaderSettings) -> Unit,
     onReset: () -> Unit,
     onBack: () -> Unit,
+    /** The installed package's version, shown in About (REQ-106). */
+    version: AppVersion,
+    /** Hands the releases page to the reader's browser (REQ-106). */
+    onCheckForUpdates: () -> Unit,
     modifier: Modifier = Modifier,
     /** Why a change did not stick, or null when the store is accepting writes. */
     persistenceFailure: String? = null,
+    /** The last hand-off found no app able to open a web link (REQ-106 edge). */
+    updateHandoffUnavailable: Boolean = false,
     /** Holds the preview on one token so a golden captures a deterministic frame. */
     heldPreviewToken: Int? = null,
+    /**
+     * Opens one of the texts shipped inside the app (REQ-109).
+     *
+     * The offer lives here as well as in the empty library because the library
+     * stops showing it the moment there are real books, and a reader who wants to
+     * show someone what the app does should not have to empty their shelf first.
+     */
+    onOpenSample: (BundledSample) -> Unit = {},
+    /** The samples, in the order this device should see them (Spanish first on a Spanish device). */
+    samples: List<BundledSample> = rememberSampleOrder(),
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("settings_screen"),
@@ -222,12 +252,134 @@ fun SettingsScreen(
                     Text(stringResource(R.string.settings_reset))
                 }
 
+                SectionHeading(stringResource(R.string.settings_section_sample))
+                SampleOffer(onOpenSample = onOpenSample, samples = samples)
+
                 SectionHeading(stringResource(R.string.settings_section_about))
+                VersionRow(version)
+                CheckForUpdatesRow(
+                    onCheckForUpdates = onCheckForUpdates,
+                    handoffUnavailable = updateHandoffUnavailable,
+                )
+                PrivacyStatement()
                 VisualOnlyStatement()
                 Spacer(Modifier.height(24.dp))
             }
         }
     }
+}
+
+/**
+ * REQ-106's first half: which FastReader this is.
+ *
+ * The value comes from the installed package (see [AppVersion]), so the row is a
+ * statement about the artifact on the device rather than about the sources it was
+ * built from. Name and build number are announced as one node — "Version 1.0.1,
+ * build 2" — because a screen reader stopping separately on the word "Version"
+ * and on "1.0.1 (build 2)" tells a reader less than the sentence does.
+ */
+@Composable
+private fun VersionRow(version: AppVersion) {
+    val description =
+        stringResource(R.string.settings_version_description, version.name, version.code)
+    Spacer(Modifier.height(4.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = TouchTarget)
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .testTag("settings_version"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.settings_version_label),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        // Both halves are weighted, so the widest text this app can be asked for
+        // wraps the value instead of taking the whole row and squeezing the
+        // label out of existence (REQ-301, and the golden at 360 dp / scale 2).
+        Text(
+            text = stringResource(R.string.settings_version_value, version.name, version.code),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * REQ-106's second half: a hand-off, and copy that says so before it happens.
+ *
+ * FastReader holds no network permission, so it cannot check anything itself; the
+ * action opens the releases page in the reader's browser. The summary says that
+ * in the button's own announcement rather than only next to it, so a reader using
+ * TalkBack learns where the tap goes before taking it — the same treatment the cue
+ * switches give their summaries.
+ *
+ * When nothing on the device can open a web link the tap fails loud: the address
+ * is shown so it is still usable, rather than the app swallowing the failure or
+ * crashing on the uncaught `ActivityNotFoundException`.
+ */
+@Composable
+private fun CheckForUpdatesRow(onCheckForUpdates: () -> Unit, handoffUnavailable: Boolean) {
+    val label = stringResource(R.string.settings_check_updates)
+    val summary = stringResource(R.string.settings_check_updates_summary)
+    Spacer(Modifier.height(12.dp))
+    Text(
+        text = summary,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clearAndSetSemantics {},
+    )
+    Spacer(Modifier.height(8.dp))
+    OutlinedButton(
+        onClick = onCheckForUpdates,
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = TouchTarget)
+            .semantics { contentDescription = "$label. $summary" }
+            .testTag("settings_check_updates"),
+    ) {
+        Text(text = label, modifier = Modifier.clearAndSetSemantics {})
+    }
+    if (handoffUnavailable) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.settings_check_updates_unavailable),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.fillMaxWidth().testTag("settings_check_updates_unavailable"),
+        )
+    }
+}
+
+/**
+ * REQ-107: what leaves this device and what is kept on it, in four sentences that
+ * each map to a manifest declaration or to something the app is observed doing.
+ *
+ * It sits in About next to the version and the update hand-off because those are
+ * the two things it is about — there is no separate privacy screen to bury it in,
+ * and the same wording is the release notes' privacy paragraph
+ * (`docs/privacy-statement.md`, which `PrivacyStatementTest` holds to this
+ * string).
+ */
+@Composable
+private fun PrivacyStatement() {
+    Spacer(Modifier.height(20.dp))
+    Text(
+        text = stringResource(R.string.settings_privacy_label),
+        style = MaterialTheme.typography.bodyLarge,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = stringResource(R.string.settings_privacy),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth().testTag("settings_privacy"),
+    )
+    Spacer(Modifier.height(20.dp))
 }
 
 /**

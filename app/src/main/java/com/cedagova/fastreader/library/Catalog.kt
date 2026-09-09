@@ -48,6 +48,30 @@ data class Catalog(
     fun book(id: String): Book? = books.firstOrNull { it.id == id }
 
     fun folder(id: String): BookFolder? = folders.firstOrNull { it.id == id }
+
+    /** Every book this folder currently provides, at any depth beneath it. */
+    fun booksIn(folderId: String): List<Book> =
+        books.filter { book -> book.sources.any { it.folderId == folderId } }
+
+    /**
+     * The books that would leave the library if this folder were removed — the
+     * ones it *alone* provides (REQ-104).
+     *
+     * A book reachable from anywhere else keeps that other source and stays, so
+     * a file that was also picked directly, or that also sits inside a second
+     * added folder, is not counted. This is the number the removal confirmation
+     * names, and it is derived from the same sources removal itself drops, so
+     * the count and the outcome cannot drift apart.
+     *
+     * The emptiness guard is what makes `all` mean what it says: with no source
+     * at all it would vacuously hold and count a book this folder never
+     * provided. Ingestion always attaches a source and removal drops a book that
+     * runs out of them, so no such entry is reachable today; the guard keeps the
+     * count honest if one ever becomes so.
+     */
+    fun booksOnlyFrom(folderId: String): List<Book> = books.filter { book ->
+        book.sources.isNotEmpty() && book.sources.all { it.folderId == folderId }
+    }
 }
 
 /** A book in the catalog, identified by content rather than by where it lives (AD-2). */
@@ -155,6 +179,10 @@ enum class FolderStatus { AVAILABLE, MISSING, PERMISSION_LOST }
  * - [bookDigest] — the content-derived identity (AD-2) the position was taken in.
  *   The map key is that same digest today, but storing it makes a position
  *   self-describing rather than only meaningful in the slot it happens to sit in.
+ *   Since v1.1.0 the reader is *handed* this identity rather than deriving it
+ *   from the bytes it reads (AD-8), so comparing it no longer detects a file
+ *   whose content changed under an unchanged catalog entry; the rescan
+ *   fingerprint on [BookSource] does that.
  * - [pipelineVersion] — the tokenization rules the index counts (AD-3). When they
  *   change, the stored index points at a different word; the reader detects that
  *   and falls back to [progressFraction] instead of silently resuming somewhere

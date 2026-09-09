@@ -1,0 +1,6 @@
+stripped-38kb-this-build-cold (cold cache): runs=5 median=0.297 min=0.291 max=0.455
+  run 1: 0.455
+  run 2: 0.297
+  run 3: 0.295
+  run 4: 0.291
+  run 5: 0.297

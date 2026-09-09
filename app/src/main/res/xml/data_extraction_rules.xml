@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Whole-app exclusion from both halves of Android 12+ data extraction (AD-11,
+  D3, REQ-107).
+
+  `android:allowBackup="false"` in the manifest already stops cloud backup and
+  restore everywhere the app runs, and on API 26-30 it stops everything. From
+  API 31 it does *not* stop device-to-device transfer: that path is governed
+  only by this file, so an unexcluded app's library, positions, settings and
+  cover cache would still be copied onto a new phone by the setup wizard.
+
+  Every domain is listed, in both sections, because the domains do not nest:
+  `root` is the app's data directory itself, and `files/`, `databases/` and
+  `shared_prefs/` are the separate `file`, `database` and `sharedpref` domains.
+  Excluding `root` alone leaves all three backed up — measured on the emulator,
+  where a build carrying only the three-domain version of this file still handed
+  the whole catalog and cover cache to the transport. The `device_*` domains are
+  the same four in device-protected storage, and `external` is anything the app
+  might ever write outside its sandbox.
+
+  Nothing is opted back in, and nothing ever should be: an inclusion element
+  anywhere in this file fails AppVersionTest.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </device-transfer>
+</data-extraction-rules>

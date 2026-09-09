@@ -1,10 +1,7 @@
 package com.cedagova.fastreader.library.ui
 
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
+import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
@@ -33,13 +31,17 @@ fun LibraryRoute(
     resumeBlocked: ResumeBlocked? = null,
     onDismissResumeNotice: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    /** Opens a text shipped inside the app, offered while the library is empty (REQ-109). */
+    onOpenSample: (BundledSample) -> Unit = {},
 ) {
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
     val ingestion by repository.ingestion.collectAsState()
+    val undoableRemoval by repository.undoableRemoval.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    val state = remember(catalog, ingestion, query, resumeBlocked) {
-        buildLibraryUiState(catalog, ingestion, query, resumeBlocked)
+    var foldersOpen by rememberSaveable { mutableStateOf(false) }
+    val state = remember(catalog, ingestion, query, resumeBlocked, undoableRemoval) {
+        buildLibraryUiState(catalog, ingestion, query, resumeBlocked, undoableRemoval)
     }
     val coverLoader = remember(graph) { CoverStoreLoader(graph.covers) }
 
@@ -59,6 +61,14 @@ fun LibraryRoute(
     val libraryIsEmpty = catalog.books.isEmpty()
     LaunchedEffect(libraryIsEmpty) { if (libraryIsEmpty) query = "" }
 
+    // The folder list sits over the library rather than beside it in a navigation
+    // graph, for the same reason settings do: it is one place the reader steps
+    // into and back out of, and the library behind it keeps its search and scroll.
+    if (foldersOpen) {
+        FolderListRoute(graph = graph, onBack = { foldersOpen = false }, modifier = modifier)
+        return
+    }
+
     LibraryScreen(
         state = state,
         onQueryChange = { query = it },
@@ -66,6 +76,8 @@ fun LibraryRoute(
         onAddFolder = { pickFolder.launch(null) },
         onRefresh = { repository.requestRescan(ScanTrigger.MANUAL_REFRESH) },
         onRemove = { repository.requestRemoveBook(it.id) },
+        onUndoRemove = { repository.requestUndoRemoveBook() },
+        onOpenFolders = { foldersOpen = true },
         onOpen = { onOpenBook(it.id) },
         onGrantAccess = { book ->
             // Re-granting a folder re-adds it at the same tree URI, which restores
@@ -76,25 +88,7 @@ fun LibraryRoute(
         coverLoader = coverLoader,
         onDismissResumeNotice = onDismissResumeNotice,
         onOpenSettings = onOpenSettings,
+        onOpenSample = onOpenSample,
         modifier = modifier,
     )
 }
-
-/**
- * The stock picker contracts do not ask for a persistable grant, so the read
- * permission would be gone the next time the app starts. Both contracts below add
- * that flag; the catalog then takes the long-lived grant (AD-1).
- */
-private class PickPersistableDocuments : ActivityResultContracts.OpenMultipleDocuments() {
-    override fun createIntent(context: Context, input: Array<String>): Intent =
-        super.createIntent(context, input).withPersistableRead()
-}
-
-private class PickPersistableDocumentTree : ActivityResultContracts.OpenDocumentTree() {
-    override fun createIntent(context: Context, input: Uri?): Intent =
-        super.createIntent(context, input).withPersistableRead()
-}
-
-private fun Intent.withPersistableRead(): Intent = addFlags(
-    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
-)

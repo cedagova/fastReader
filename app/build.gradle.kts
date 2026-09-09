@@ -95,6 +95,16 @@ android {
         compose = true
     }
 
+    androidResources {
+        // The bundled samples (#48) are stored, not deflated, inside the APK.
+        // An EPUB is already a deflated zip, so compressing it again saves
+        // almost nothing, and only an uncompressed asset has a file descriptor
+        // AssetManager.openFd can hand out — which is what lets the reader seek
+        // to the four entries it wants instead of streaming past the rest
+        // (REQ-110). See app/src/main/java/.../content/SampleBookSource.kt.
+        noCompress += "epub"
+    }
+
     // EPUB fixtures are shared by the JVM tests and the on-device SAF test.
     sourceSets {
         getByName("test").java.srcDir("src/sharedTest/java")
@@ -106,6 +116,19 @@ android {
             isIncludeAndroidResources = true
         }
     }
+}
+
+// The committed goldens are read by Roborazzi at compare time but are not part
+// of any source set, so Gradle did not see them as an input: editing a golden
+// left :app:testDebugUnitTest UP-TO-DATE and `verifyRoborazziDebug` reported a
+// green gate over a changed reference image. Declaring the directory makes a
+// golden edit invalidate the task locally and invalidate the build-cache key on
+// CI, so the regression gate always actually runs. This tightens the gate; it
+// changes no tolerance.
+tasks.withType<Test>().configureEach {
+    inputs.dir(layout.projectDirectory.dir("screenshots"))
+        .withPropertyName("roborazziGoldens")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 kotlin {
