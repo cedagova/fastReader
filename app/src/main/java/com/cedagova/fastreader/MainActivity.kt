@@ -17,6 +17,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.cedagova.fastreader.content.BundledSample
+import com.cedagova.fastreader.crash.CrashReportStore
+import com.cedagova.fastreader.crash.ui.CrashReportOfferHost
 import com.cedagova.fastreader.external.incomingBook
 import com.cedagova.fastreader.library.LaunchDestination
 import com.cedagova.fastreader.library.LibraryGraph
@@ -49,7 +51,8 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val library = (application as FastReaderApplication).library
+        val app = application as FastReaderApplication
+        val library = app.library
         // Only on a genuine launch (REQ-103). `savedInstanceState` is the exact
         // discriminator the behaviour needs: null means someone just handed this
         // app a book, while non-null means the activity is being rebuilt. A
@@ -65,7 +68,7 @@ class MainActivity : ComponentActivity() {
             // without either screen knowing the settings exist.
             val settings by library.repository.settings.collectAsState()
             FastReaderTheme(darkTheme = settings.theme.isDark(), fontSize = settings.fontSize) {
-                FastReaderApp(library)
+                FastReaderApp(library, app.crashReports)
             }
         }
     }
@@ -127,7 +130,7 @@ private fun LibraryGraph.acceptIfExternal(intent: Intent?) {
  * sample is not in it.
  */
 @Composable
-private fun FastReaderApp(library: LibraryGraph) {
+private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
     // A book handed over by another app (REQ-103). Not saved state: it belongs to
@@ -254,6 +257,12 @@ private fun FastReaderApp(library: LibraryGraph) {
             onOpenSettings = { settingsOpen = true },
         )
     }
+
+    // Over whichever destination the launch settled on, and only once the launch
+    // has settled: a dialog above the blank routing frame would be the first
+    // thing a reader saw, with nothing behind it to say which app it belongs to.
+    // It is its own window, so it needs no place in the layout above.
+    if (routed) CrashReportOfferHost(crashReports)
 }
 
 /**
