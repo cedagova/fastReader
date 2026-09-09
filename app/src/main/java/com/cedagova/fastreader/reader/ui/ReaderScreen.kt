@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -401,11 +403,15 @@ private fun ExternalOpenNotice(onAddToLibrary: () -> Unit, onDismiss: () -> Unit
  *
  * ## Accessibility (REQ-301)
  *
- * The sentence above the buttons names the chapter the skip goes to, so the
- * spoken label of the skip button carries the destination too — "Skip to Chapter
- * One" tells a reader who cannot see the sentence what the tap will do. Both
- * buttons clear [TouchTarget].
+ * The skip button names the chapter it goes to, so a reader who cannot see the
+ * sentence above it still learns where the tap lands. That label is as long as
+ * the book's chapter title, which is why the buttons sit in a [FlowRow]: on a
+ * 360 dp screen at a large font scale a plain `Row` gives the second button no
+ * width at all, wraps its label one character to a line, and pushes the way to
+ * decline off the screen — the compact golden beside this one was recorded
+ * against exactly that failure. Both buttons clear [TouchTarget].
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FrontMatterOfferNotice(chapterTitle: String, onSkip: () -> Unit, onDismiss: () -> Unit) {
     Surface(
@@ -418,7 +424,7 @@ private fun FrontMatterOfferNotice(chapterTitle: String, onSkip: () -> Unit, onD
                 text = stringResource(R.string.reader_front_matter_notice),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(
                     onClick = onSkip,
                     modifier = Modifier
