@@ -21,6 +21,7 @@ import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ui.LibraryFixtures
 import com.cedagova.fastreader.library.ui.LibraryScreen
 import com.cedagova.fastreader.library.ui.buildLibraryUiState
+import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ui.SettingsScreen
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
@@ -79,6 +80,8 @@ class SampleOfferTest {
                     onSettingsChange = {},
                     onReset = {},
                     onBack = {},
+                    version = AppVersion(name = "1.0.1", code = 2),
+                    onCheckForUpdates = {},
                     samples = samples,
                 )
             }
