@@ -1,3 +1,15 @@
+# Toolchain and libraries, last refreshed to current stable 2026-09-09 (#50).
+#
+# Everything below is the newest stable release of its artifact at that date;
+# nothing is held back. Two versions are constrained rather than chosen:
+#
+#   * material-icons-core is a deprecated artifact frozen at 1.7.8, and the
+#     Compose BOM pins it, so it carries no version here (see [libraries]).
+#   * junit stays 4.13.2 because that is the last JUnit 4 release.
+#
+# When something cannot move, pin it here with the reason on the line above it.
+# compileSdk/targetSdk live in app/build.gradle.kts and track the same policy.
+
 [versions]
 agp = "9.4.0"
 kotlin = "2.4.20"
