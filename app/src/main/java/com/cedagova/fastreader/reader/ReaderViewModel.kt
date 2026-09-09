@@ -362,7 +362,6 @@ class ReaderViewModel(
     fun skipFrontMatter() {
         val offer = _frontMatterOffer.value ?: return
         _frontMatterOffer.value = null
-        frontMatterOfferSettled = false
         frontMatterOfferSettled = true
         update { it.jumpTo(offer.startTokenIndex) }
     }
@@ -370,7 +369,6 @@ class ReaderViewModel(
     /** Declines the offer: the reader stays on the cover, and it is not raised again. */
     fun dismissFrontMatterOffer() {
         _frontMatterOffer.value = null
-        frontMatterOfferSettled = false
         frontMatterOfferSettled = true
     }
 
