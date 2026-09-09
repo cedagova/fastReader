@@ -35,7 +35,6 @@ val keystoreProperties: Properties? = keystorePropertiesPath
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.roborazzi)
     alias(libs.plugins.kotlin.serialization)
@@ -43,12 +42,12 @@ plugins {
 
 android {
     namespace = "com.cedagova.fastreader"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.cedagova.fastreader"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -106,9 +105,12 @@ android {
     }
 
     // EPUB fixtures are shared by the JVM tests and the on-device SAF test.
+    // AGP 9 compiles Kotlin through its built-in Kotlin support, which reads the
+    // source set's `kotlin` directories, not `java`: registering the shared
+    // directory on `java` alone left every fixture unresolved at test compile.
     sourceSets {
-        getByName("test").java.srcDir("src/sharedTest/java")
-        getByName("androidTest").java.srcDir("src/sharedTest/java")
+        getByName("test").kotlin.directories.add("src/sharedTest/java")
+        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
     }
 
     testOptions {
@@ -143,6 +145,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
