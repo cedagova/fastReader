@@ -326,6 +326,69 @@ class ReaderScreenScreenshotTest {
         )
     }
 
+    // --- REQ-205, controls beside the stream ---------------------------------
+    //
+    // The requirement's own words are "no control below the stream": that is a
+    // claim about an image and nothing else, so these are the images. The three
+    // widths are the boundary device, the same rule reached by turning a phone on
+    // its side, and a 10" tablet, and the acceptance's largest font size is
+    // applied the way [ReaderRoute] applies it — through the theme *and* the cue
+    // value, because the word's own size does not move on Android's font curve.
+
+    /**
+     * The boundary: `Tablet_Low_API33` is exactly 600 dp wide, and this is what it
+     * renders. Chapter, progress, scrubber, transport and speed are all to the
+     * right of the stream; nothing is under it.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_BOUNDARY)
+    fun atExactlySixHundredDpTheControlsAreBesideTheStream() {
+        capture("reader_tablet", pausedAt(12))
+    }
+
+    /**
+     * The same 600 dp at the largest font size — the narrowest control column the
+     * app ever draws, carrying the largest text it ever puts in it. This is the
+     * one image that settles both halves of the acceptance at once: no control
+     * below the stream, and no label cut off inside the column.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_BOUNDARY)
+    fun theTabletControlColumnIsWholeAtTheLargestFontSize() {
+        largeFontCapture("reader_tablet_large_font", pausedAt(12))
+    }
+
+    /** The reference phone on its side at the largest font size. */
+    @Test
+    @Config(sdk = [35], qualifiers = LANDSCAPE_PHONE)
+    fun theLandscapeControlColumnIsWholeAtTheLargestFontSize() {
+        largeFontCapture("reader_landscape_large_font", pausedAt(12))
+    }
+
+    /** `Tablet_Mid_API36`: the control column stops growing, the stream does not. */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_LARGE)
+    fun aTenInchTabletSpendsItsExtraWidthOnTheStream() {
+        largeFontCapture("reader_tablet_large", playingAt(12))
+    }
+
+    /**
+     * REQ-030 is unchanged by REQ-205: focused mode has no control column, so the
+     * wide branch is skipped and the tablet shows the same full-bleed stream a
+     * phone does. Compare with `reader_tablet`, the same session at the same
+     * width with the chrome on.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_BOUNDARY)
+    fun focusedModeIsTheSameFullBleedStreamAtTabletWidth() {
+        capture("reader_tablet_focused", playingAt(12), cues = CueSettings.DEFAULTS, focused = true)
+    }
+
+    private fun largeFontCapture(name: String, state: ReaderUiState) {
+        val largest = ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE)
+        capture(name, state, cues = largest.cues, fontSize = largest.fontSize)
+    }
+
     private fun playingAt(index: Int) = view.present(ReaderSession(book).jumpTo(index).play())
 
     private fun pausedAt(index: Int) = view.present(ReaderSession(book).jumpTo(index))
@@ -392,3 +455,12 @@ private const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"
 
 /** The reference phone turned on its side: the shortest reading area the app has to fit. */
 private const val LANDSCAPE_PHONE = "w914dp-h411dp-land-xxhdpi"
+
+/**
+ * The `sw600dp` boundary itself, matching the `Tablet_Low_API33` AVD, which is
+ * exactly 600 dp wide. A breakpoint that is wrong by one dp is wrong only here.
+ */
+private const val TABLET_BOUNDARY = "w600dp-h960dp-xhdpi"
+
+/** 10" tablet at 2560 x 1600, matching the `Tablet_Mid_API36` AVD: 1280 x 800 dp. */
+private const val TABLET_LARGE = "w1280dp-h800dp-land-xhdpi"

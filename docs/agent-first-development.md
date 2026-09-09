@@ -229,6 +229,22 @@ fixed header lines, exception *types*, and call sites — no exception messages 
 all, and every interpolated value filtered to characters that cannot spell a
 path. Adding a field means adding its line shape to `CrashReportTest`'s
 allow-list, which is the point at which to ask what that field could carry.
+### Compose layout quirks
+
+- **A lazy grid measures its items with an unbounded height.** Inside a
+  `LazyVerticalGrid` item, `Modifier.fillMaxHeight()` does nothing and a
+  `Modifier.weight()` in a `Column` resolves against infinity. The first draft of
+  the tablet library used both to line the row dividers up, and rendered four
+  books at zero height — a build that passed, a screen that was empty, and no
+  error anywhere. The fix that does line them up is a *leading* divider: every
+  cell in a grid row starts at the same y, so a rule above each item draws an
+  unbroken line while a rule below each item draws a staircase.
+- **Compare a `dp` breakpoint in whole pixels.** `600.dp` is the width of
+  `Tablet_Low_API33` exactly, and converting that device's pixel width back to
+  `Dp` can land on 599.99997 at a non-integral density (420 dpi is 2.625x). Round
+  both sides to pixels through the same `Density` and the boundary device lands
+  on the side of its own breakpoint that the `sw600dp` resource qualifier would
+  have put it on.
 
 ### Resource-folder quirk
 
