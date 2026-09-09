@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/36
 - Planning PR: https://github.com/cedagova/fastReader/pull/40
-- Status: Review
+- Status: Ready for implementation
 - Root classification: INCREMENTAL
 - Delivery topology: INCREMENTAL
 - Planner: Planning lead (Claude)
@@ -352,7 +352,13 @@ constrained by the invariants and acceptance below.
   the fallback recorded in the leaf's evidence rather than hidden. An absent
   stored fingerprint (every position written before the migration) is likewise
   not a mismatch — no guard, current behaviour — so nobody's position is
-  thrown away by the upgrade.
+  thrown away by the upgrade. The write path is decided here too, because the
+  one failure mode that loses protection silently is an open that stores an
+  empty fingerprint over a good one: **a position written from an open that
+  produced no fingerprint keeps whatever fingerprint is already stored**, and
+  the first directory open of a book after the migration arms the guard by
+  storing one. A book therefore only ever gains protection, never loses it to
+  one awkward source.
 
 ## Execution graph and waves
 
@@ -387,10 +393,12 @@ frontier). Leaves depend only on siblings inside their own increment.
     LEAF603, whose schema step lands immediately before it). Added by the
     owner decision of 2026-09-09 that put follow-up #62 in this increment.
   - wave 5: LEAF606 Spanish interface (blocked by LEAF602, LEAF603, LEAF604,
-    LEAF605, LEAF608 — it translates every string those leaves add, and the
-    owner's ordering rule keeps Spanish the last product leaf before the
-    release; LEAF608 adds no string, so the added edge is ordering, not
-    translation).
+    LEAF605 — it translates every string those leaves add — and by LEAF608).
+    The owner's decision placed #62 in 002 blocked by LEAF603 and said nothing
+    about Spanish; the LEAF608 edge is a **planner ordering choice**, keeping
+    this plan's existing property that Spanish is the last product leaf before
+    the release so the tail into LEAF607 stays a single line. LEAF608 adds no
+    string, so it is ordering, not translation.
   - wave 6: LEAF607 v1.2.0 release and update proof (blocked by LEAF606
     only — unchanged, because LEAF606 still gates it).
   - Completion rule: `main` green in CI on the refreshed toolchain; every
@@ -694,7 +702,10 @@ design (D3), which the privacy copy states.
   is refused and the book restarts at 0. A source that falls back to the
   streaming archive, and any position stored before the migration, yield no
   fingerprint and therefore no guard — exactly today's behaviour, never a
-  discarded position. The doc comments in `ReaderPosition` and
+  discarded position. On the write side (AD-18) a position stored from an open
+  that produced no fingerprint must leave an already-stored fingerprint alone,
+  and the first directory open after the migration stores one, so protection
+  is only ever gained. The doc comments in `ReaderPosition` and
   `Catalog.ReadingState` that currently state the guard cannot fire are
   rewritten to describe what now fires and what still does not. Owns no
   product requirement: this repairs a guard that increment 001's AD-8 change
@@ -704,8 +715,13 @@ design (D3), which the privacy copy states.
   `resolveIndex` case 3; a migration test that a shipped v1.1.0 document reads
   back with no fingerprint and still resumes; an emulator flow that swaps an
   EPUB in place at the same URI with size and last-modified unchanged and
-  shows the reader restarting at 0 instead of resuming at an arbitrary word;
-  the streaming-fallback path still opens and resumes.
+  shows the reader restarting at 0 instead of resuming at an arbitrary word —
+  the swap must hold size and last-modified constant (a same-length byte
+  substitution inside a STORED entry changes that entry's CRC-32 without
+  changing the total size, and `touch` restores the mtime) so the rescan
+  fingerprint cannot be what catches it and the flow proves this guard; the
+  streaming-fallback path still opens and resumes; and a streaming open of a
+  book that already has a stored fingerprint leaves it stored.
 
 ## Acceptance coverage
 
@@ -843,10 +859,33 @@ REQ-103 acceptance amendment, and pins the delivered 001 result as 002's
 evidence baseline. Nothing else moves: no 002 leaf is re-planned, no existing
 issue is reparented, and increment 001's published graph is untouched.
 
-- `plan validate --phase review-ready` on the amended candidate: valid,
-  20 rows, INCREMENTAL.
-- Pending on this head, run after the content pass exactly as the original
-  publication above was: #62's body gains the leaf metadata lines its siblings
-  carry (its existing text preserved), then `plan reconcile-graph` attaches
-  #62 under #39 and creates LEAF608<-LEAF603 and LEAF606<-LEAF608, then
-  `plan verify-graph` confirms the live graph matches the 20-row manifest.
+- Content review: CHANGES_REQUESTED at `df0b9e9` (2 actionable, 1 advisory),
+  all three addressed here — AD-18 and LEAF608 now decide the write path (an
+  open that produced no fingerprint must not clear a stored one); the
+  LEAF606<-LEAF608 edge is labelled a planner ordering choice rather than an
+  owner rule, since the owner's decisions cover only #62 in 002 blocked by
+  LEAF603; and LEAF608's swap fixture states how size and last-modified are
+  held constant. PR #40 review by `cedagova-codex-reviewer[bot]`.
+- LEAF608 reuses the existing issue #62 — nothing was created. Its body gained
+  the leaf metadata lines its siblings carry (`Planning root:`,
+  `Planning plan:`, `Planning kind: LEAF`) and the standard leaf sections; the
+  original follow-up report is preserved verbatim below them.
+- Graph edges added 2026-09-09: #62 attached as a native sub-issue of #39,
+  LEAF608<-LEAF603 (#62 blocked by #52), LEAF606<-LEAF608 (#55 blocked by
+  #62). Nothing was deleted, reparented or removed; increment 001's published
+  graph is untouched.
+- `plan reconcile-graph` and `plan verify-graph` cannot run against this
+  graph: both preflight every manifest row as `must be open`, which a plan
+  whose first increment is delivered and closed can never satisfy. The edges
+  were therefore created with the same `addSubIssue` / `addBlockedBy`
+  mutations the reconciler issues, and the graph was verified row by row
+  against live GitHub
+  instead: for all 20 rows the live title, native parent and blocked-by set
+  match the manifest exactly, ROOT's children are #38 and #39, INC001's are
+  #41-#49, INC002's are #50-#56 plus #62. That gap in the tooling is worth a
+  small follow-up; it is not a property of this plan.
+- `plan validate --phase review-ready` on the review candidate: valid,
+  20 rows. `--phase publication-ready` on this head: valid, 20 rows,
+  INCREMENTAL.
+- `implementation route --issue .../issues/39 --intent work`: EFFORT,
+  8 children (#50-#56 and #62), role `implementation-effort-coordinator`.
