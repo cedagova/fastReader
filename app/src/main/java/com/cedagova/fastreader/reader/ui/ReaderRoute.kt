@@ -7,13 +7,16 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,7 +33,9 @@ import com.cedagova.fastreader.reader.ReaderBooks
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.fastreader.reader.ReaderPositions
+import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -94,6 +99,40 @@ fun ReaderRoute(
     // know that gesture is stuck looking at a bare word.
     BackHandler { if (focused) focused = false else onBack() }
 
+    // REQ-108. The notice is the *whole* of the gesture's feedback, and it is
+    // screen state for the same reason `focused` is: what the reader last did with
+    // the drag is a property of this view, not of the book or the session.
+    //
+    // The serial is not decoration. Two steps in a row can produce identical text —
+    // holding the drag against the 1000 WPM ceiling repeats "1000 WPM" — and
+    // without it the effect below would not restart, so the second step would
+    // inherit the first one's already-running timer and the line would vanish early.
+    var notice by remember { mutableStateOf<SpeedNotice?>(null) }
+    var noticeSerial by remember { mutableIntStateOf(0) }
+    LaunchedEffect(notice) {
+        if (notice == null) return@LaunchedEffect
+        delay(SPEED_NOTICE_MILLIS)
+        notice = null
+    }
+
+    // Where v1 explains focused mode is focused mode itself, so that is where the
+    // gesture is named: entering it puts the hint in the same slot the readout
+    // uses, on the same timer. Leaving takes whatever is there with it, which is
+    // the issue's "leaving focused mode dismisses the readout".
+    val gestureHint = stringResource(R.string.reader_focused_speed_hint)
+    LaunchedEffect(focused) {
+        notice = if (focused) {
+            noticeSerial += 1
+            SpeedNotice(gestureHint, noticeSerial)
+        } else {
+            null
+        }
+    }
+
+    // `getString` rather than `stringResource`: the text is chosen inside a
+    // callback, which is not a composable scope.
+    val context = LocalContext.current
+
     ReaderScreen(
         state = state,
         onBack = onBack,
@@ -109,9 +148,35 @@ fun ReaderRoute(
         cues = settings.cues,
         focused = focused,
         onToggleFocused = { focused = !focused },
+        speedNotice = notice?.text,
+        onSpeedStep = { steps ->
+            val current = (state as? ReaderUiState.Reading)?.wpm
+            if (current != null) {
+                // Straight through `setWpm`, the same call the slider makes, so the
+                // gesture inherits REQ-016's persistence and REQ-012's "never stops
+                // playback" for free rather than reimplementing either.
+                val next = steppedWpm(current, steps)
+                reader.setWpm(next)
+                noticeSerial += 1
+                notice = SpeedNotice(context.getString(R.string.reader_speed, next), noticeSerial)
+            }
+        },
         onOpenSettings = onOpenSettings,
     )
 }
+
+/**
+ * One self-dismissing line on the focused surface, with the serial that makes two
+ * identical lines in a row two separate notices.
+ */
+private data class SpeedNotice(val text: String, val serial: Int)
+
+/**
+ * How long the readout stays. The issue's ceiling is two seconds; this sits under
+ * it with room for the frame the reader lifts their thumb on, and is long enough
+ * to read three digits without being long enough to sit in the way of the stream.
+ */
+private const val SPEED_NOTICE_MILLIS = 1_400L
 
 /**
  * The catalog, as the reader needs it: one open request per book.

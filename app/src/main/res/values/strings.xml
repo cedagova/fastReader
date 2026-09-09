@@ -79,6 +79,12 @@
     <string name="reader_hide_controls">Hide the controls</string>
     <string name="reader_show_controls">Show the controls</string>
 
+    <!-- REQ-108: the focused-mode speed gesture, its readout, and the screen-reader
+         equivalent of a gesture no accessibility service can perform. -->
+    <string name="reader_focused_speed_hint">Drag up or down to change speed</string>
+    <string name="reader_speed_faster">Increase reading speed</string>
+    <string name="reader_speed_slower">Decrease reading speed</string>
+
     <string name="reader_persistence_problem_title">Your place is not being saved</string>
 
     <string name="library_resume_blocked_title">Could not go back to %1$s</string>
