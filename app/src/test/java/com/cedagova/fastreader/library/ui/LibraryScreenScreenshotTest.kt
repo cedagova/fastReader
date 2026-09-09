@@ -14,9 +14,11 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.library.BookContentStatus
+import com.cedagova.fastreader.library.BookFolder
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.RemovedBook
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
@@ -129,6 +131,29 @@ class LibraryScreenScreenshotTest {
         )
     }
 
+    /**
+     * REQ-105: the removal is on screen with the way to take it back, and the
+     * sentence says what happened to the file and to the reader's place.
+     */
+    @Test
+    fun aRemovedBookCanStillBeBroughtBack() {
+        // The row is genuinely gone from the catalog behind the banner: this is
+        // the state a reader is actually in one tap after removing Rayuela.
+        val afterRemoval = populatedCatalog().let { catalog ->
+            catalog.copy(
+                books = catalog.books.filterNot { it.id == "rayuela" },
+                removedBookIds = setOf("rayuela"),
+            )
+        }
+        capture("library_undo", state(afterRemoval, undoableRemoval = RemovedBook("rayuela", "Rayuela")))
+    }
+
+    /** REQ-104's way in, shown only once a folder exists to manage. */
+    @Test
+    fun addedFoldersAreReachableFromTheLibrary() {
+        capture("library_folders_entry", state(folderCatalog()))
+    }
+
     /** Cramped 720p phone (`Phone_Low_API33`) at a large system font scale. */
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)
@@ -205,7 +230,21 @@ class LibraryScreenScreenshotTest {
         ingestion: IngestionState = IngestionState.Idle,
         query: String = "",
         resumeBlocked: ResumeBlocked? = null,
-    ) = buildLibraryUiState(catalog, ingestion, query, resumeBlocked)
+        undoableRemoval: RemovedBook? = null,
+    ) = buildLibraryUiState(catalog, ingestion, query, resumeBlocked, undoableRemoval)
+
+    /** A library whose books come from two added folders (REQ-104). */
+    private fun folderCatalog() = Catalog(
+        folders = listOf(
+            BookFolder(id = "tree://novels", treeUri = "tree://novels", displayName = "Novels"),
+            BookFolder(id = "tree://sd", treeUri = "tree://sd", displayName = "SD card books"),
+        ),
+        books = listOf(
+            LibraryFixtures.inFolder("ficciones", "Ficciones", "tree://novels"),
+            LibraryFixtures.inFolder("rayuela", "Rayuela", "tree://novels"),
+            LibraryFixtures.inFolder("dubliners", "Dubliners", "tree://sd"),
+        ),
+    )
 
     private fun populatedCatalog() = Catalog(
         books = listOf(
@@ -276,7 +315,7 @@ class LibraryScreenScreenshotTest {
 }
 
 /** 1080p reference phone, matching the `Phone_Mid_API36` AVD used for the emulator pass. */
-private const val REFERENCE_PHONE = "w411dp-h914dp-xxhdpi"
+internal const val REFERENCE_PHONE = "w411dp-h914dp-xxhdpi"
 
 /** 720p, 2 GB phone, matching the `Phone_Low_API33` AVD used for cramped layouts. */
-private const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"
+internal const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"
