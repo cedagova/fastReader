@@ -78,6 +78,8 @@ class FakeDocumentGateway : DocumentGateway {
         releasedGrants += uri
     }
 
+    override fun persistedReadPermissions(): List<String> = persistedGrants.toList()
+
     override fun displayName(uri: String): String? = documents[uri]?.displayName
 
     override fun lookup(uri: String): DocumentLookup = when {

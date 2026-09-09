@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,8 +51,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -90,6 +94,10 @@ fun LibraryScreen(
     onDismissResumeNotice: () -> Unit = {},
     /** Opens the settings screen (LEAF302). */
     onOpenSettings: () -> Unit = {},
+    /** Opens the added-folder list (REQ-104). */
+    onOpenFolders: () -> Unit = {},
+    /** Takes back the removal the undo snackbar is offering (REQ-105). */
+    onUndoRemove: () -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
     Scaffold(
@@ -107,6 +115,7 @@ fun LibraryScreen(
                 },
             )
         },
+        bottomBar = { state.undoNotice?.let { UndoBar(it, onUndoRemove) } },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             state.failureMessage?.let { FailureBanner(it) }
@@ -116,6 +125,8 @@ fun LibraryScreen(
                 LibraryContent.EMPTY_LIBRARY -> EmptyLibrary(
                     onAddBooks = onAddBooks,
                     onAddFolder = onAddFolder,
+                    folderCount = state.folders.size,
+                    onOpenFolders = onOpenFolders,
                 )
 
                 LibraryContent.NO_SEARCH_RESULTS,
@@ -123,6 +134,7 @@ fun LibraryScreen(
                 -> {
                     SearchField(query = state.query, onQueryChange = onQueryChange)
                     AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder)
+                    FoldersEntry(count = state.folders.size, onOpenFolders = onOpenFolders)
                     if (state.content == LibraryContent.NO_SEARCH_RESULTS) {
                         NoSearchResults(state.query)
                     } else {
@@ -189,6 +201,66 @@ private fun ResumeNoticeBanner(notice: ResumeNotice, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * The removal the reader can still take back (REQ-105).
+ *
+ * Anchored to the bottom of the screen rather than stacked with the banners at
+ * the top: a book removed from the end of a long list would put a top banner
+ * off-screen, and an offer that expires in eight seconds is worth nothing if the
+ * reader has to scroll to find it.
+ *
+ * It is a plain [Snackbar] driven by [LibraryUiState] rather than a
+ * `SnackbarHostState`, so it stays as testable as every other library state:
+ * the goldens prove the copy and the control instead of a timing-dependent
+ * overlay, and the window itself is the repository's to keep. The sentence says
+ * what happened to the *file* as well as to the row, because "removed" is
+ * exactly the word a reader would fear meant deleted.
+ */
+@Composable
+private fun UndoBar(notice: UndoNotice, onUndo: () -> Unit) {
+    val undoLabel = stringResource(R.string.library_undo_label, notice.title)
+    Snackbar(
+        modifier = Modifier.padding(12.dp).testTag("library_undo"),
+        action = {
+            TextButton(
+                onClick = onUndo,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.inversePrimary,
+                ),
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_undo_action")
+                    .semantics { contentDescription = undoLabel },
+            ) {
+                Text(stringResource(R.string.library_undo))
+            }
+        },
+    ) {
+        Text(stringResource(R.string.library_undo_removed, notice.title))
+    }
+}
+
+/**
+ * The way into the added-folder list (REQ-104).
+ *
+ * Only shown once a folder exists: with none, the list would be a dead end, and
+ * "Add folder" is already on the screen right above it.
+ */
+@Composable
+private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit, horizontalPadding: Dp = 16.dp) {
+    if (count == 0) return
+    TextButton(
+        onClick = onOpenFolders,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPadding)
+            .defaultMinSize(minHeight = TouchTarget)
+            .testTag("library_open_folders"),
+    ) {
+        Text(pluralStringResource(R.plurals.library_folders_open_count, count, count))
+    }
+}
+
 @Composable
 private fun FailureBanner(message: String) {
     Surface(
@@ -248,7 +320,12 @@ private fun ScanBanner(scan: LibraryScan) {
 }
 
 @Composable
-private fun EmptyLibrary(onAddBooks: () -> Unit, onAddFolder: () -> Unit) {
+private fun EmptyLibrary(
+    onAddBooks: () -> Unit,
+    onAddFolder: () -> Unit,
+    folderCount: Int,
+    onOpenFolders: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -268,6 +345,9 @@ private fun EmptyLibrary(onAddBooks: () -> Unit, onAddFolder: () -> Unit) {
         Bullet(stringResource(R.string.library_empty_folder))
         Spacer(Modifier.height(4.dp))
         AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder, horizontalPadding = 0.dp)
+        // An added folder with nothing readable in it still has to be reachable,
+        // or the only way to take it back out would be to add a book first.
+        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders, horizontalPadding = 0.dp)
         Text(
             text = stringResource(R.string.library_empty_in_place),
             style = MaterialTheme.typography.bodyMedium,

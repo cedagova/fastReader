@@ -16,6 +16,8 @@ import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -33,6 +35,13 @@ class LibraryRepositoryTest {
 
     private val gateway = FakeDocumentGateway()
     private var now = 100_000L
+
+    /** A distinct book, so the content digests that identify them differ (AD-2). */
+    private fun epub(title: String) = EpubFixtures.validEpub(
+        title = title,
+        identifier = "urn:uuid:$title",
+        bodyText = "A book called $title.",
+    )
 
     private fun repository(
         store: CatalogStore = FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")),
@@ -231,6 +240,269 @@ class LibraryRepositoryTest {
 
         assertTrue("the removal must survive a restart", restarted.catalog.value.books.isEmpty())
         assertEquals(250, restarted.readingState(bookId)?.tokenIndex)
+    }
+
+    /**
+     * REQ-104's acceptance case, exactly: a folder holding three books, one of
+     * which was also picked directly. Two books belong to the folder alone, so
+     * that is the number the confirmation names and the number of rows that go.
+     * The third stays, no file is touched, and all three positions survive.
+     */
+    @Test
+    fun `removing a folder drops only the books it alone provided and keeps every file and position`() = runTest {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", epub("One"), "one.epub")
+        gateway.putIntoFolder("tree://books", "tree://books/two.epub", epub("Two"), "two.epub")
+        val alsoPicked = epub("Three")
+        gateway.putIntoFolder("tree://books", "tree://books/three.epub", alsoPicked, "three.epub")
+        // The same book reached from outside the tree, as the document picker
+        // hands it over: same content, so the same book (AD-2), second source.
+        gateway.putDocument("doc://three", alsoPicked, "three.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addFolder("tree://books", "Books")
+        repository.addPickedBooks(listOf("doc://three"))
+        val byTitle = repository.catalog.value.books.associateBy { it.title }
+        assertEquals(3, byTitle.size)
+        byTitle.values.forEachIndexed { index, book ->
+            repository.updateReadingState(book.id, ReadingState(bookDigest = book.id, tokenIndex = 100 + index))
+        }
+
+        // The number the confirmation names, taken from the catalog it acts on.
+        assertEquals(2, repository.catalog.value.booksOnlyFrom("tree://books").size)
+        assertEquals(3, repository.catalog.value.booksIn("tree://books").size)
+
+        repository.removeFolder("tree://books")
+
+        val remaining = repository.catalog.value.books
+        assertEquals("only the directly picked book stays", listOf("Three"), remaining.map { it.title })
+        assertTrue("the folder itself is gone", repository.catalog.value.folders.isEmpty())
+        assertEquals("no file is touched", 4, gateway.documents.size)
+        byTitle.values.forEach { book ->
+            assertNotNull("the position of ${book.title} must survive", repository.readingState(book.id))
+        }
+    }
+
+    /**
+     * REQ-105: the removal can be taken back while the offer stands, and what
+     * comes back is the row with the reader's place in it.
+     */
+    @Test
+    fun `undo puts a removed book back with its position and progress`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addPickedBooks(listOf("doc://a"))
+        val bookId = repository.catalog.value.books.single().id
+        repository.updateReadingState(
+            bookId,
+            ReadingState(bookDigest = bookId, tokenIndex = 900, progressFraction = 0.6f, wpm = 400),
+        )
+
+        repository.removeBook(bookId)
+        assertTrue(repository.catalog.value.books.isEmpty())
+        assertEquals(bookId, repository.undoableRemoval.value?.bookId)
+
+        repository.undoRemoveBook()
+
+        assertEquals(bookId, repository.catalog.value.books.single().id)
+        assertNull("the offer is spent once it is taken", repository.undoableRemoval.value)
+        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
+        assertEquals(0.6f, repository.readingState(bookId)?.progressFraction)
+        assertEquals(400, repository.readingState(bookId)?.wpm)
+        assertTrue("the book must be readable again", repository.catalog.value.books.single().status == BookStatus.READABLE)
+        assertTrue(
+            "a grant given back cannot be taken again without the picker, so undo must not release it",
+            gateway.releasedGrants.isEmpty(),
+        )
+        assertEquals(EpubFixtures.validEpub().size, repository.openBook(bookId).use { it.readBytes() }.size)
+    }
+
+    /** REQ-105's other half: let the window elapse and the removal stands. */
+    @Test
+    fun `the undo window elapsing makes the removal final and gives the grant back`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addPickedBooks(listOf("doc://a"))
+        val bookId = repository.catalog.value.books.single().id
+
+        repository.removeBook(bookId)
+        assertNotNull(repository.undoableRemoval.value)
+
+        advanceTimeBy(LibraryRepository.DEFAULT_UNDO_WINDOW_MS + 1)
+        runCurrent()
+
+        assertNull("the offer must expire", repository.undoableRemoval.value)
+        assertEquals(listOf("doc://a"), gateway.releasedGrants)
+
+        repository.undoRemoveBook()
+
+        assertTrue("undo after the window must do nothing", repository.catalog.value.books.isEmpty())
+    }
+
+    /**
+     * The undo window is longer than the app-open rescan debounce, so a rescan
+     * lands inside it every time the reader removes a book and switches away.
+     * Undo has to survive that without duplicating or losing the row.
+     */
+    @Test
+    fun `undo restores exactly one row even when a rescan runs inside the window`() = runTest {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addFolder("tree://books", "Books")
+        val bookId = repository.catalog.value.books.single().id
+
+        repository.removeBook(bookId)
+        now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
+        repository.rescan(ScanTrigger.APP_OPEN)
+        assertTrue("the rescan must honour the removal while it stands", repository.catalog.value.books.isEmpty())
+
+        repository.undoRemoveBook()
+
+        assertEquals(listOf(bookId), repository.catalog.value.books.map { it.id })
+        assertEquals(1, repository.catalog.value.books.single().sources.size)
+
+        // And the row stays exactly one row once scanning resumes.
+        now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
+        repository.rescan(ScanTrigger.APP_OPEN)
+
+        assertEquals(listOf(bookId), repository.catalog.value.books.map { it.id })
+        assertEquals(1, repository.catalog.value.books.single().sources.size)
+    }
+
+    /**
+     * Removing the folder a pending removal came from takes its last source with
+     * it. Nothing rescans a folder that is no longer added, so bringing that row
+     * back would leave a book that looks readable and never opens.
+     */
+    @Test
+    fun `undo brings back nothing when the folder the book came from is gone too`() = runTest {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addFolder("tree://books", "Books")
+        val bookId = repository.catalog.value.books.single().id
+        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 640))
+
+        repository.removeBook(bookId)
+        repository.removeFolder("tree://books")
+        repository.undoRemoveBook()
+
+        assertTrue("no orphaned row may come back", repository.catalog.value.books.isEmpty())
+        assertEquals("the position still outlives it (REQ-004)", 640, repository.readingState(bookId)?.tokenIndex)
+    }
+
+    /**
+     * The undo window only exists in memory. A reader who removes a book and
+     * then leaves the app takes the timer with them, and the baseline released
+     * that grant synchronously — so without reconciling at load, deferring the
+     * release would leak a persisted grant permanently, and Android caps how
+     * many an app may hold.
+     */
+    @Test
+    fun `a grant orphaned by a process that died inside the undo window is released at the next load`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.addPickedBooks(listOf("doc://a"))
+        val bookId = first.catalog.value.books.single().id
+
+        first.removeBook(bookId)
+        // The window is still open: nothing has given the grant back yet.
+        assertTrue(gateway.releasedGrants.isEmpty())
+        assertTrue("doc://a" in gateway.persistedGrants)
+
+        // A new process over the same store, as after the app was swiped away.
+        repository(FileCatalogStore(file), backgroundScope).load()
+
+        assertEquals(listOf("doc://a"), gateway.releasedGrants)
+        assertTrue("doc://a" !in gateway.persistedGrants)
+    }
+
+    /** The sweep must not touch a grant the library is actually using. */
+    @Test
+    fun `the load sweep keeps every grant the catalog still references`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.spanishEpub(), "one.epub")
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.addPickedBooks(listOf("doc://a"))
+        first.addFolder("tree://books", "Books")
+
+        repository(FileCatalogStore(file), backgroundScope).load()
+
+        assertTrue("nothing in use may be released, got ${gateway.releasedGrants}", gateway.releasedGrants.isEmpty())
+    }
+
+    /**
+     * A store that refuses to load reports an empty catalog. Sweeping against it
+     * would release the grant for every book the reader owns.
+     */
+    @Test
+    fun `a blocked store never triggers the grant sweep`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        gateway.persistReadPermission("doc://a", isTree = false)
+        val blocking = object : CatalogStore {
+            override fun load() = CatalogLoad.Blocked("catalog was written by a newer version of the app")
+            override fun save(catalog: Catalog) = Unit
+        }
+
+        repository(blocking, backgroundScope).load()
+
+        assertTrue("a blocked load must not release anything", gateway.releasedGrants.isEmpty())
+        assertTrue("doc://a" in gateway.persistedGrants)
+    }
+
+    /**
+     * A damaged catalog is set aside and the app carries on with an empty one,
+     * reported as `Loaded`, not `Blocked`. Sweeping against that would release
+     * every grant the reader has — and a grant cannot be taken again except
+     * through the picker, so it would make the preserved document unrecoverable
+     * even if repaired.
+     */
+    @Test
+    fun `a recovered catalog never triggers the grant sweep`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.addFolder("tree://books", "Books")
+        first.addPickedBooks(listOf("doc://a"))
+        assertTrue("doc://a" in gateway.persistedGrants)
+
+        // The stored document is corrupted, as an interrupted write would leave it.
+        file.writeText("{ this is not a catalog")
+        val store = FileCatalogStore(file)
+        val recovered = repository(store, backgroundScope)
+        recovered.load()
+
+        assertTrue("the catalog is empty after recovery", recovered.catalog.value.books.isEmpty())
+        assertTrue(
+            "a recovery must keep every grant, got ${gateway.releasedGrants}",
+            gateway.releasedGrants.isEmpty(),
+        )
+        assertTrue("doc://a" in gateway.persistedGrants)
+        assertTrue("tree://books" in gateway.persistedGrants)
+        assertTrue(
+            "the damaged document must be kept",
+            file.parentFile!!.listFiles()!!.any { it.name.contains("damaged") },
+        )
+    }
+
+    /**
+     * Re-picking the file inside the window puts the book back by another route.
+     * The expiring timer must not then release a grant the library is using.
+     */
+    @Test
+    fun `a book re-added inside the undo window keeps its grant when the window closes`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addPickedBooks(listOf("doc://a"))
+        val bookId = repository.catalog.value.books.single().id
+
+        repository.removeBook(bookId)
+        repository.addPickedBooks(listOf("doc://a"))
+        advanceTimeBy(LibraryRepository.DEFAULT_UNDO_WINDOW_MS + 1)
+        runCurrent()
+
+        assertEquals(bookId, repository.catalog.value.books.single().id)
+        assertTrue("the grant is still in use", gateway.releasedGrants.isEmpty())
+        assertTrue("doc://a" in gateway.persistedGrants)
     }
 
     @Test

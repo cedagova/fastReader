@@ -172,16 +172,60 @@ class CatalogIngestor(
      * (REQ-004). The removal is recorded so that a book living inside an added
      * folder does not reappear on the next rescan; picking the file again, or
      * re-adding its folder, brings it back.
+     *
+     * This is only the catalog half of a removal. The read grants a directly
+     * picked file holds are given back separately, by [releaseGrants], once the
+     * removal is final — a released grant cannot be taken again without sending
+     * the reader back to the document picker, so releasing it while undo is
+     * still on offer (REQ-105) would make undo restore an unreadable row.
      */
     fun removeBook(catalog: Catalog, bookId: String): Catalog {
-        val book = catalog.book(bookId) ?: return catalog
-        book.sources
-            .filter { it.origin == SourceOrigin.DIRECT_PICK }
-            .forEach { gateway.releaseReadPermission(it.uri, isTree = false) }
+        catalog.book(bookId) ?: return catalog
         return catalog.copy(
             books = catalog.books.filterNot { it.id == bookId },
             removedBookIds = catalog.removedBookIds + bookId,
         )
+    }
+
+    /** Gives back the long-lived grants a removal no longer needs (AD-1). */
+    fun releaseGrants(sources: List<BookSource>) {
+        sources
+            .filter { it.origin == SourceOrigin.DIRECT_PICK }
+            .forEach { gateway.releaseReadPermission(it.uri, isTree = false) }
+    }
+
+    /**
+     * Puts a removed book back exactly where it was (REQ-105).
+     *
+     * Applied to whatever the catalog holds *now* rather than to the snapshot
+     * taken when the book was removed, because a folder rescan can land inside
+     * the undo window. If that rescan somehow reinstated the row, its sources
+     * win and the restored ones only fill gaps, so undo can neither duplicate
+     * the row nor throw away a fresher availability the scan just established.
+     *
+     * The position is not restored here because removal never took it: reading
+     * states are keyed by book id and outlive the entry (REQ-004).
+     *
+     * A source whose folder was removed in the meantime is dropped rather than
+     * brought back: nothing rescans an orphaned folder id, so restoring one
+     * would put back a row that claims to be readable and never stops claiming
+     * it. With no source left there is no book to restore.
+     */
+    fun restoreBook(catalog: Catalog, book: Book): Catalog {
+        val sources = book.sources.filter { it.folderId == null || catalog.folder(it.folderId) != null }
+        if (sources.isEmpty()) return catalog
+        val existing = catalog.book(book.id)
+        val restored = when (existing) {
+            null -> book.copy(sources = sources)
+            else -> existing.copy(
+                sources = existing.sources + sources.filterNot { old -> existing.sources.any { it.uri == old.uri } },
+            )
+        }
+        val books = when (existing) {
+            null -> catalog.books + restored
+            else -> catalog.books.map { if (it.id == book.id) restored else it }
+        }
+        return catalog.copy(books = books, removedBookIds = catalog.removedBookIds - book.id)
     }
 
     /** Removes an added folder and the entries only it provided. Files are never touched. */

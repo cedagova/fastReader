@@ -34,9 +34,11 @@ fun LibraryRoute(
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
     val ingestion by repository.ingestion.collectAsState()
+    val undoableRemoval by repository.undoableRemoval.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
-    val state = remember(catalog, ingestion, query, resumeBlocked) {
-        buildLibraryUiState(catalog, ingestion, query, resumeBlocked)
+    var foldersOpen by rememberSaveable { mutableStateOf(false) }
+    val state = remember(catalog, ingestion, query, resumeBlocked, undoableRemoval) {
+        buildLibraryUiState(catalog, ingestion, query, resumeBlocked, undoableRemoval)
     }
     val coverLoader = remember(graph) { CoverStoreLoader(graph.covers) }
 
@@ -56,6 +58,14 @@ fun LibraryRoute(
     val libraryIsEmpty = catalog.books.isEmpty()
     LaunchedEffect(libraryIsEmpty) { if (libraryIsEmpty) query = "" }
 
+    // The folder list sits over the library rather than beside it in a navigation
+    // graph, for the same reason settings do: it is one place the reader steps
+    // into and back out of, and the library behind it keeps its search and scroll.
+    if (foldersOpen) {
+        FolderListRoute(graph = graph, onBack = { foldersOpen = false }, modifier = modifier)
+        return
+    }
+
     LibraryScreen(
         state = state,
         onQueryChange = { query = it },
@@ -63,6 +73,8 @@ fun LibraryRoute(
         onAddFolder = { pickFolder.launch(null) },
         onRefresh = { repository.requestRescan(ScanTrigger.MANUAL_REFRESH) },
         onRemove = { repository.requestRemoveBook(it.id) },
+        onUndoRemove = { repository.requestUndoRemoveBook() },
+        onOpenFolders = { foldersOpen = true },
         onOpen = { onOpenBook(it.id) },
         onGrantAccess = { book ->
             // Re-granting a folder re-adds it at the same tree URI, which restores

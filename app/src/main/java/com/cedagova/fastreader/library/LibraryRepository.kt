@@ -12,6 +12,7 @@ import java.nio.channels.SeekableByteChannel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +43,7 @@ class LibraryRepository(
      */
     private val themeMirror: ThemeMirror = ThemeMirror.None,
     private val minimumRescanIntervalMs: Long = DEFAULT_MINIMUM_RESCAN_INTERVAL_MS,
+    private val undoWindowMs: Long = DEFAULT_UNDO_WINDOW_MS,
     positionFlushIntervalMs: Long = ReadingPositionWriter.DEFAULT_INTERVAL_MILLIS,
 ) {
 
@@ -50,6 +52,15 @@ class LibraryRepository(
     private val _ingestion = MutableStateFlow<IngestionState>(IngestionState.Idle)
     private val _persistenceFailure = MutableStateFlow<String?>(null)
     private val _settings = MutableStateFlow(ReaderSettings.DEFAULTS)
+
+    /**
+     * The book removal that can still be taken back, and the timer that ends the
+     * offer. Held under [undoMutex] rather than [mutex] so claiming the pending
+     * removal never nests inside a catalog write, which would deadlock.
+     */
+    private val undoMutex = Mutex()
+    private var pendingRemoval: PendingRemoval? = null
+    private val _undoableRemoval = MutableStateFlow<RemovedBook?>(null)
 
     /**
      * Coalesces reading positions so the reader can report one per word without
@@ -93,6 +104,12 @@ class LibraryRepository(
      * what a device with nothing stored resolves to.
      */
     val settings: StateFlow<ReaderSettings> = _settings.asStateFlow()
+
+    /**
+     * The book the reader has just removed, while taking it back is still on
+     * offer (REQ-105). Null once [undoRemoveBook] ran or the window elapsed.
+     */
+    val undoableRemoval: StateFlow<RemovedBook?> = _undoableRemoval.asStateFlow()
 
     /** Loads the stored catalog without scanning. Safe to call repeatedly. */
     suspend fun load() = mutex.withLock { ensureLoaded() }
@@ -178,10 +195,40 @@ class LibraryRepository(
      * Removes a catalog entry. The file stays on the device and the position is
      * kept (REQ-004). The removal survives folder rescans; picking the file
      * again, or re-adding its folder, brings the book back.
+     *
+     * For a short window afterwards the removal can be taken back with
+     * [undoRemoveBook] (REQ-105). Until that window closes the book's read
+     * grants are still held, so undo restores a row that is genuinely readable
+     * rather than one whose file the app can no longer open.
      */
-    suspend fun removeBook(bookId: String) = mutateCatalog { ingestor.removeBook(it, bookId) }
+    suspend fun removeBook(bookId: String) {
+        var removed: Book? = null
+        mutateCatalog { catalog ->
+            removed = catalog.book(bookId)
+            if (removed == null) catalog else ingestor.removeBook(catalog, bookId)
+        }
+        val book = removed ?: return
+        // A write that failed left the book on screen; offering to undo a removal
+        // that did not happen would be a lie the reader could tap.
+        if (_catalog.value.book(bookId) != null) return
+        offerUndo(book)
+    }
 
-    /** Removes an added folder and the entries only it provided. Files are never touched. */
+    /**
+     * Puts back the book the reader has just removed, with its position and
+     * progress (REQ-105). Does nothing once the window has closed.
+     */
+    suspend fun undoRemoveBook() {
+        val pending = claimPendingRemoval(null) ?: return
+        pending.timer.cancel()
+        mutateCatalog { ingestor.restoreBook(it, pending.book) }
+    }
+
+    /**
+     * Removes an added folder and the entries only it provided
+     * ([Catalog.booksOnlyFrom]). Files are never touched and every position is
+     * kept, including those of the books that left (REQ-104, REQ-004).
+     */
     suspend fun removeFolder(folderId: String) = mutateCatalog { ingestor.removeFolder(it, folderId) }
 
     /**
@@ -282,7 +329,107 @@ class LibraryRepository(
 
     fun requestRemoveBook(bookId: String) = scope.launch { removeBook(bookId) }
 
+    fun requestUndoRemoveBook() = scope.launch { undoRemoveBook() }
+
     fun requestRemoveFolder(folderId: String) = scope.launch { removeFolder(folderId) }
+
+    /**
+     * Starts the undo window for [book] and closes any window still open, which
+     * makes that earlier removal final.
+     */
+    private suspend fun offerUndo(book: Book) {
+        val superseded = undoMutex.withLock {
+            val previous = pendingRemoval
+            val timer = scope.launch {
+                delay(undoWindowMs)
+                // This coroutine *is* the timer, so it claims but never cancels.
+                claimPendingRemoval(book.id)?.let { releaseGrantsNoLongerNeeded(it.book) }
+            }
+            pendingRemoval = PendingRemoval(book, timer)
+            _undoableRemoval.value = RemovedBook(book.id, book.title)
+            previous?.timer?.cancel()
+            previous
+        }
+        superseded?.let { releaseGrantsNoLongerNeeded(it.book) }
+    }
+
+    /**
+     * Takes the pending removal, if it is still there and is the expected one.
+     * Whoever claims it owns finishing it, so the timer and undo cannot both
+     * act, and the claim carries its own timer so no caller has to guess which
+     * job it is cancelling.
+     */
+    private suspend fun claimPendingRemoval(expectedBookId: String?): PendingRemoval? = undoMutex.withLock {
+        val pending = pendingRemoval
+        if (pending == null || (expectedBookId != null && pending.book.id != expectedBookId)) {
+            return@withLock null
+        }
+        pendingRemoval = null
+        _undoableRemoval.value = null
+        pending
+    }
+
+    /**
+     * Gives back every long-lived grant the catalog no longer references.
+     *
+     * [releaseGrantsNoLongerNeeded] only runs while the process that removed the
+     * book is alive. A reader who removes a book and then swipes the app away
+     * inside the undo window leaves the row gone from the stored catalog and the
+     * grant still held, with nothing left in memory that knows about it — and
+     * Android caps how many persisted grants an app may hold, so that leak
+     * eventually stops the reader from adding books at all. The platform's own
+     * list is the only record that survives, so reconciling against it at load
+     * closes that window and any grant an earlier crash orphaned.
+     *
+     * It runs exactly once per process, from the first successful load, which is
+     * necessarily before this process can have a removal pending.
+     *
+     * It runs only on a load that produced a *genuine* catalog. Two loads report
+     * an empty one without meaning the library is empty, and sweeping against
+     * either would release the grant for every book the reader has:
+     *
+     * - a **blocked** store, which refuses to be read at all; and
+     * - a **recovered** one, where a damaged document was set aside under
+     *   `recoveredFrom` and the app carried on with an empty catalog. That path
+     *   exists to make corruption survivable — the document is kept, not
+     *   deleted. A grant cannot be taken again except by sending the reader back
+     *   through the document picker, so releasing them here would destroy the
+     *   access the set-aside document describes and make it unrecoverable even
+     *   if repaired. Grants orphaned before the corruption simply wait for the
+     *   next clean load.
+     *
+     * A migrated catalog is a real one and needs no such guard.
+     *
+     * A grant that cannot be enumerated or given back is a housekeeping miss,
+     * not a reason to refuse to show the library, so it does not fail the load.
+     */
+    private fun releaseOrphanedGrants(catalog: Catalog) {
+        try {
+            val referenced = HashSet<String>()
+            catalog.books.forEach { book -> book.sources.forEach { referenced += it.uri } }
+            catalog.folders.forEach { referenced += it.treeUri }
+            gateway.persistedReadPermissions()
+                .filterNot { it in referenced }
+                // Neither gateway distinguishes a tree from a document when
+                // giving a grant back; a sweep cannot know which an orphan is.
+                .forEach { gateway.releaseReadPermission(it, isTree = false) }
+        } catch (_: Exception) {
+            // Deliberately quiet: see above.
+        }
+    }
+
+    /**
+     * Gives back only the grants nothing in the catalog still uses.
+     *
+     * Re-picking the same file inside the undo window brings the book back with
+     * its grant; the timer must not then release a permission the library is
+     * relying on. There is no suspension point after the claim, so a cancelled
+     * timer cannot stop half-way through this.
+     */
+    private fun releaseGrantsNoLongerNeeded(book: Book) {
+        val stillUsed = _catalog.value.book(book.id)?.sources?.mapTo(HashSet()) { it.uri }.orEmpty()
+        ingestor.releaseGrants(book.sources.filterNot { it.uri in stillUsed })
+    }
 
     private suspend fun mutate(
         trigger: ScanTrigger,
@@ -369,7 +516,17 @@ class LibraryRepository(
                 // mirror that a failed write left stale, and what gives an
                 // install whose catalog predates the mirror a correct second
                 // launch instead of a permanently default first frame.
+                // Unconditional, recovery included: a recovered load really does
+                // put the app on the default theme, so the mirror has to say so
+                // or the next cold start opens on the pre-corruption colour.
                 withContext(ioDispatcher) { themeMirror.write(load.catalog.settings.theme) }
+                // The grant sweep is the opposite case and stays guarded: an
+                // empty recovered catalog is no evidence the library is empty,
+                // and a released grant cannot be taken back. See
+                // [releaseOrphanedGrants].
+                if (load.recoveredFrom == null) {
+                    withContext(ioDispatcher) { releaseOrphanedGrants(load.catalog) }
+                }
                 true
             }
 
@@ -384,8 +541,22 @@ class LibraryRepository(
 
     companion object {
         const val DEFAULT_MINIMUM_RESCAN_INTERVAL_MS = 2_000L
+
+        /**
+         * How long taking a removal back stays on offer (REQ-105's "short time").
+         * Long enough to read the sentence and reach the control at a large font
+         * size, short enough that the library is not left in two minds about
+         * whether a book is in it.
+         */
+        const val DEFAULT_UNDO_WINDOW_MS = 8_000L
     }
 }
+
+/** A book whose removal can still be taken back, named so the library can say which. */
+data class RemovedBook(val bookId: String, val title: String)
+
+/** The removed entry and the job that will make its removal final. */
+private class PendingRemoval(val book: Book, val timer: Job)
 
 private fun DocumentLookup.availability(): SourceAvailability = when (this) {
     is DocumentLookup.Found -> SourceAvailability.AVAILABLE

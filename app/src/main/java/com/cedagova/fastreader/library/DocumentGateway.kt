@@ -46,6 +46,15 @@ interface DocumentGateway {
     /** Gives back a grant the catalog no longer needs. */
     fun releaseReadPermission(uri: String, isTree: Boolean)
 
+    /**
+     * Every URI the app currently holds a long-lived read grant for.
+     *
+     * The platform's list is the only record of what was taken that outlives the
+     * process, so it is what lets the catalog reconcile grants it stopped using
+     * without ever getting the chance to give them back.
+     */
+    fun persistedReadPermissions(): List<String>
+
     fun lookup(uri: String): DocumentLookup
 
     /** The platform's name for a document or folder, when it has one. */

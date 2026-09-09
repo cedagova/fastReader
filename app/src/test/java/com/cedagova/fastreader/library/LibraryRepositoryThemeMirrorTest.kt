@@ -135,4 +135,39 @@ class LibraryRepositoryThemeMirrorTest {
 
         assertEquals(ThemeChoice.DARK, stale.read())
     }
+
+    /**
+     * Recovery is the one load that reports `Loaded` while carrying none of the
+     * reader's data, so it is the load the two housekeeping steps disagree
+     * about. The grant sweep must skip it: an empty recovered catalog is no
+     * evidence the library is empty, and a released grant cannot be taken back.
+     * The mirror is the opposite — recovery genuinely does put the app back on
+     * the default theme, so a mirror still holding the pre-corruption choice
+     * would open the next cold start on a colour the app no longer uses, and
+     * the mirror exists precisely to be right about that first frame.
+     *
+     * Stated here because nothing else pins it: guarding the mirror write
+     * alongside the sweep is a one-word change that every other test survives.
+     */
+    @Test
+    fun `recovering from a damaged catalog still re-syncs the mirror to the default theme`() = runTest {
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        run {
+            val seeded = repository(FileCatalogStore(file), RecordingThemeMirror(), backgroundScope)
+            seeded.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+        }
+        // The stored document is corrupted, as an interrupted write would leave it.
+        file.writeText("{ this is not a catalog")
+        val mirror = RecordingThemeMirror(stored = ThemeChoice.DARK)
+        val repository = repository(FileCatalogStore(file), mirror, backgroundScope)
+
+        repository.load()
+
+        assertEquals(ReaderSettings.DEFAULTS.theme, repository.catalog.value.settings.theme)
+        assertEquals(
+            "the mirror must follow the catalog the app actually loaded",
+            listOf(ReaderSettings.DEFAULTS.theme),
+            mirror.writes,
+        )
+    }
 }
