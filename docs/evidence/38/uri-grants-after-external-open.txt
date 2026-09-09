@@ -1,0 +1,29 @@
+ACTIVITY MANAGER URI PERMISSIONS (dumpsys activity permissions)
+  Granted Uri Permissions:
+  * UID 1000 holds:
+    UriPermission{f202706 content://com.google.android.configupdater.fileprovider/downloads/update4953359579672367370.tmp [user 0]}
+      targetUserId=0 sourcePkg=com.google.android.configupdater targetPkg=android
+      mode=0x1 owned=0x0 global=0x1 persistable=0x0 persisted=0x0
+    UriPermission{138a1c7 content://downloads/all_downloads/1 [user 0]}
+      targetUserId=0 sourcePkg=com.android.providers.downloads targetPkg=com.android.emulator.multidisplay
+      mode=0x3 owned=0x0 global=0x3 persistable=0x0 persisted=0x0
+    UriPermission{d51b3f4 content://downloads/all_downloads/12 [user 0]}
+      targetUserId=0 sourcePkg=com.android.providers.downloads targetPkg=com.android.emulator.multidisplay
+      mode=0x3 owned=0x0 global=0x3 persistable=0x0 persisted=0x0
+    UriPermission{356271d content://downloads/all_downloads/17 [user 0]}
+      targetUserId=0 sourcePkg=com.android.providers.downloads targetPkg=com.android.emulator.multidisplay
+      mode=0x3 owned=0x0 global=0x3 persistable=0x0 persisted=0x0
+    UriPermission{907ad92 content://downloads/all_downloads/18 [user 0]}
+      targetUserId=0 sourcePkg=com.android.providers.downloads targetPkg=com.android.emulator.multidisplay
+      mode=0x3 owned=0x0 global=0x3 persistable=0x0 persisted=0x0
+    UriPermission{139363 content://com.google.android.configupdater.fileprovider/downloads/update4486315744460876961.tmp [user 0]}
+      targetUserId=0 sourcePkg=com.google.android.configupdater targetPkg=android
+      mode=0x1 owned=0x0 global=0x1 persistable=0x0 persisted=0x0
+  * UID 10217 holds:
+    UriPermission{28b3670 content://com.android.externalstorage.documents/document/primary%3ADownload%2Fthe-lighthouse-keeper.epub [user 0]}
+      targetUserId=0 sourcePkg=com.android.externalstorage targetPkg=com.cedagova.fastreader
+      mode=0x3 owned=0x3 global=0x0 persistable=0x0 persisted=0x0
+      readOwners:
+        * ActivityRecord{200842509 u0 com.cedagova.fastreader/.MainActivity t29}
+      writeOwners:
+        * ActivityRecord{200842509 u0 com.cedagova.fastreader/.MainActivity t29}
