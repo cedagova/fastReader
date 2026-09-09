@@ -37,10 +37,10 @@ cache emptied before every run, via `adb root`).
 
 | Book | median | min | max |
 | --- | --- | --- | --- |
-| (a) illustrated, 52.47 MB | **1.586** | 1.546 | 1.966 |
-| (b) stripped, 38.65 kB | **1.603** | 1.473 | 1.621 |
+| (a) illustrated, 52.47 MB | **1.580** | 1.554 | 1.599 |
+| (b) stripped, 38.65 kB | **1.582** | 1.512 | 1.613 |
 
-The 52 MB book opens **1.1 % faster** than its 38 kB twin — that is, the two are
+The 52 MB book opens **0.1 % faster** than its 38 kB twin — that is, the two are
 indistinguishable, against an acceptance band of 25 %. Per-run numbers are in
 [`runs/`](runs).
 
@@ -63,7 +63,10 @@ than statistically:
 - `ExternalOpenControllerTest."accepting a hand-over reads none of the book"` —
   `accept()` is given a byte source that throws on any read, and the hand-over
   still completes. The grant, the ingest and the digest are all in
-  `resolveIdentity`, which the reader only calls once the stream is running.
+  `resolveIdentity`, which `ReaderRoute` calls only once *this* book's stream is
+  running — it waits on `reader.state.first { it is Reading && reader.openKey ==
+  uri }`, so a hand-over arriving mid-book cannot start hashing the new file
+  while the old one is still on screen.
 - `ReaderOpenCostTest` and `ContentPipelineDeviceTest.imageEntriesAreNeverReadOnDevice`
   (both from #43) — the parse never touches an image entry's bytes.
 
