@@ -48,11 +48,18 @@ import kotlinx.coroutines.flow.StateFlow
  */
 sealed interface ReaderTarget {
 
+    /** What "the same book" means here — the value [BookOpenRequest.openKey] carries. */
+    val openKey: String
+
     /** A catalog book, opened from the library or resumed at launch. */
-    data class Library(val bookId: String) : ReaderTarget
+    data class Library(val bookId: String) : ReaderTarget {
+        override val openKey: String get() = bookId
+    }
 
     /** A book handed over by another app through "Open with" or the share sheet (REQ-103). */
-    data class External(val open: ExternalOpen) : ReaderTarget
+    data class External(val open: ExternalOpen) : ReaderTarget {
+        override val openKey: String get() = open.uri
+    }
 }
 
 /**
@@ -88,11 +95,15 @@ fun ReaderRoute(
             initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository)) }
         },
     )
+    // Keyed on which book, not on the target value: an external target changes
+    // whenever its identity lands or its notice is dismissed, and neither is a
+    // different book to open.
+    //
     // Idempotent: after a rotation this finds the book already parsed and the
     // position intact, and switching books drops the previous one — which is also
     // how an "Open with" arriving mid-book swaps the reader over without a second
     // process (REQ-103).
-    LaunchedEffect(reader, target) {
+    LaunchedEffect(reader, target.openKey) {
         when (target) {
             is ReaderTarget.Library -> reader.openLibraryBook(target.bookId)
             is ReaderTarget.External -> reader.open(

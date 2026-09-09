@@ -1,5 +1,7 @@
 package com.cedagova.fastreader.library
 
+import com.cedagova.fastreader.content.ContentFixtures
+import com.cedagova.fastreader.epub.BookDigest
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
@@ -106,9 +108,7 @@ class LibraryRepositoryTest {
     fun `adding the book afterwards makes its kept position resumable`() = runTest {
         val bytes = EpubFixtures.validEpub()
         val repository = repository(scope = backgroundScope)
-        val digest = requireNotNull(
-            com.cedagova.fastreader.epub.BookDigest.of(com.cedagova.fastreader.content.ContentFixtures.source(bytes)),
-        ).value
+        val digest = requireNotNull(BookDigest.of(ContentFixtures.source(bytes))).value
         repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 512))
 
         gateway.putDocument("doc://shared", bytes, "quiet.epub")

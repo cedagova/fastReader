@@ -2,8 +2,8 @@ package com.cedagova.fastreader.reader
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cedagova.fastreader.content.BookContentResult
 import com.cedagova.fastreader.content.BookContent
+import com.cedagova.fastreader.content.BookContentResult
 import com.cedagova.fastreader.content.BookIdentity
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.reader.ui.ReaderBookView
