@@ -104,13 +104,13 @@ Rules that make the loops work:
 
 | General concept | Binding here |
 | --- | --- |
-| Build / static | `./gradlew assembleDebug`, `./gradlew lint` (Gradle 8.14.2 wrapper, AGP 8.11.1, versions in `gradle/libs.versions.toml`) |
+| Build / static | `./gradlew assembleDebug`, `./gradlew lint` (Gradle 9.7.1 wrapper, AGP 9.4.0, Kotlin 2.4.20, Compose BOM 2026.09.00, `compileSdk`/`targetSdk` 37, `minSdk` 26; versions in `gradle/libs.versions.toml`) |
 | Isolated tests | `./gradlew testDebugUnitTest` (JUnit4 + Robolectric) |
 | Rendered UI | Roborazzi: `./gradlew recordRoborazziDebug` → PNGs + goldens in `app/screenshots/`; `verifyRoborazziDebug` is the regression gate |
-| Real runtime | AVD matrix (`Phone_Low_API33` … `Tablet_Mid_API36`): `emulator -avd <name> -no-window` → poll `sys.boot_completed` → `./gradlew installDebug` → `adb shell am start` → `adb exec-out screencap -p` → `adb logcat -d -s AndroidRuntime:E` → `adb emu kill` |
+| Real runtime | AVD matrix (`Phone_Low_API33` … `Tablet_Mid_API36`, plus `Phone_Mid_API37` — same 1080x2400 @420dpi as `Phone_Mid_API36`, and the only device that can exercise an Android 17 behaviour change now that `targetSdk` is 37): `emulator -avd <name> -no-window` → poll `sys.boot_completed` → `./gradlew installDebug` → `adb shell am start` → `adb exec-out screencap -p` → `adb logcat -d -s AndroidRuntime:E` → `adb emu kill` |
 | Flows | `adb shell input tap/swipe/text` today; Maestro when flows warrant it |
 | Hosted gate | `.github/workflows/checks.yml` on GitHub Actions (`ubuntu-latest`, free tier): `testDebugUnitTest`, `verifyRoborazziDebug`, `lint` on every push and pull request |
-| Machine-local config | `local.properties` (`sdk.dir=$HOME/Library/Android/sdk`); `JAVA_HOME` must be JDK 21 — Gradle 8.x cannot run on Android Studio's bundled Java 25 |
+| Machine-local config | `local.properties` (`sdk.dir=$HOME/Library/Android/sdk`, plus `platforms;android-37.0` and `build-tools;37.0.0` installed); `JAVA_HOME` must be JDK 21 — the only JDK this project builds and validates on |
 
 ### Goldens and the hosted gate
 
@@ -130,6 +130,40 @@ macOS-recorded goldens verified green unmodified on the runner, and inverting
 - `app/screenshots/` is declared as an input of the unit-test task in
   `app/build.gradle.kts`. Without it, editing a golden left the task up to date
   and `verifyRoborazziDebug` passed over a changed reference image.
+- **A dialog golden now includes the scrim.** Under the old Compose/Roborazzi
+  pair an `AlertDialog` golden showed an undimmed background, which is not what
+  a device shows. Since the 2026-09 refresh the dim layer is composited into the
+  capture, so a dialog golden is darker than its pre-refresh reference and now
+  matches the device.
+
+### Toolchain refresh notes (2026-09, AGP 9)
+
+Hard-won facts from the AGP 8.11 → 9.4 / Gradle 8.14 → 9.7 move. They are not
+obvious from the error messages, so check here before re-deriving them:
+
+- **No `org.jetbrains.kotlin.android` plugin.** AGP 9 compiles Kotlin itself and
+  refuses to configure when that plugin is applied. `kotlin.plugin.compose` and
+  `kotlin.plugin.serialization` are still applied, at the `kotlin` version in the
+  catalog; the resolved stdlib must match it (`./gradlew :app:dependencies
+  --configuration debugRuntimeClasspath` to confirm).
+- **Extra source directories go on `kotlin`, not `java`.** AGP 9's built-in
+  Kotlin reads the source set's `kotlin` directories. Registering
+  `src/sharedTest/java` on `java` alone still configures and still builds the
+  app, and then fails test compilation with every shared fixture unresolved.
+  Use `getByName("test").kotlin.directories.add(...)`.
+- **Icons are a direct dependency now.** Compose Material3 1.4.0 dropped its
+  transitive `material-icons-core`, so `androidx.compose.material.icons.Icons`
+  stops resolving until the artifact is declared. The Compose BOM still pins it
+  (1.7.8), so no version is chosen by hand.
+- **`OutlinedButton` labels are `onSurface`, not `primary`.** Material3 1.4.0
+  changed the default, so every outlined button's text went from blue to near
+  black. That is a library default, not an app change; the goldens record it.
+- **Older AGP lint could not run on this Mac at all.** At AGP 8.11.1 on Homebrew
+  JDK 21.0.12.1, `./gradlew lint` died with "Can't initialize detector
+  androidx.compose.runtime.lint.AutoboxingStateCreationDetector" while the same
+  commit's hosted `lint` was green on Temurin 21. AGP 9.4.0's lint runs locally
+  again. If lint ever dies in a detector constructor rather than reporting
+  issues, suspect the lint/JDK pair, not the code.
 
 ### Proving a claim about frames, not screenshots
 

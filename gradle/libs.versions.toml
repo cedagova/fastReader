@@ -1,19 +1,31 @@
+# Toolchain and libraries, last refreshed to current stable 2026-09-09 (#50).
+#
+# Everything below is the newest stable release of its artifact at that date;
+# nothing is held back. Two versions are constrained rather than chosen:
+#
+#   * material-icons-core is a deprecated artifact frozen at 1.7.8, and the
+#     Compose BOM pins it, so it carries no version here (see [libraries]).
+#   * junit stays 4.13.2 because that is the last JUnit 4 release.
+#
+# When something cannot move, pin it here with the reason on the line above it.
+# compileSdk/targetSdk live in app/build.gradle.kts and track the same policy.
+
 [versions]
-agp = "8.11.1"
-kotlin = "2.1.21"
-coreKtx = "1.16.0"
-activityCompose = "1.10.1"
-composeBom = "2025.06.01"
+agp = "9.4.0"
+kotlin = "2.4.20"
+coreKtx = "1.19.0"
+activityCompose = "1.13.0"
+composeBom = "2026.09.00"
 junit = "4.13.2"
-robolectric = "4.14.1"
-roborazzi = "1.26.0"
-coroutines = "1.10.2"
-serialization = "1.8.1"
-lifecycle = "2.9.1"
-androidxTestJunit = "1.2.1"
-androidxTestRunner = "1.6.2"
-androidxTestCore = "1.6.1"
-uiautomator = "2.3.0"
+robolectric = "4.16.1"
+roborazzi = "1.74.0"
+coroutines = "1.11.0"
+serialization = "1.11.0"
+lifecycle = "2.11.0"
+androidxTestJunit = "1.3.0"
+androidxTestRunner = "1.7.0"
+androidxTestCore = "1.7.0"
+uiautomator = "2.4.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -21,6 +33,11 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+# Icons come from the deprecated material-icons-core artifact, which the Compose
+# BOM still pins (1.7.8 in BOM 2026.09.00). Compose Material3 1.4.0 dropped its
+# transitive dependency on it, so the app now declares it directly; the icon set
+# and the artifact version are unchanged from the previous BOM.
+androidx-compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }

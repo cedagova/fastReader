@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
@@ -186,7 +187,10 @@ fun ReaderRoute(
 
     // `getString` rather than `stringResource`: the text is chosen inside a
     // callback, which is not a composable scope.
-    val context = LocalContext.current
+    // LocalResources, not LocalContext.getString: a Configuration change (locale,
+    // font scale) invalidates this read, so the speed notice is always formatted
+    // with the current configuration. Lint's LocalContextGetResourceValueCall.
+    val resources = LocalResources.current
 
     ReaderScreen(
         state = state,
@@ -213,7 +217,7 @@ fun ReaderRoute(
                 val next = steppedWpm(current, steps)
                 reader.setWpm(next)
                 noticeSerial += 1
-                notice = SpeedNotice(context.getString(R.string.reader_speed, next), noticeSerial)
+                notice = SpeedNotice(resources.getString(R.string.reader_speed, next), noticeSerial)
             }
         },
         onOpenSettings = onOpenSettings,
