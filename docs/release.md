@@ -31,11 +31,20 @@ network call from the app itself. This page is the whole procedure.
    ./scripts/release.sh
    ```
 
-3. Publish, from the exact commit that is on `main`:
+3. Write the release notes as `docs/release-notes/v<versionName>.md`, with the
+   privacy statement's marked block pasted into it. `PrivacyStatementTest`
+   fails until that file exists and its copy of the block matches the string
+   the app shows, so a release cannot go out with notes that promise something
+   different from the build.
+
+4. Publish, from the exact commit that is on `main`:
 
    ```bash
-   ./scripts/release.sh --publish
+   ./scripts/release.sh --publish --notes-file docs/release-notes/v<versionName>.md
    ```
+
+   Without `--notes-file` the script falls back to a one-line default, which has
+   no privacy statement in it (REQ-107).
 
 `scripts/release.sh` is the release command. Nothing else publishes, and no CI
 job does it for you. Every run builds `:app:assembleRelease` and then proves,

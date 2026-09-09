@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.settings.AppVersion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,8 +19,10 @@ import org.robolectric.annotation.Config
  * notes making *different* promises about the same build — the kind of drift that
  * happens when one of them is edited months after the other, by which point
  * nobody can say which one the software actually honours. Holding
- * `docs/privacy-statement.md` to the shipped string means LEAF509 can paste the
- * block into release notes and the README knowing it is the app's own words.
+ * `docs/privacy-statement.md` to the shipped string means the block can be
+ * pasted into release notes and the README knowing it is the app's own words —
+ * and, since #49, the two pasted copies are held to it too, so a later edit to
+ * one of the three published places turns this red instead of shipping.
  *
  * Line wrapping is the one difference allowed: the document wraps to the width of
  * the repository's prose and the resource is one paragraph, so both sides are
@@ -58,15 +61,45 @@ class PrivacyStatementTest {
         }
     }
 
+    /**
+     * The two places the block is actually published to a reader outside the app:
+     * the repository's front page and the notes attached to the GitHub Release.
+     * Both carry the same marked block, so both are compared the same way.
+     */
+    @Test
+    fun `the README and the release notes carry that same statement`() {
+        val inApp = oneLine(shownInApp())
+
+        assertEquals(inApp, oneLine(markedBlock("README.md")))
+        assertEquals(inApp, oneLine(markedBlock(releaseNotesPath())))
+    }
+
+    /**
+     * The notes file is named after the version being shipped, so cutting a
+     * release without writing its notes fails here rather than at publish time,
+     * when `scripts/release.sh --publish` would otherwise fall back to a
+     * one-line default with no privacy statement in it.
+     */
+    @Test
+    fun `this version has a release-notes file`() {
+        val path = releaseNotesPath()
+        assertTrue("$path does not exist", repositoryFile(path).isFile)
+    }
+
+    private fun releaseNotesPath(): String =
+        "docs/release-notes/v${AppVersion.of(context).name}.md"
+
     private fun shownInApp(): String = context.getString(R.string.settings_privacy)
 
-    private fun releaseNotesBlock(): String {
-        val document = repositoryFile("docs/privacy-statement.md").readText()
+    private fun releaseNotesBlock(): String = markedBlock("docs/privacy-statement.md")
+
+    private fun markedBlock(path: String): String {
+        val document = repositoryFile(path).readText()
         val begin = "<!-- privacy-statement:begin -->"
         val end = "<!-- privacy-statement:end -->"
         val from = document.indexOf(begin)
         val to = document.indexOf(end)
-        assertTrue("docs/privacy-statement.md has no marked block", from >= 0 && to > from)
+        assertTrue("$path has no marked privacy-statement block", from >= 0 && to > from)
         return document.substring(from + begin.length, to)
     }
 

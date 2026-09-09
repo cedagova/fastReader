@@ -1,11 +1,13 @@
 # FastReader privacy statement
 
-One statement, two places. Settings shows it in the app
+One statement, three places. Settings shows it in the app
 (`settings_privacy` in `app/src/main/res/values/strings.xml`); every GitHub
-Release carries the same words in its notes, and the README repeats them
-(LEAF509, #49). `PrivacyStatementTest` compares the block below against the
-string resource word for word, so the two cannot drift: change one and the
-unit tests go red until the other matches.
+Release carries the same words in its notes (`docs/release-notes/v<version>.md`,
+passed to `scripts/release.sh --publish --notes-file`); and the README repeats
+them. `PrivacyStatementTest` compares the block below, the README's copy and
+this version's release-notes copy against the string resource word for word, so
+none of them can drift: change one and the unit tests go red until the rest
+match.
 
 ## The block to paste into release notes
 
