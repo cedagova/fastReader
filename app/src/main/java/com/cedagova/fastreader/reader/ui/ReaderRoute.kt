@@ -42,6 +42,7 @@ import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * Which book the reader is showing, and therefore where its bytes and its
@@ -137,7 +138,7 @@ fun ReaderRoute(
     }
 
     val external = (target as? ReaderTarget.External)?.open
-    ExternalIdentity(graph, external, reader, streaming = state is ReaderUiState.Reading)
+    ExternalIdentity(graph, external, reader)
 
     // Live, because the answer changes under this screen: the keepable half of
     // REQ-103 adds the row itself, and "Add to library" adds it through the
@@ -248,11 +249,18 @@ private fun ExternalIdentity(
     graph: LibraryGraph,
     external: ExternalOpen?,
     reader: ReaderViewModel,
-    streaming: Boolean,
 ) {
-    LaunchedEffect(external?.uri, streaming) {
+    LaunchedEffect(reader, external?.uri) {
         val uri = external?.uri ?: return@LaunchedEffect
-        if (streaming) graph.external.resolveIdentity(uri)
+        // Waits for *this* book's stream, not for "a" stream. A state value read
+        // during composition can still describe the book before this one — an
+        // "Open with" arriving mid-book recomposes with the new URI while the
+        // reader is still showing the old book's Reading state — and starting the
+        // deferred work there would hash one book while another is on screen,
+        // which is both the wrong REQ-110 claim and the window in which
+        // [ReaderViewModel.identityResolved] has no session to stamp.
+        reader.state.first { it is ReaderUiState.Reading && reader.openKey == uri }
+        graph.external.resolveIdentity(uri)
     }
     LaunchedEffect(reader, external?.uri, external?.identity) {
         val identity = external?.identity ?: return@LaunchedEffect

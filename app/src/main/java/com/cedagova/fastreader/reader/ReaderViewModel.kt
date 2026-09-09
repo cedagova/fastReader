@@ -106,6 +106,17 @@ class ReaderViewModel(
     /** How long the token on screen is shown, or null when nothing is streaming. */
     val currentDurationMillis: Long? get() = session?.takeIf { it.isPlaying }?.currentDurationMillis
 
+    /**
+     * Which book the reader currently holds — its [BookOpenRequest.openKey] — or
+     * null before the first open.
+     *
+     * Exists so a caller can tell "the reader is streaming" from "the reader is
+     * streaming *this* book". [ReaderUiState] deliberately carries no key, and a
+     * state read one recomposition ago can still describe the book before this
+     * one.
+     */
+    val openKey: String? get() = openRequest?.openKey
+
     /** Opens the catalog book [bookId], unless it is already open. */
     fun openLibraryBook(bookId: String) = open(books.libraryBook(bookId))
 
@@ -144,7 +155,20 @@ class ReaderViewModel(
                 _state.value = ReaderUiState.Unavailable(title, result.reason)
 
             is BookContentResult.Parsed -> {
-                val content = result.content
+                // The identity can land *while this parse runs* (AD-8), and then
+                // [identityResolved] has no session to stamp: it is created here,
+                // a moment later. The request this parse started from is
+                // therefore not the last word on who the book is — `openRequest`
+                // is. Reading it here is what closes that window; without it the
+                // session keeps the empty digest the pipeline stamped from a null
+                // identity, while `positionKey` is already set, and the first
+                // write stores a first-word position under the right key with the
+                // wrong digest — overwriting a real stored position with nothing.
+                val identity = openRequest?.takeIf { it.openKey == request.openKey }?.identity
+                val content = result.content.let { parsed ->
+                    if (identity == null || parsed.bookDigest == identity.value) parsed
+                    else parsed.copy(bookDigest = identity.value)
+                }
                 // Building the time-remaining index is one sweep of the book; it
                 // belongs on the parsing thread, next to the parse, not on the
                 // first frame of the reader.
@@ -154,7 +178,7 @@ class ReaderViewModel(
                 view = book
                 // Resuming lands paused, on the stored word, at the stored speed
                 // (REQ-010, REQ-016). A book never opens playing.
-                val stored = request.positionKey?.let { positions.restore(it) }
+                val stored = (identity?.value ?: request.positionKey)?.let { positions.restore(it) }
                 session = ReaderSession(
                     content = content,
                     index = stored?.resolveIndex(content) ?: 0,
