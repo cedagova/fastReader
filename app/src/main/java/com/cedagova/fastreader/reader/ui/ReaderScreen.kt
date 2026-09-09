@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,16 +49,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
@@ -111,6 +120,25 @@ private val TouchTarget = 48.dp
  * column are not composed, leaving the stream and its cues alone on the page. It
  * is a parameter rather than session state because it is a property of this
  * screen, not of the book — which also lets the goldens render it directly.
+ *
+ * ## Speed without the controls (REQ-108)
+ *
+ * Focused mode hides the speed slider, so it adds a third gesture in its place: a
+ * vertical drag on the reading surface, one 25 WPM step per
+ * [SpeedStepDistance], up for faster. [SpeedGesture] documents why that gesture
+ * and no other, and holds the arithmetic.
+ *
+ * [speedNotice] is the text-only, self-dismissing line the drag leaves behind —
+ * the new speed, or the one-line hint that names the gesture when focused mode is
+ * entered. It is a parameter for the same reason [focused] is: the timer that
+ * clears it belongs to [ReaderRoute], and passing the text in lets a golden render
+ * the readout without one.
+ *
+ * It is an *overlay*, drawn in a [Box] over the surface rather than in the
+ * column with it, so appearing and disappearing cannot move the word (AD-6): the
+ * stream keeps the same size and the same background whether the notice is there
+ * or not. Nothing about it animates, and it never touches the stream's own
+ * luminance (REQ-062).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,6 +158,14 @@ fun ReaderScreen(
     /** REQ-030: chrome hidden, stream and cues left alone. */
     focused: Boolean = false,
     onToggleFocused: () -> Unit = {},
+    /**
+     * REQ-108: the static, self-dismissing line the focused surface shows — the
+     * speed the gesture just set, or the hint that names the gesture. Null when
+     * there is nothing to say, which is nearly always.
+     */
+    speedNotice: String? = null,
+    /** REQ-108: whole 25 WPM steps from the focused-mode drag; positive is faster. */
+    onSpeedStep: (Int) -> Unit = {},
     /** Opens the settings screen (LEAF302). Hidden with the rest of the chrome in focused mode. */
     onOpenSettings: () -> Unit = {},
     /**
@@ -215,6 +251,8 @@ fun ReaderScreen(
                         onTogglePlay = onTogglePlay,
                         onToggleFocused = onToggleFocused,
                         focused = chromeHidden,
+                        speedNotice = speedNotice,
+                        onSpeedStep = onSpeedStep,
                         word = word,
                         modifier = Modifier.weight(1f),
                     )
@@ -403,6 +441,30 @@ private fun Unavailable(state: ReaderUiState.Unavailable, modifier: Modifier) {
  * Both are announced. `onClickLabel` and `onLongClickLabel` land on the node that
  * carries the actions, so TalkBack offers "Pause" and "Hide the controls" on the
  * reading surface rather than leaving focused mode undiscoverable without sight.
+ *
+ * ## The third gesture, in focused mode only (REQ-108)
+ *
+ * With the chrome hidden the speed slider is gone, so the surface takes a
+ * **vertical drag**: up faster, down slower, one 25 WPM step per
+ * [SpeedStepDistance]. It is added only when [focused], because the slider is the
+ * speed control everywhere else and a drag on an unfocused surface would only be
+ * a second way to do the same thing.
+ *
+ * It cannot collide with the two gestures above. A drag consumes the pointer past
+ * touch slop, which cancels `combinedClickable`'s press, and the drag node sits
+ * *inside* the clickable in the modifier chain, so it sees each pointer event
+ * first. A press that never moves is still a tap or a long press.
+ *
+ * Over the paused paragraph, whose own vertical scroll is nested inside this, the
+ * scroll wins where there is anything to scroll — the nearer meaning of a drag on
+ * a paragraph the reader is reading. The word itself, which is where the thumb
+ * goes in a running stream, always changes speed.
+ *
+ * A screen reader cannot perform a drag: TalkBack takes the swipes for its own
+ * navigation. So the same two steps are also custom accessibility actions on this
+ * node, "Increase reading speed" and "Decrease reading speed" (REQ-301), which is
+ * both the accessible control and the place the gesture is named for a reader who
+ * never sees the hint.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -411,6 +473,8 @@ private fun ReadingSurface(
     onTogglePlay: () -> Unit,
     onToggleFocused: () -> Unit,
     focused: Boolean,
+    speedNotice: String?,
+    onSpeedStep: (Int) -> Unit,
     word: @Composable (ReaderWord, Modifier) -> Unit,
     modifier: Modifier,
 ) {
@@ -424,46 +488,134 @@ private fun ReadingSurface(
         null
     }
     val focusLabel = stringResource(if (focused) R.string.reader_show_controls else R.string.reader_hide_controls)
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            // No content description: the word and, when stopped, the paragraph
-            // under it are what a screen reader should read here. The click labels
-            // still name the actions, so the tap target announces them without
-            // hiding the text it covers.
-            .combinedClickable(
-                enabled = tappable || focused,
-                onClickLabel = label,
-                onLongClickLabel = focusLabel,
-                onLongClick = onToggleFocused,
-                onClick = { if (tappable) onTogglePlay() },
-            )
-            .padding(horizontal = 20.dp)
-            .testTag(if (focused) "reader_surface_focused" else "reader_surface"),
-    ) {
-        when (state.mode) {
-            // The word keeps the same place whether the stream is running or
-            // stopped, so pausing reveals the paragraph underneath instead of
-            // moving the word the reader is looking at.
-            ReaderMode.PLAYING, ReaderMode.PAUSED -> {
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f).testTag("reader_word"),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    word(state.word, Modifier.fillMaxSize())
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                // No content description: the word and, when stopped, the paragraph
+                // under it are what a screen reader should read here. The click labels
+                // still name the actions, so the tap target announces them without
+                // hiding the text it covers.
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    // No ripple. The default indication tints this entire surface
+                    // for as long as a pointer is down, and the speed drag put that
+                    // on screen *during a running stream* — a whole-page brightness
+                    // change on the one surface REQ-062/REQ-302 promise is static
+                    // apart from glyphs, and an animation on a screen AD-6 says has
+                    // none. Tap and long press lose nothing: each already answers
+                    // with the state change itself, the paragraph appearing or the
+                    // chrome going.
+                    indication = null,
+                    enabled = tappable || focused,
+                    onClickLabel = label,
+                    onLongClickLabel = focusLabel,
+                    onLongClick = onToggleFocused,
+                    onClick = { if (tappable) onTogglePlay() },
+                )
+                // After the clickable, never before: the inner node sees each
+                // pointer event first, so a real drag is consumed here and the
+                // press above it is cancelled instead of also firing.
+                .then(if (focused) Modifier.speedGesture(onSpeedStep) else Modifier)
+                .padding(horizontal = 20.dp)
+                .testTag(if (focused) "reader_surface_focused" else "reader_surface"),
+        ) {
+            when (state.mode) {
+                // The word keeps the same place whether the stream is running or
+                // stopped, so pausing reveals the paragraph underneath instead of
+                // moving the word the reader is looking at.
+                ReaderMode.PLAYING, ReaderMode.PAUSED -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().weight(1f).testTag("reader_word"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        word(state.word, Modifier.fillMaxSize())
+                    }
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
+                        if (state.mode == ReaderMode.PAUSED) PausedContext(state)
+                    }
                 }
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
-                    if (state.mode == ReaderMode.PAUSED) PausedContext(state)
-                }
-            }
 
-            // A stop screen has no word to keep in place, so it uses the whole
-            // surface.
-            ReaderMode.CHAPTER_PAUSE -> FullSurface { ChapterPause(state) }
-            ReaderMode.FINISHED -> FullSurface { Finished(state) }
+                // A stop screen has no word to keep in place, so it uses the whole
+                // surface.
+                ReaderMode.CHAPTER_PAUSE -> FullSurface { ChapterPause(state) }
+                ReaderMode.FINISHED -> FullSurface { Finished(state) }
+            }
+        }
+        if (speedNotice != null) {
+            SpeedNotice(speedNotice, Modifier.align(Alignment.BottomCenter))
         }
     }
+}
+
+/**
+ * The focused-mode speed drag and its screen-reader equivalent, on one node.
+ *
+ * A `Modifier` extension rather than inline chain so the surface's own layout
+ * stays readable and so the two halves of REQ-108's control — the gesture and the
+ * custom actions that stand in for it under TalkBack — cannot drift apart.
+ */
+@Composable
+private fun Modifier.speedGesture(onSpeedStep: (Int) -> Unit): Modifier {
+    val faster = stringResource(R.string.reader_speed_faster)
+    val slower = stringResource(R.string.reader_speed_slower)
+    val stepPixels = with(LocalDensity.current) { SpeedStepDistance.toPx() }
+    val drag = remember(stepPixels) { SpeedDrag(stepPixels) }
+    // The callback is read through a state holder rather than being a key of the
+    // block below. This screen recomposes on every streamed word — sixteen times a
+    // second at the 1000 WPM ceiling — and `pointerInput` restarts its block, and
+    // so cancels a gesture in progress, whenever a key changes by identity. Today
+    // the caller's lambda happens to be memoized and the drag survives; a single
+    // unstable capture added to it later would silently break dragging at speed
+    // and nowhere else. This makes that impossible rather than lucky.
+    val step by rememberUpdatedState(onSpeedStep)
+    return this
+        .semantics {
+            customActions = listOf(
+                CustomAccessibilityAction(faster) { step(1); true },
+                CustomAccessibilityAction(slower) { step(-1); true },
+            )
+        }
+        .pointerInput(drag) {
+            detectVerticalDragGestures(
+                onDragStart = { drag.begin() },
+                onVerticalDrag = { _, deltaY ->
+                    val steps = drag.drag(deltaY)
+                    if (steps != 0) step(steps)
+                },
+            )
+        }
+}
+
+/**
+ * REQ-108's readout, and the hint that names the gesture: one line of text over
+ * the bottom of the focused surface, gone again within two seconds.
+ *
+ * Text and nothing else — no card, no scrim, no animation. Its background is the
+ * page's own background, so it occludes the paused paragraph where it overlaps it
+ * without putting a second brightness on the screen (REQ-062/REQ-302). Being an
+ * overlay, it does not exist in the surface's layout at all: the word does not
+ * move when it appears or when it goes.
+ *
+ * A live region, because the reader who most needs the readout is the one who
+ * reached the speed change through the custom accessibility actions and cannot
+ * see the line it left behind.
+ */
+@Composable
+private fun SpeedNotice(text: String, modifier: Modifier) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .padding(horizontal = 24.dp, vertical = 32.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag("reader_speed_notice"),
+    )
 }
 
 @Composable
@@ -885,7 +1037,7 @@ private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Uni
     ) {
         Slider(
             value = state.wpm.toFloat(),
-            onValueChange = { onWpmChange((it / SPEED_STEP).roundToInt() * SPEED_STEP) },
+            onValueChange = { onWpmChange((it / SPEED_STEP_WPM).roundToInt() * SPEED_STEP_WPM) },
             valueRange = RsvpTiming.MIN_WPM.toFloat()..RsvpTiming.MAX_WPM.toFloat(),
             modifier = Modifier
                 .weight(1f)
@@ -962,9 +1114,9 @@ private fun remainingLabel(remainingMillis: Long): String {
     }
 }
 
-/**
- * Speed lands on round 25 WPM steps. The slider itself stays continuous rather
+/*
+ * Speed lands on round 25 WPM steps, which [SPEED_STEP_WPM] holds for the slider
+ * and the focused-mode gesture alike. The slider itself stays continuous rather
  * than using Material's `steps`, whose tick marks would draw 36 dots across a
  * control the reader is only ever asked to read one number off.
  */
-private const val SPEED_STEP = 25

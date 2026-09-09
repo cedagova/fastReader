@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
@@ -144,11 +145,45 @@ class SettingsScreenScreenshotTest {
         )
     }
 
+    /**
+     * REQ-301 for the rows this leaf adds, at the width and text size that break
+     * a row: the 720 dp phone's 360 dp of width, the device font scale at 2.0 and
+     * the app's own size at its largest. `settings_compact_large_font` is the same
+     * stress on a real 640 dp viewport, where About is below the fold and no image
+     * can reach it; this window is tall enough to see whether the version row
+     * keeps both its halves and the statement keeps its lines.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE_SCROLLED)
+    fun `the about rows survive the narrowest screen at the largest text`() {
+        capture(
+            "settings_about_compact_large_font",
+            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE),
+            fontScale = 2f,
+        )
+    }
+
+    /**
+     * REQ-106's edge, which is the only state of the About section that a reader
+     * can reach and no other golden shows: a device with nothing able to open a
+     * web link. The tap has to leave the address on the page rather than doing
+     * nothing, so what the failure looks like is worth holding still.
+     */
+    @Test
+    fun `the update hand-off says so when nothing can open a web link`() {
+        capture(
+            "settings_update_no_browser",
+            ReaderSettings.DEFAULTS,
+            updateHandoffUnavailable = true,
+        )
+    }
+
     private fun capture(
         name: String,
         settings: ReaderSettings,
         darkTheme: Boolean = false,
         fontScale: Float = 1f,
+        updateHandoffUnavailable: Boolean = false,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -158,6 +193,9 @@ class SettingsScreenScreenshotTest {
                         onSettingsChange = {},
                         onReset = {},
                         onBack = {},
+                        version = GOLDEN_VERSION,
+                        onCheckForUpdates = {},
+                        updateHandoffUnavailable = updateHandoffUnavailable,
                         heldPreviewToken = PREVIEW_HELD_TOKEN,
                     )
                 }
@@ -190,10 +228,24 @@ class SettingsScreenScreenshotTest {
  * exist to prove — outside every capture. The emulator pass shows what the real
  * viewport looks like and that the rest is reachable by scrolling.
  */
-private const val TALL_PHONE = "w411dp-h1400dp-xxhdpi"
+private const val TALL_PHONE = "w411dp-h1800dp-xxhdpi"
 
 /** The same window, tall enough to hold the whole surface at the largest text size. */
-private const val TALLER_PHONE = "w411dp-h1800dp-xxhdpi"
+private const val TALLER_PHONE = "w411dp-h2500dp-xxhdpi"
 
 /** 720p, 2 GB phone, matching the `Phone_Low_API33` AVD used for cramped layouts. */
 private const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"
+
+/** The same 720p phone, unrolled far enough that what it scrolls to is capturable. */
+private const val COMPACT_PHONE_SCROLLED = "w360dp-h3400dp-xhdpi"
+
+/**
+ * A fixed version for the About row (REQ-106), rather than the build's own.
+ *
+ * The row reads the installed package, so wiring the real value in here would
+ * make every release bump re-record seven goldens and turn the UI regression gate
+ * into noise on exactly the commit that should be quiet. `AppVersionTest` is
+ * where the shown value is held to `version.properties`; this is only the shape
+ * of the row. The literal matches the version at the time these were recorded.
+ */
+private val GOLDEN_VERSION = AppVersion(name = "1.0.1", code = 2)

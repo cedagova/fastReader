@@ -266,6 +266,66 @@ class ReaderScreenScreenshotTest {
         capture("reader_font_extra_large", pausedAt(12), cues = largest.cues, fontSize = largest.fontSize)
     }
 
+    // --- REQ-108, the focused-mode speed gesture -----------------------------
+    //
+    // The gesture is a device claim; its *readout* is a rendering one. These two
+    // settle the only questions an image can settle about it: that the line is
+    // text and nothing else — no card, no scrim, no second brightness on a page
+    // REQ-302 requires to be static — and that it sits clear of the word, which
+    // must not move when it appears.
+
+    /**
+     * The state a drag leaves behind: the new speed, over an otherwise untouched
+     * focused surface. Compare with `reader_focused`, which is the same session
+     * and the same word with no notice — the only difference between the two
+     * images is the line at the bottom.
+     */
+    @Test
+    fun theSpeedGestureLeavesTheNewSpeedOnTheScreen() {
+        capture(
+            "reader_focused_speed_readout",
+            view.present(ReaderSession(book).jumpTo(12).play().withWpm(500)),
+            cues = CueSettings.DEFAULTS,
+            focused = true,
+            speedNotice = "500 WPM",
+        )
+    }
+
+    /**
+     * The same slot carrying the hint that names the gesture on entering focused
+     * mode — the longest copy it ever holds, so this is also where its wrapping is
+     * checked.
+     */
+    @Test
+    fun enteringFocusedModeNamesTheGesture() {
+        capture(
+            "reader_focused_speed_hint",
+            playingAt(12),
+            cues = CueSettings.DEFAULTS,
+            focused = true,
+            speedNotice = "Drag up or down to change speed",
+        )
+    }
+
+    /**
+     * REQ-301's font-scale clause for the new copy, at its worst case: the longest
+     * of the two lines, on the 720p phone (`Phone_Low_API33`), at a 2.0 system
+     * font scale. The notice is the only new thing on the page that has text to
+     * lose, and this is where it would lose it.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theGestureHintSurvivesACrampedScreenAtTwiceTheFontScale() {
+        capture(
+            "reader_focused_speed_hint_compact_large_font",
+            playingAt(12),
+            fontScale = 2f,
+            cues = CueSettings.DEFAULTS,
+            focused = true,
+            speedNotice = "Drag up or down to change speed",
+        )
+    }
+
     private fun playingAt(index: Int) = view.present(ReaderSession(book).jumpTo(index).play())
 
     private fun pausedAt(index: Int) = view.present(ReaderSession(book).jumpTo(index))
@@ -279,6 +339,7 @@ class ReaderScreenScreenshotTest {
         focused: Boolean = false,
         fontSize: FontSize = FontSize.MEDIUM,
         externalNotice: Boolean = false,
+        speedNotice: String? = null,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -297,6 +358,7 @@ class ReaderScreenScreenshotTest {
                         cues = cues,
                         focused = focused,
                         externalNotice = externalNotice,
+                        speedNotice = speedNotice,
                     )
                 }
             }

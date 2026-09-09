@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import org.junit.Assert.assertEquals
@@ -34,7 +35,7 @@ import org.robolectric.annotation.Config
  * cannot quietly escape.
  */
 @RunWith(AndroidJUnit4::class)
-@Config(sdk = [35], qualifiers = "w411dp-h1400dp-xxhdpi")
+@Config(sdk = [35], qualifiers = "w411dp-h1800dp-xxhdpi")
 class SettingsAccessibilityTest {
 
     @get:Rule
@@ -49,6 +50,8 @@ class SettingsAccessibilityTest {
                     onSettingsChange = {},
                     onReset = {},
                     onBack = {},
+                    version = AppVersion(name = "1.0.1", code = 2),
+                    onCheckForUpdates = {},
                     heldPreviewToken = PREVIEW_HELD_TOKEN,
                 )
             }
@@ -95,6 +98,14 @@ class SettingsAccessibilityTest {
             "the guide-marks switch should name what it toggles, got $labels",
             labels.any { it.startsWith("Guide marks.") },
         )
+        // REQ-106: the only outbound action in the app says where it goes in its
+        // own announcement, not only in the line drawn next to it.
+        assertTrue(
+            "the update action should say it opens the browser, got $labels",
+            labels.any {
+                it.startsWith("Check for updates. Opens the FastReader releases page in your browser")
+            },
+        )
         // The mechanism's internal vocabulary must not reach a screen reader.
         listOf("pivot", "ORP", "Spritz").forEach { word ->
             assertTrue(
@@ -116,6 +127,23 @@ class SettingsAccessibilityTest {
             0,
             short.size,
         )
+    }
+
+    /**
+     * REQ-106/REQ-301 for the two things About states rather than offers: they
+     * are not clickable, so the actionable-node checks above never see them, and
+     * a version split into "Version" and "1.0.1 (build 2)" would still pass
+     * every one of them while reading badly.
+     */
+    @Test
+    fun `the version is announced as one sentence and the privacy statement as one node`() {
+        assertTrue(
+            "no node announces the version as a sentence, got " + allNodes().map { it.label() },
+            allNodes().any { it.label() == "Version 1.0.1, build 2" },
+        )
+        val privacy = allNodes().map { it.label() }
+            .filter { it.startsWith("FastReader has no internet permission") }
+        assertEquals("the privacy statement should be exactly one node", 1, privacy.size)
     }
 
     /** The live preview must not announce a word that changes four times a second. */

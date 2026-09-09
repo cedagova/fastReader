@@ -1,0 +1,99 @@
+FastReader #46 — device backup evidence
+Device: Phone_Mid_API36 (sdk_gphone64_arm64, Android 16 / API 36), adb root.
+
+Same seeded data throughout: two books added through the picker, one opened and
+read (so a reading position exists), settings written. Three builds installed in
+place over that data, so nothing but the manifest differs between them:
+
+  A  no allowBackup, no rules            — the collector base's behaviour
+  B  allowBackup="true" + the new rules  — control: does the rules file work?
+  C  allowBackup="false" + the new rules — the shipped head
+
+Two transports, because the two halves of AD-11 are governed separately:
+
+  com.android.localtransport/.LocalTransport                    cloud backup
+  com.google.android.gms/.backup.migrate.service.D2dTransport   device transfer
+
+For the local transport the proof is the stored blob under
+/data/data/com.android.localtransport/files/1/_full/. The D2D transport does not
+store there, so its measure is the byte progress the framework reports.
+
+Result: A moves 9,728 bytes on both transports and the local blob contains
+catalog.json, both cover files and the theme mirror. B and C move nothing on
+either transport. C is additionally refused outright on the cloud path
+("Backup is not allowed"), which is allowBackup="false"; on the device-transfer
+path, which ignores that attribute, it is the rules file that empties the
+payload — which is exactly what B isolates.
+
+Transcript follows.
+
+================ BUILD A — baseline: no allowBackup, no rules (collector base behaviour) ================
+---- transport: com.android.localtransport/.LocalTransport ----
+Wiped backup data for com.cedagova.fastreader on com.android.localtransport/.LocalTransport
+Running incremental backup for 1 requested packages.
+Package @pm@ with result: Success
+Package com.cedagova.fastreader with progress: 2048/7680
+Package com.cedagova.fastreader with progress: 4608/7680
+Package com.cedagova.fastreader with progress: 5632/7680
+Package com.cedagova.fastreader with progress: 8704/7680
+Package com.cedagova.fastreader with progress: 9216/7680
+Package com.cedagova.fastreader with progress: 9728/7680
+Package com.cedagova.fastreader with result: Success
+Backup finished with result: Success
+-- what the transport stored --
+total 16
+-rw------- 1 system system 9728 2026-09-07 22:38 com.cedagova.fastreader
+   FastReader paths found in the stored blob: 4
+---- transport: com.google.android.gms/.backup.migrate.service.D2dTransport ----
+Wiped backup data for com.cedagova.fastreader on com.google.android.gms/.backup.migrate.service.D2dTransport
+Running incremental backup for 1 requested packages.
+Package @pm@ with result: Success
+Package com.cedagova.fastreader with progress: 2048/7680
+Package com.cedagova.fastreader with progress: 8704/7680
+Package com.cedagova.fastreader with progress: 9216/7680
+Package com.cedagova.fastreader with progress: 9728/7680
+Package com.cedagova.fastreader with result: Success
+Backup finished with result: Success
+-- what the transport stored --
+total 0
+   FastReader paths found in the stored blob: 0
+
+================ BUILD B — control: allowBackup=true, data_extraction_rules present ================
+---- transport: com.android.localtransport/.LocalTransport ----
+Wiped backup data for com.cedagova.fastreader on com.android.localtransport/.LocalTransport
+Running incremental backup for 1 requested packages.
+Package @pm@ with result: Success
+Package com.cedagova.fastreader with result: Transport rejected package because it wasn't able to process it at the time
+Backup finished with result: Success
+-- what the transport stored --
+total 0
+   FastReader paths found in the stored blob: 0
+---- transport: com.google.android.gms/.backup.migrate.service.D2dTransport ----
+Wiped backup data for com.cedagova.fastreader on com.google.android.gms/.backup.migrate.service.D2dTransport
+Running incremental backup for 1 requested packages.
+Package @pm@ with result: Success
+Package com.cedagova.fastreader with result: Transport rejected package because it wasn't able to process it at the time
+Backup finished with result: Success
+-- what the transport stored --
+total 0
+   FastReader paths found in the stored blob: 0
+
+================ BUILD C — shipped head: allowBackup=false + data_extraction_rules ================
+---- transport: com.android.localtransport/.LocalTransport ----
+Wiped backup data for com.cedagova.fastreader on com.android.localtransport/.LocalTransport
+Running incremental backup for 1 requested packages.
+Package com.cedagova.fastreader with result: Backup is not allowed
+Backup finished with result: Success
+-- what the transport stored --
+total 0
+   FastReader paths found in the stored blob: 0
+---- transport: com.google.android.gms/.backup.migrate.service.D2dTransport ----
+Wiped backup data for com.cedagova.fastreader on com.google.android.gms/.backup.migrate.service.D2dTransport
+Running incremental backup for 1 requested packages.
+Package @pm@ with result: Success
+Package com.cedagova.fastreader with result: Transport rejected package because it wasn't able to process it at the time
+Backup finished with result: Success
+-- what the transport stored --
+total 0
+   FastReader paths found in the stored blob: 0
+
