@@ -8,7 +8,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.library.BookContentStatus
@@ -47,10 +49,28 @@ class LibraryScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /**
+     * REQ-109's first half: the screen a stranger meets has both ways to add their
+     * own books *and* something they can read right now, with the licence of that
+     * something stated where it is offered.
+     */
     @Test
-    fun emptyLibraryExplainsBothWaysToAddBooks() {
+    fun emptyLibraryExplainsBothWaysToAddBooksAndOffersASample() {
         capture("library_empty", state(Catalog()))
     }
+
+    /**
+     * REQ-109's language rule, proved through the mechanism that actually decides
+     * it: the composition's configuration. The `es` qualifier is what a Spanish
+     * device gives the app, and the offer comes back Español first. The interface
+     * around it stays English until the Spanish resource set lands (D5).
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun aSpanishDeviceIsOfferedTheSpanishSampleFirst() {
+        capture("library_empty_spanish", state(Catalog()))
+    }
+
 
     @Test
     fun populatedLibraryShowsTitleAuthorCoverAndProgress() {
@@ -142,6 +162,17 @@ class LibraryScreenScreenshotTest {
     }
 
     /**
+     * REQ-301 for the new controls: the smallest screen in the matrix at a large
+     * system font scale. The offer's buttons wrap rather than clip, and the page
+     * scrolls, so nothing on it becomes unreachable.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theSampleOfferSurvivesACrampedScreenAtALargeFontScale() {
+        capture("library_empty_compact_large_font", state(Catalog()), fontScale = 1.4f, scrollTo = "sample_offer")
+    }
+
+    /**
      * REQ-022's other half: the text-size setting is applied by the app's theme,
      * so it reaches the library as well as the reader. Same catalog and same
      * screen as `library_populated`; the only difference is the setting.
@@ -157,6 +188,8 @@ class LibraryScreenScreenshotTest {
         darkTheme: Boolean = false,
         fontScale: Float = 1f,
         fontSize: FontSize = FontSize.MEDIUM,
+        /** A test tag to bring into view before capturing, for content below the fold. */
+        scrollTo: String? = null,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -175,6 +208,7 @@ class LibraryScreenScreenshotTest {
                 }
             }
         }
+        scrollTo?.let { composeRule.onNodeWithTag(it).performScrollTo() }
         composeRule.onRoot().captureRoboImage("screenshots/$name.png")
     }
 

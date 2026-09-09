@@ -15,12 +15,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.LaunchDestination
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
 import com.cedagova.fastreader.library.ui.LibraryRoute
+import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ui.ReaderRoute
 import com.cedagova.fastreader.settings.SharedPreferencesThemeMirror
 import com.cedagova.fastreader.settings.ui.SettingsRoute
@@ -71,11 +73,22 @@ class MainActivity : ComponentActivity() {
  * The decision is taken once per process. Everything it produces is saved
  * instance state, so rotating the phone keeps the reader on screen and coming
  * back to the library does not bounce straight into the book again.
+ *
+ * The reader destination now covers two kinds of book. A bundled sample
+ * (REQ-109) is held in its own piece of state and takes precedence while it is
+ * open, so leaving it puts the reader back in whatever they were reading before.
+ * It is never a launch destination: launch routing reads the catalog, and the
+ * sample is not in it.
  */
 @Composable
 private fun FastReaderApp(library: LibraryGraph) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
+    // The bundled sample being read, by enum name (REQ-109). Kept apart from
+    // [openBookId] rather than folded into it because a sample is not a catalog
+    // book: nothing may look it up in the library, and launch routing must never
+    // land here.
+    var openSample by rememberSaveable { mutableStateOf<String?>(null) }
     // Whether the reader on screen was chosen by the launch routing rather than
     // by the reader tapping a row. It decides who owns a book that will not open.
     var routedIntoReader by rememberSaveable { mutableStateOf(false) }
@@ -110,11 +123,22 @@ private fun FastReaderApp(library: LibraryGraph) {
         // spinner that flashes for one frame is worse than nothing.
         !routed -> Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
 
-        settingsOpen -> SettingsRoute(graph = library, onBack = { settingsOpen = false })
+        settingsOpen -> SettingsRoute(
+            graph = library,
+            onBack = { settingsOpen = false },
+            onOpenSample = { settingsOpen = false; openSample = it.name },
+        )
+
+        openSample != null -> ReaderRoute(
+            graph = library,
+            target = ReaderTarget.Sample(BundledSample.valueOf(requireNotNull(openSample))),
+            onBack = { openSample = null },
+            onOpenSettings = { settingsOpen = true },
+        )
 
         openBookId != null -> ReaderRoute(
             graph = library,
-            bookId = requireNotNull(openBookId),
+            target = ReaderTarget.Library(requireNotNull(openBookId)),
             onBack = { openBookId = null; routedIntoReader = false },
             // A book the reader chose from the library keeps the reader's own
             // explanation on screen: they picked it, and its row already said
@@ -136,6 +160,7 @@ private fun FastReaderApp(library: LibraryGraph) {
         else -> LibraryRoute(
             graph = library,
             onOpenBook = { openBookId = it },
+            onOpenSample = { openSample = it.name },
             resumeBlocked = resumeBlocked(blockedBookId, blockedReason),
             onDismissResumeNotice = {
                 blockedBookId = null

@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.cedagova.fastreader.content.BundledSample
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import com.cedagova.fastreader.library.LibraryGraph
@@ -52,6 +53,8 @@ fun SettingsRoute(
     graph: LibraryGraph,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens a text shipped inside the app (REQ-109), which stays reachable here. */
+    onOpenSample: (BundledSample) -> Unit = {},
 ) {
     val repository = graph.repository
     val settings by repository.settings.collectAsState()
@@ -79,6 +82,7 @@ fun SettingsRoute(
         },
         modifier = modifier,
         persistenceFailure = persistenceFailure,
+        onOpenSample = onOpenSample,
         updateHandoffUnavailable = updateHandoffUnavailable,
     )
 }

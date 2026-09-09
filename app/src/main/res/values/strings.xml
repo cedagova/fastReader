@@ -17,6 +17,14 @@
     <string name="library_empty_folder">Add a folder. Every EPUB inside it, including subfolders, appears here, and books you add to that folder later show up the next time you open the app.</string>
     <string name="library_empty_in_place">Books are read where they are. FastReader never copies, changes, or deletes your files.</string>
 
+    <!-- The bundled sample (REQ-109). The button labels are the languages' own
+         names for themselves, which do not change with the interface language,
+         so they live in BundledSample rather than here. -->
+    <string name="sample_title">Try a sample</string>
+    <string name="sample_intro">Two short texts came with the app. Nothing is downloaded, nothing is added to your library, and nothing is left on your device.</string>
+    <string name="sample_source">Both were written for FastReader and placed in the public domain (CC0 1.0). Each one says so on its last page.</string>
+    <string name="sample_open_description">Read the sample in %1$s: %2$s</string>
+
     <string name="library_no_results_title">No books match “%1$s”</string>
     <string name="library_no_results_hint">Search looks at title, author, and file name.</string>
 
@@ -176,6 +184,8 @@
     <string name="settings_off">Off</string>
 
     <string name="settings_reset">Reset to defaults</string>
+
+    <string name="settings_section_sample">Sample</string>
 
     <string name="settings_section_about">About this reader</string>
     <string name="settings_version_label">Version</string>

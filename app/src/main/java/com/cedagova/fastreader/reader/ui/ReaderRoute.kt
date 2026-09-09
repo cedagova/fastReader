@@ -22,6 +22,9 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.cedagova.fastreader.R
+import com.cedagova.fastreader.content.BundledSample
+import com.cedagova.fastreader.content.SampleBookSource
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.library.LibraryGraph
@@ -33,7 +36,7 @@ import com.cedagova.fastreader.reader.ReaderBooks
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.fastreader.reader.ReaderPositions
-import com.cedagova.fastreader.R
+import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ReaderViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -48,19 +51,24 @@ import kotlinx.coroutines.flow.StateFlow
 @Composable
 fun ReaderRoute(
     graph: LibraryGraph,
-    bookId: String,
+    target: ReaderTarget,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     /**
-     * The book turned out not to be openable. Reported, not acted on: whether a
-     * dead reader is the right screen depends on how the reader got here, and
-     * only the caller knows that (LEAF204).
+     * The catalog book turned out not to be openable. Reported, not acted on:
+     * whether a dead reader is the right screen depends on how the reader got
+     * here, and only the caller knows that (LEAF204).
+     *
+     * Never called for a sample. A sample is inside the APK, so it is not a book
+     * whose access can be revoked or whose file can move, and there is no catalog
+     * row for the library to name if it somehow fails.
      */
     onCannotOpen: (String) -> Unit = {},
     /** Opens the settings screen (LEAF302), so cues can be changed while reading. */
     onOpenSettings: () -> Unit = {},
 ) {
     val repository = graph.repository
+    val assets = LocalContext.current.applicationContext.assets
     // The stored settings drive the cue layer LEAF301 built and the timing engine
     // LEAF202 built. This is the whole of "live preview" outside the settings
     // screen: the reader is drawn from the same value the settings screen writes,
@@ -73,7 +81,18 @@ fun ReaderRoute(
     )
     // Idempotent: after a rotation this finds the book already parsed and the
     // position intact, and switching books drops the previous one.
-    LaunchedEffect(reader, bookId) { reader.openLibraryBook(bookId) }
+    //
+    // The sample takes the general entry rather than a path of its own: the whole
+    // point of the open contract is that "a book inside the APK" is a request
+    // like any other, so nothing downstream of here knows the difference.
+    LaunchedEffect(reader, target) {
+        when (target) {
+            is ReaderTarget.Library -> reader.openLibraryBook(target.bookId)
+            is ReaderTarget.Sample -> reader.open(
+                BookOpenRequest.sample(target.sample, SampleBookSource(assets, target.sample)),
+            )
+        }
+    }
 
     // REQ-011 mid-book: this both changes the next word's duration and rebuilds
     // the time-remaining index, which is a function of pause strength.
@@ -83,7 +102,9 @@ fun ReaderRoute(
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
 
     val unavailable = state as? ReaderUiState.Unavailable
-    LaunchedEffect(unavailable, bookId) { if (unavailable != null) onCannotOpen(bookId) }
+    LaunchedEffect(unavailable, target) {
+        if (unavailable != null && target is ReaderTarget.Library) onCannotOpen(target.bookId)
+    }
 
     KeepScreenOn(playing)
     PauseWhenBackgrounded(reader)
@@ -202,12 +223,17 @@ private class CatalogBooks(private val repository: LibraryRepository) : ReaderBo
  *
  * The only place the reader's [ReaderPosition] and the catalog's [ReadingState]
  * meet, so neither package has to know the other's shape.
+ *
+ * It is also the boundary that keeps the bundled sample out of the catalog
+ * entirely: a sample identity is dropped on the way in and answers "no stored
+ * position" on the way out, so reading the sample changes nothing durable.
  */
-private class CatalogPositions(private val repository: LibraryRepository) : ReaderPositions {
+internal class CatalogPositions(private val repository: LibraryRepository) : ReaderPositions {
 
     override val failure: StateFlow<String?> get() = repository.persistenceFailure
 
     override fun restore(bookId: String): ReaderPosition? {
+        if (BundledSample.isSampleIdentity(bookId)) return null
         val stored = repository.readingState(bookId) ?: return null
         return ReaderPosition(
             position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
@@ -216,16 +242,23 @@ private class CatalogPositions(private val repository: LibraryRepository) : Read
         )
     }
 
-    override fun record(bookId: String, position: ReaderPosition) = repository.recordReadingState(
-        bookId,
-        ReadingState(
-            bookDigest = position.position.bookDigest,
-            tokenIndex = position.position.tokenIndex,
-            pipelineVersion = position.position.pipelineVersion,
-            progressFraction = position.progressFraction,
-            wpm = position.wpm,
-        ),
-    )
+    override fun record(bookId: String, position: ReaderPosition) {
+        // A sample keeps no position (#48). Not a shortcut: recording one is also
+        // what makes a book the last-read one, and the sample has no catalog row,
+        // so the next launch would try to resume into a book the library cannot
+        // find and open on "could not be reopened" instead of the library.
+        if (BundledSample.isSampleIdentity(bookId)) return
+        repository.recordReadingState(
+            bookId,
+            ReadingState(
+                bookDigest = position.position.bookDigest,
+                tokenIndex = position.position.tokenIndex,
+                pipelineVersion = position.position.pipelineVersion,
+                progressFraction = position.progressFraction,
+                wpm = position.wpm,
+            ),
+        )
+    }
 
     override fun flush() {
         repository.flushReadingState()
