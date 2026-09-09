@@ -9,6 +9,16 @@
         <activity
             android:name=".library.PickerHostActivity"
             android:exported="false" />
+        <!--
+            Debug-only crash button (REQ-207). `adb shell am start` runs as the
+            shell user, which may only start an activity another uid has
+            exported, so this one is exported and takes no data of any kind: it
+            throws in onCreate and nothing else. It is absent from release
+            builds, because this whole file is.
+        -->
+        <activity
+            android:name=".debug.CrashInducerActivity"
+            android:exported="true" />
     </application>
 
 </manifest>
