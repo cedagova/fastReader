@@ -1,6 +1,10 @@
 package com.cedagova.fastreader.ui
 
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -8,6 +12,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.BookStatus
@@ -20,6 +25,7 @@ import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ui.SettingsScreen
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -107,6 +113,57 @@ class SampleOfferTest {
         composeRule.onNodeWithTag("sample_open_en").performClick()
 
         assertEquals(listOf(BundledSample.SPANISH, BundledSample.ENGLISH), opened)
+    }
+
+    /**
+     * REQ-301 for the offer as the empty library shows it.
+     *
+     * The Settings copy of these buttons is already swept by
+     * `SettingsAccessibilityTest`, which walks the whole settings screen; the
+     * empty library has no such sweep, so this is the one that would otherwise
+     * go unchecked. Scoped to the offer's own subtree, because the surrounding
+     * empty-library controls belong to LEAF102 and #45 and are unchanged here.
+     */
+    @Test
+    fun `every control in the offer is labelled and at least forty-eight dp tall`() {
+        setLibrary(Catalog())
+
+        val controls = offerControls()
+        val minimum = with(composeRule.density) { 48.dp.toPx() }
+
+        assertEquals("the offer must have one button per sample", samples.size, controls.size)
+        controls.forEach { node ->
+            assertTrue(
+                "a sample button reaches the accessibility tree with nothing to announce",
+                node.label().isNotBlank(),
+            )
+            assertTrue(
+                "${node.label()} is ${node.boundsInRoot.height}px tall, under 48 dp",
+                node.boundsInRoot.height >= minimum - 1f,
+            )
+        }
+    }
+
+    /** The offer's own actionable nodes: the per-sample buttons, by test tag. */
+    private fun offerControls(): List<SemanticsNode> {
+        val out = mutableListOf<SemanticsNode>()
+        fun walk(node: SemanticsNode) {
+            out += node
+            node.children.forEach(::walk)
+        }
+        composeRule.onAllNodes(isRoot()).fetchSemanticsNodes().forEach(::walk)
+        return out.filter {
+            it.config.contains(SemanticsActions.OnClick) &&
+                it.config.getOrElseNullable(SemanticsProperties.TestTag) { null }
+                    .orEmpty().startsWith("sample_open_")
+        }
+    }
+
+    private fun SemanticsNode.label(): String {
+        val described = config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }
+        if (!described.isNullOrEmpty()) return described.joinToString(" ").trim()
+        val text = config.getOrElseNullable(SemanticsProperties.Text) { null }
+        return text?.joinToString(" ") { it.text }?.trim().orEmpty()
     }
 
     private fun setLibrary(catalog: Catalog, onOpenSample: (BundledSample) -> Unit = {}) {
