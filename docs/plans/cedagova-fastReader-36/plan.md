@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/36
 - Planning PR: https://github.com/cedagova/fastReader/pull/40
-- Status: Ready for implementation
+- Status: Review
 - Root classification: INCREMENTAL
 - Delivery topology: INCREMENTAL
 - Planner: Planning lead (Claude)
@@ -15,6 +15,19 @@
 | Repository | Baseline |
 | --- | --- |
 | `cedagova/fastReader` | `a8caa0964bf892efa6ba5f1a33b47a06309bba6a` |
+
+`a8caa09` stays the planning baseline: every observation in "Current-state
+evidence" was taken there and is not restated. Increment 001 has since been
+delivered, so increment 002 and the 2026-09-09 amendment below pin the
+delivered result as their evidence baseline:
+
+- **Increment 001 merge on `main`** —
+  `63bd366d90a2c0790f9e3e95c39808f74e020668`, released as tag `v1.1.0`
+  (versionCode 3). This is the code every 002 leaf starts from and the
+  published artifact LEAF607's update proof upgrades over.
+- **Current `main`** — `6d02dc34133efeb8c08258b763b67dafc6fe3853`: the 001
+  merge plus one docs-only commit recording the published-asset proofs (#49).
+  No application code differs from `63bd366`.
 
 ## Preserved objective and boundaries
 
@@ -46,6 +59,42 @@ goldens re-recorded in the same change, in v1.2.0) are carried as planned
 work below. This plan adds system-level HOW and executable leaves; it does
 not reinterpret the product contract.
 
+### Owner amendments after approval (2026-09-09)
+
+Two owner decisions were recorded while increment 001 was being delivered and
+are carried here. Nothing else in the definition moves.
+
+**REQ-103 acceptance amended to the conditional form.** The root acceptance
+as written — "tapping an EPUB in the Files app opens it in FastReader and the
+book is in the library afterwards" — assumed the platform hands over a
+lasting permission. It does not: Android's Files app and its share sheet grant
+`persistable=0x0`, device-proven twice during 001 (on PR #65 and again on the
+final v1.1.0 candidate). The owner amended the acceptance to the conditional
+form it already had in the requirement's own failure text: **opening an EPUB
+from another app is session-only — the book is read and its position kept —
+unless the platform grants a persistable read permission, in which case the
+book joins the library exactly like a pick.** The shipped v1.1.0 behaves this
+way; AD-9, LEAF504's contract and the acceptance coverage below already
+described both branches, so no leaf changes.
+
+That wording is **not** re-cycled through the product-definition PR. PR #37
+is a coordination artifact: it stays open at its approved head `da4394c` and
+is closed unmerged once this graph is delivered, so re-editing it would
+rewrite an approved, pinned record without producing a durable one. The
+durable record is the amended acceptance line in the **#38 issue body** plus
+this decision. The plan's pinned definition head is therefore unchanged.
+
+**Follow-up #62 joins increment 002 as a new leaf (LEAF608).** Increment 001's
+LEAF503 made book identity an input (AD-8), which silently disarmed
+`ReaderPosition.resolveIndex`'s content-change guard; the reviewer asked for
+the repair to survive as an issue rather than PR prose, and the owner placed
+it in 002 behind LEAF603. It is a quality repair to work this plan authored,
+not new product scope: it adds no requirement, no UI and no user-visible
+feature.
+
+Both decisions are recorded on GitHub: #38 comment 5606844664 and #62 comment
+5606844991.
+
 ## Classification
 
 - **ROOT #36 — `INCREMENTAL`.** The two native outcome children are each a
@@ -60,10 +109,11 @@ not reinterpret the product contract.
   "Open with", library housekeeping, version/backup/privacy, the focused-
   mode speed gesture, the bundled sample, and the v1.1.0 release with its
   update proof. Topology `COLLECTOR`.
-- **#39 v1.2.0 — `GROUP` (ready), sequence 002.** Seven leaves: toolchain
+- **#39 v1.2.0 — `GROUP` (ready), sequence 002.** Eight leaves: toolchain
   refresh, chapter control, library order and rescan, tablet/landscape
-  layouts, crash report, Spanish interface, and the v1.2.0 release with its
-  update proof. Topology `COLLECTOR`.
+  layouts, crash report, the stored-position content-change guard (#62, added
+  by the 2026-09-09 owner decision), Spanish interface, and the v1.2.0 release
+  with its update proof. Topology `COLLECTOR`.
 
 No increment is `DEFERRED`. Every v1.2.0 requirement is fixed by the pinned
 definition and its execution path is knowable from the pinned code today;
@@ -114,6 +164,38 @@ All at `a8caa09` (definition evidence re-verified by reading the source):
 
 Nothing is `ALREADY_SATISFIED`: every requirement names behaviour absent at
 the baseline.
+
+### Delivered-001 drift check (2026-09-09 amendment, bounded to LEAF608)
+
+Increment 002's existing leaves are not re-planned; their contracts stand. The
+amendment checked only the surfaces the new leaf touches, on `main` at
+`6d02dc3`, and found nothing that contradicts them:
+
+- **`ReaderPosition.resolveIndex` case 3** still compares
+  `position.bookDigest` with `content.bookDigest`, and its doc comment already
+  states plainly that identity is now an input so the comparison cannot fail
+  for a library book. That is the gap #62 names, described exactly as #62
+  describes it.
+- **`ZipDirectory`** parses the central directory into an `Entry` holding
+  `localHeaderOffset`, `compressedSize`, `uncompressedSize`, `method` and the
+  encrypted flag. Every entry's CRC-32 sits in the same already-read bytes
+  (the central header's offset 16) but is **not** retained today, so LEAF608
+  keeps that field rather than reading anything more — no extra I/O either
+  way.
+- **`EpubArchive.open`** prefers the directory strategy and falls back to
+  `StreamingArchive` for a source that cannot seek, reporting which one ran
+  through `ArchiveReadStrategy`. That existing signal is what LEAF608's
+  no-guard fallback keys off; no new capability is needed.
+- **Catalog schema is still version 4.** LEAF505 shipped folder removal and
+  undo without a schema field (as its contract allowed), and the v1.1.0 update
+  proof records `schemaVersion 4` on both sides. So increment 002's chain is
+  three consecutive steps — LEAF602 (5), LEAF603 (6), LEAF608 (7) — and
+  `ReadingState` still carries exactly `bookDigest`, `tokenIndex`,
+  `pipelineVersion`, `progressFraction`, `wpm`, `updatedAtEpochMs`.
+- **`EpubContentPipeline.parse` takes identity as an input** and writes it
+  verbatim to `BookContent.bookDigest`, never deriving it. LEAF608 adds a
+  second stored signal beside it and changes neither identity nor REQ-110's
+  mechanism.
 
 ## Selected implementation direction
 
@@ -183,8 +265,10 @@ the previous published release. System-level shape:
     persisted) plus a longer return-to-app rescan interval; tablet-width and
     landscape layouts (controls beside the stream, library using the width);
     an in-process crash capture that offers a share-sheet text report once
-    on the next launch; a complete Spanish resource set; and the v1.2.0
-    release with its update proof.
+    on the next launch; a restored content-change guard for stored
+    positions built on a structural fingerprint the archive directory already
+    yields (#62, owner decision of 2026-09-09); a complete Spanish resource
+    set; and the v1.2.0 release with its update proof.
 
 Concrete choices inside these boundaries (icon artwork, gesture, undo
 mechanism, exact rescan interval, front-matter detection heuristics, the
@@ -245,16 +329,30 @@ constrained by the invariants and acceptance below.
   statement; lint's missing-translation check becomes a gate so no new
   string can ship untranslated. The sample already carries both languages.
 - **AD-16 — Schema evolution continues under v1 AD-3.** New persisted fields
-  (chapter pause, library order, per-book front-matter-offer-shown) each get
-  a documented default and one forward migration step; leaves that bump the
-  schema in the same increment land in a fixed order expressed as a native
-  dependency (LEAF603 after LEAF602), so the shipped chain is
-  deterministic. Existing readers see defaults that
+  (chapter pause, library order, per-book front-matter-offer-shown, the
+  stored structural fingerprint) each get a documented default and one forward
+  migration step; leaves that bump the schema in the same increment land in a
+  fixed order expressed as a native dependency (LEAF602 → LEAF603 → LEAF608),
+  so the shipped chain is deterministic. Existing readers see defaults that
   reproduce v1 behaviour (pause on; order recently read).
 - **AD-17 — Release identity.** v1.1.0 is versionCode 3 and v1.2.0 is
   versionCode 4 via `version.properties`; both are cut with the existing
   `scripts/release.sh` and keep the pinned signing certificate. No store
   publication (D6).
+- **AD-18 — The content-change guard is a second stored signal, not a second
+  identity.** Book identity stays the whole-file SHA-256 computed off the open
+  path (AD-8 is unchanged). The guard #62 asks for is a separate, cheaper
+  *structural fingerprint* — a digest over the archive directory's per-entry
+  names, uncompressed sizes and CRC-32 values — stored beside `bookDigest` in
+  `ReadingState` and recomputed on each open from the directory read that
+  already happens. It answers "is this the same bytes I read last time?",
+  which identity no longer can; it never re-reads the file and so cannot cost
+  REQ-110 anything. A source that falls back to the streaming archive yields
+  no fingerprint: the position is then resumed exactly as it is today, with
+  the fallback recorded in the leaf's evidence rather than hidden. An absent
+  stored fingerprint (every position written before the migration) is likewise
+  not a mismatch — no guard, current behaviour — so nobody's position is
+  thrown away by the upgrade.
 
 ## Execution graph and waves
 
@@ -283,15 +381,22 @@ frontier). Leaves depend only on siblings inside their own increment.
   - wave 1: LEAF601 toolchain and library refresh with goldens re-recorded.
   - wave 2: LEAF602 chapter control; LEAF604 tablet and landscape layouts;
     LEAF605 crash report (each blocked by LEAF601).
-  - wave 3: LEAF603 library order and rescan (blocked by LEAF602, so the
-    two schema bumps of this increment land in one fixed order: LEAF602
-    first, LEAF603 second).
-  - wave 4: LEAF606 Spanish interface (blocked by LEAF602, LEAF603, LEAF604,
-    LEAF605 — it translates every string those leaves add).
-  - wave 5: LEAF607 v1.2.0 release and update proof (blocked by LEAF606).
+  - wave 3: LEAF603 library order and rescan (blocked by LEAF602, so this
+    increment's schema bumps land in one fixed order).
+  - wave 4: LEAF608 content-change guard for stored positions (blocked by
+    LEAF603, whose schema step lands immediately before it). Added by the
+    owner decision of 2026-09-09 that put follow-up #62 in this increment.
+  - wave 5: LEAF606 Spanish interface (blocked by LEAF602, LEAF603, LEAF604,
+    LEAF605, LEAF608 — it translates every string those leaves add, and the
+    owner's ordering rule keeps Spanish the last product leaf before the
+    release; LEAF608 adds no string, so the added edge is ordering, not
+    translation).
+  - wave 6: LEAF607 v1.2.0 release and update proof (blocked by LEAF606
+    only — unchanged, because LEAF606 still gates it).
   - Completion rule: `main` green in CI on the refreshed toolchain; every
-    REQ-201..208 acceptance recorded; v1.2.0 published with the update-
-    over-published-v1.1.0 evidence showing defaults for the new settings.
+    REQ-201..208 acceptance recorded plus LEAF608's guard acceptance; v1.2.0
+    published with the update-over-published-v1.1.0 evidence showing defaults
+    for the new settings and every pre-migration position still resuming.
 
 Why `COLLECTOR` for both: one repository, cumulative leaves that share the
 reader open contract and the settings schema, and a release that must be
@@ -304,13 +409,19 @@ contracts. Internal boundaries the leaves must respect:
 
 - **Reader open contract (AD-8/AD-9):** established by LEAF503 (identity as
   input, no re-hash, directory-based archive reads); consumed by LEAF504
-  (external books, session-only origin) and LEAF508 (sample origin).
-  LEAF503 must not change position semantics or the token stream model
-  (v1 AD-4).
-- **Catalog and settings schema (AD-3/AD-16):** LEAF505 uses existing
-  removal semantics and adds no schema field unless undo needs one; LEAF602
-  adds chapter-pause and the per-book front-matter flag; LEAF603 adds the
-  persisted order after it (native dependency), so the chain is fixed.
+  (external books, session-only origin) and LEAF508 (sample origin), and
+  extended in 002 by LEAF608, which takes the structural fingerprint off the
+  same directory read (AD-18) and adds no new read. LEAF503 must not change
+  position semantics or the token stream model (v1 AD-4); LEAF608 changes when
+  a stored position is *refused*, never how one is computed or stored on the
+  stream side.
+- **Catalog and settings schema (AD-3/AD-16):** LEAF505 used existing removal
+  semantics and in the end shipped undo with no schema field, so `main` is
+  still at schemaVersion 4; LEAF602 adds chapter-pause and the per-book
+  front-matter flag; LEAF603 adds the persisted order after it; LEAF608 adds
+  the stored structural fingerprint on `ReadingState` after LEAF603. Each edge
+  is a native dependency, so the shipped chain is exactly
+  LEAF602 → LEAF603 → LEAF608, one forward step each.
 - **Theme mirror (AD-10):** written by the settings write path (LEAF502
   owns the mirror; the settings screen from v1 keeps writing the catalog).
 - **Manifest:** LEAF502 (icon, theme, splash), LEAF504 (intent filters,
@@ -337,7 +448,15 @@ contracts. Internal boundaries the leaves must respect:
   non-seekable streams; the directory-based read then needs a fallback.
   Bound: fallback streams without hashing; REQ-110 is measured on the
   reference device with a local file, and the leaf documents which sources
-  fall back.
+  fall back. The same fallback costs LEAF608 its structural fingerprint;
+  bound there is explicit no-guard (today's behaviour), never a guessed
+  substitute and never a whole-file hash bought back.
+- **A structural fingerprint is not a hash of the text.** Two files whose
+  entries have identical names, uncompressed sizes and CRC-32s are treated as
+  the same content. Bound: that is exactly the intent — the guard must fire on
+  a book replaced in place and must never fire on the same book re-downloaded
+  or re-copied. It is a change detector, not a tamper check, and the leaf says
+  so in the doc comment it rewrites.
 - **Intent-filter coverage.** Apps send EPUBs as `application/epub+zip`,
   `application/octet-stream` or `*/*` with an `.epub` name. Bound: MIME
   filters plus a name-pattern fallback; acceptance is the Files app and one
@@ -406,8 +525,9 @@ design (D3), which the privacy copy states.
 | LEAF603 | LEAF | INC002 | cedagova/fastReader | Library order and return-to-app rescan | None | LEAF602 | https://github.com/cedagova/fastReader/issues/52 |
 | LEAF604 | LEAF | INC002 | cedagova/fastReader | Tablet and landscape layouts | None | LEAF601 | https://github.com/cedagova/fastReader/issues/53 |
 | LEAF605 | LEAF | INC002 | cedagova/fastReader | Crash report offered on next launch | None | LEAF601 | https://github.com/cedagova/fastReader/issues/54 |
-| LEAF606 | LEAF | INC002 | cedagova/fastReader | Spanish interface | None | LEAF602, LEAF603, LEAF604, LEAF605 | https://github.com/cedagova/fastReader/issues/55 |
+| LEAF606 | LEAF | INC002 | cedagova/fastReader | Spanish interface | None | LEAF602, LEAF603, LEAF604, LEAF605, LEAF608 | https://github.com/cedagova/fastReader/issues/55 |
 | LEAF607 | LEAF | INC002 | cedagova/fastReader | v1.2.0 release and update proof | None | LEAF606 | https://github.com/cedagova/fastReader/issues/56 |
+| LEAF608 | LEAF | INC002 | cedagova/fastReader | Restore a real content-change guard for stored reading positions | None | LEAF603 | https://github.com/cedagova/fastReader/issues/62 |
 
 ### Planned leaf contracts (summaries; full contracts go to the issues)
 
@@ -560,19 +680,45 @@ design (D3), which the privacy copy states.
   books, position and settings, "Pause at chapters" on, library ordered by
   recently read (REQ-208). Validation: release script gates plus the
   recorded flow under `docs/evidence/`.
+- **LEAF608 — Content-change guard for stored positions** (follow-up #62;
+  reuses that issue, executed in wave 4, before LEAF606). A structural
+  fingerprint of the book — a digest over the archive directory's per-entry
+  names, uncompressed sizes and CRC-32 values, all of which `ZipDirectory`
+  already has in the bytes it reads (CRC-32 is the one field it currently
+  discards) — is stored beside `bookDigest` in `ReadingState` with its
+  documented default and one forward migration, taken after LEAF603's step
+  (AD-16, AD-18). It is computed on the open path from the directory read, so
+  no whole-file hashing returns and REQ-110's mechanism and measurement are
+  untouched. `ReaderPosition.resolveIndex` case 3 becomes a real guard again:
+  a stored position whose fingerprint disagrees with the content just opened
+  is refused and the book restarts at 0. A source that falls back to the
+  streaming archive, and any position stored before the migration, yield no
+  fingerprint and therefore no guard — exactly today's behaviour, never a
+  discarded position. The doc comments in `ReaderPosition` and
+  `Catalog.ReadingState` that currently state the guard cannot fire are
+  rewritten to describe what now fires and what still does not. Owns no
+  product requirement: this repairs a guard that increment 001's AD-8 change
+  disarmed. No UI, so REQ-301 does not apply; REQ-110 and REQ-303 are
+  constraints on it. Validation: unit tests for the fingerprint over a fixture
+  pair (same book twice → equal; one XHTML entry edited → different) and for
+  `resolveIndex` case 3; a migration test that a shipped v1.1.0 document reads
+  back with no fingerprint and still resumes; an emulator flow that swaps an
+  EPUB in place at the same URI with size and last-modified unchanged and
+  shows the reader restarting at 0 instead of resuming at an arbitrary word;
+  the streaming-fallback path still opens and resumes.
 
 ## Acceptance coverage
 
 | Requirement | Leaves |
 | --- | --- |
 | REQ-101 icon; REQ-102 first frame | LEAF502 |
-| REQ-103 Open with / share, session-only path | LEAF504 (on LEAF503's open contract) |
+| REQ-103 Open with / share, session-only path | LEAF504 (on LEAF503's open contract); acceptance amended 2026-09-09 to the conditional form — both branches were already in LEAF504's contract, so no leaf changed |
 | REQ-104 folder list and removal; REQ-105 undo | LEAF505 |
 | REQ-106 version and check for updates | LEAF506 (rows), LEAF509 (version equals tag, no-network proof on the artifact) |
 | REQ-107 backup exclusion and privacy statement | LEAF506 (manifest, in-app copy, release-notes text), LEAF504 (session-only clause), LEAF509 (release notes) |
 | REQ-108 focused-mode speed gesture | LEAF507 |
 | REQ-109 bundled sample | LEAF508 (on LEAF503's open contract) |
-| REQ-110 open time independent of image payload | LEAF503 (mechanism and first measurement), LEAF504 (external path never hashes before first text), LEAF509 (re-measured on the published artifact as a release gate) |
+| REQ-110 open time independent of image payload | LEAF503 (mechanism and first measurement), LEAF504 (external path never hashes before first text), LEAF509 (re-measured on the published artifact as a release gate), LEAF608 (constraint: the restored guard reuses the directory read and re-introduces no whole-file hash) |
 | REQ-111 MIT license and README | LEAF501 (license), LEAF509 (README) |
 | REQ-112 v1.0.1 cue set unchanged | LEAF509 (check), constraint on every 001 leaf |
 | REQ-113 update over published v1.0.1 | LEAF509 |
@@ -588,6 +734,7 @@ design (D3), which the privacy copy states.
 | Delivery constraint: hosted checks | LEAF501 |
 | Delivery constraint: v1 docs on `main` | LEAF501 |
 | Delivery constraint: toolchain refresh with goldens (v1.2.0) | LEAF601 |
+| Owner follow-up #62: real content-change guard for stored positions | LEAF608 |
 
 Root #36 acceptance: (1) both outcomes delivered → INC001, INC002 completion
 rules; (2) one person outside the project reaches a playing stream unaided
@@ -604,7 +751,9 @@ by the pinned definition (PR #37 `da4394c`, decision table); no leaf.
 No orphan or overlapping outcome remains: the open path (LEAF503) is split
 from its two consumers (LEAF504, LEAF508) at the open contract; housekeeping
 (LEAF505) is split from Settings identity (LEAF506) at the screen boundary;
-each release leaf owns only the version, notes, README and update proof.
+LEAF608 is split from LEAF603 at the schema step it takes after (it owns the
+position guard, LEAF603 owns library order); each release leaf owns only the
+version, notes, README and update proof.
 
 ## Validation and feedback
 
@@ -624,9 +773,14 @@ update proof before the increment closes.
 
 ## Assumptions and open questions
 
-None open. All material product, policy, privacy and persistence choices
-were resolved by the owner in the pinned definition (D1–D6, distribution,
-languages, cue set). Planner choices recorded here are ordinary and
+None open, including after the 2026-09-09 amendment: both of its decisions
+came from the owner, and the bounded drift check above found the delivered
+code consistent with the 002 contracts it touches (no 002 leaf was
+re-planned).
+
+All material product, policy, privacy and persistence choices were resolved
+by the owner in the pinned definition (D1–D6, distribution, languages, cue
+set). Planner choices recorded here are ordinary and
 reversible: identity computation moved rather than changed (AD-8), a theme
 mirror rather than a synchronous catalog read before the first frame
 (AD-10), whole-app backup exclusion (AD-11 implements D3), GitHub Actions
@@ -636,6 +790,12 @@ as the hosted check (AD-13; free for this public repository), and
 Owner-provided test inputs (not decisions): the largest owned illustrated
 EPUB (≥50 MB) for REQ-110, made available to the implementation lead on the
 reference emulator; the unaided stranger test after v1.1.0 is published.
+
+LEAF608 has no requirement of its own in the pinned definition, and that is
+deliberate rather than an omission: it repairs a guard that this plan's own
+AD-8 disarmed while delivering REQ-110. Its acceptance is written against
+observable reader behaviour (a swapped file restarts at 0; every pre-migration
+position still resumes), not against a new product promise.
 
 Surfaced for the owner, not blocking: the recorded delivery constraint
 places the **v1** definition and plan on `main` (LEAF501). #36's own
@@ -674,3 +834,19 @@ baseline; implementation work remains.
 - Final exact-head validation (`ready-for-implementation` with --head and
   --reviewed-head) runs after the official marked approval and is recorded
   on PR #40.
+
+### Amendment 1 — 2026-09-09 (owner decisions recorded on #38 and #62)
+
+Increment 001 is delivered, verified and closed; increment 002 has not
+started. This amendment adds LEAF608 (#62) to increment 002, records the
+REQ-103 acceptance amendment, and pins the delivered 001 result as 002's
+evidence baseline. Nothing else moves: no 002 leaf is re-planned, no existing
+issue is reparented, and increment 001's published graph is untouched.
+
+- `plan validate --phase review-ready` on the amended candidate: valid,
+  20 rows, INCREMENTAL.
+- Pending on this head, run after the content pass exactly as the original
+  publication above was: #62's body gains the leaf metadata lines its siblings
+  carry (its existing text preserved), then `plan reconcile-graph` attaches
+  #62 under #39 and creates LEAF608<-LEAF603 and LEAF606<-LEAF608, then
+  `plan verify-graph` confirms the live graph matches the 20-row manifest.
