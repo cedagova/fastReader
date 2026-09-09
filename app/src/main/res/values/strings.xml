@@ -95,6 +95,11 @@
 
     <string name="reader_persistence_problem_title">Your place is not being saved</string>
 
+    <!-- REQ-103 / REQ-107: a book handed over by another app, with no library row -->
+    <string name="reader_external_notice">Opened from another app. Only your reading position will be remembered.</string>
+    <string name="reader_external_add">Add to library</string>
+    <string name="reader_external_dismiss">Dismiss</string>
+
     <string name="library_resume_blocked_title">Could not go back to %1$s</string>
     <string name="library_resume_blocked_missing">Its file was moved or deleted. Your place is kept in case it comes back.</string>
     <string name="library_resume_blocked_permission_lost">Access to its folder was revoked. Grant access again to carry on reading.</string>
@@ -195,7 +200,7 @@
     <string name="settings_check_updates_summary">Opens the FastReader releases page in your browser. FastReader never connects to the internet itself.</string>
     <string name="settings_check_updates_unavailable">No app on this device can open a web link. The releases page is github.com/cedagova/fastReader/releases.</string>
     <string name="settings_privacy_label">What stays on this device</string>
-    <string name="settings_privacy">FastReader has no internet permission, so it cannot send or receive anything itself. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings and small cover thumbnails, in its private storage. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library.</string>
+    <string name="settings_privacy">FastReader has no internet permission, so it cannot send or receive anything itself. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings and small cover thumbnails, in its private storage. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
     <string name="settings_visual_only">The word stream is visual only. FastReader shows one word at a time on the screen; it never reads a book aloud, and there is no audio or text-to-speech anywhere in the app. Everything around the stream — the library, the reader controls, and this screen — is labelled for TalkBack, but the stream itself has to be seen.</string>
 
     <string name="settings_problem_title">Your settings are not being saved</string>

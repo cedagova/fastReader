@@ -1,0 +1,53 @@
+# What FastReader is allowed to keep, Phone_Mid_API36
+
+Taken while `plates-and-pages-illustrated.epub` was open from the Files app
+(session-only) and `the-lighthouse-keeper.epub` had been added earlier through
+FastReader's own picker. Same package, same moment: the difference between the
+two grants is the whole of REQ-103's two paths.
+
+- the handed-over book - `persistable=0x0 persisted=0x0`. The platform never
+  offered a keepable grant, so this is the session-only path. Nothing about it
+  survives the process.
+- the picked book - `persistable=0x3 persisted=0x1`. A grant that outlives the
+  process, which is why that book has a library row.
+
+$ adb shell dumpsys activity permissions   # filtered to this package
+    UriPermission{9345d99 content://com.android.externalstorage.documents/document/primary%3ADownload%2Fthe-lighthouse-keeper.epub [user 0]}
+      targetUserId=0 sourcePkg=com.android.externalstorage targetPkg=com.cedagova.fastreader
+      mode=0x1 owned=0x0 global=0x0 persistable=0x3 persisted=0x1 persistedCreate=1788924954791
+    UriPermission{33a355a content://com.android.providers.downloads.documents/document/msf%3A25 [user 0]}
+      targetUserId=0 sourcePkg=com.android.providers.downloads targetPkg=com.cedagova.fastreader
+      mode=0x3 owned=0x3 global=0x0 persistable=0x0 persisted=0x0
+
+# What the Files app actually sends
+
+Neither intent carries FLAG_GRANT_PERSISTABLE_URI_PERMISSION (0x40). That is why
+an "Open with" from the Files app takes the session-only path: the app cannot
+take a grant it was not offered.
+
+ACTION_VIEW, tapping a book in the Files listing:
+  Intent { act=android.intent.action.VIEW dat=content://com.android.providers.downloads.documents/document/msf%3A25 typ=application/epub+zip flg=0x30000003 xflg=0x4 cmp=com.cedagova.fastreader/.MainActivity }
+  launchedFromPackage=com.google.android.documentsui
+
+ACTION_SEND, sharing a book from the same app (recorded minutes earlier in this
+same session, from a cold start so the launch intent is the one dumpsys keeps):
+  Intent { act=android.intent.action.SEND cat=[android.intent.category.DEFAULT] typ=application/epub+zip flg=0x13000001 xflg=0x4 cmp=com.cedagova.fastreader/.MainActivity clip={application/epub+zip {U(content)}} (has extras) }
+  launchedFromPackage=com.google.android.documentsui
+
+# Both name gates reach the device (API 31 and API 1)
+
+The generic-type filter carries pathAdvancedPattern for API 31+ and two
+pathPattern spellings for 26-30, and all five paths land in one OR-ed set:
+
+$ adb shell dumpsys package com.cedagova.fastreader
+  Path: "PatternMatcher{ADVANCED: .*.[eE][pP][uU][bB]}"
+  Path: "PatternMatcher{GLOB: .*\.EPUB}"
+  Path: "PatternMatcher{GLOB: .*\.epub}"
+
+# The notice's controls on the real device (REQ-301)
+
+$ adb shell uiautomator dump   # clickable nodes in the notice, 420 dpi (2.625 px/dp)
+  'Add to library': 283x126 px = 108x48 dp
+  'Dismiss': 197x126 px = 75x48 dp
+  'Back to library': 126x126 px = 48x48 dp
+  'Settings': 126x126 px = 48x48 dp

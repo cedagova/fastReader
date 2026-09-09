@@ -43,7 +43,7 @@ class PrivacyStatementTest {
      * well. Each maps to a row of the table in `docs/privacy-statement.md`.
      */
     @Test
-    fun `the statement still makes the four claims the build backs up`() {
+    fun `the statement still makes the five claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
@@ -51,6 +51,7 @@ class PrivacyStatementTest {
             "hands a web address to your browser",
             "your books stay in the folders you chose",
             "is included in this device's backup or in a transfer to a new phone",
+            "not added to your list and no permission to it is kept",
         ).forEach { claim ->
             assertTrue("the statement no longer says \"$claim\": $statement",
                 statement.contains(claim, ignoreCase = true))

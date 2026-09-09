@@ -1,7 +1,9 @@
 package com.cedagova.fastreader.reader.ui
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -27,9 +29,12 @@ import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.content.SampleBookSource
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.epub.EpubByteSource
+import com.cedagova.fastreader.external.ExternalOpen
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.saf.SafDocumentGateway
+import com.cedagova.fastreader.library.ui.PickPersistableDocuments
 import com.cedagova.fastreader.reader.PlaybackScheduler
 import com.cedagova.fastreader.reader.BookOpenRequest
 import com.cedagova.fastreader.reader.ReaderBooks
@@ -40,6 +45,7 @@ import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ReaderViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 
 /**
  * The reader wired to a real book: catalog bytes in, playback out.
@@ -79,17 +85,32 @@ fun ReaderRoute(
             initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository)) }
         },
     )
+    // Keyed on which book, not on the target value: an external target changes
+    // whenever its identity lands or its notice is dismissed, and neither is a
+    // different book to open.
+    //
     // Idempotent: after a rotation this finds the book already parsed and the
-    // position intact, and switching books drops the previous one.
+    // position intact, and switching books drops the previous one — which is also
+    // how an "Open with" arriving mid-book swaps the reader over without a second
+    // process (REQ-103).
     //
     // The sample takes the general entry rather than a path of its own: the whole
     // point of the open contract is that "a book inside the APK" is a request
     // like any other, so nothing downstream of here knows the difference.
-    LaunchedEffect(reader, target) {
+    LaunchedEffect(reader, target.openKey) {
         when (target) {
             is ReaderTarget.Library -> reader.openLibraryBook(target.bookId)
             is ReaderTarget.Sample -> reader.open(
                 BookOpenRequest.sample(target.sample, SampleBookSource(assets, target.sample)),
+            )
+            is ReaderTarget.External -> reader.open(
+                BookOpenRequest.external(
+                    uri = target.open.uri,
+                    title = target.open.title,
+                    identity = target.open.identity,
+                    origin = target.open.origin,
+                    bytes = graph.external.byteSource(target.open.uri),
+                ),
             )
         }
     }
@@ -102,8 +123,21 @@ fun ReaderRoute(
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
 
     val unavailable = state as? ReaderUiState.Unavailable
-    LaunchedEffect(unavailable, target) {
-        if (unavailable != null && target is ReaderTarget.Library) onCannotOpen(target.bookId)
+    val failedKey = (target as? ReaderTarget.Library)?.bookId
+    LaunchedEffect(unavailable, failedKey) {
+        if (unavailable != null && failedKey != null) onCannotOpen(failedKey)
+    }
+
+    val external = (target as? ReaderTarget.External)?.open
+    ExternalIdentity(graph, external, reader)
+
+    // Live, because the answer changes under this screen: the keepable half of
+    // REQ-103 adds the row itself, and "Add to library" adds it through the
+    // picker. Either way the notice has to go the moment the book has a row.
+    val catalog by repository.catalog.collectAsState()
+    val inLibrary = external?.identity?.let { catalog.book(it.value) != null } == true
+    val addToLibrary = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
+        if (uris.isNotEmpty()) repository.requestAddPickedBooks(uris.map(Uri::toString))
     }
 
     KeepScreenOn(playing)
@@ -183,7 +217,46 @@ fun ReaderRoute(
             }
         },
         onOpenSettings = onOpenSettings,
+        externalNotice = external != null && external.resolved && !external.noticeDismissed && !inLibrary,
+        onAddToLibrary = { addToLibrary.launch(SafDocumentGateway.PICKER_MIME_TYPES) },
+        onDismissExternalNotice = { graph.external.dismissNotice() },
     )
+}
+
+/**
+ * The deferred half of an external open (AD-8).
+ *
+ * Two effects, and the order between them is the requirement. The first starts
+ * the work that reads the whole file — the grant, the ingest, the digest — and it
+ * is keyed on the stream actually running, which is the mechanical guarantee that
+ * REQ-110 holds on this path: nothing here can run before the reader has text on
+ * screen, and a book that turned out to be damaged or DRM-protected never reaches
+ * it at all, so nothing is added for it. The second hands the identity, once
+ * known, to the open book, from which point its position is stored like any
+ * other's.
+ */
+@Composable
+private fun ExternalIdentity(
+    graph: LibraryGraph,
+    external: ExternalOpen?,
+    reader: ReaderViewModel,
+) {
+    LaunchedEffect(reader, external?.uri) {
+        val uri = external?.uri ?: return@LaunchedEffect
+        // Waits for *this* book's stream, not for "a" stream. A state value read
+        // during composition can still describe the book before this one — an
+        // "Open with" arriving mid-book recomposes with the new URI while the
+        // reader is still showing the old book's Reading state — and starting the
+        // deferred work there would hash one book while another is on screen,
+        // which is both the wrong REQ-110 claim and the window in which
+        // [ReaderViewModel.identityResolved] has no session to stamp.
+        reader.state.first { it is ReaderUiState.Reading && reader.openKey == uri }
+        graph.external.resolveIdentity(uri)
+    }
+    LaunchedEffect(reader, external?.uri, external?.identity) {
+        val identity = external?.identity ?: return@LaunchedEffect
+        reader.identityResolved(external.uri, identity)
+    }
 }
 
 /**

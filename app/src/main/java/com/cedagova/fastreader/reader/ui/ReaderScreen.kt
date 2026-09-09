@@ -168,6 +168,13 @@ fun ReaderScreen(
     onSpeedStep: (Int) -> Unit = {},
     /** Opens the settings screen (LEAF302). Hidden with the rest of the chrome in focused mode. */
     onOpenSettings: () -> Unit = {},
+    /**
+     * REQ-103: this book was handed over by another app and has no library row,
+     * so the screen says what will and will not be kept.
+     */
+    externalNotice: Boolean = false,
+    onAddToLibrary: () -> Unit = {},
+    onDismissExternalNotice: () -> Unit = {},
     word: @Composable (ReaderWord, Modifier) -> Unit = { token, wordModifier ->
         CueWord(token, cues, wordModifier)
     },
@@ -230,7 +237,15 @@ fun ReaderScreen(
                 is ReaderUiState.Opening -> OpeningBook(state, Modifier.weight(1f))
                 is ReaderUiState.Unavailable -> Unavailable(state, Modifier.weight(1f))
                 is ReaderUiState.Reading -> {
-                    if (!chromeHidden) state.persistenceFailure?.let { PersistenceFailureBanner(it) }
+                    if (!chromeHidden) {
+                        state.persistenceFailure?.let { PersistenceFailureBanner(it) }
+                        if (externalNotice) {
+                            ExternalOpenNotice(
+                                onAddToLibrary = onAddToLibrary,
+                                onDismiss = onDismissExternalNotice,
+                            )
+                        }
+                    }
                     ReadingSurface(
                         state = state,
                         onTogglePlay = onTogglePlay,
@@ -297,6 +312,60 @@ private fun PersistenceFailureBanner(message: String) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(text = message, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/**
+ * The book was opened from another app and is not in the library (REQ-103).
+ *
+ * One line and two buttons, in the register of every other explanation in the
+ * app: it says the one thing that is kept — the reading position — because that
+ * is the whole of what the privacy statement promises for this path (REQ-107),
+ * and it offers the way to keep the book itself.
+ *
+ * Stacked rather than a single row: at the largest font scale on a 720p phone a
+ * sentence and two labels side by side either clip or squeeze the sentence into a
+ * column of single words. The buttons keep 48 dp of height at every scale
+ * (REQ-301), and both carry their own label for TalkBack — the sentence above
+ * them is read as ordinary text, so neither button has to repeat it.
+ *
+ * A banner and not a dialog, for the same reason as
+ * [PersistenceFailureBanner]: nothing here should stop someone reading. It sits
+ * above the reading surface rather than inside it, so the stream keeps its fixed
+ * size and static background (REQ-062, REQ-302, AD-6), and it goes with the rest
+ * of the chrome in focused mode.
+ */
+@Composable
+private fun ExternalOpenNotice(onAddToLibrary: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth().testTag("reader_external_notice"),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                text = stringResource(R.string.reader_external_notice),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = onAddToLibrary,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_external_add"),
+                ) {
+                    Text(text = stringResource(R.string.reader_external_add))
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_external_dismiss"),
+                ) {
+                    Text(text = stringResource(R.string.reader_external_dismiss))
+                }
+            }
         }
     }
 }

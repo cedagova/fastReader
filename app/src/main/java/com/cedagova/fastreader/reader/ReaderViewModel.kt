@@ -2,7 +2,9 @@ package com.cedagova.fastreader.reader
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.BookContentResult
+import com.cedagova.fastreader.content.BookIdentity
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.reader.ui.ReaderBookView
 import com.cedagova.fastreader.reader.ui.ReaderUiState
@@ -104,6 +106,17 @@ class ReaderViewModel(
     /** How long the token on screen is shown, or null when nothing is streaming. */
     val currentDurationMillis: Long? get() = session?.takeIf { it.isPlaying }?.currentDurationMillis
 
+    /**
+     * Which book the reader currently holds — its [BookOpenRequest.openKey] — or
+     * null before the first open.
+     *
+     * Exists so a caller can tell "the reader is streaming" from "the reader is
+     * streaming *this* book". [ReaderUiState] deliberately carries no key, and a
+     * state read one recomposition ago can still describe the book before this
+     * one.
+     */
+    val openKey: String? get() = openRequest?.openKey
+
     /** Opens the catalog book [bookId], unless it is already open. */
     fun openLibraryBook(bookId: String) = open(books.libraryBook(bookId))
 
@@ -142,7 +155,20 @@ class ReaderViewModel(
                 _state.value = ReaderUiState.Unavailable(title, result.reason)
 
             is BookContentResult.Parsed -> {
-                val content = result.content
+                // The identity can land *while this parse runs* (AD-8), and then
+                // [identityResolved] has no session to stamp: it is created here,
+                // a moment later. The request this parse started from is
+                // therefore not the last word on who the book is — `openRequest`
+                // is. Reading it here is what closes that window; without it the
+                // session keeps the empty digest the pipeline stamped from a null
+                // identity, while `positionKey` is already set, and the first
+                // write stores a first-word position under the right key with the
+                // wrong digest — overwriting a real stored position with nothing.
+                val identity = openRequest?.takeIf { it.openKey == request.openKey }?.identity
+                val content = result.content.let { parsed ->
+                    if (identity == null || parsed.bookDigest == identity.value) parsed
+                    else parsed.copy(bookDigest = identity.value)
+                }
                 // Building the time-remaining index is one sweep of the book; it
                 // belongs on the parsing thread, next to the parse, not on the
                 // first frame of the reader.
@@ -152,7 +178,7 @@ class ReaderViewModel(
                 view = book
                 // Resuming lands paused, on the stored word, at the stored speed
                 // (REQ-010, REQ-016). A book never opens playing.
-                val stored = request.positionKey?.let { positions.restore(it) }
+                val stored = (identity?.value ?: request.positionKey)?.let { positions.restore(it) }
                 session = ReaderSession(
                     content = content,
                     index = stored?.resolveIndex(content) ?: 0,
@@ -172,6 +198,55 @@ class ReaderViewModel(
                 persist(flush = true)
             }
         }
+    }
+
+    /**
+     * The identity of the open book has been worked out after the fact (AD-8).
+     *
+     * The one deferred half of the external open path: a book handed over from
+     * another app starts streaming with no identity at all, and
+     * [com.cedagova.fastreader.external.ExternalOpenController] computes the
+     * whole-file digest once the stream is running. From this call on, the book
+     * has a [BookOpenRequest.positionKey] and its position is stored like any
+     * other.
+     *
+     * It also *restores* a stored position, but only into an untouched session —
+     * still on the first token and not playing. That is the case where opening
+     * before the digest was known cost something: a book read before, under
+     * whatever origin, would otherwise silently restart from its first word. Once
+     * the reader has moved or pressed play, where they are is what they asked
+     * for, and pulling them back to a stored word would undo the very
+     * responsiveness this deferral exists to buy.
+     *
+     * The parsed book is *re-stamped* with the identity, and that is the part
+     * that carries the promise. [EpubContentPipeline] writes the identity it was
+     * given onto [BookContent.bookDigest], which for this book was nothing; every
+     * position taken from it would therefore be stored against an empty digest,
+     * and the row that appears when the reader adds the book would refuse to
+     * match it — the resume-after-add half of REQ-103 failing quietly, months
+     * later, with no error anywhere. Stamping it here is what makes a position
+     * written before the add and a position written after it the same position.
+     *
+     * Ignores a key that is no longer open and an identity that is already known,
+     * so a late resolution for a book the reader has since left cannot touch the
+     * book they are in now.
+     */
+    fun identityResolved(openKey: String, identity: BookIdentity) {
+        val request = openRequest ?: return
+        if (request.openKey != openKey || request.identity != null) return
+        openRequest = request.withIdentity(identity)
+        val current = session ?: return
+        val identified = current.content.copy(bookDigest = identity.value)
+        val stored = positions.restore(identity.value)
+        session = if (stored != null && current.index == 0 && !current.isPlaying) {
+            current.copy(content = identified)
+                .jumpTo(stored.resolveIndex(identified))
+                .withWpm(stored.wpm)
+        } else {
+            current.copy(content = identified)
+        }
+        publish()
+        persist(flush = true)
     }
 
     fun togglePlay() = update { if (it.isPlaying) it.pause() else it.play() }

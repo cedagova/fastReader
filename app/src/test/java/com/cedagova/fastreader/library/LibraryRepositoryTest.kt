@@ -1,5 +1,7 @@
 package com.cedagova.fastreader.library
 
+import com.cedagova.fastreader.content.ContentFixtures
+import com.cedagova.fastreader.epub.BookDigest
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
@@ -86,6 +88,45 @@ class LibraryRepositoryTest {
         assertEquals(512, second.readingState(bookId)?.tokenIndex)
         assertEquals(bookId, second.catalog.value.lastReadBookId)
         assertNotNull(second.coverFile(bookId))
+    }
+
+    /**
+     * REQ-103 with REQ-009. A book opened from another app and never added has a
+     * position but no row, and launch routing can only resume into rows: making
+     * it the last-read book would send the next launch after an entry that does
+     * not exist and greet the reader with "it is no longer in your library" about
+     * a book they never added.
+     */
+    @Test
+    fun `a position for a book outside the library keeps the position, not the resume`() = runTest {
+        gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addPickedBooks(listOf("doc://a"))
+        val ownBook = repository.catalog.value.books.single().id
+        repository.updateReadingState(ownBook, ReadingState(bookDigest = ownBook, tokenIndex = 100))
+        val external = "sha256:" + "ff".repeat(32)
+
+        repository.updateReadingState(external, ReadingState(bookDigest = external, tokenIndex = 512))
+
+        assertEquals(512, repository.readingState(external)?.tokenIndex)
+        assertEquals(ownBook, repository.catalog.value.lastReadBookId)
+    }
+
+    /** Once that same book is added, it resumes like any other (REQ-103). */
+    @Test
+    fun `adding the book afterwards makes its kept position resumable`() = runTest {
+        val bytes = EpubFixtures.validEpub()
+        val repository = repository(scope = backgroundScope)
+        val digest = requireNotNull(BookDigest.of(ContentFixtures.source(bytes))).value
+        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 512))
+
+        gateway.putDocument("doc://shared", bytes, "quiet.epub")
+        repository.addPickedBooks(listOf("doc://shared"))
+        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 600))
+
+        assertEquals(digest, repository.catalog.value.books.single().id)
+        assertEquals(600, repository.readingState(digest)?.tokenIndex)
+        assertEquals(digest, repository.catalog.value.lastReadBookId)
     }
 
     // REQ-002: both the open-rescan and the manual refresh find a newly copied book.

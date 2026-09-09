@@ -1,10 +1,7 @@
 package com.cedagova.fastreader.library.ui
 
-import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -95,22 +92,3 @@ fun LibraryRoute(
         modifier = modifier,
     )
 }
-
-/**
- * The stock picker contracts do not ask for a persistable grant, so the read
- * permission would be gone the next time the app starts. Both contracts below add
- * that flag; the catalog then takes the long-lived grant (AD-1).
- */
-private class PickPersistableDocuments : ActivityResultContracts.OpenMultipleDocuments() {
-    override fun createIntent(context: Context, input: Array<String>): Intent =
-        super.createIntent(context, input).withPersistableRead()
-}
-
-private class PickPersistableDocumentTree : ActivityResultContracts.OpenDocumentTree() {
-    override fun createIntent(context: Context, input: Uri?): Intent =
-        super.createIntent(context, input).withPersistableRead()
-}
-
-private fun Intent.withPersistableRead(): Intent = addFlags(
-    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
-)
