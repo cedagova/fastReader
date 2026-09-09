@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -573,6 +574,44 @@ class LibraryRepositoryTest {
         assertEquals(ThemeChoice.DARK, second.settings.value.theme)
         assertEquals(PauseStrength.OFF, second.settings.value.pauseStrength)
         assertEquals(FontSize.MEDIUM, second.settings.value.fontSize)
+    }
+
+    /**
+     * REQ-201: the chapter pause is an ordinary setting, so it goes down the same
+     * write path as the rest and comes back after a restart.
+     */
+    @Test
+    fun `the chapter pause setting is stored and survives a restart`() = runTest {
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.load()
+        assertTrue("it ships on", first.settings.value.chapterPauseEnabled)
+
+        first.updateSettings { it.copy(chapterPauseEnabled = false) }
+
+        val second = repository(FileCatalogStore(file), backgroundScope)
+        second.load()
+        assertFalse(second.settings.value.chapterPauseEnabled)
+    }
+
+    /**
+     * REQ-202's durable half: the offer is made once per book, and "once" has to
+     * outlive the process that made it.
+     */
+    @Test
+    fun `a book offered the front-matter skip stays offered across a restart`() = runTest {
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.load()
+        assertTrue(first.catalog.value.frontMatterOfferedBookIds.isEmpty())
+
+        first.markFrontMatterOffered("sha256:abc")
+        // Answering twice must cost one record, not two.
+        first.markFrontMatterOffered("sha256:abc")
+
+        val second = repository(FileCatalogStore(file), backgroundScope)
+        second.load()
+        assertEquals(setOf("sha256:abc"), second.catalog.value.frontMatterOfferedBookIds)
     }
 
     /** REQ-023: reset restores exactly the documented defaults, not "most of" them. */
