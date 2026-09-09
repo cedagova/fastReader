@@ -45,6 +45,15 @@ import kotlinx.coroutines.withContext
  *
  * A source that cannot seek still works: it falls back to the forward pass and
  * costs what it always did. See [EpubByteSource.openChannel].
+ *
+ * ## The structural fingerprint (AD-18)
+ *
+ * The directory pass also yields [BookContent.structuralFingerprint], a digest of
+ * every entry's name, uncompressed size and CRC-32. Those are fields the archive
+ * reader already had in hand, so it adds no read to any path and REQ-110's
+ * mechanism and measurement are untouched. It is what lets a stored position be
+ * refused when the file changed under it — see
+ * `com.cedagova.fastreader.reader.ReaderPosition`.
  */
 class EpubContentPipeline(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -171,6 +180,10 @@ class EpubContentPipeline(
         return BookContentResult.Parsed(
             BookContent(
                 bookDigest = identity?.value.orEmpty(),
+                // Taken from the directory read this parse already did, never from
+                // a second pass (AD-18, REQ-110). Null under the streaming
+                // fallback, which means "no guard" downstream.
+                structuralFingerprint = archive.structuralFingerprint,
                 language = opf.metadata.language,
                 tokens = classify(tokens),
                 chapters = chapters,

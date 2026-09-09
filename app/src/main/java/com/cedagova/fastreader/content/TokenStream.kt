@@ -275,6 +275,21 @@ data class TokenPosition(
 data class BookContent(
     /** Content-derived book identity (AD-2), the same digest the catalog stores. */
     val bookDigest: String,
+    /**
+     * What this parse read, structurally (AD-18): a digest over the archive
+     * directory's per-entry names, uncompressed sizes and CRC-32 values.
+     *
+     * Not an identity and never a key — see
+     * [com.cedagova.fastreader.epub.StructuralFingerprint]. It exists so a stored
+     * position can be checked against the bytes actually opened, which
+     * [bookDigest] can no longer do now that identity is handed to the reader
+     * rather than derived from the file (AD-8).
+     *
+     * Null when the open produced none: a source that fell back to the streaming
+     * archive, or a book built by anything other than the EPUB pipeline. Null
+     * means *no guard*, never a mismatch.
+     */
+    val structuralFingerprint: String? = null,
     /** BCP-47 language from the package document, when it declares one. */
     val language: String?,
     val tokens: List<Token>,

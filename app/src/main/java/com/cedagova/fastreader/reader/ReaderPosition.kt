@@ -18,6 +18,11 @@ data class ReaderPosition(
     /** Share of the book already shown; the library's "% read", and the fallback below. */
     val progressFraction: Float,
     val wpm: Int = RsvpTiming.DEFAULT_WPM,
+    /**
+     * The structure of the file this position was taken in (AD-18), or null when
+     * that was not known — see [resolveIndex]'s case 3.
+     */
+    val structuralFingerprint: String? = null,
 ) {
 
     /**
@@ -31,30 +36,44 @@ data class ReaderPosition(
      *    still describes the same *place in the book*, so it is remapped onto the
      *    new stream: approximate, but a paragraph or two out beats resuming
      *    somewhere arbitrary, and it never silently reports a wrong exact word.
-     * 3. A different book's digest (AD-2) — the position does not belong to this
-     *    content at all and is ignored outright. This catches a position handed
-     *    to the wrong book, which is a caller mistake.
+     * 3. Not this content — the position is ignored outright and the book opens at
+     *    0. Two different things land here, and they fail for different reasons:
+     *    a different book's digest (AD-2), which is a caller handing a position to
+     *    the wrong book; and the same book's *bytes having changed*, which is the
+     *    guard [structuralFingerprint] exists for.
      *
-     * ## What case 3 stopped catching in v1.1.0
+     * ## What case 3 catches, and what it does not
      *
-     * Until v1.1.0 the reader hashed the file it was reading, so this comparison
-     * put *what was stored* against *what was just read off disk* and a file
-     * replaced in place at the same URI failed it. Identity is now an input
-     * (AD-8): for a library book both sides are the catalog id, so the
-     * comparison cannot fail and this is no longer a content-change guard.
+     * The digest half stopped detecting a changed file in v1.1.0. Until then the
+     * reader hashed what it read, so the comparison put *what was stored* against
+     * *what was just read off disk*. Identity is now an input (AD-8): for a
+     * library book both sides are the catalog id, so that half can only ever catch
+     * the caller mistake, never a swapped file.
      *
-     * A file swapped under an unchanged catalog entry is now caught by the
-     * rescan fingerprint (size and last-modified on [com.cedagova.fastreader
-     * .library.BookSource]) re-keying the book, not here — so between the swap
-     * and the next rescan the reader will resume at the stored index in the new
-     * text. Restoring a real guard needs a second stored signal, which is a
-     * catalog schema change and deliberately not part of the leaf that made this
-     * one stop firing.
+     * [structuralFingerprint] is the second stored signal that restores the rest
+     * (AD-18). It is a digest of the archive directory's per-entry names,
+     * uncompressed sizes and CRC-32 values, taken from the read the open already
+     * performs, so nothing re-reads the file and REQ-110 is untouched. When the
+     * stored one and the one just computed disagree, the file is not the file this
+     * position was taken in and the book restarts at 0.
+     *
+     * Either side being null is **no guard, not a mismatch** — the position
+     * resumes exactly as it did before this existed:
+     *
+     * - the stored side is null for every position written before the schema 7
+     *   migration, and for one written by an open that produced no fingerprint;
+     * - the computed side is null when the open fell back to the streaming
+     *   archive, which reads no central directory (see
+     *   `com.cedagova.fastreader.epub.EpubArchive.structuralFingerprint`).
+     *
+     * It is a change detector, not a tamper check: two files whose entries have
+     * identical names, sizes and CRC-32s count as the same content, so the same
+     * book re-downloaded or re-copied resumes rather than restarting.
      */
     fun resolveIndex(content: BookContent): Int {
         if (content.isEmpty) return 0
         val last = content.tokens.lastIndex
-        if (position.bookDigest != content.bookDigest) return 0
+        if (!belongsTo(content)) return 0
         if (position.pipelineVersion != content.pipelineVersion) {
             return (progressFraction.coerceIn(0f, 1f) * last).toInt().coerceIn(0, last)
         }
@@ -63,8 +82,18 @@ data class ReaderPosition(
 
     /** True when [resolveIndex] had to fall back rather than use the stored index. */
     fun isApproximate(content: BookContent): Boolean =
-        position.bookDigest == content.bookDigest &&
-            position.pipelineVersion != content.pipelineVersion
+        belongsTo(content) && position.pipelineVersion != content.pipelineVersion
+
+    /**
+     * Case 3, as one predicate: the same book, and — when both sides know it — the
+     * same bytes of it.
+     */
+    private fun belongsTo(content: BookContent): Boolean {
+        if (position.bookDigest != content.bookDigest) return false
+        val stored = structuralFingerprint ?: return true
+        val opened = content.structuralFingerprint ?: return true
+        return stored == opened
+    }
 }
 
 /** The position a session is at right now, ready to be stored. */
@@ -72,6 +101,10 @@ fun ReaderSession.toPosition(): ReaderPosition = ReaderPosition(
     position = content.positionAt(index),
     progressFraction = progressFraction,
     wpm = settings.wpm,
+    // Null when this open produced none. Storage must then keep whatever
+    // fingerprint is already recorded rather than clearing it (AD-18): a book
+    // only ever gains this protection.
+    structuralFingerprint = content.structuralFingerprint,
 )
 
 /**

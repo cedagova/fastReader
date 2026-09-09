@@ -39,8 +39,13 @@ object CatalogSchema {
      *   (`libraryOrder`, written as `RECENTLY_READ` so an updating reader gets
      *   the new default rather than v1's alphabetical list). The second of
      *   increment 002's three steps; issue #62 takes 7 (AD-16).
+     * - **7** — issue #62: a reading position records the structure of the file it
+     *   was taken in (`ReadingState.structuralFingerprint`, written as `null`
+     *   because no earlier document can know one — and null means no guard, so
+     *   every stored position still resumes). The last of increment 002's three
+     *   steps; the chain 5 → 6 → 7 is complete.
      */
-    const val CURRENT_VERSION: Int = 6
+    const val CURRENT_VERSION: Int = 7
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -53,6 +58,7 @@ object CatalogSchema {
         3 to CueSplitV4Migration,
         4 to ChapterPauseV5Migration,
         5 to LibraryOrderV6Migration,
+        6 to ContentFingerprintV7Migration,
     )
 }
 

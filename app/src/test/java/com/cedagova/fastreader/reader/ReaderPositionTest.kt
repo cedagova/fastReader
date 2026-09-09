@@ -1,9 +1,17 @@
 package com.cedagova.fastreader.reader
 
+import com.cedagova.fastreader.content.BookContentResult
+import com.cedagova.fastreader.content.BookIdentity
+import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.ContentPipelineVersion
+import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.TokenPosition
+import com.cedagova.fastreader.epub.EpubFixtures
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -87,8 +95,136 @@ class ReaderPositionTest {
         assertEquals(ReaderMode.PAUSED, reopened.mode)
     }
 
-    private fun position(digest: String, tokenIndex: Int, pipelineVersion: Int) = ReaderPosition(
+    // --- Case 3, the content-change guard (AD-18, #62) ---
+    //
+    // Four states, because the guard has to fire in exactly one of them. It is
+    // armed only when *both* sides know a fingerprint; either side missing means
+    // "no guard", which is what keeps every position written before schema 7 —
+    // and every book opened through the streaming archive — resuming as it always
+    // did.
+
+    @Test
+    fun `a position whose fingerprint matches the opened file resumes`() {
+        val opened = book.copy(structuralFingerprint = "zipdir1:aaaa")
+        val stored = position(book.bookDigest, 24, book.pipelineVersion, fingerprint = "zipdir1:aaaa")
+
+        assertEquals(24, stored.resolveIndex(opened))
+        assertFalse(stored.isApproximate(opened))
+    }
+
+    @Test
+    fun `a position whose fingerprint disagrees with the opened file restarts the book`() {
+        val opened = book.copy(structuralFingerprint = "zipdir1:bbbb")
+        val stored = position(book.bookDigest, 24, book.pipelineVersion, fingerprint = "zipdir1:aaaa")
+
+        // The identity still matches — it is the catalog id on both sides (AD-8),
+        // so this is exactly the case the digest comparison can no longer catch.
+        assertEquals(book.bookDigest, opened.bookDigest)
+        assertEquals(0, stored.resolveIndex(opened))
+        assertFalse(stored.isApproximate(opened))
+    }
+
+    /** Every position written before the schema 7 migration. */
+    @Test
+    fun `a position stored without a fingerprint resumes against a file that has one`() {
+        val opened = book.copy(structuralFingerprint = "zipdir1:bbbb")
+        val stored = position(book.bookDigest, 24, book.pipelineVersion, fingerprint = null)
+
+        assertEquals(24, stored.resolveIndex(opened))
+    }
+
+    /** The streaming fallback: the open read no central directory, so it knows nothing. */
+    @Test
+    fun `a position with a fingerprint resumes when the open produced none`() {
+        val opened = book.copy(structuralFingerprint = null)
+        val stored = position(book.bookDigest, 24, book.pipelineVersion, fingerprint = "zipdir1:aaaa")
+
+        assertEquals(24, stored.resolveIndex(opened))
+    }
+
+    /**
+     * The two halves of case 3 are independent: a changed file is refused even
+     * when the tokenization rules also moved, rather than falling through to the
+     * progress-fraction remap that case 2 would otherwise apply.
+     */
+    @Test
+    fun `a changed file is refused rather than remapped onto progress`() {
+        val opened = book.copy(structuralFingerprint = "zipdir1:bbbb")
+        val stored = ReaderPosition(
+            position = TokenPosition(book.bookDigest, tokenIndex = 3, pipelineVersion = book.pipelineVersion - 1),
+            progressFraction = 0.5f,
+            structuralFingerprint = "zipdir1:aaaa",
+        )
+
+        assertEquals(0, stored.resolveIndex(opened))
+        assertFalse(stored.isApproximate(opened))
+    }
+
+    @Test
+    fun `a session stores the fingerprint of the file it was reading`() {
+        val opened = book.copy(structuralFingerprint = "zipdir1:aaaa")
+
+        val position = ReaderSession(opened, index = 27).toPosition()
+
+        assertEquals("zipdir1:aaaa", position.structuralFingerprint)
+    }
+
+    // --- The same thing, end to end through the real pipeline ---
+
+    /**
+     * The failure #62 exists to fix, reproduced at the seam where it happens: a
+     * file replaced in place keeps its catalog id, so the two parses carry the
+     * *same identity* and differ only in what the bytes say. Before the guard the
+     * stored index resolved straight onto the new text.
+     */
+    @Test
+    fun `a book edited under the same identity restarts, and the untouched one resumes`() {
+        val original = ReaderFixtures.parse(
+            EpubFixtures.validEpub(bodyText = "One word at a time, and then the next one."),
+        )
+        val edited = ReaderFixtures.parse(
+            EpubFixtures.validEpub(bodyText = "One word at a tyme, and then the next one."),
+        )
+        assertEquals("the swap must not change identity", original.bookDigest, edited.bookDigest)
+
+        val stored = ReaderSession(original, index = 5).toPosition()
+
+        assertEquals("the changed file must restart at 0", 0, stored.resolveIndex(edited))
+        assertEquals("the untouched file must resume", 5, stored.resolveIndex(original))
+    }
+
+    /**
+     * A source with no seekable view reads no central directory, so it computes no
+     * fingerprint and the guard simply does not apply. The reader resumes exactly
+     * as it did before this existed — and, on the write side, the stored value is
+     * left alone rather than cleared (see `LibraryRepositoryTest`).
+     */
+    @Test
+    fun `a book opened through the streaming fallback resumes on its stored position`() {
+        val bytes = EpubFixtures.validEpub(bodyText = "One word at a time, and then the next one.")
+        val seekable = ReaderFixtures.parse(bytes)
+        val streamed = runBlocking {
+            val result = EpubContentPipeline(Dispatchers.Unconfined).parse(
+                ContentFixtures.streamingSource(bytes),
+                BookIdentity(ReaderFixtures.ENGLISH_NOVEL_ID),
+            )
+            (result as BookContentResult.Parsed).content
+        }
+        assertNull("the streaming open must produce no fingerprint", streamed.structuralFingerprint)
+
+        val stored = ReaderSession(seekable, index = 5).toPosition()
+
+        assertEquals(5, stored.resolveIndex(streamed))
+    }
+
+    private fun position(
+        digest: String,
+        tokenIndex: Int,
+        pipelineVersion: Int,
+        fingerprint: String? = null,
+    ) = ReaderPosition(
         position = TokenPosition(digest, tokenIndex, pipelineVersion),
         progressFraction = 0f,
+        structuralFingerprint = fingerprint,
     )
 }

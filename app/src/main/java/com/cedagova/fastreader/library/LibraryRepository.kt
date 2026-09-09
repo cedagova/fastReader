@@ -311,10 +311,30 @@ class LibraryRepository(
      * they actually own stays the one launch comes back to, and the external
      * book's position is kept exactly as the definition says, waiting for the
      * file to be added.
+     *
+     * ## The one thing a write must not do (AD-18)
+     *
+     * A position taken from an open that produced no structural fingerprint —
+     * the streaming fallback, or a book whose layout the directory reader refuses
+     * — carries a null. Storing that null over a fingerprint already recorded
+     * would disarm the content-change guard for that book silently and for good:
+     * nothing would report it, and the next swapped file would resume at an
+     * arbitrary word again. So a null keeps what is stored, and only a real
+     * fingerprint replaces one. A book only ever gains this protection.
+     *
+     * Done here rather than at the reader's boundary because this is the single
+     * place a position reaches the store, and it runs under the catalog mutex
+     * with the current document in hand — so the read of the previous value and
+     * the write of the new one cannot interleave with another write.
      */
     private suspend fun writeReadingState(bookId: String, state: ReadingState) = mutateCatalog { catalog ->
+        val storedFingerprint = catalog.readingStates[bookId]?.structuralFingerprint
+        val next = state.copy(
+            structuralFingerprint = state.structuralFingerprint ?: storedFingerprint,
+            updatedAtEpochMs = clock(),
+        )
         catalog.copy(
-            readingStates = catalog.readingStates + (bookId to state.copy(updatedAtEpochMs = clock())),
+            readingStates = catalog.readingStates + (bookId to next),
             lastReadBookId = if (catalog.book(bookId) != null) bookId else catalog.lastReadBookId,
         )
     }

@@ -22,6 +22,23 @@ internal interface EpubArchive : AutoCloseable {
     val strategy: ArchiveReadStrategy
 
     /**
+     * A digest of this archive's structure (AD-18), or null when the open produced
+     * none and a stored position therefore has nothing to be checked against.
+     *
+     * Null is exactly [ArchiveReadStrategy.STREAMING]: the fingerprint comes off
+     * the central directory, and the streaming reader never reads one — that is
+     * the difference between the two strategies. Keying the fallback on the
+     * strategy rather than on whether the source *could* seek is deliberate: a
+     * perfectly seekable file whose layout [ZipDirectory] refuses (ZIP64, spanned,
+     * too many entries) also lands here, and would otherwise be assumed to have a
+     * fingerprint it does not have.
+     *
+     * See [StructuralFingerprint] for what a non-null value means, and
+     * `com.cedagova.fastreader.reader.ReaderPosition` for what is done with it.
+     */
+    val structuralFingerprint: String?
+
+    /**
      * Reads every entry [select] accepts, each capped at [maxBytes].
      *
      * Never throws. An archive that is damaged partway through reports what it
@@ -95,6 +112,8 @@ private class DirectoryArchive(private val directory: ZipDirectory) : EpubArchiv
 
     override val strategy = ArchiveReadStrategy.DIRECTORY
 
+    override val structuralFingerprint: String get() = directory.structuralFingerprint
+
     override fun read(select: (String) -> Boolean, maxBytes: Long): ArchiveRead {
         val entries = LinkedHashMap<String, ByteArray>()
         directory.entryNames.forEach { name ->
@@ -112,6 +131,16 @@ private class DirectoryArchive(private val directory: ZipDirectory) : EpubArchiv
 private class StreamingArchive(private val source: EpubByteSource) : EpubArchive {
 
     override val strategy = ArchiveReadStrategy.STREAMING
+
+    /**
+     * No fingerprint: a forward pass never reads the central directory, and
+     * rebuilding the same value from the local headers would mean reading past
+     * every entry's data — the whole-file cost REQ-110 exists to avoid. A book
+     * opened this way keeps exactly the resume behaviour it had before the guard
+     * existed, and an already-stored fingerprint is left alone rather than
+     * cleared (AD-18).
+     */
+    override val structuralFingerprint: String? get() = null
 
     override fun read(select: (String) -> Boolean, maxBytes: Long): ArchiveRead {
         val scan = ZipReader.scan(source, collect = select, maxEntryBytes = maxBytes, computeDigest = false)
