@@ -1,0 +1,17 @@
+=== BEFORE: published v1.0.1 installed from its GitHub Release asset ===
+host UTC 2026-09-09T04:15:58Z
+    codePath=/data/app/~~ubNVmm5oGI5i1edRG0u2wA==/com.cedagova.fastreader-txUGaHmNgZ7OSPaJ25JgpA==
+    versionCode=2 minSdk=26 targetSdk=36
+    versionName=1.0.1
+    lastUpdateTime=2026-09-08 22:11:14
+    signatures=PackageSignatures{4fb7bb6 version:3, signatures:[5b76aa38], past signatures:[]}
+      firstInstallTime=2026-09-08 22:11:14
+
+=== AFTER: locally built release-signed v1.1.0 installed in place (adb install -r, no data clear) ===
+host UTC 2026-09-09T04:16:06Z
+    codePath=/data/app/~~L5gEonUdiHfrddFjyzFPRg==/com.cedagova.fastreader-sVVgcPZv2SNEBQCzZEqp0g==
+    versionCode=3 minSdk=26 targetSdk=36
+    versionName=1.1.0
+    lastUpdateTime=2026-09-08 22:16:05
+    signatures=PackageSignatures{4fb7bb6 version:3, signatures:[5b76aa38], past signatures:[]}
+      firstInstallTime=2026-09-08 22:11:14
