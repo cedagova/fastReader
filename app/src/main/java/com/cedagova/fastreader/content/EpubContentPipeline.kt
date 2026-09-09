@@ -104,6 +104,10 @@ class EpubContentPipeline(
         val entries = HashMap(read.entries)
 
         val titles = readTitles(opf, entries)
+        // Read before the spine loop, which consumes entries as it goes: a book
+        // that lists its own navigation document in the spine would otherwise have
+        // had it removed by the time the body-start declaration is wanted.
+        val declaredBody = readDeclaredBodyStart(opf, entries)
         val spineItems = opf.spineItems
         onProgress(ContentProgress(completedItems = 0, totalItems = spineItems.size))
 
@@ -171,6 +175,7 @@ class EpubContentPipeline(
                 tokens = classify(tokens),
                 chapters = chapters,
                 gaps = gaps,
+                frontMatter = FrontMatterDetector.detect(chapters, declaredBody?.first, declaredBody?.second),
             ),
         )
     }
@@ -240,6 +245,28 @@ class EpubContentPipeline(
                 EpubPaths.resolve("", full)?.let { return it }
             }
         }
+        return null
+    }
+
+    /**
+     * Where the book itself says its body starts, if it says so at all (REQ-202).
+     *
+     * Both declarations come from bytes this parse already holds: the EPUB 3
+     * navigation document was read for its chapter titles, and the EPUB 2 guide
+     * is part of the package document. Detection therefore costs one scan of
+     * markup already in memory and never another read of the archive, which is
+     * what keeps the open cost where REQ-110 needs it.
+     */
+    private fun readDeclaredBodyStart(
+        opf: OpfDocument,
+        entries: Map<String, ByteArray>,
+    ): Pair<String, FrontMatterSource>? {
+        opf.navPath?.let { path ->
+            entries[path]
+                ?.let { TocReader.readBodyMatterLandmark(path, ContentCharsets.decode(it)) }
+                ?.let { return it to FrontMatterSource.LANDMARKS }
+        }
+        opf.guideTextPath?.let { return it to FrontMatterSource.GUIDE }
         return null
     }
 

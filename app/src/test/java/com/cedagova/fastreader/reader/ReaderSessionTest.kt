@@ -76,6 +76,73 @@ class ReaderSessionTest {
         assertTrue(crossed.timing.reorientationPending)
     }
 
+    /**
+     * REQ-201, D4: the same boundary with the setting off.
+     *
+     * The comparison against the default session above is the whole requirement —
+     * one boolean, the same book, the same word — so "with the setting off the
+     * stream crosses a chapter boundary without stopping; with it on, v1
+     * behaviour is unchanged" is a difference of exactly one field.
+     */
+    @Test
+    fun `REQ-201 with the chapter pause off the stream crosses the boundary without stopping`() {
+        val crossed = session(4).withChapterPause(false).play().advance()
+
+        assertEquals(ReaderMode.PLAYING, crossed.mode)
+        assertEquals(5, crossed.index)
+        assertEquals("Chapter One: The Arrival", crossed.currentChapter?.title)
+    }
+
+    /**
+     * Crossing with the pause off is an ordinary step, so it must not smuggle the
+     * re-orientation hold in as a slower next word — that is the same
+     * interruption in a smaller size.
+     */
+    @Test
+    fun `crossing with the pause off is an ordinary step of the stream`() {
+        val lastOfChapter = session(4).withChapterPause(false).play()
+        val crossed = lastOfChapter.advance()
+
+        assertEquals(lastOfChapter.currentDurationMillis, crossed.timing.elapsedPlaybackMillis)
+        assertFalse("crossing without stopping must not re-orient", crossed.timing.reorientationPending)
+    }
+
+    /** The default is v1's behaviour, so an existing reader sees no change (REQ-201). */
+    @Test
+    fun `the chapter pause is on unless it is turned off`() {
+        assertTrue(ReaderSession(book).chapterPauseEnabled)
+    }
+
+    /** A setting change is not a navigation: the reader stays where they are. */
+    @Test
+    fun `turning the chapter pause off mid-book moves nobody`() {
+        val playing = session(12).play()
+        val changed = playing.withChapterPause(false)
+
+        assertEquals(12, changed.index)
+        assertEquals(ReaderMode.PLAYING, changed.mode)
+        assertEquals(playing.timing, changed.timing)
+        assertSame("an unchanged value must not build a new session", changed, changed.withChapterPause(false))
+    }
+
+    /** Turning it off while held at a chapter is not a play command. */
+    @Test
+    fun `turning the chapter pause off at a chapter pause does not start playing`() {
+        val held = session(4).play().advance()
+        assertEquals(ReaderMode.CHAPTER_PAUSE, held.mode)
+
+        assertEquals(ReaderMode.CHAPTER_PAUSE, held.withChapterPause(false).mode)
+        assertEquals(5, held.withChapterPause(false).index)
+    }
+
+    /** The end of the book is the end of the book, pause setting or not (REQ-018). */
+    @Test
+    fun `the end state still stops the stream with the chapter pause off`() {
+        val finished = session(40).withChapterPause(false).play().advance()
+
+        assertEquals(ReaderMode.FINISHED, finished.mode)
+    }
+
     @Test
     fun `playing on from a chapter pause does not pause again inside the chapter`() {
         val resumed = session(4).play().advance().play().advance()

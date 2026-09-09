@@ -47,6 +47,27 @@ class ReaderSettingsTest {
         assertEquals(CueSettings.DEFAULTS, ReaderSettings.DEFAULTS.cues)
     }
 
+    /**
+     * REQ-201's default, and D4's promise with it: turning the chapter pause into
+     * a choice must not change what anyone already had.
+     *
+     * The cue assertion beside it is not padding — it is the check that a new
+     * field did not disturb an existing default, which is the way a schema
+     * addition usually goes wrong.
+     */
+    @Test
+    fun `the chapter pause ships on and is not a cue`() {
+        assertTrue(ReaderSettings.DEFAULTS.chapterPauseEnabled)
+        assertEquals(CueSettings.DEFAULTS, ReaderSettings.DEFAULTS.copy(chapterPauseEnabled = false).cues)
+    }
+
+    /** Turning it off is a change, so reset-to-defaults has something to undo (REQ-023). */
+    @Test
+    fun `turning the chapter pause off is not the default state`() {
+        assertTrue(ReaderSettings.DEFAULTS.isDefault)
+        assertFalse(ReaderSettings.DEFAULTS.copy(chapterPauseEnabled = false).isDefault)
+    }
+
     /** The two cues are separate choices, so all four combinations are reachable. */
     @Test
     fun `the highlight and the alignment move independently`() {

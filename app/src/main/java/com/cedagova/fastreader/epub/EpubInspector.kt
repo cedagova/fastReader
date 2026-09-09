@@ -153,6 +153,15 @@ internal class OpfDocument(
     val navPath: String? = null,
     /** EPUB 2 NCX table of contents, when the spine or manifest points at one. */
     val ncxPath: String? = null,
+    /**
+     * The spine item an EPUB 2 `<guide><reference type="text">` names as the
+     * start of the body text, when the package declares one (REQ-202).
+     *
+     * The guide is EPUB 2's way of saying what EPUB 3 says with a `bodymatter`
+     * landmark, and it is the only declaration an EPUB 2 book can make about
+     * where its front matter ends.
+     */
+    val guideTextPath: String? = null,
 ) {
     companion object {
 
@@ -195,6 +204,7 @@ internal class OpfDocument(
                 spineItems = spineItems,
                 navPath = resolveNav(manifestItems),
                 ncxPath = resolveNcx(elements, manifestItems),
+                guideTextPath = resolveGuideText(opfPath, elements),
             )
         }
 
@@ -217,6 +227,22 @@ internal class OpfDocument(
                 .firstOrNull { it.mediaType.equals("application/x-dtbncx+xml", ignoreCase = true) }
                 ?.path
         }
+
+        /**
+         * `<guide><reference type="text" href="chapter1.xhtml"/>`: where the book
+         * says its body begins.
+         *
+         * Only `type="text"` is read. The guide's other reference types name
+         * individual front-matter pages — `cover`, `title-page`, `copyright-page`
+         * — and a list of what to skip is a weaker statement than a pointer at
+         * what to start from: it says nothing about the pages it does not
+         * mention. [com.cedagova.fastreader.content.FrontMatterDetector] wants one
+         * unambiguous answer or none.
+         */
+        private fun resolveGuideText(opfPath: String, elements: List<Element>): String? = elements
+            .filter { it.hasLocalName("reference") && it.attr("type").equals("text", ignoreCase = true) }
+            .mapNotNull { it.attr("href") }
+            .firstNotNullOfOrNull { EpubPaths.resolve(opfPath, it) }
 
         private fun readMetadata(root: Element, elements: List<Element>): EpubMetadata {
             val title = elements.firstText("title")

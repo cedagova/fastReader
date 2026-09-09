@@ -281,6 +281,13 @@ data class BookContent(
     val chapters: List<Chapter>,
     /** Spine items that produced no words, in book order. Empty for an intact book. */
     val gaps: List<ContentGap> = emptyList(),
+    /**
+     * Where this book's body starts, when its leading spine items are front
+     * matter and the book says so clearly enough to act on (REQ-202). Null for a
+     * book that opens on its first chapter, and for every book this cannot be
+     * sure about — see [FrontMatterDetector].
+     */
+    val frontMatter: FrontMatter? = null,
     val pipelineVersion: Int = ContentPipelineVersion.CURRENT,
 ) {
     /** Total positions, and therefore the denominator of progress. */

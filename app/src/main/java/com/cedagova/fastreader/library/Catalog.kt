@@ -44,6 +44,24 @@ data class Catalog(
      * before schema 3; every field then reads back as its documented default.
      */
     val settings: ReaderSettings = ReaderSettings(),
+    /**
+     * Books that have already been offered the one-time front-matter skip
+     * (REQ-202), by book id.
+     *
+     * The requirement is "offered once, per book", and the only durable place
+     * that can be true is here. Declining counts: the set records that the offer
+     * was *made*, not that it was taken, so a reader who chose to start at the
+     * cover is not asked again the next time they open the book.
+     *
+     * It is a set of ids rather than a flag on [ReadingState] because it is not a
+     * reading position: a book removed from the library keeps its position for a
+     * later re-add (REQ-004), and it should keep this too — being re-added is not
+     * a reason to be asked a second time. Absent in a document written before
+     * schema 5; the documented default is the empty set, which reads as "no book
+     * has been offered yet" and is exactly right for a library that predates the
+     * offer.
+     */
+    val frontMatterOfferedBookIds: Set<String> = emptySet(),
 ) {
     fun book(id: String): Book? = books.firstOrNull { it.id == id }
 

@@ -127,6 +127,36 @@ class ReaderScreenScreenshotTest {
         capture("reader_external_notice_compact", pausedAt(12), externalNotice = true, fontScale = 1.3f)
     }
 
+    /**
+     * REQ-202: a book that opens on its cover, with the one-time offer to start
+     * at the first chapter.
+     *
+     * Captured on the book's very first token, which is the only position the
+     * offer is ever shown at, and with the paused context view under it — so the
+     * image shows the offer sitting *above* the reading surface rather than
+     * inside it, which is what keeps the stream's fixed size and static
+     * background intact (REQ-062, REQ-302, AD-6).
+     */
+    @Test
+    fun aBookThatOpensOnItsCoverOffersTheFirstChapter() {
+        capture("reader_front_matter_offer", pausedAt(0), frontMatterOffer = "Chapter One: The Approach")
+    }
+
+    /**
+     * The same offer where it has to survive: 360 dp of width at a large font
+     * scale, where a destination-naming label is the thing that wraps.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theOfferFitsACrampedScreenAtALargeFontScale() {
+        capture(
+            "reader_front_matter_offer_compact",
+            pausedAt(0),
+            frontMatterOffer = "Chapter One: The Approach",
+            fontScale = 1.3f,
+        )
+    }
+
     // --- The cue matrix ------------------------------------------------------
     //
     // One golden per cue combination the reader can be looking at, because a cue
@@ -403,6 +433,7 @@ class ReaderScreenScreenshotTest {
         fontSize: FontSize = FontSize.MEDIUM,
         externalNotice: Boolean = false,
         speedNotice: String? = null,
+        frontMatterOffer: String? = null,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -422,6 +453,7 @@ class ReaderScreenScreenshotTest {
                         focused = focused,
                         externalNotice = externalNotice,
                         speedNotice = speedNotice,
+                        frontMatterOffer = frontMatterOffer,
                     )
                 }
             }
