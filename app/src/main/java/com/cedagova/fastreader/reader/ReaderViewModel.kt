@@ -92,6 +92,35 @@ class ReaderViewModel(
     private var pauseStrength: PauseStrength = PauseStrength.NORMAL
     private var rebuild: Job? = null
 
+    /**
+     * The reader's chapter-pause setting (REQ-201), held for the same reason
+     * [pauseStrength] is: a book can finish parsing after the setting was last
+     * changed, so the session built for it has to start from the wanted value
+     * rather than from the type's default.
+     */
+    private var chapterPauseEnabled: Boolean = true
+
+    private val _frontMatterOffer = MutableStateFlow<FrontMatterOffer?>(null)
+
+    /**
+     * True once the reader has answered the offer for the open book, so a later
+     * transition cannot raise it a second time in the same session.
+     */
+    private var frontMatterOfferSettled: Boolean = false
+
+    /**
+     * The one-time front-matter skip for the open book, or null (REQ-202).
+     *
+     * Non-null only while all of this holds: the parse found a body start it is
+     * sure of, the reader is still on the book's very first token, and neither of
+     * the offer's two actions has been taken this session. Whether the offer has
+     * *already been made for this book* is a durable per-book fact and is not
+     * known here — [com.cedagova.fastreader.library.Catalog.frontMatterOfferedBookIds]
+     * holds it, and the caller that can read the catalog applies it. Splitting it
+     * that way keeps this class free of the store, exactly as it is for positions.
+     */
+    val frontMatterOffer: StateFlow<FrontMatterOffer?> = _frontMatterOffer.asStateFlow()
+
     init {
         // A failing store must be visible on the reading surface, not only on the
         // library's banner: this is where the reader is when their place is lost.
@@ -140,6 +169,8 @@ class ReaderViewModel(
         rebuild?.cancel()
         view = null
         session = null
+        _frontMatterOffer.value = null
+        frontMatterOfferSettled = false
         val title = request.title
         _state.value = ReaderUiState.Opening(title, null)
         parse = viewModelScope.launch { parse(request) }
@@ -186,7 +217,9 @@ class ReaderViewModel(
                         wpm = stored?.wpm ?: RsvpTiming.DEFAULT_WPM,
                         pauseStrength = pauseStrength,
                     ),
+                    chapterPauseEnabled = chapterPauseEnabled,
                 )
+                raiseFrontMatterOffer()
                 publish()
                 // The setting can have changed while this book was parsing, and
                 // the index above was measured at whatever it was when the parse
@@ -245,6 +278,9 @@ class ReaderViewModel(
         } else {
             current.copy(content = identified)
         }
+        // The late restore can have moved the reader off the first token, and the
+        // key the "already offered" record is stored under only exists now.
+        raiseFrontMatterOffer()
         publish()
         persist(flush = true)
     }
@@ -296,6 +332,72 @@ class ReaderViewModel(
     }
 
     /**
+     * Applies the reader's chapter-pause setting (REQ-201), mid-book included.
+     *
+     * Far cheaper than [setPauseStrength] and deliberately so: this changes
+     * whether a boundary *stops* the stream, not how long any word is shown, so
+     * the time-remaining index — a sum of durations — is unaffected and nothing
+     * is rebuilt. Held time is not part of that estimate; a reader who turns
+     * chapter pauses off does not finish the book sooner by the clock.
+     *
+     * Idempotent, because it is called from a `LaunchedEffect` that re-runs on
+     * recomposition.
+     */
+    fun setChapterPause(enabled: Boolean) {
+        if (enabled == chapterPauseEnabled) return
+        chapterPauseEnabled = enabled
+        // Not a position change, so no durable write of its own; the setting
+        // itself is already stored by the settings screen.
+        update(flush = false) { current -> current.withChapterPause(enabled) }
+    }
+
+    /**
+     * Takes the front-matter offer: the reader lands on the first word of the
+     * book's first real chapter (REQ-202).
+     *
+     * An ordinary [jumpTo], so it inherits everything a jump already does —
+     * the re-orientation hold, the paused context view, and the durable write
+     * that makes the new place the one a later open comes back to.
+     */
+    fun skipFrontMatter() {
+        val offer = _frontMatterOffer.value ?: return
+        _frontMatterOffer.value = null
+        frontMatterOfferSettled = false
+        frontMatterOfferSettled = true
+        update { it.jumpTo(offer.startTokenIndex) }
+    }
+
+    /** Declines the offer: the reader stays on the cover, and it is not raised again. */
+    fun dismissFrontMatterOffer() {
+        _frontMatterOffer.value = null
+        frontMatterOfferSettled = false
+        frontMatterOfferSettled = true
+    }
+
+    /**
+     * Publishes the offer when this book and this position still warrant one.
+     *
+     * The position test is REQ-202's "on first open" made mechanical: the offer
+     * belongs to a reader who is looking at the book's very first token. A stored
+     * position anywhere else means they have read some of this book already, and
+     * offering to move them would be offering to lose their place.
+     */
+    private fun raiseFrontMatterOffer() {
+        if (frontMatterOfferSettled) return
+        val current = session ?: return
+        val front = current.content.frontMatter
+        _frontMatterOffer.value = if (front != null && current.index == 0) {
+            FrontMatterOffer(
+                positionKey = openRequest?.positionKey,
+                startTokenIndex = front.startTokenIndex,
+                chapterTitle = front.bodyChapterTitle,
+            )
+        } else {
+            null
+        }
+    }
+
+    /**
      * Rebuilds the time-remaining index when it no longer matches [pauseStrength].
      *
      * The rebuild is cancellable and re-entrant: flicking through all four
@@ -337,6 +439,9 @@ class ReaderViewModel(
         val current = session ?: return
         val next = transform(current)
         session = next
+        // Reading on past the first word answers the offer as surely as declining
+        // it does: whatever it was about is now behind the reader.
+        if (_frontMatterOffer.value != null && next.index != 0) _frontMatterOffer.value = null
         publish()
         // A stream that stopped itself — a chapter boundary, the end of the book —
         // is a place the reader returns to, so it is made durable like a tap.

@@ -265,6 +265,27 @@ class LibraryRepository(
     fun requestUpdateSettings(transform: (ReaderSettings) -> ReaderSettings): Job =
         scope.launch { updateSettings(transform) }
 
+    /**
+     * Records that this book has been offered the front-matter skip (REQ-202).
+     *
+     * Written whichever way the reader answered, because the requirement is that
+     * the offer is made *once*: someone who chose to start at the cover has
+     * answered the question and must not be asked it again.
+     *
+     * A book that is already in the set is not rewritten, so answering the offer
+     * on a book that somehow reached it twice costs no catalog write.
+     */
+    suspend fun markFrontMatterOffered(bookId: String) = mutateCatalog { catalog ->
+        if (bookId in catalog.frontMatterOfferedBookIds) {
+            catalog
+        } else {
+            catalog.copy(frontMatterOfferedBookIds = catalog.frontMatterOfferedBookIds + bookId)
+        }
+    }
+
+    /** Fire-and-forget [markFrontMatterOffered], for the reader's callbacks. */
+    fun requestMarkFrontMatterOffered(bookId: String): Job = scope.launch { markFrontMatterOffered(bookId) }
+
     /** The retained position for a book, including one that was removed and re-added. */
     fun readingState(bookId: String): ReadingState? = _catalog.value.readingStates[bookId]
 

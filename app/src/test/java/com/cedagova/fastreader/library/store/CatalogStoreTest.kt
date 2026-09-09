@@ -413,6 +413,78 @@ class CatalogStoreTest {
     }
 
     /**
+     * REQ-201's update half and REQ-208's, as one migration test: the shipped
+     * v1.1.0 document is schema 4, and a reader who installs v1.2.0 over it has to
+     * find the chapter pause **on** — the behaviour they already had — with the
+     * rest of the library and every other setting exactly where they were.
+     */
+    @Test
+    fun `a version 4 document keeps everything and reads the chapter pause on`() {
+        val v4 = """
+            {"schemaVersion":4,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9}},
+             "lastReadBookId":"sha256:abc",
+             "removedBookIds":["sha256:gone"],
+             "settings":{"theme":"DARK","fontSize":"LARGE","highlightEnabled":false,
+                         "focusAlignmentEnabled":true,"pivotColor":"CRIMSON",
+                         "guideMarksEnabled":false,"pauseStrength":"SUBTLE"}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v4) as CatalogDecoding.Decoded
+
+        assertEquals(4, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+
+        val settings = decoded.catalog.settings
+        assertTrue("an updating reader keeps v1's chapter pause", settings.chapterPauseEnabled)
+
+        // Nothing else moved.
+        assertEquals(listOf("The Long Signal"), decoded.catalog.books.map { it.title })
+        assertEquals("sha256:abc", decoded.catalog.lastReadBookId)
+        assertEquals(setOf("sha256:gone"), decoded.catalog.removedBookIds)
+        assertEquals(77, decoded.catalog.readingStates.getValue("sha256:abc").tokenIndex)
+        assertEquals(400, decoded.catalog.readingStates.getValue("sha256:abc").wpm)
+        assertEquals(ThemeChoice.DARK, settings.theme)
+        assertEquals(FontSize.LARGE, settings.fontSize)
+        assertFalse(settings.highlightEnabled)
+        assertTrue(settings.focusAlignmentEnabled)
+        assertEquals(PivotColor.CRIMSON, settings.pivotColor)
+        assertFalse(settings.guideMarksEnabled)
+        assertEquals(PauseStrength.SUBTLE, settings.pauseStrength)
+        // No book has been offered the front-matter skip: the documented default
+        // for a library that predates the offer.
+        assertTrue(decoded.catalog.frontMatterOfferedBookIds.isEmpty())
+    }
+
+    /**
+     * The step is total. A document with no settings block at all still migrates,
+     * and the chapter pause reads back on from the type's own default rather than
+     * from a key the step had to invent.
+     */
+    @Test
+    fun `a version 4 document with no settings block still reads the chapter pause on`() {
+        val v4 = """{"schemaVersion":4,"books":[],"folders":[],"readingStates":{}}"""
+
+        val decoded = CatalogCodec().decode(v4) as CatalogDecoding.Decoded
+
+        assertTrue(decoded.catalog.settings.chapterPauseEnabled)
+    }
+
+    /** REQ-202's durable half: which books have already been offered survives a round trip. */
+    @Test
+    fun `the front-matter offer record round trips through the store`() {
+        val store = FileCatalogStore(file)
+        store.save(Catalog(frontMatterOfferedBookIds = setOf("sha256:abc", "sha256:def")))
+
+        val loaded = (store.load() as CatalogLoad.Loaded).catalog
+        assertEquals(setOf("sha256:abc", "sha256:def"), loaded.frontMatterOfferedBookIds)
+    }
+
+    /**
      * The downgrade guard is unchanged by the bump: a document from a newer schema
      * is refused rather than rewritten, so an older build cannot cost a reader
      * their library.

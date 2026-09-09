@@ -100,6 +100,11 @@
     <string name="reader_external_add">Add to library</string>
     <string name="reader_external_dismiss">Dismiss</string>
 
+    <!-- REQ-202: the one-time offer to start past a book's cover and title pages -->
+    <string name="reader_front_matter_notice">This book starts with cover and title pages.</string>
+    <string name="reader_front_matter_skip">Skip to %1$s</string>
+    <string name="reader_front_matter_stay">Start at the beginning</string>
+
     <string name="library_resume_blocked_title">Could not go back to %1$s</string>
     <string name="library_resume_blocked_missing">Its file was moved or deleted. Your place is kept in case it comes back.</string>
     <string name="library_resume_blocked_permission_lost">Access to its folder was revoked. Grant access again to carry on reading.</string>
@@ -184,6 +189,11 @@
     <string name="settings_pause_subtle">Subtle</string>
     <string name="settings_pause_normal">Normal</string>
     <string name="settings_pause_strong">Strong</string>
+
+    <!-- REQ-201: the chapter-boundary pause, now a choice (D4) -->
+    <string name="settings_section_chapters">Chapters</string>
+    <string name="settings_chapter_pause">Pause at chapters</string>
+    <string name="settings_chapter_pause_summary">Stops the stream on the first word of each new chapter and names it. Turn off to read straight through.</string>
 
     <string name="settings_on">On</string>
     <string name="settings_off">Off</string>

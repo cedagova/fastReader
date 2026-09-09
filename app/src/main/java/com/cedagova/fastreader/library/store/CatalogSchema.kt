@@ -29,8 +29,14 @@ object CatalogSchema {
      *   `highlightEnabled` (the coloured letter, carried forward from the old
      *   flag) and `focusAlignmentEnabled` (the off-centre alignment, now opt-in
      *   and written as `false`).
+     * - **5** — issue #51: the chapter-boundary pause becomes a setting
+     *   (`chapterPauseEnabled`, written as `true` so an updating reader keeps v1
+     *   behaviour), and the catalog remembers which books have already been
+     *   offered the one-time front-matter skip (`frontMatterOfferedBookIds`,
+     *   absent meaning none). The first of increment 002's three steps; issue #52
+     *   takes 6 and issue #62 takes 7 (AD-16).
      */
-    const val CURRENT_VERSION: Int = 4
+    const val CURRENT_VERSION: Int = 5
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -41,6 +47,7 @@ object CatalogSchema {
         1 to ReadingStateV2Migration,
         2 to SettingsV3Migration,
         3 to CueSplitV4Migration,
+        4 to ChapterPauseV5Migration,
     )
 }
 

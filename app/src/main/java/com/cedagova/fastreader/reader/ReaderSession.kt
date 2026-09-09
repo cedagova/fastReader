@@ -46,6 +46,17 @@ data class ReaderSession(
     val mode: ReaderMode = ReaderMode.PAUSED,
     val settings: TimingSettings = TimingSettings(),
     val timing: TimingState = TimingState.AT_PLAYBACK_START,
+    /**
+     * Whether crossing into a new chapter ends the run (REQ-201, D4). On by
+     * default, which is v1's mandatory behaviour exactly.
+     *
+     * It sits here and not in [TimingSettings] because it is not a duration:
+     * every other reading setting scales how long a word is shown, and this one
+     * decides whether [advance] stops at all. Keeping them apart is what lets a
+     * reader turn every pause off and still be stopped at a chapter, or read
+     * straight through the chapters with the sentence pauses intact.
+     */
+    val chapterPauseEnabled: Boolean = true,
 ) {
 
     init {
@@ -93,7 +104,15 @@ data class ReaderSession(
      *
      * Two things end a run: the last token of the book (REQ-018's explicit end
      * state) and crossing into a new chapter (REQ-015's auto-pause on a titled
-     * screen). Both leave [index] on the token the reader should see.
+     * screen, now [chapterPauseEnabled] under REQ-201). Both leave [index] on the
+     * token the reader should see.
+     *
+     * With the chapter pause off, a boundary is not a special token at all: the
+     * stream steps across it exactly as it steps between two words of one
+     * paragraph, with no stop, no titled screen and no re-orientation hold. The
+     * hold would be a hesitation the reader did not ask for — turning the setting
+     * off says "do not interrupt me at chapters", and a slower next word is a
+     * smaller interruption of the same kind rather than a different thing.
      */
     fun advance(): ReaderSession {
         val shown = currentDurationMillis
@@ -101,7 +120,7 @@ data class ReaderSession(
         if (next > content.tokens.lastIndex) {
             return copy(mode = ReaderMode.FINISHED)
         }
-        if (content.tokens[next].chapterIndex != currentToken.chapterIndex) {
+        if (chapterPauseEnabled && content.tokens[next].chapterIndex != currentToken.chapterIndex) {
             // The new chapter's first word is on screen but held: play() resumes
             // from it with the re-orientation hold a fresh chapter deserves. The
             // token that ended the previous chapter still counts towards the ramp
@@ -176,6 +195,21 @@ data class ReaderSession(
      */
     fun withPauseStrength(pauseStrength: PauseStrength): ReaderSession =
         copy(settings = settings.copy(pauseStrength = pauseStrength))
+
+    /**
+     * Turns the chapter-boundary stop on or off mid-book (REQ-201).
+     *
+     * Like [withPauseStrength] this only replaces a setting: the reader is not
+     * moved and a running stream is not stopped, so the change takes effect at
+     * the very next boundary the stream reaches.
+     *
+     * Turning the pause *on* while the reader is already held at a chapter does
+     * not un-hold them, and turning it *off* there does not start playing — a
+     * setting is not a play command, and the reader is looking at a titled screen
+     * they can leave with the control they already know.
+     */
+    fun withChapterPause(enabled: Boolean): ReaderSession =
+        if (enabled == chapterPauseEnabled) this else copy(chapterPauseEnabled = enabled)
 
     /** The token run [index] belongs to, as `start..end` inclusive — the paused context view. */
     fun runBounds(ordinal: (Token) -> Int): IntRange {

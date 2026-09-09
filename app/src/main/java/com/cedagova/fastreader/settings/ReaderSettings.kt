@@ -25,7 +25,7 @@ import kotlinx.serialization.Serializable
  *
  * The definition rules out a free-form theme engine, so every choice here is an
  * enum or a boolean over a small fixed set: three themes, four font sizes, five
- * highlight colours, four pause strengths, three toggles. There is deliberately no
+ * highlight colours, four pause strengths, four toggles. There is deliberately no
  * stored colour value, no stored point size, and no per-multiplier timing panel.
  *
  * ## Why the cue fields are flat rather than a nested [CueSettings]
@@ -68,6 +68,22 @@ data class ReaderSettings(
      * paragraph boundaries (REQ-011). `OFF` makes every word uniform.
      */
     val pauseStrength: PauseStrength = PauseStrength.NORMAL,
+    /**
+     * Stop the stream on the first word of every new chapter (REQ-201). **On by
+     * default**, which is exactly v1's behaviour: increment 003's REQ-015 made
+     * that stop mandatory, and decision D4 turns it into a choice without
+     * changing what an existing reader gets.
+     *
+     * It is not a [pauseStrength] value. Pause strength stretches a word's
+     * *duration* and is a timing input; this ends a run outright and is a
+     * [com.cedagova.fastreader.reader.ReaderSession] transition. Folding the two
+     * together would make "no pauses at all" silently mean "never stop at a
+     * chapter", which is two different readers' preferences on one control.
+     *
+     * A document written before schema 5 reads this back as `true` — see
+     * [com.cedagova.fastreader.library.store.ChapterPauseV5Migration].
+     */
+    val chapterPauseEnabled: Boolean = true,
 ) {
 
     /**

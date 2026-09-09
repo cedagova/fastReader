@@ -47,6 +47,28 @@ internal object TocReader {
         return titles
     }
 
+    /**
+     * The zip path an EPUB 3 `landmarks` list names as the start of the body
+     * text, or null when the book declares none (REQ-202).
+     *
+     * `<a epub:type="bodymatter" href="chapter1.xhtml"/>` is the book itself
+     * saying where its front matter ends, which is the strongest evidence
+     * [FrontMatterDetector] can have. Any anchor carrying that token is accepted
+     * rather than only one nested inside `<nav epub:type="landmarks">`: the token
+     * appears nowhere else in a navigation document, and requiring the wrapper
+     * would lose the books that spell the nav element loosely — the same
+     * leniency the rest of this file is built on.
+     */
+    fun readBodyMatterLandmark(navPath: String, markup: String): String? {
+        for (event in MarkupScanner.scan(markup)) {
+            if (event !is MarkupEvent.Open || event.name != "a") continue
+            if (!event.hasToken("epub:type", "bodymatter")) continue
+            val href = event.attribute("href")?.takeIf { it.isNotBlank() } ?: continue
+            EpubPaths.resolve(navPath, href)?.let { return it }
+        }
+        return null
+    }
+
     /** The same map, from an EPUB 2 NCX `navMap`. */
     fun readNcx(ncxPath: String, markup: String): Map<String, String> {
         val titles = LinkedHashMap<String, String>()

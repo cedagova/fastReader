@@ -175,6 +175,14 @@ fun ReaderScreen(
     externalNotice: Boolean = false,
     onAddToLibrary: () -> Unit = {},
     onDismissExternalNotice: () -> Unit = {},
+    /**
+     * REQ-202: this book opens on front matter and has not been offered the skip
+     * before, so the screen offers it once. The title is the chapter the skip
+     * lands in; null means no offer.
+     */
+    frontMatterOffer: String? = null,
+    onSkipFrontMatter: () -> Unit = {},
+    onDismissFrontMatterOffer: () -> Unit = {},
     word: @Composable (ReaderWord, Modifier) -> Unit = { token, wordModifier ->
         CueWord(token, cues, wordModifier)
     },
@@ -243,6 +251,13 @@ fun ReaderScreen(
                             ExternalOpenNotice(
                                 onAddToLibrary = onAddToLibrary,
                                 onDismiss = onDismissExternalNotice,
+                            )
+                        }
+                        frontMatterOffer?.let { chapterTitle ->
+                            FrontMatterOfferNotice(
+                                chapterTitle = chapterTitle,
+                                onSkip = onSkipFrontMatter,
+                                onDismiss = onDismissFrontMatterOffer,
                             )
                         }
                     }
@@ -364,6 +379,61 @@ private fun ExternalOpenNotice(onAddToLibrary: () -> Unit, onDismiss: () -> Unit
                         .testTag("reader_external_dismiss"),
                 ) {
                     Text(text = stringResource(R.string.reader_external_dismiss))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * REQ-202: the one-time offer to start past a book's cover and title pages.
+ *
+ * A banner in the same slot and the same shape as [ExternalOpenNotice], and for
+ * the same reasons: it must not stop anyone reading, it must not sit inside the
+ * reading surface where it would change the stream's fixed size or static
+ * background (REQ-062, REQ-302, AD-6), and it goes with the chrome in focused
+ * mode.
+ *
+ * Both buttons answer the question, which is why the second one says what it
+ * does rather than "Dismiss": staying on the cover is a choice about where to
+ * start reading, not the closing of a message. Either way the offer is recorded
+ * as made and this book never shows it again.
+ *
+ * ## Accessibility (REQ-301)
+ *
+ * The sentence above the buttons names the chapter the skip goes to, so the
+ * spoken label of the skip button carries the destination too — "Skip to Chapter
+ * One" tells a reader who cannot see the sentence what the tap will do. Both
+ * buttons clear [TouchTarget].
+ */
+@Composable
+private fun FrontMatterOfferNotice(chapterTitle: String, onSkip: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth().testTag("reader_front_matter_offer"),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                text = stringResource(R.string.reader_front_matter_notice),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = onSkip,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_front_matter_skip"),
+                ) {
+                    Text(text = stringResource(R.string.reader_front_matter_skip, chapterTitle))
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_front_matter_stay"),
+                ) {
+                    Text(text = stringResource(R.string.reader_front_matter_stay))
                 }
             }
         }
