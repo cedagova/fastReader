@@ -1,0 +1,6 @@
+illustrated-419mb-published-v1.1.0-cold (cold cache): runs=5 median=0.147 min=0.142 max=0.293
+  run 1: 0.293
+  run 2: 0.146
+  run 3: 0.147
+  run 4: 0.147
+  run 5: 0.142

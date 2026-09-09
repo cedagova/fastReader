@@ -96,7 +96,9 @@ statistically, is the mechanism: `ReaderOpenCostTest` and
 `ContentPipelineDeviceTest.imageEntriesAreNeverReadOnDevice`.
 
 Re-running this against the **published** v1.1.0 asset, as the issue's
-acceptance asks, is part of the post-merge publish.
+acceptance asks, was part of the post-merge publish and is now recorded in
+[`published/README.md`](published/README.md): medians 0.147 s and 0.150 s,
+2 % apart, neither slower than its v1.0.1 recording.
 
 ## Release-script gates that did run
 
@@ -112,6 +114,9 @@ artifact gates:
 - `minSdkVersion` 26 (REQ-040);
 - `versionCode=3` / `versionName=1.1.0` match `version.properties`.
 
-Still to run at publish time: the clean-tree/tag-target gate, the
-"tag does not already exist" gate, the highest-published-version ordering gate,
-and the unauthenticated `curl` re-download of the uploaded asset.
+The four publish-only gates — clean-tree/tag-target, "tag does not already
+exist", highest-published-version ordering, and the unauthenticated `curl`
+re-download of the uploaded asset — ran at publish time on
+`63bd366d90a2c0790f9e3e95c39808f74e020668` and all passed. See
+[`published/README.md`](published/README.md), which also repeats the update
+proof against the **published** v1.1.0 asset rather than a local build.

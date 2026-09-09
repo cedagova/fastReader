@@ -1,0 +1,6 @@
+stripped-38kb-published-v1.1.0-cold (cold cache): runs=5 median=0.150 min=0.143 max=0.293
+  run 1: 0.293
+  run 2: 0.152
+  run 3: 0.150
+  run 4: 0.149
+  run 5: 0.143

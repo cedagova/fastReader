@@ -1,0 +1,15 @@
+=== BEFORE (published v1.0.1) ===
+    codePath=/data/app/~~VTdSnLuMLBENhN0HTqs8Cg==/com.cedagova.fastreader-zx_QwzjPpeSy0rcX0CzHPg==
+    versionCode=2 minSdk=26 targetSdk=36
+    versionName=1.0.1
+    lastUpdateTime=2026-09-09 12:45:09
+    signatures=PackageSignatures{c0ec57 version:3, signatures:[5b76aa38], past signatures:[]}
+      firstInstallTime=2026-09-09 12:45:09
+
+=== AFTER (published v1.1.0, adb install -r, no -d, no data clear) ===
+    codePath=/data/app/~~TyMlOFsKUZSNI3-IU_bhIg==/com.cedagova.fastreader-_PcyCjtwyx6kM5FpkCuH0w==
+    versionCode=3 minSdk=26 targetSdk=36
+    versionName=1.1.0
+    lastUpdateTime=2026-09-09 12:49:50
+    signatures=PackageSignatures{c0ec57 version:3, signatures:[5b76aa38], past signatures:[]}
+      firstInstallTime=2026-09-09 12:45:09

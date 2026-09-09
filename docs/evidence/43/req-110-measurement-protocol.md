@@ -124,9 +124,12 @@ removed, 38 kB.
 | published v1.0.1 | 0.155 | 0.161 | 4 % |
 | this branch (release) | 0.154 | 0.154 | 0 % |
 | v1.1.0 release APK (#49) | 0.153 | 0.148 | 3 % |
+| published v1.1.0 asset (#49, post-merge) | 0.147 | 0.150 | 2 % |
 
-The last row was measured by #49 on the v1.1.0 release APK, same device and
-same 5 cold runs per cell; see [../49/README.md](../49/README.md).
+The last two rows were measured by #49 on the v1.1.0 release APK and then, after
+the merge, on the artifact actually published to GitHub Releases; same device and
+same 5 cold runs per cell. See [../49/README.md](../49/README.md) and
+[../49/published/README.md](../49/published/README.md).
 
 Read against the acceptance, this build passes both clauses on this pair: the
 two books are 0 % apart (limit 25 %), and neither is slower than its own v1.0.1
