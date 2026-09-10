@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,6 +42,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -65,6 +68,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -72,7 +76,15 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -1223,6 +1235,8 @@ private fun PauseGlyph(color: Color) {
 private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Unit) {
     val label = stringResource(R.string.reader_speed_label)
     val speed = stringResource(R.string.reader_speed, state.wpm)
+    val editSpeed = stringResource(R.string.reader_speed_edit)
+    var editing by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1240,13 +1254,76 @@ private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Uni
                 },
         )
         Spacer(Modifier.width(12.dp))
-        Text(
-            text = speed,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.clearAndSetSemantics {},
-        )
+        if (editing) {
+            SpeedEntry(
+                wpm = state.wpm,
+                onDone = { typed ->
+                    editing = false
+                    typed?.let(onWpmChange)
+                },
+            )
+        } else {
+            Text(
+                text = speed,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .clickable(role = Role.Button, onClick = { editing = true })
+                    .testTag("reader_speed_readout")
+                    .clearAndSetSemantics { contentDescription = editSpeed },
+            )
+        }
     }
 }
+
+/**
+ * The slider lands on 25 WPM steps; the readout it sits beside is the way off
+ * the grid. Pressed, it becomes this field, which hands back any whole number in
+ * [RsvpTiming.MIN_WPM]..[RsvpTiming.MAX_WPM] exactly as typed. Done commits, and
+ * the field commits or reverts on its own when focus leaves it or the keyboard
+ * is dismissed, so there is no second control to reach for.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SpeedEntry(wpm: Int, onDone: (Int?) -> Unit) {
+    var text by remember { mutableStateOf(wpm.toString()) }
+    val parsed = text.toIntOrNull()?.takeIf { it in RsvpTiming.MIN_WPM..RsvpTiming.MAX_WPM }
+    val focusRequester = remember { FocusRequester() }
+    var hadFocus by remember { mutableStateOf(false) }
+    var finished by remember { mutableStateOf(false) }
+    val finish = { value: Int? ->
+        if (!finished) {
+            finished = true
+            onDone(value)
+        }
+    }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it.filter(Char::isDigit).take(4) },
+        isError = parsed == null,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.labelLarge,
+        suffix = { Text(stringResource(R.string.reader_speed_unit)) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { parsed?.let(finish) }),
+        modifier = Modifier
+            .width(SpeedEntryWidth)
+            .focusRequester(focusRequester)
+            .onFocusChanged { focus ->
+                if (focus.isFocused) hadFocus = true else if (hadFocus) finish(parsed)
+            }
+            .testTag("reader_speed_entry"),
+    )
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Back, or the keyboard's own dismiss, hides the IME without moving focus; the
+    // field must not sit there editing over a keyboard that is gone.
+    val imeVisible = WindowInsets.isImeVisible
+    var imeWasVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(imeVisible) {
+        if (imeVisible) imeWasVisible = true else if (imeWasVisible) finish(parsed)
+    }
+}
+
+private val SpeedEntryWidth = 132.dp
 
 @Composable
 private fun ChapterPicker(

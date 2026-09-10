@@ -115,6 +115,8 @@
 
     <string name="reader_speed_label">Velocidad de lectura</string>
     <string name="reader_speed">%1$d ppm</string>
+    <string name="reader_speed_edit">Escribir una velocidad de lectura</string>
+    <string name="reader_speed_unit">ppm</string>
 
     <string name="reader_context_continues">…</string>
 

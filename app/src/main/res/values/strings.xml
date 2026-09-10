@@ -87,6 +87,8 @@
 
     <string name="reader_speed_label">Reading speed</string>
     <string name="reader_speed">%1$d WPM</string>
+    <string name="reader_speed_edit">Type a reading speed</string>
+    <string name="reader_speed_unit">WPM</string>
 
     <string name="reader_context_continues">…</string>
 
