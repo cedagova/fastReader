@@ -1,0 +1,88 @@
+{
+    "schemaVersion": 7,
+    "books": [
+        {
+            "id": "sha256:512cd179c2a4887d0a61117321a9ea8812dc2386248367e789f2bb720c1506ef",
+            "title": "The Lighthouse Keeper",
+            "author": "Increment Two",
+            "language": "en",
+            "publicationId": "urn:uuid:rel120-lighthouse",
+            "hasCover": false,
+            "contentStatus": "READABLE",
+            "rejectReason": null,
+            "rejectDetail": null,
+            "sources": [
+                {
+                    "uri": "content://com.android.externalstorage.documents/tree/primary%3ADownload%2Frel120/document/primary%3ADownload%2Frel120%2Flighthouse-keeper.epub",
+                    "origin": "FOLDER",
+                    "displayName": "lighthouse-keeper.epub",
+                    "folderId": "content://com.android.externalstorage.documents/tree/primary%3ADownload%2Frel120",
+                    "sizeBytes": 3652,
+                    "lastModifiedEpochMs": 1789056513000,
+                    "availability": "AVAILABLE"
+                }
+            ],
+            "addedAtEpochMs": 1789056634994,
+            "lastSeenEpochMs": 1789056946871
+        },
+        {
+            "id": "sha256:1cc42f763921bade1f91a481e116590b10a5862452c45aeb8eb094c2f8388ad9",
+            "title": "A Second Book",
+            "author": "Increment Two",
+            "language": "en",
+            "publicationId": "urn:uuid:rel120-second",
+            "hasCover": false,
+            "contentStatus": "READABLE",
+            "rejectReason": null,
+            "rejectDetail": null,
+            "sources": [
+                {
+                    "uri": "content://com.android.externalstorage.documents/tree/primary%3ADownload%2Frel120/document/primary%3ADownload%2Frel120%2Fa-second-book.epub",
+                    "origin": "FOLDER",
+                    "displayName": "a-second-book.epub",
+                    "folderId": "content://com.android.externalstorage.documents/tree/primary%3ADownload%2Frel120",
+                    "sizeBytes": 2788,
+                    "lastModifiedEpochMs": 1789056513000,
+                    "availability": "AVAILABLE"
+                }
+            ],
+            "addedAtEpochMs": 1789056634994,
+            "lastSeenEpochMs": 1789056946871
+        }
+    ],
+    "folders": [
+        {
+            "id": "content://com.android.externalstorage.documents/tree/primary%3ADownload%2Frel120",
+            "treeUri": "content://com.android.externalstorage.documents/tree/primary%3ADownload%2Frel120",
+            "displayName": "rel120",
+            "status": "AVAILABLE",
+            "addedAtEpochMs": 1789056634994,
+            "lastScannedEpochMs": 1789056946871
+        }
+    ],
+    "readingStates": {
+        "sha256:512cd179c2a4887d0a61117321a9ea8812dc2386248367e789f2bb720c1506ef": {
+            "bookDigest": "sha256:512cd179c2a4887d0a61117321a9ea8812dc2386248367e789f2bb720c1506ef",
+            "tokenIndex": 88,
+            "pipelineVersion": 1,
+            "structuralFingerprint": "zipdir1:f3877e9672ed07437194ce52dc7146035004a703006cddb52015871045ab5713",
+            "progressFraction": 0.67424244,
+            "wpm": 250,
+            "updatedAtEpochMs": 1789056946987
+        }
+    },
+    "removedBookIds": [],
+    "lastReadBookId": "sha256:512cd179c2a4887d0a61117321a9ea8812dc2386248367e789f2bb720c1506ef",
+    "settings": {
+        "theme": "DARK",
+        "fontSize": "LARGE",
+        "highlightEnabled": true,
+        "focusAlignmentEnabled": true,
+        "pivotColor": "VIOLET",
+        "guideMarksEnabled": true,
+        "pauseStrength": "STRONG",
+        "chapterPauseEnabled": true,
+        "libraryOrder": "RECENTLY_READ"
+    },
+    "frontMatterOfferedBookIds": []
+}

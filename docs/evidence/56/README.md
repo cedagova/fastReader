@@ -85,3 +85,8 @@ tag target, tag does not exist, highest published version, and the
 unauthenticated re-download of the uploaded asset — did not run, and the
 "version equals the tag" comparison has nothing to compare against. The PR
 lists these line by line.
+
+**All of that ran after the merge**, from the `main` merge commit
+`bc1388f638246b81eaec54615b69b8eb99e1a400`, and the whole update proof was
+re-run with the **published** v1.2.0 asset on the after side:
+[`published/README.md`](published/README.md).
