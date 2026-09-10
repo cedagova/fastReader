@@ -350,6 +350,7 @@ internal class CatalogPositions(private val repository: LibraryRepository) : Rea
             position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
             progressFraction = stored.progressFraction,
             wpm = stored.wpm,
+            structuralFingerprint = stored.structuralFingerprint,
         )
     }
 
@@ -367,6 +368,9 @@ internal class CatalogPositions(private val repository: LibraryRepository) : Rea
                 pipelineVersion = position.position.pipelineVersion,
                 progressFraction = position.progressFraction,
                 wpm = position.wpm,
+                // Null when this open read no central directory. The store keeps
+                // whatever it already holds rather than clearing it (AD-18).
+                structuralFingerprint = position.structuralFingerprint,
             ),
         )
     }

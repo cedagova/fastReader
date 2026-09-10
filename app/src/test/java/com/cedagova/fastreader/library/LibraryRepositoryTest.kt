@@ -131,6 +131,65 @@ class LibraryRepositoryTest {
         assertEquals(digest, repository.catalog.value.lastReadBookId)
     }
 
+    // --- The write-path rule for the content-change guard (#62, AD-18) ---
+
+    /**
+     * The one failure mode that would disarm the guard silently.
+     *
+     * A book opened through the streaming archive produces no fingerprint, so the
+     * position it stores carries a null. Writing that null over a fingerprint
+     * already recorded would leave the book unprotected for good, with nothing
+     * anywhere reporting it. So a null keeps what is stored.
+     */
+    @Test
+    fun `a position stored with no fingerprint leaves the recorded one alone`() = runTest {
+        val repository = repository(scope = backgroundScope)
+        val digest = "sha256:abc"
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 100, structuralFingerprint = "zipdir1:feed"),
+        )
+
+        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 200))
+
+        assertEquals(200, repository.readingState(digest)?.tokenIndex)
+        assertEquals("zipdir1:feed", repository.readingState(digest)?.structuralFingerprint)
+    }
+
+    /** A real fingerprint does replace one: reopening a changed file re-arms the guard. */
+    @Test
+    fun `a position stored with a fingerprint replaces the recorded one`() = runTest {
+        val repository = repository(scope = backgroundScope)
+        val digest = "sha256:abc"
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 100, structuralFingerprint = "zipdir1:feed"),
+        )
+
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 0, structuralFingerprint = "zipdir1:beef"),
+        )
+
+        assertEquals("zipdir1:beef", repository.readingState(digest)?.structuralFingerprint)
+    }
+
+    /** The first directory open after the migration is what arms it. */
+    @Test
+    fun `a book with no recorded fingerprint gains one from the next open that has it`() = runTest {
+        val repository = repository(scope = backgroundScope)
+        val digest = "sha256:abc"
+        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 100))
+        assertNull(repository.readingState(digest)?.structuralFingerprint)
+
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 140, structuralFingerprint = "zipdir1:feed"),
+        )
+
+        assertEquals("zipdir1:feed", repository.readingState(digest)?.structuralFingerprint)
+    }
+
     // REQ-002: both the open-rescan and the manual refresh find a newly copied book.
     @Test
     fun `manual refresh finds a new book that the debounced app-open scan skipped`() = runTest {
