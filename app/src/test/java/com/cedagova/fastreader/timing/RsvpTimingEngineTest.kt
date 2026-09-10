@@ -173,6 +173,31 @@ class RsvpTimingEngineTest {
         assertEquals(840L, marker)
     }
 
+    // --- #81: the dial names the average ---------------------------------------
+
+    @Test
+    fun theMeanMultiplierDividesThePlainWordAndEverythingBuiltOnIt() {
+        val normalized = steady.copy(meanMultiplier = 1.2)
+
+        // 240 / 1.2: the plain word is faster than the dial by exactly the book's
+        // mean, and every pause is still a multiple of that plain word.
+        assertEquals(200L, RsvpTimingEngine.plainWordMillis(normalized, running))
+        assertEquals(200L, RsvpTimingEngine.durationMillis(word(), normalized, running))
+        assertEquals(3 * 200L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE), normalized, running))
+        assertEquals(3 * 200L, RsvpTimingEngine.durationMillis(word(), normalized, TimingState(60_000L, true)))
+    }
+
+    @Test
+    fun aMeanBelowOneOrNotANumberReadsAsNoCorrection() {
+        // Every multiplier the engine produces is at least one, so a mean below
+        // one cannot come from a measurement; it is a bug upstream, and the safe
+        // reading is "unmeasured".
+        for (bad in listOf(0.0, 0.5, -3.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertEquals("mean=$bad", 240L, RsvpTimingEngine.plainWordMillis(steady.copy(meanMultiplier = bad), running))
+        }
+        assertEquals(1.0, TimingSettings().effectiveMeanMultiplier, 0.0)
+    }
+
     // --- REQ-012: speed, range, and mid-stream change ------------------------
 
     @Test

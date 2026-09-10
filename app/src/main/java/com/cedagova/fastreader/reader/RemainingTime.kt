@@ -42,12 +42,32 @@ class RemainingTimeIndex private constructor(
 ) {
 
     /**
+     * The book's mean multiplier at [pauseStrength] — `suffix[0] / tokens` — which
+     * is [com.cedagova.fastreader.timing.TimingSettings.meanMultiplier] for this
+     * book (#81). The same sweep that answers "how long is left" answers "how much
+     * slower than the dial does this book run", so the reader gets both for one
+     * pass. `1.0` for an empty stream, and never below `1.0`: every multiplier the
+     * engine produces is at least one.
+     */
+    val meanMultiplier: Double = if (suffixMultipliers.size > 1) {
+        (suffixMultipliers[0] / (suffixMultipliers.size - 1)).coerceAtLeast(1.0)
+    } else {
+        1.0
+    }
+
+    /**
      * Milliseconds still to stream *after* the token at [tokenIndex] at [settings]'
      * speed. Pass `-1` for the whole book.
      *
      * Ramp-up and the re-orientation hold are excluded, matching
      * [RsvpTimingEngine.estimatedMillis]: an estimate for the rest of a book should
      * not lurch every time the reader jumps.
+     *
+     * The multipliers were measured un-normalized; [settings] carries the book's
+     * [TimingSettings.meanMultiplier], so its `targetWordMillis` is already divided
+     * by it and the whole book comes out at exactly `tokens × 60000 / wpm` (#81).
+     * Hand this index settings without the mean and it reports the old, additive
+     * figure — which is what the engine's own `estimatedMillis` does too.
      */
     fun millisAfter(tokenIndex: Int, settings: TimingSettings): Long {
         val from = (tokenIndex + 1).coerceIn(0, suffixMultipliers.size - 1)

@@ -45,6 +45,29 @@ class RemainingTimeTest {
         }
     }
 
+    /** #81: with the book's own mean in the settings, the dial is the average. */
+    @Test
+    fun `with the mean the whole book takes exactly tokens over wpm`() {
+        for (content in listOf(book, longBook)) {
+            for (strength in listOf(PauseStrength.SUBTLE, PauseStrength.NORMAL, PauseStrength.STRONG)) {
+                val index = RemainingTimeIndex.build(content, strength)
+                assertTrue("mean ${index.meanMultiplier}", index.meanMultiplier > 1.0)
+                for (wpm in listOf(100, 250, 1000)) {
+                    val settings = TimingSettings(wpm = wpm, pauseStrength = strength, meanMultiplier = index.meanMultiplier)
+                    val budget = content.totalTokens * 60_000.0 / wpm
+                    val whole = index.millisAfter(-1, settings)
+                    val error = abs(whole - budget) / budget
+                    assertTrue("$strength at $wpm WPM: $whole vs budget $budget (${error * 100}%)", error < 0.002)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `pause strength off measures a mean of exactly one`() {
+        assertEquals(1.0, RemainingTimeIndex.build(book, PauseStrength.OFF).meanMultiplier, 0.0)
+    }
+
     @Test
     fun `it agrees from the middle of a book too`() {
         val index = RemainingTimeIndex.build(book, PauseStrength.NORMAL)

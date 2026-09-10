@@ -18,7 +18,7 @@ import kotlin.math.roundToLong
  * ## The formula
  *
  * ```
- * word    = (60000 / wpm) / rampSpeedFraction      // one plain word, right now
+ * word    = (60000 / wpm / meanMultiplier) / rampSpeedFraction   // one plain word, right now
  * pause   = max(boundaryMultiplier, emphasisMultiplier)
  * hold    = 3.0 on the first token after a start/resume/jump, else 1.0
  * duration = word * hold  +  word * (pause - 1) * pauseStrength.extraPauseScale
@@ -31,6 +31,14 @@ import kotlin.math.roundToLong
  * split is what makes REQ-011's acceptance exact rather than approximate:
  * `PauseStrength.OFF` zeroes the second term, so every token in a book takes the
  * same time.
+ *
+ * `meanMultiplier` (#81) is the book's mean `pause` at the current strength,
+ * measured once by `RemainingTimeIndex` and carried in [TimingSettings]. Dividing
+ * the plain word by it makes the dial name the *average* speed of the book,
+ * pauses included: the pauses are redistributed inside a fixed budget of
+ * `tokens × 60000 / wpm` rather than added on top of it. The engine itself never
+ * sees the book; it only divides by the number it is handed, which is `1.0` for
+ * a stream nobody has measured.
  *
  * `max` rather than a product is deliberate. A twelve-letter word ending a
  * sentence holds for the sentence pause (3x), not 4.5x: LEAF201 already

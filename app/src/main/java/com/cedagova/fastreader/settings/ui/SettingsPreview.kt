@@ -148,14 +148,22 @@ private fun rhythmLabel(timing: TimingSettings): String {
     }
 }
 
-private fun previewTiming(pauseStrength: PauseStrength) = TimingSettings(
-    wpm = RsvpTiming.DEFAULT_WPM,
-    pauseStrength = pauseStrength,
-    // The ramp is a property of settling into a book, not of a two-second loop:
-    // with it on, the preview would open 20% slow and the readout would describe
-    // a speed the loop is not running at.
-    rampEnabled = false,
-)
+private fun previewTiming(pauseStrength: PauseStrength): TimingSettings {
+    val raw = TimingSettings(
+        wpm = RsvpTiming.DEFAULT_WPM,
+        pauseStrength = pauseStrength,
+        // The ramp is a property of settling into a book, not of a two-second loop:
+        // with it on, the preview would open 20% slow and the readout would describe
+        // a speed the loop is not running at.
+        rampEnabled = false,
+    )
+    // The sample is normalized by its own mean, exactly as a book is by its
+    // index (#81), so the 250 WPM the readout states is the average speed of the
+    // loop, pauses included — the same thing the dial means in the reader.
+    val plain = RsvpTimingEngine.plainWordMillis(raw, STEADY).toDouble()
+    val mean = SAMPLE.sumOf { RsvpTimingEngine.durationMillis(it, raw, STEADY) } / plain / SAMPLE.size
+    return raw.copy(meanMultiplier = mean)
+}
 
 /** Warmed up and not re-orienting, so the preview shows steady-state rhythm. */
 private val STEADY = TimingState(

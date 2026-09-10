@@ -7,6 +7,7 @@ import com.cedagova.fastreader.reader.ui.ReaderUiState
 import com.cedagova.fastreader.timing.PauseStrength
 import com.cedagova.fastreader.timing.RsvpTimingEngine
 import com.cedagova.fastreader.timing.TimingSettings
+import com.cedagova.fastreader.timing.TimingState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,10 +30,12 @@ import org.junit.Test
  *
  * The interesting property is not that the engine honours the value — LEAF202
  * proved that — but that changing it mid-book moves both things that depend on
- * it. Displayed time remaining comes from the timing engine's estimate, and that
- * estimate includes pause time, so the remaining-time index is a function of pause
- * strength. A build that changed only the word durations would leave a reader who
- * turned pauses off looking at a time remaining that still counted every pause.
+ * it: the word durations and the book's mean multiplier, which the time-remaining
+ * index measures at the strength in force. Since #81 the dial names the average
+ * speed of the book, so changing the strength redistributes time between pauses
+ * and plain words *without changing how long the book takes*; a rebuild that
+ * updated the index but left the session's old mean in place would have the
+ * time remaining and the pacing describe two different books.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReaderPauseStrengthTest {
@@ -62,17 +65,32 @@ class ReaderPauseStrengthTest {
         assertTrue("pauses should add real time, got $plain then $normal", normal > plain * 1.1)
     }
 
+    /**
+     * #81: the strength moves the pauses around inside a fixed budget, not the
+     * budget. The reader sits on the first word, so what it is shown is the book
+     * *after* that word; adding the first word's own duration back gives the whole
+     * book, which must be `tokens × 60000 / wpm` at every strength. A rebuild that
+     * left the session's old mean in place would miss by the ratio of the means.
+     */
     @Test
-    fun `turning pauses off shortens the time remaining the reader is shown`() = runTest(dispatcher) {
+    fun `changing the strength keeps how long the book takes`() = runTest(dispatcher) {
         val reader = openedReader()
-        val withPauses = (reader.state.value as ReaderUiState.Reading).remainingMillis
+        val steady = TimingState(elapsedPlaybackMillis = 60_000L, reorientationPending = false)
+        val wpm = (reader.state.value as ReaderUiState.Reading).wpm
+        val budget = book.totalTokens * 60_000.0 / wpm
 
-        reader.setPauseStrength(PauseStrength.OFF)
-        advanceUntilIdle()
-
-        val withoutPauses = (reader.state.value as ReaderUiState.Reading).remainingMillis
-        assertNotEquals(withPauses, withoutPauses)
-        assertTrue("$withoutPauses should be well under $withPauses", withoutPauses < withPauses * 0.95)
+        for (strength in listOf(PauseStrength.NORMAL, PauseStrength.OFF, PauseStrength.STRONG, PauseStrength.SUBTLE)) {
+            reader.setPauseStrength(strength)
+            advanceUntilIdle()
+            val remaining = (reader.state.value as ReaderUiState.Reading).remainingMillis
+            val mean = RemainingTimeIndex.build(book, strength).meanMultiplier
+            val firstWord = RsvpTimingEngine.durationMillis(
+                book.tokens[0],
+                TimingSettings(wpm = wpm, pauseStrength = strength, rampEnabled = false, meanMultiplier = mean),
+                steady,
+            )
+            assertEquals("$strength (mean $mean)", budget, (remaining + firstWord).toDouble(), budget * 0.01)
+        }
     }
 
     /**
@@ -88,9 +106,12 @@ class ReaderPauseStrengthTest {
         advanceUntilIdle()
 
         val state = reader.state.value as ReaderUiState.Reading
+        // The mean must have travelled with the rebuild: an estimate at the new
+        // strength but the old mean would be off by the ratio of the two means.
+        val mean = RemainingTimeIndex.build(book, PauseStrength.STRONG).meanMultiplier
         val expected = RsvpTimingEngine.estimatedMillis(
             book.tokens.drop(1),
-            TimingSettings(pauseStrength = PauseStrength.STRONG, rampEnabled = false),
+            TimingSettings(pauseStrength = PauseStrength.STRONG, rampEnabled = false, meanMultiplier = mean),
         )
         // The index sums per-token multipliers rounded to whole milliseconds at a
         // reference speed, so it lands within a fraction of a percent rather than
@@ -145,9 +166,20 @@ class ReaderPauseStrengthTest {
         reader.openLibraryBook(ReaderFixtures.ENGLISH_NOVEL_ID)
         advanceUntilIdle()
 
-        val off = (reader.state.value as ReaderUiState.Reading).remainingMillis
-        val normal = openedReader().let { (it.state.value as ReaderUiState.Reading).remainingMillis }
-        assertTrue("$off should be under $normal", off < normal * 0.95)
+        // Time remaining no longer tells the strengths apart (#81), so the proof
+        // is the pacing itself: at OFF a sentence end is held like any plain word
+        // — three plain words, for the re-orientation hold, at the ramp's opening
+        // 300 ms — with a mean of exactly one; at NORMAL the same token carries
+        // its pause against the book's mean, and the two cannot coincide.
+        val sentenceEnd = book.tokens.first { it.boundary == Boundary.SENTENCE }.index
+        fun ReaderViewModel.durationAtSentenceEnd(): Long? {
+            scrubTo(sentenceEnd.toFloat() / book.tokens.lastIndex)
+            togglePlay()
+            advanceUntilIdle()
+            return currentDurationMillis
+        }
+        assertEquals(3 * 300L, reader.durationAtSentenceEnd())
+        assertNotEquals(3 * 300L, openedReader().durationAtSentenceEnd())
     }
 
     private fun TestScope.openedReader(): ReaderViewModel {

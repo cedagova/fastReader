@@ -6,6 +6,7 @@ import com.cedagova.fastreader.content.BookContentResult
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.WordToken
+import com.cedagova.fastreader.reader.RemainingTimeIndex
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -122,6 +123,34 @@ class TimingOverRealBookTest {
             book.tokens.sumOf { RsvpTimingEngine.durationMillis(it, settings, steady) },
             RsvpTimingEngine.estimatedMillis(book.tokens, settings),
         )
+    }
+
+    /**
+     * #81's budget identity on a real token stream: with the book's measured mean
+     * in the settings, the steady-state stream of the whole book takes exactly
+     * `tokens × 60000 / wpm`, at every strength and speed. The tolerance is 0.5%
+     * or one millisecond per token, whichever is larger, because each token's
+     * duration is rounded to a whole millisecond and at 1000 WPM that rounding is
+     * systematic rather than random.
+     */
+    @Test
+    fun `with the mean the book takes exactly tokens over wpm at every strength`() = runTest {
+        val book = parse(ContentFixtures.spanishNovel())
+        val steady = TimingState(elapsedPlaybackMillis = 60_000L, reorientationPending = false)
+
+        for (strength in listOf(PauseStrength.SUBTLE, PauseStrength.NORMAL, PauseStrength.STRONG)) {
+            val mean = RemainingTimeIndex.build(book, strength).meanMultiplier
+            for (wpm in listOf(100, 250, 1000)) {
+                val settings = TimingSettings(wpm = wpm, pauseStrength = strength, rampEnabled = false, meanMultiplier = mean)
+                val actual = book.tokens.sumOf { RsvpTimingEngine.durationMillis(it, settings, steady) }
+                val budget = book.totalTokens * 60_000.0 / wpm
+                val tolerance = maxOf(budget * 0.005, book.totalTokens.toDouble())
+                assertTrue(
+                    "$strength at $wpm WPM: ${actual}ms vs budget ${budget}ms (mean $mean)",
+                    kotlin.math.abs(actual - budget) <= tolerance,
+                )
+            }
+        }
     }
 
     @Test
