@@ -1,0 +1,27 @@
+dumpsys package com.cedagova.fastreader, Phone_Mid_API36, one session.
+The published v1.1.0 asset was installed first; the local release-signed
+v1.2.0 then went on with `adb install -r` -- no -d, no uninstall, no data clear.
+
+BEFORE -- published v1.1.0:
+  codePath=/data/app/~~JFjmcE0Q73Vo8oHERKFEUQ==/com.cedagova.fastreader-_mHLV38shEtVvYQaZcgeQw==
+  versionCode=3 minSdk=26 targetSdk=36
+  versionName=1.1.0
+  lastUpdateTime=2026-09-09 21:19:55
+  signatures=PackageSignatures{23af8cc version:3, signatures:[5b76aa38], past signatures:[]}
+  firstInstallTime=2026-09-09 21:19:55
+
+AFTER -- v1.2.0 installed in place:
+  codePath=/data/app/~~9rTuEp1gXDXyqZSLk8Vm4g==/com.cedagova.fastreader-ZaKr0cBZWKrAdyF0FkkZsA==
+  versionCode=4 minSdk=26 targetSdk=37
+  versionName=1.2.0
+  lastUpdateTime=2026-09-09 21:25:48
+  signatures=PackageSignatures{23af8cc version:3, signatures:[5b76aa38], past signatures:[]}
+  firstInstallTime=2026-09-09 21:19:55
+
+What this shows:
+  * firstInstallTime is unchanged -- this is an update, not a fresh install.
+  * lastUpdateTime moved and codePath is new -- the APK really was replaced.
+  * signatures is the same signer (5b76aa38) with no past signatures, so the
+    certificate is identical on both sides. That is what lets Android do this
+    at all, and it is the pinned d476be...485d that scripts/release.sh checks.
+  * versionCode 3 -> 4 and targetSdk 36 -> 37.

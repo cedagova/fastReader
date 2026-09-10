@@ -16,7 +16,7 @@ the v1.2.0 release APK.
 
 | Reading | Library | Settings |
 | --- | --- | --- |
-| ![The reader paused mid-sentence: one word large in the middle of the screen with its focus letter coloured, the sentence it came from underneath, chapter, progress and speed below](docs/screenshots/reader-phone-mid-api36.png) | ![The library listing two books with their authors and how far each one has been read](docs/screenshots/library-phone-mid-api36.png) | ![Settings on a fresh install: theme, text size, and the Cues section with Highlight letter on, Fixed focus letter off and Guide marks on](docs/screenshots/settings-phone-mid-api36.png) |
+| ![The reader paused mid-sentence: one word large in the middle of the screen with its focus letter coloured, the sentence it came from underneath, chapter, progress and speed below](docs/screenshots/reader-phone-mid-api36.png) | ![The library listing two books with their authors and how far each one has been read, under a Sort: Recently read button](docs/screenshots/library-phone-mid-api36.png) | ![Settings on a fresh install: theme, text size, and the Cues section with Highlight letter on, Fixed focus letter off and Guide marks on](docs/screenshots/settings-phone-mid-api36.png) |
 
 The first screen of a fresh install offers the two bundled sample texts, so you
 can see the stream before you go looking for a book:
