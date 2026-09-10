@@ -34,6 +34,24 @@ class ReaderPositionTest {
         assertFalse(stored.isApproximate(book))
     }
 
+    /**
+     * #81 annotated every word with a span and some with a breath class, and
+     * neither moves a stored position: the same words still produce the same
+     * token count in the same order with the same indices, so the pipeline
+     * version stays at 1 and a position stored before the change resolves
+     * exactly, not approximately. Bumping the version defensively would drop
+     * every reader to the fallback position for no reason.
+     */
+    @Test
+    fun `span and breath annotations do not move stored positions`() {
+        assertEquals(1, ContentPipelineVersion.CURRENT)
+        assertEquals(ContentPipelineVersion.CURRENT, book.pipelineVersion)
+        val storedBeforeTheChange = position(book.bookDigest, 24, pipelineVersion = 1)
+
+        assertEquals(24, storedBeforeTheChange.resolveIndex(book))
+        assertFalse(storedBeforeTheChange.isApproximate(book))
+    }
+
     @Test
     fun `an index past the end of a shortened book is clamped, not thrown`() {
         val stored = position(book.bookDigest, 10_000_000, book.pipelineVersion)
