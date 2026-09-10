@@ -85,10 +85,10 @@ internal object FrontMatterDetector {
      * judgement this app has no business making; a book that starts with one
      * simply gets no offer.
      *
-     * The Spanish entries are here because this app ships a Spanish sample and
-     * puts its whole interface in Spanish (D5) — a Spanish EPUB is an ordinary
-     * case, not an exotic one — and because each of these is as unambiguous in
-     * Spanish as its English counterpart.
+     * The Spanish entries are here because this app puts its whole interface in
+     * Spanish (D5) — a Spanish EPUB is an ordinary case, not an exotic one — and
+     * because each of these is as unambiguous in Spanish as its English
+     * counterpart.
      */
     private val TITLES: Set<String> = setOf(
         // English

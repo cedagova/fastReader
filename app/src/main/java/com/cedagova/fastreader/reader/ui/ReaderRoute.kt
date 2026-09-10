@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -26,8 +25,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.content.BundledSample
-import com.cedagova.fastreader.content.SampleBookSource
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.external.ExternalOpen
@@ -65,17 +62,12 @@ fun ReaderRoute(
      * The catalog book turned out not to be openable. Reported, not acted on:
      * whether a dead reader is the right screen depends on how the reader got
      * here, and only the caller knows that (LEAF204).
-     *
-     * Never called for a sample. A sample is inside the APK, so it is not a book
-     * whose access can be revoked or whose file can move, and there is no catalog
-     * row for the library to name if it somehow fails.
      */
     onCannotOpen: (String) -> Unit = {},
     /** Opens the settings screen (LEAF302), so cues can be changed while reading. */
     onOpenSettings: () -> Unit = {},
 ) {
     val repository = graph.repository
-    val assets = LocalContext.current.applicationContext.assets
     // The stored settings drive the cue layer LEAF301 built and the timing engine
     // LEAF202 built. This is the whole of "live preview" outside the settings
     // screen: the reader is drawn from the same value the settings screen writes,
@@ -94,16 +86,9 @@ fun ReaderRoute(
     // position intact, and switching books drops the previous one — which is also
     // how an "Open with" arriving mid-book swaps the reader over without a second
     // process (REQ-103).
-    //
-    // The sample takes the general entry rather than a path of its own: the whole
-    // point of the open contract is that "a book inside the APK" is a request
-    // like any other, so nothing downstream of here knows the difference.
     LaunchedEffect(reader, target.openKey) {
         when (target) {
             is ReaderTarget.Library -> reader.openLibraryBook(target.bookId)
-            is ReaderTarget.Sample -> reader.open(
-                BookOpenRequest.sample(target.sample, SampleBookSource(assets, target.sample)),
-            )
             is ReaderTarget.External -> reader.open(
                 BookOpenRequest.external(
                     uri = target.open.uri,
@@ -157,9 +142,7 @@ fun ReaderRoute(
     // Answering settles the offer for this book for good, whichever way it was
     // answered: the requirement is that it is *offered* once (REQ-202).
     val settleFrontMatterOffer = {
-        offer?.positionKey
-            ?.takeUnless(BundledSample::isSampleIdentity)
-            ?.let { repository.requestMarkFrontMatterOffered(it) }
+        offer?.positionKey?.let { repository.requestMarkFrontMatterOffered(it) }
         Unit
     }
     val addToLibrary = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
@@ -334,17 +317,12 @@ private class CatalogBooks(private val repository: LibraryRepository) : ReaderBo
  *
  * The only place the reader's [ReaderPosition] and the catalog's [ReadingState]
  * meet, so neither package has to know the other's shape.
- *
- * It is also the boundary that keeps the bundled sample out of the catalog
- * entirely: a sample identity is dropped on the way in and answers "no stored
- * position" on the way out, so reading the sample changes nothing durable.
  */
 internal class CatalogPositions(private val repository: LibraryRepository) : ReaderPositions {
 
     override val failure: StateFlow<String?> get() = repository.persistenceFailure
 
     override fun restore(bookId: String): ReaderPosition? {
-        if (BundledSample.isSampleIdentity(bookId)) return null
         val stored = repository.readingState(bookId) ?: return null
         return ReaderPosition(
             position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
@@ -355,11 +333,6 @@ internal class CatalogPositions(private val repository: LibraryRepository) : Rea
     }
 
     override fun record(bookId: String, position: ReaderPosition) {
-        // A sample keeps no position (#48). Not a shortcut: recording one is also
-        // what makes a book the last-read one, and the sample has no catalog row,
-        // so the next launch would try to resume into a book the library cannot
-        // find and open on "could not be reopened" instead of the library.
-        if (BundledSample.isSampleIdentity(bookId)) return
         repository.recordReadingState(
             bookId,
             ReadingState(

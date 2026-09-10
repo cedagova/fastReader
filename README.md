@@ -18,11 +18,6 @@ the v1.2.0 release APK.
 | --- | --- | --- |
 | ![The reader paused mid-sentence: one word large in the middle of the screen with its focus letter coloured, the sentence it came from underneath, chapter, progress and speed below](docs/screenshots/reader-phone-mid-api36.png) | ![The library listing two books with their authors and how far each one has been read, under a Sort: Recently read button](docs/screenshots/library-phone-mid-api36.png) | ![Settings on a fresh install: theme, text size, and the Cues section with Highlight letter on, Fixed focus letter off and Guide marks on](docs/screenshots/settings-phone-mid-api36.png) |
 
-The first screen of a fresh install offers the two bundled sample texts, so you
-can see the stream before you go looking for a book:
-
-![The empty library explaining the two ways to add books, and a "Try a sample" section offering an English and a Spanish text](docs/screenshots/empty-library-phone-mid-api36.png)
-
 ## Install it
 
 FastReader needs **Android 8.0 (API 26) or newer**. It is not on any store; it
@@ -132,5 +127,4 @@ project is developed and verified.
 
 ## Licence
 
-[MIT](LICENSE). The two bundled sample texts were written for FastReader and
-placed in the public domain (CC0 1.0); each one says so on its last page.
+[MIT](LICENSE).

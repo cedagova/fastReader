@@ -54,7 +54,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.reader.ui.resolve
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.FontSize
@@ -62,8 +61,6 @@ import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
 import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.ui.SampleOffer
-import com.cedagova.fastreader.ui.rememberSampleOrder
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
 private val TouchTarget = 48.dp
@@ -129,16 +126,6 @@ fun SettingsScreen(
     updateHandoffUnavailable: Boolean = false,
     /** Holds the preview on one token so a golden captures a deterministic frame. */
     heldPreviewToken: Int? = null,
-    /**
-     * Opens one of the texts shipped inside the app (REQ-109).
-     *
-     * The offer lives here as well as in the empty library because the library
-     * stops showing it the moment there are real books, and a reader who wants to
-     * show someone what the app does should not have to empty their shelf first.
-     */
-    onOpenSample: (BundledSample) -> Unit = {},
-    /** The samples, in the order this device should see them (Spanish first on a Spanish device). */
-    samples: List<BundledSample> = rememberSampleOrder(),
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("settings_screen"),
@@ -264,9 +251,6 @@ fun SettingsScreen(
                 ) {
                     Text(stringResource(R.string.settings_reset))
                 }
-
-                SectionHeading(stringResource(R.string.settings_section_sample))
-                SampleOffer(onOpenSample = onOpenSample, samples = samples)
 
                 SectionHeading(stringResource(R.string.settings_section_about))
                 VersionRow(version)

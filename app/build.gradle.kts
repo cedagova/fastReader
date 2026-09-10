@@ -94,16 +94,6 @@ android {
         compose = true
     }
 
-    androidResources {
-        // The bundled samples (#48) are stored, not deflated, inside the APK.
-        // An EPUB is already a deflated zip, so compressing it again saves
-        // almost nothing, and only an uncompressed asset has a file descriptor
-        // AssetManager.openFd can hand out — which is what lets the reader seek
-        // to the four entries it wants instead of streaming past the rest
-        // (REQ-110). See app/src/main/java/.../content/SampleBookSource.kt.
-        noCompress += "epub"
-    }
-
     // EPUB fixtures are shared by the JVM tests and the on-device SAF test.
     // AGP 9 compiles Kotlin through its built-in Kotlin support, which reads the
     // source set's `kotlin` directories, not `java`: registering the shared

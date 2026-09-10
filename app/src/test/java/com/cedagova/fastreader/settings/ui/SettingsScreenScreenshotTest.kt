@@ -50,9 +50,7 @@ class SettingsScreenScreenshotTest {
 
     /**
      * The screen as a reader first meets it: every default, the preview showing
-     * the cues the app ships with, the sample section that keeps the bundled
-     * texts reachable once the library has real books in it (REQ-109), and the
-     * REQ-061 statement at the end.
+     * the cues the app ships with, and the REQ-061 statement at the end.
      */
     @Test
     fun theWholeSurfaceAtItsDefaults() {

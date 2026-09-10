@@ -45,14 +45,6 @@
     <string name="library_empty_folder">Añadir una carpeta. Todos los EPUB que haya dentro, incluidas las subcarpetas, aparecen aquí, y los libros que añadas a esa carpeta más adelante aparecen la próxima vez que abras la aplicación.</string>
     <string name="library_empty_in_place">Los libros se leen donde están. FastReader nunca copia, modifica ni borra tus archivos.</string>
 
-    <!-- The bundled sample (REQ-109). The button labels are the languages' own
-         names for themselves, which do not change with the interface language,
-         so they live in BundledSample rather than here. -->
-    <string name="sample_title">Prueba una muestra</string>
-    <string name="sample_intro">La aplicación viene con dos textos breves. No se descarga nada, no se añade nada a tu biblioteca y no queda nada en tu dispositivo.</string>
-    <string name="sample_source">Los dos se escribieron para FastReader y se pusieron en el dominio público (CC0 1.0). Cada uno lo dice en su última página.</string>
-    <string name="sample_open_description">Leer la muestra en %1$s: %2$s</string>
-
     <string name="library_no_results_title">Ningún libro coincide con “%1$s”</string>
     <string name="library_no_results_hint">La búsqueda mira el título, el autor y el nombre del archivo.</string>
 
@@ -249,7 +241,6 @@
 
     <string name="settings_reset">Restablecer los valores predeterminados</string>
 
-    <string name="settings_section_sample">Muestra</string>
 
     <string name="settings_section_about">Acerca de este lector</string>
     <string name="settings_version_label">Versión</string>

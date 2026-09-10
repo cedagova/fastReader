@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.crash.CrashReportStore
 import com.cedagova.fastreader.crash.ui.CrashReportOfferHost
 import com.cedagova.fastreader.external.incomingBook
@@ -123,11 +122,6 @@ private fun LibraryGraph.acceptIfExternal(intent: Intent?) {
  * instance state, so rotating the phone keeps the reader on screen and coming
  * back to the library does not bounce straight into the book again.
  *
- * The reader destination now covers two kinds of book. A bundled sample
- * (REQ-109) is held in its own piece of state and takes precedence while it is
- * open, so leaving it puts the reader back in whatever they were reading before.
- * It is never a launch destination: launch routing reads the catalog, and the
- * sample is not in it.
  */
 @Composable
 private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore) {
@@ -136,11 +130,6 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
     // A book handed over by another app (REQ-103). Not saved state: it belongs to
     // the process, and its whole lifetime rule is written down on the controller.
     val external by library.external.open.collectAsState()
-    // The bundled sample being read, by enum name (REQ-109). Kept apart from
-    // [openBookId] rather than folded into it because a sample is not a catalog
-    // book: nothing may look it up in the library, and launch routing must never
-    // land here.
-    var openSample by rememberSaveable { mutableStateOf<String?>(null) }
     // Whether the reader on screen was chosen by the launch routing rather than
     // by the reader tapping a row. It decides who owns a book that will not open.
     var routedIntoReader by rememberSaveable { mutableStateOf(false) }
@@ -158,9 +147,6 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
     LaunchedEffect(external?.uri) {
         if (external == null) return@LaunchedEffect
         openBookId = null
-        // The sample too: it is above the external branch in the `when` below, so
-        // leaving it set would hide the book the reader just asked for.
-        openSample = null
         routedIntoReader = false
         blockedBookId = null
         blockedReason = null
@@ -205,14 +191,6 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
         settingsOpen -> SettingsRoute(
             graph = library,
             onBack = { settingsOpen = false },
-            onOpenSample = { settingsOpen = false; openSample = it.name },
-        )
-
-        openSample != null -> ReaderRoute(
-            graph = library,
-            target = ReaderTarget.Sample(BundledSample.valueOf(requireNotNull(openSample))),
-            onBack = { openSample = null },
-            onOpenSettings = { settingsOpen = true },
         )
 
         external != null -> ReaderRoute(
@@ -248,7 +226,6 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
         else -> LibraryRoute(
             graph = library,
             onOpenBook = { openBookId = it },
-            onOpenSample = { openSample = it.name },
             resumeBlocked = resumeBlocked(blockedBookId, blockedReason),
             onDismissResumeNotice = {
                 blockedBookId = null

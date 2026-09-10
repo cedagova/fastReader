@@ -53,28 +53,20 @@ class LibraryScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /**
-     * REQ-109's first half: the screen a stranger meets has both ways to add their
-     * own books *and* something they can read right now, with the licence of that
-     * something stated where it is offered.
-     */
+    /** The screen a stranger meets has both ways to add their own books. */
     @Test
-    fun emptyLibraryExplainsBothWaysToAddBooksAndOffersASample() {
+    fun emptyLibraryExplainsBothWaysToAddBooks() {
         capture("library_empty", state(Catalog()))
     }
 
     /**
-     * REQ-109's language rule, proved through the mechanism that actually decides
-     * it: the composition's configuration. The `es` qualifier is what a Spanish
-     * device gives the app, and the offer comes back Español first.
-     *
-     * Since #55 the interface around it is Spanish too (REQ-206, D5), so this
-     * golden now also holds the empty-library guidance — the longest prose the
-     * screen shows — in its translated form.
+     * REQ-206, D5: the `es` qualifier is what a Spanish device gives the app, and
+     * this golden holds the empty-library guidance — the longest prose the screen
+     * shows — in its translated form.
      */
     @Test
     @Config(qualifiers = "+es")
-    fun aSpanishDeviceIsOfferedTheSpanishSampleFirst() {
+    fun theEmptyLibraryIsSpanishOnASpanishDevice() {
         capture("library_empty_spanish", state(Catalog()))
     }
 
@@ -222,14 +214,14 @@ class LibraryScreenScreenshotTest {
     }
 
     /**
-     * REQ-301 for the new controls: the smallest screen in the matrix at a large
-     * system font scale. The offer's buttons wrap rather than clip, and the page
-     * scrolls, so nothing on it becomes unreachable.
+     * REQ-301: the smallest screen in the matrix at a large system font scale.
+     * The add buttons wrap rather than clip, and the page scrolls, so nothing on
+     * it becomes unreachable.
      */
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)
-    fun theSampleOfferSurvivesACrampedScreenAtALargeFontScale() {
-        capture("library_empty_compact_large_font", state(Catalog()), fontScale = 1.4f, scrollTo = "sample_offer")
+    fun theEmptyLibrarySurvivesACrampedScreenAtALargeFontScale() {
+        capture("library_empty_compact_large_font", state(Catalog()), fontScale = 1.4f)
     }
 
     /**

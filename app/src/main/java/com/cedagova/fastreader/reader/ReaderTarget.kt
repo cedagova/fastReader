@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.external.ExternalOpen
 
 /**
@@ -12,8 +11,8 @@ import com.cedagova.fastreader.external.ExternalOpen
  * book that [com.cedagova.fastreader.reader.ui.ReaderRoute] turns into a request.
  *
  * Before v1.1.0 the reader took a bare catalog id, which said "there is exactly
- * one kind of book" — no longer true the moment a text ships inside the APK
- * (#48) or arrives from another app (#44).
+ * one kind of book" — no longer true the moment a book arrives from another app
+ * (#44).
  */
 sealed interface ReaderTarget {
 
@@ -31,11 +30,6 @@ sealed interface ReaderTarget {
     /** A book in the catalog, opened from the library list or by launch routing. */
     data class Library(val bookId: String) : ReaderTarget {
         override val openKey: String get() = bookId
-    }
-
-    /** A text shipped inside the APK, which is never in the catalog (REQ-109). */
-    data class Sample(val sample: BundledSample) : ReaderTarget {
-        override val openKey: String get() = sample.openKey
     }
 
     /** A book handed over by another app through "Open with" or the share sheet (REQ-103). */
