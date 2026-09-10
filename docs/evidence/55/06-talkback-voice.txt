@@ -1,0 +1,6 @@
+09-09 20:51:44.827  2345  4891 I GoogleTTSServiceImpl: Synthesis request for locale spa-ESP and name es-ES-language
+09-09 20:51:46.913  2345  5821 I GoogleTTSServiceImpl: Synthesis request for locale spa-ESP and name es-ES-language
+09-09 20:51:48.697  2345  5821 I GoogleTTSServiceImpl: Synthesis request for locale spa-ESP and name es-ES-language
+09-09 20:51:49.741  2345  5821 I GoogleTTSServiceImpl: Synthesis request for locale spa-ESP and name es-ES-language
+09-09 20:51:50.556  2345  5821 I GoogleTTSServiceImpl: Synthesis request for locale spa-ESP and name es-ES-language
+09-09 20:51:51.379  2345  5821 I GoogleTTSServiceImpl: Synthesis request for locale spa-ESP and name es-ES-language
