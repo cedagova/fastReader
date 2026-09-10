@@ -68,6 +68,51 @@ class ReaderScreenScreenshotTest {
         capture("reader_paused", pausedAt(12))
     }
 
+    // --- REQ-206, the Spanish interface --------------------------------------
+
+    /**
+     * REQ-206 on the reader: with the device in Spanish every label and readout
+     * around the stream comes from `values-es`, and nothing falls back to
+     * English.
+     *
+     * Paused rather than playing, because paused is the state that has every
+     * string on screen at once — the chapter name, the progress, the time left,
+     * the speed readout in its Spanish unit, and the six transport labels that
+     * only TalkBack ever reads aloud. The book's own words are the fixture's and
+     * stay as they are: translating the interface never touches a book.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theReaderIsSpanishOnASpanishDevice() {
+        capture("reader_spanish", pausedAt(12))
+    }
+
+    /**
+     * REQ-206 on the notice a book handed over by another app carries. Its
+     * sentence is the promise that nothing but the reading position is kept, so
+     * it is the one notice whose Spanish has to be exactly as narrow as the
+     * English.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theExternalNoticeIsSpanishOnASpanishDevice() {
+        capture("reader_external_notice_spanish", pausedAt(12), externalNotice = true)
+    }
+
+    /**
+     * REQ-206 on #51's front-matter offer: two buttons and a sentence, where the
+     * Spanish labels are the longer pair and the chapter title is the book's own.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theFrontMatterOfferIsSpanishOnASpanishDevice() {
+        capture(
+            "reader_front_matter_offer_spanish",
+            pausedAt(0),
+            frontMatterOffer = "Chapter One: The Approach",
+        )
+    }
+
     @Test
     fun theSameParagraphInDarkTheme() {
         capture("reader_paused_dark", pausedAt(12), darkTheme = true)

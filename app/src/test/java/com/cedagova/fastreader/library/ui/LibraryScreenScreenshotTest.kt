@@ -66,13 +66,69 @@ class LibraryScreenScreenshotTest {
     /**
      * REQ-109's language rule, proved through the mechanism that actually decides
      * it: the composition's configuration. The `es` qualifier is what a Spanish
-     * device gives the app, and the offer comes back Español first. The interface
-     * around it stays English until the Spanish resource set lands (D5).
+     * device gives the app, and the offer comes back Español first.
+     *
+     * Since #55 the interface around it is Spanish too (REQ-206, D5), so this
+     * golden now also holds the empty-library guidance — the longest prose the
+     * screen shows — in its translated form.
      */
     @Test
     @Config(qualifiers = "+es")
     fun aSpanishDeviceIsOfferedTheSpanishSampleFirst() {
         capture("library_empty_spanish", state(Catalog()))
+    }
+
+    /**
+     * REQ-206 on the library: with the device in Spanish, every word this screen
+     * puts on the page comes from `values-es` and nothing falls back to English.
+     *
+     * The populated state is the one worth holding still, because it is the one
+     * carrying strings from four different leaves at once — the app bar, the
+     * search field, both add buttons, #52's sort control and the per-book
+     * progress — and a fallback would show up as a single English word among
+     * them rather than as a broken screen.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theLibraryIsSpanishOnASpanishDevice() {
+        capture("library_spanish", state(populatedCatalog()))
+    }
+
+    /**
+     * The same screen where Spanish can actually break it: Spanish prose runs
+     * longer than the English it replaces, and the narrow 720p phone at a large
+     * font scale is the first place that costs a line or clips a control. "Orden:
+     * Añadidos hace poco" and the two add buttons are the widest things here.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = "es-$COMPACT_PHONE")
+    fun theSpanishLibrarySurvivesACrampedScreenAtALargeFontScale() {
+        capture(
+            "library_spanish_compact_large_font",
+            state(
+                populatedCatalog().let {
+                    it.copy(settings = it.settings.copy(libraryOrder = LibraryOrder.RECENTLY_ADDED))
+                },
+            ),
+            fontScale = 1.3f,
+        )
+    }
+
+    /**
+     * REQ-206 on the library's notices: the resume-blocked banner, which is the
+     * longest sentence the library can put on screen and the one that has to stay
+     * honest about a reader's place being kept.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theLibraryNoticesAreSpanishOnASpanishDevice() {
+        capture(
+            "library_resume_blocked_spanish",
+            state(
+                catalog = failureCatalog(),
+                resumeBlocked = ResumeBlocked("revoked", ResumeBlockedReason.PERMISSION_LOST),
+            ),
+        )
     }
 
 

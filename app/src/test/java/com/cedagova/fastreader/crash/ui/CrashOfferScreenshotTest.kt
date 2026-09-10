@@ -46,6 +46,17 @@ class CrashOfferScreenshotTest {
         capture("crash_offer_compact_large_font", fontScale = 1.3f)
     }
 
+    /**
+     * REQ-206 on the crash offer (#55). The offer is what the reader reads, so
+     * it is translated; the report the offer is about is not, and no part of it
+     * appears on this screen. `crash_offer` is the English twin.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theOfferIsSpanishOnASpanishDevice() {
+        capture("crash_offer_spanish")
+    }
+
     private fun capture(name: String, fontScale: Float = 1f) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
