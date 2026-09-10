@@ -183,46 +183,58 @@ private fun Token.toReaderWord(): ReaderWord = when (this) {
 /**
  * The sample stream, written out rather than parsed.
  *
- * Two sentences about the preview itself, then the pangram, so every letter the
+ * One sentence about the preview itself, then the pangram, so every letter the
  * reader's settings will be drawn in goes past at least once. The tokens carry
  * the three boundaries pause strength actually scales — a clause comma, a full
  * stop, and the paragraph end that closes the loop — so the difference between
  * `off` and `strong` is visible within one pass. Building them by hand keeps the
  * preview independent of the EPUB pipeline.
+ *
+ * Each token carries the span the tokenizer would give it (#81). The sentence
+ * that closes at [SENTENCE_END] runs ten words from its last comma, so the
+ * pause the rhythm readout measures is the full research value rather than a
+ * span-scaled fraction of it: the readout exists to make pause strength
+ * legible, and a shortened sentence would halve the contrast it shows.
  */
 private val SAMPLE: List<Token> = listOf(
-    sample(0, "Words"),
-    sample(1, "appear"),
-    sample(2, "here", trailing = ",", boundary = Boundary.CLAUSE),
-    sample(3, "one"),
-    sample(4, "at"),
-    sample(5, "a"),
-    sample(6, "time", trailing = ",", boundary = Boundary.CLAUSE),
-    sample(7, "in"),
-    sample(8, "a"),
-    sample(9, "fixed"),
-    sample(10, "place", trailing = ".", boundary = Boundary.SENTENCE, sentence = 0),
-    sample(11, "Your", sentence = 1),
-    sample(12, "eyes", sentence = 1),
-    sample(13, "stay", sentence = 1),
-    sample(14, "still", trailing = ".", boundary = Boundary.SENTENCE, sentence = 1),
-    sample(15, "The", sentence = 2),
-    sample(16, "quick", sentence = 2),
-    sample(17, "brown", sentence = 2),
-    sample(18, "fox", sentence = 2),
-    sample(19, "jumps", sentence = 2),
-    sample(20, "over", sentence = 2),
-    sample(21, "the", sentence = 2),
-    sample(22, "lazy", sentence = 2),
-    sample(23, "dog", trailing = ".", boundary = Boundary.PARAGRAPH, sentence = 2),
+    sample(0, "Words", span = 1),
+    sample(1, "appear", span = 2),
+    sample(2, "here", trailing = ",", boundary = Boundary.CLAUSE, span = 3),
+    sample(3, "one", span = 1),
+    sample(4, "at", span = 2),
+    sample(5, "a", span = 3),
+    sample(6, "time", trailing = ",", boundary = Boundary.CLAUSE, span = 4),
+    sample(7, "and", span = 1),
+    sample(8, "your", span = 2),
+    sample(9, "eyes", span = 3),
+    sample(10, "can", span = 4),
+    sample(11, "stay", span = 5),
+    sample(12, "still", span = 6),
+    sample(13, "in", span = 7),
+    sample(14, "one", span = 8),
+    sample(15, "fixed", span = 9),
+    sample(16, "place", trailing = ".", boundary = Boundary.SENTENCE, span = 10),
+    sample(17, "The", sentence = 1, span = 1),
+    sample(18, "quick", sentence = 1, span = 2),
+    sample(19, "brown", sentence = 1, span = 3),
+    sample(20, "fox", sentence = 1, span = 4),
+    sample(21, "jumps", sentence = 1, span = 5),
+    sample(22, "over", sentence = 1, span = 6),
+    sample(23, "the", sentence = 1, span = 7),
+    sample(24, "lazy", sentence = 1, span = 8),
+    sample(25, "dog", trailing = ".", boundary = Boundary.PARAGRAPH, sentence = 1, span = 9),
 )
 
-/** The token the rhythm readout measures: an ordinary word that ends a sentence. */
-private val SENTENCE_END: Token = SAMPLE[10]
+/**
+ * The token the rhythm readout measures: an ordinary word that ends a sentence,
+ * at a span that earns the full sentence pause.
+ */
+private val SENTENCE_END: Token = SAMPLE[16]
 
 private fun sample(
     index: Int,
     text: String,
+    span: Int,
     trailing: String = "",
     boundary: Boundary = Boundary.NONE,
     sentence: Int = 0,
@@ -234,6 +246,7 @@ private fun sample(
     sentenceIndex = sentence,
     boundary = boundary,
     trailing = trailing,
+    span = span,
 )
 
 /**

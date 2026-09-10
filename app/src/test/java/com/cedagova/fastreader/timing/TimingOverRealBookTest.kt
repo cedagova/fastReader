@@ -86,7 +86,18 @@ class TimingOverRealBookTest {
 
         assertTrue("the Spanish fixture must contain sentence ends", sentenceEnds.isNotEmpty())
         assertTrue(plainWords.isNotEmpty())
-        assertEquals(setOf(720L), sentenceEnds.map { RsvpTimingEngine.durationMillis(it, settings, steady) }.toSet())
+        // #81: a sentence end holds the full 3.0x once it closes ten or more words;
+        // a shorter sentence holds proportionally less, and always more than a
+        // plain word.
+        for (end in sentenceEnds) {
+            val duration = RsvpTimingEngine.durationMillis(end, settings, steady)
+            val span = (end as WordToken).span!!
+            if (span >= RsvpTiming.SPAN_FULL_PAUSE_WORDS) {
+                assertEquals("${end.text} at span $span", 720L, duration)
+            } else {
+                assertTrue("${end.text} at span $span held ${duration}ms", duration in 241L..719L)
+            }
+        }
         assertEquals(setOf(240L), plainWords.map { RsvpTimingEngine.durationMillis(it, settings, steady) }.toSet())
     }
 

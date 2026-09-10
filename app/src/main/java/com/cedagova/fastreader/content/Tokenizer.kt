@@ -138,7 +138,26 @@ internal object Tokenizer {
             trailing = text.substring(tail).gluedPrefix(),
             gapAfter = "",
         )
+        annotateSpans(words)
         return words
+    }
+
+    /**
+     * Stamps every word with its [WordToken.span]: words since the previous clause
+     * or stronger boundary, this one included (#81).
+     *
+     * A separate pass, because boundaries are attributed *backwards* — a word
+     * learns it ends a clause only when the next word's punctuation run is read —
+     * so the count is only known once the paragraph is complete. A paragraph
+     * always ends on at least a [Boundary.PARAGRAPH], so no span crosses one.
+     */
+    private fun annotateSpans(words: MutableList<WordToken>) {
+        var span = 0
+        for (position in words.indices) {
+            span++
+            words[position] = words[position].copy(span = span)
+            if (words[position].boundary >= Boundary.CLAUSE) span = 0
+        }
     }
 
     /**

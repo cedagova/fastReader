@@ -173,6 +173,50 @@ class RsvpTimingEngineTest {
         assertEquals(840L, marker)
     }
 
+    // --- #81: pauses proportional to the span they close ------------------------
+
+    @Test
+    fun boundaryPausesScaleWithTheSpanTheyClose() {
+        fun at(boundary: Boundary, span: Int?) =
+            RsvpTimingEngine.durationMillis(word(boundary = boundary, span = span), steady, running)
+
+        // 1 + (3.0 - 1) * 3/10 = 1.6x; at ten words and beyond, the full 3.0x.
+        assertEquals(384L, at(Boundary.SENTENCE, 3))
+        assertEquals(720L, at(Boundary.SENTENCE, 10))
+        assertEquals(720L, at(Boundary.SENTENCE, 12))
+        assertEquals(720L, at(Boundary.SENTENCE, null))
+        // A full stop after "Yes." costs 1.2 plain words, not three.
+        assertEquals(288L, at(Boundary.SENTENCE, 1))
+        assertEquals(360L, at(Boundary.CLAUSE, 5))
+        assertEquals(300L, at(Boundary.PARAGRAPH, 1))
+        // Headings are structural, not wrap-up: never scaled.
+        assertEquals(960L, at(Boundary.HEADING, 1))
+        assertTrue(at(Boundary.SENTENCE, 3) < at(Boundary.SENTENCE, 12))
+    }
+
+    @Test
+    fun emphasisIsAPerWordCostThatTheSpanNeverTouches() {
+        val longAtSpanTwo = word(classes = setOf(WordClass.LONG), span = 2)
+        assertEquals(360L, RsvpTimingEngine.durationMillis(longAtSpanTwo, steady, running))
+
+        // A long word ending a three-word sentence: max(1.6, 1.5) = 1.6, not a product.
+        val longSentenceEnd = word(boundary = Boundary.SENTENCE, classes = setOf(WordClass.LONG), span = 3)
+        assertEquals(384L, RsvpTimingEngine.durationMillis(longSentenceEnd, steady, running))
+        // And at span 1 the emphasis wins: max(1.2, 1.5).
+        val longShortSentence = word(boundary = Boundary.SENTENCE, classes = setOf(WordClass.LONG), span = 1)
+        assertEquals(360L, RsvpTimingEngine.durationMillis(longShortSentence, steady, running))
+        // Skip markers carry no span and keep their paragraph pause.
+        assertEquals(840L, RsvpTimingEngine.durationMillis(skipMarker(), steady, running))
+    }
+
+    @Test
+    fun pauseStrengthOffIsUniformWhateverTheSpans() {
+        val off = steady.copy(pauseStrength = PauseStrength.OFF)
+        for (span in listOf(null, 1, 3, 10, 40)) {
+            assertEquals(240L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, span = span), off, running))
+        }
+    }
+
     // --- #81: the dial names the average ---------------------------------------
 
     @Test

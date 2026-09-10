@@ -56,6 +56,25 @@ class TokenizerTest {
     }
 
     @Test
+    fun `each word carries its span since the previous clause or stronger boundary`() {
+        val tokens = tokenize("Bien, gracias. ¡Qué sorpresa! ¿Cómo estás tú?")
+
+        assertEquals(listOf(1, 1, 1, 2, 1, 2, 3), tokens.map { it.span })
+        assertEquals(Boundary.PARAGRAPH, tokens.last().boundary)
+    }
+
+    @Test
+    fun `a long word does not reset the span and neither does a paragraph carry one over`() {
+        val first = tokenize("One two extraordinariamente four five six.")
+        assertEquals(listOf(1, 2, 3, 4, 5, 6), first.map { it.span })
+
+        val blocks = listOf(ContentBlock.Paragraph("One two three"), ContentBlock.Paragraph("four five."))
+        val both = Tokenizer.tokenize(blocks, chapterIndex = 0, state = Tokenizer.StreamState())
+            .filterIsInstance<WordToken>()
+        assertEquals(listOf(1, 2, 3, 1, 2), both.map { it.span })
+    }
+
+    @Test
     fun `the strongest break in a punctuation run wins`() {
         // "estás? —preguntó": a sentence end and a dialogue dash in one run.
         val tokens = tokenize("—¿Cómo estás? —preguntó él.")

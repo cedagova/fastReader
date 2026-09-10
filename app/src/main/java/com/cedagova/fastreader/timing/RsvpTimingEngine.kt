@@ -47,6 +47,15 @@ import kotlin.math.roundToLong
  * time-remaining math (REQ-017) much harder to predict for no comprehension
  * benefit research supports.
  *
+ * A boundary pause is also *proportional to the span it closes* (#81): the
+ * extra part of a clause, sentence or paragraph pause is scaled by
+ * `min(1, span / SPAN_FULL_PAUSE_WORDS)`, where `span` is the token's own count
+ * of words since the previous clause or stronger boundary. A full stop after
+ * "Yes." no longer costs three words; one after twelve words costs exactly what
+ * research says. Heading pauses are structural and keep their full value, skip
+ * markers have no span, and emphasis is a per-word cost that is never scaled. A
+ * token without a measured span — a hand-built stream — gets the full pause.
+ *
  * ## Contract for the scheduler (LEAF203)
  *
  * 1. **Integer milliseconds.** Durations are whole milliseconds, so the
@@ -164,11 +173,23 @@ object RsvpTimingEngine {
         }
         return when (token.boundary) {
             Boundary.NONE -> 1.0
-            Boundary.CLAUSE -> RsvpTiming.CLAUSE_MULTIPLIER
-            Boundary.SENTENCE -> RsvpTiming.SENTENCE_MULTIPLIER
-            Boundary.PARAGRAPH -> RsvpTiming.PARAGRAPH_MULTIPLIER
+            Boundary.CLAUSE -> spanScaled(token, RsvpTiming.CLAUSE_MULTIPLIER)
+            Boundary.SENTENCE -> spanScaled(token, RsvpTiming.SENTENCE_MULTIPLIER)
+            Boundary.PARAGRAPH -> spanScaled(token, RsvpTiming.PARAGRAPH_MULTIPLIER)
             Boundary.HEADING -> RsvpTiming.HEADING_MULTIPLIER
         }
+    }
+
+    /**
+     * [full] scaled by the span [token] closes (#81): a short span earns a
+     * proportionally shorter pause, a span of [RsvpTiming.SPAN_FULL_PAUSE_WORDS]
+     * or more earns all of it. Only a [WordToken] carries a span; anything else,
+     * and a word whose span was never measured, holds the full pause.
+     */
+    private fun spanScaled(token: Token, full: Double): Double {
+        val span = (token as? WordToken)?.span ?: return full
+        val share = (span.toDouble() / RsvpTiming.SPAN_FULL_PAUSE_WORDS).coerceIn(0.0, 1.0)
+        return 1.0 + (full - 1.0) * share
     }
 
     private fun emphasisMultiplier(token: Token): Double =

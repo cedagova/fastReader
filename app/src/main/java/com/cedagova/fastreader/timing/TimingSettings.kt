@@ -49,6 +49,21 @@ object RsvpTiming {
     const val HEADING_MULTIPLIER: Double = 4.0
 
     /**
+     * The span, in words, at which a clause, sentence or paragraph pause earns its
+     * full research value (#81, `research-pacing.md`): the extra part of the pause
+     * is scaled by `min(1, span / SPAN_FULL_PAUSE_WORDS)`, so a full stop after a
+     * three-word sentence holds `1 + 2.0 × 0.3 = 1.6x`, not 3.0x.
+     *
+     * The idea is Spritz's — its sentence-end pause grows with sentence length —
+     * and the reading research behind it is Just & Carpenter's wrap-up effect:
+     * the time a reader needs at a boundary scales with how much there is to
+     * integrate. Ten words is the addendum's simulated value; it brings every
+     * 60-word window of two full books within about ±4% of the dial. Heading
+     * pauses are structural, not wrap-up, and are never scaled.
+     */
+    const val SPAN_FULL_PAUSE_WORDS: Int = 10
+
+    /**
      * Research timing heuristics: *long word (>11 chars) -> 1.5x*, and
      * *Numbers/ALL-CAPS/rare words treated like long words (~1.5x) by
      * convention*.
