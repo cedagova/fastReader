@@ -12,7 +12,7 @@ permissions beyond the one Android adds for its own broadcast plumbing, and
 ## What it looks like
 
 Captured on the reference emulator (`Phone_Mid_API36`, Android 16, 1080p) from
-the v1.1.0 release APK.
+the v1.2.0 release APK.
 
 | Reading | Library | Settings |
 | --- | --- | --- |
@@ -54,7 +54,11 @@ Two ways, both from the library screen:
 
 - **Add books** — pick individual EPUB files.
 - **Add folder** — every EPUB inside it, subfolders included, appears in the
-  library, and books you drop in later show up the next time you open the app.
+  library, and books you drop in later show up the next time you open the app,
+  or straight away if you pull the list down to refresh.
+
+The **Sort** button above the list orders your books by *Title*, *Recently
+read* or *Recently added*. It starts at *Recently read*.
 
 Books are read where they are. FastReader never copies, changes, or deletes your
 files, and removing a book or a folder from the library leaves the files alone.
@@ -64,6 +68,13 @@ share sheet. That opens the book straight away and remembers your place in it,
 but the book is only added to your library when the app that handed it over
 grants lasting permission to read it; the Files app does not, so those books are
 read for that session and leave no row behind.
+
+## English and Spanish
+
+FastReader follows your phone's language: set the phone — or FastReader alone,
+in **Settings → Apps → FastReader → Language** — to Spanish and every screen,
+button and TalkBack label is Spanish. There is nothing to choose inside the
+app, and no other language is included.
 
 ## What stays on this device
 
@@ -75,12 +86,16 @@ FastReader has no internet permission, so it cannot send or receive anything
 itself. Check for updates only hands a web address to your browser, and your
 browser makes that request. Your books stay in the folders you chose; on this
 device FastReader keeps only its own list of them, your reading positions, your
-settings and small cover thumbnails, in its private storage. None of that is
-included in this device's backup or in a transfer to a new phone, so a reinstall
-or a new phone starts with an empty library. When another app opens a book in
-FastReader and does not give lasting permission to read it, that book is not
-added to your list and no permission to it is kept; only your place in it is
-remembered.
+settings and small cover thumbnails, in its private storage. If the app stops
+unexpectedly it also keeps one short report about what went wrong in that
+private storage: the app version, this device's model, its Android version and
+where in the code it stopped, with no part of any book in it — the next launch
+offers that report to you once, and it goes nowhere unless you share it and
+pick an app to send it to. None of that is included in this device's backup or
+in a transfer to a new phone, so a reinstall or a new phone starts with an
+empty library. When another app opens a book in FastReader and does not give
+lasting permission to read it, that book is not added to your list and no
+permission to it is kept; only your place in it is remembered.
 <!-- privacy-statement:end -->
 
 What each sentence rests on, and how it was checked, is in
