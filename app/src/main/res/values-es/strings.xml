@@ -101,7 +101,7 @@
     <string name="reader_chapters_of">Lista de capítulos. %1$s, %2$s.</string>
     <string name="reader_close">Cerrar</string>
     <string name="reader_chapter_position">%1$d de %2$d</string>
-    <string name="reader_chapter_pause_hint">Reproduce para seguir leyendo.</string>
+    <string name="reader_chapter_pause_hint">Pulsa ▶ para seguir leyendo.</string>
 
     <string name="reader_finished_title">Has llegado al final de</string>
     <string name="reader_finished_hint">Usa la lista de capítulos o la barra para volver atrás en el libro.</string>

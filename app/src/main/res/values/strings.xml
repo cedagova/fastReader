@@ -73,7 +73,7 @@
     <string name="reader_chapters_of">Chapter list. %1$s, %2$s.</string>
     <string name="reader_close">Close</string>
     <string name="reader_chapter_position">%1$d of %2$d</string>
-    <string name="reader_chapter_pause_hint">Play to read on.</string>
+    <string name="reader_chapter_pause_hint">Press ▶ to continue reading.</string>
 
     <string name="reader_finished_title">You have reached the end of</string>
     <string name="reader_finished_hint">Use the chapter list or the slider to go back into the book.</string>
