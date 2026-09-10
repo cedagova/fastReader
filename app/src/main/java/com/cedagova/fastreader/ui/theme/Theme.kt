@@ -56,12 +56,12 @@ private val DarkColors = darkColorScheme(
  * resolves to 12 dp and `12.sp` to 18 dp — both a full 1.5× — while `24.sp`
  * resolves to 28 dp and `36.sp` to **36 dp**, which is no growth whatsoever.
  *
- * The streamed word is drawn at 36 sp. Left to this mechanism alone, a reader who
- * chose "Largest" would get a larger library, larger controls and a word of
- * exactly the same size — the one element REQ-022 most obviously has to move. So
- * [com.cedagova.fastreader.settings.ReaderSettings.cues] applies
- * [FontSize.scale] to the word's size directly, and the curve above is left to do
- * what it is good at for everything else.
+ * The streamed word is drawn at 36 sp, so this mechanism cannot move it at all —
+ * and it is not asked to. The word has its own setting,
+ * [com.cedagova.fastreader.settings.ReaderSettings.wordSize], which
+ * [com.cedagova.fastreader.settings.ReaderSettings.cues] applies to the word's
+ * size directly; the curve above is left to do what it is good at for everything
+ * else.
  */
 @Composable
 fun FastReaderTheme(

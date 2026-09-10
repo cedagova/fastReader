@@ -203,7 +203,10 @@
     <string name="settings_theme_light">Claro</string>
     <string name="settings_theme_dark">Oscuro</string>
     <string name="settings_theme_system">Sistema</string>
+    <string name="settings_word_size">Tamaño de la palabra</string>
+    <string name="settings_word_size_summary">La palabra que se muestra al leer.</string>
     <string name="settings_font_size">Tamaño del texto</string>
+    <string name="settings_font_size_summary">Todo lo demás: menús, listas y el párrafo en pausa.</string>
     <string name="settings_font_small">Pequeño</string>
     <string name="settings_font_medium">Mediano</string>
     <string name="settings_font_large">Grande</string>

@@ -115,16 +115,17 @@ class SettingsScreenScreenshotTest {
     }
 
     /**
-     * REQ-022's font size, applied to the settings screen by the same theme that
-     * applies it to the reader and the library — including to the previewed word,
-     * which is what tells a reader what they are choosing before they leave.
+     * REQ-022's two sizes at their largest: the text size applied to the settings
+     * screen by the same theme that applies it to the reader and the library, and
+     * the word size applied to the previewed word, which is what tells a reader
+     * what they are choosing before they leave.
      */
     @Test
     @Config(sdk = [35], qualifiers = TALLER_PHONE)
     fun theLargestTextSizeAppliesToThisScreenToo() {
         capture(
             "settings_font_extra_large",
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, theme = ThemeChoice.DARK),
+            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE, theme = ThemeChoice.DARK),
             darkTheme = true,
         )
     }
@@ -142,7 +143,7 @@ class SettingsScreenScreenshotTest {
     fun theLargestTextThisAppCanBeAskedForStillFitsACrampedScreen() {
         capture(
             "settings_compact_large_font",
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE),
+            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE),
             fontScale = 2f,
         )
     }
@@ -160,7 +161,7 @@ class SettingsScreenScreenshotTest {
     fun `the about rows survive the narrowest screen at the largest text`() {
         capture(
             "settings_about_compact_large_font",
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE),
+            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE),
             fontScale = 2f,
         )
     }
@@ -216,7 +217,7 @@ class SettingsScreenScreenshotTest {
     fun theSpanishSettingsScreenSurvivesTheNarrowestScreenAtTheLargestText() {
         capture(
             "settings_spanish_compact_large_font",
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE),
+            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE),
             fontScale = 2f,
         )
     }

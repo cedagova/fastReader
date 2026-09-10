@@ -332,7 +332,7 @@ class ReaderScreenScreenshotTest {
      */
     @Test
     fun theTextSizeSettingAppliesToTheReader() {
-        val largest = ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE)
+        val largest = ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE)
         capture("reader_font_extra_large", pausedAt(12), cues = largest.cues, fontSize = largest.fontSize)
     }
 
@@ -455,7 +455,7 @@ class ReaderScreenScreenshotTest {
     }
 
     private fun largeFontCapture(name: String, state: ReaderUiState) {
-        val largest = ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE)
+        val largest = ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE)
         capture(name, state, cues = largest.cues, fontSize = largest.fontSize)
     }
 

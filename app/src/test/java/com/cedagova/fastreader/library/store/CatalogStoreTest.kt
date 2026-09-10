@@ -601,12 +601,49 @@ class CatalogStoreTest {
         val decoded = CatalogCodec().decode(v4) as CatalogDecoding.Decoded
 
         assertEquals(4, decoded.migratedFrom)
-        assertEquals(7, decoded.catalog.schemaVersion)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
         val state = decoded.catalog.readingStates.getValue("sha256:abc")
         assertEquals(77, state.tokenIndex)
         assertNull(state.structuralFingerprint)
         assertTrue(decoded.catalog.settings.chapterPauseEnabled)
         assertEquals(LibraryOrder.RECENTLY_READ, decoded.catalog.settings.libraryOrder)
+        assertEquals(FontSize.MEDIUM, decoded.catalog.settings.wordSize)
+    }
+
+    /**
+     * Schema 8 splits the one text size into two. The updating reader's word must
+     * stay the size it was: `wordSize` comes forward as a copy of `fontSize`.
+     */
+    @Test
+    fun `a version 7 document gives the word the size the text already had`() {
+        val v7 = """
+            {"schemaVersion":7,"books":[],"folders":[],"readingStates":{},
+             "settings":{"theme":"DARK","fontSize":"LARGE"}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v7) as CatalogDecoding.Decoded
+
+        assertEquals(7, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertEquals(FontSize.LARGE, decoded.catalog.settings.fontSize)
+        assertEquals(FontSize.LARGE, decoded.catalog.settings.wordSize)
+        assertEquals(ThemeChoice.DARK, decoded.catalog.settings.theme)
+    }
+
+    /** A reader at the default size has nothing to carry over, and a malformed size is not thrown over. */
+    @Test
+    fun `a version 7 document without a usable font size still migrates`() {
+        val noSettings = """{"schemaVersion":7,"books":[],"folders":[],"readingStates":{}}"""
+        val noFontSize = """{"schemaVersion":7,"books":[],"folders":[],"readingStates":{},"settings":{"theme":"DARK"}}"""
+        val wrongShape = """{"schemaVersion":7,"books":[],"folders":[],"readingStates":{},"settings":{"fontSize":7}}"""
+
+        val a = CatalogCodec().decode(noSettings) as CatalogDecoding.Decoded
+        val b = CatalogCodec().decode(noFontSize) as CatalogDecoding.Decoded
+        assertEquals(FontSize.MEDIUM, a.catalog.settings.wordSize)
+        assertEquals(FontSize.MEDIUM, b.catalog.settings.wordSize)
+        assertEquals(ThemeChoice.DARK, b.catalog.settings.theme)
+        // The step must not throw; what the codec then makes of the bad value is its own guard.
+        assertTrue(CatalogCodec().decode(wrongShape) !is CatalogDecoding.Newer)
     }
 
     /**

@@ -76,7 +76,7 @@ private val TouchTarget = 48.dp
  *
  * ## Bounded, exactly as defined
  *
- * Six groups and nothing else: theme (REQ-022), text size (REQ-022), the cue set
+ * Six groups and nothing else: theme and the two sizes (REQ-022), the cue set
  * — letter highlight and its palette, fixed focus letter, guide marks (REQ-020,
  * REQ-021) — pause strength (REQ-011), and the chapter-boundary pause (REQ-201).
  * There is no free-form colour picker, no point-size field, and no per-multiplier
@@ -175,8 +175,22 @@ fun SettingsScreen(
                     onSelect = { onSettingsChange(settings.copy(theme = it)) },
                     tag = "settings_theme",
                 )
+                // Two sizes, deliberately: the word is the reading surface and the
+                // size that suits it has nothing to do with the size that suits a
+                // menu. The word's row comes first because it is the one a reader
+                // came here to change.
+                ChoiceRow(
+                    label = stringResource(R.string.settings_word_size),
+                    summary = stringResource(R.string.settings_word_size_summary),
+                    options = FontSize.entries,
+                    selected = settings.wordSize,
+                    optionLabel = { stringResource(it.labelRes()) },
+                    onSelect = { onSettingsChange(settings.copy(wordSize = it)) },
+                    tag = "settings_word_size",
+                )
                 ChoiceRow(
                     label = stringResource(R.string.settings_font_size),
+                    summary = stringResource(R.string.settings_font_size_summary),
                     options = FontSize.entries,
                     selected = settings.fontSize,
                     optionLabel = { stringResource(it.labelRes()) },

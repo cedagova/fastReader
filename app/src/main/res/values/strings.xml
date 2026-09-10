@@ -162,7 +162,10 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_system">System</string>
+    <string name="settings_word_size">Word size</string>
+    <string name="settings_word_size_summary">The word shown while reading.</string>
     <string name="settings_font_size">Text size</string>
+    <string name="settings_font_size_summary">Everything else: menus, lists and the paused paragraph.</string>
     <string name="settings_font_small">Small</string>
     <string name="settings_font_medium">Medium</string>
     <string name="settings_font_large">Large</string>

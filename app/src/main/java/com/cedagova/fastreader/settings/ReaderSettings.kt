@@ -24,10 +24,19 @@ import kotlinx.serialization.Serializable
  * ## The bounded set (definition constraint)
  *
  * The definition rules out a free-form theme engine, so every choice here is an
- * enum or a boolean over a small fixed set: three themes, four font sizes, five
- * highlight colours, four pause strengths, three library orders, four toggles.
+ * enum or a boolean over a small fixed set: three themes, four text sizes, four
+ * word sizes, five highlight colours, four pause strengths, three library orders,
+ * four toggles.
  * There is deliberately no stored colour value, no stored point size, and no
  * per-multiplier timing panel.
+ *
+ * ## Two sizes, not one
+ *
+ * [fontSize] is the app's text — library rows, reader chrome, the paused
+ * paragraph, this screen — and [wordSize] is the streamed word alone. They were
+ * one setting until schema 8, and a reader who wanted a bigger word had to take
+ * bigger menus with it. Now each is its own choice, and the migration gives an
+ * updating reader the word size they already had.
  *
  * ## Why the cue fields are flat rather than a nested [CueSettings]
  *
@@ -36,14 +45,26 @@ import kotlinx.serialization.Serializable
  * choice. Persisting it whole would put that pixel value in the schema and tie the
  * store to the renderer. The four cue choices a reader actually makes are stored
  * flat, and [cues] reassembles them — with the word size derived from
- * [fontSize] — on the way to the renderer.
+ * [wordSize] — on the way to the renderer.
  */
 @Serializable
 data class ReaderSettings(
     /** Light, dark, or follow the device (REQ-022). Applies to the reader and the library. */
     val theme: ThemeChoice = ThemeChoice.SYSTEM,
-    /** Text size across the whole app (REQ-022), on top of the device's own font scale. */
+    /**
+     * Text size across the app (REQ-022), on top of the device's own font scale.
+     * Everything except the streamed word, which [wordSize] carries.
+     */
     val fontSize: FontSize = FontSize.MEDIUM,
+    /**
+     * The size of the streamed word, and of nothing else. Its own choice rather
+     * than a facet of [fontSize] because the word is the reading surface, and the
+     * size that suits it has nothing to do with the size that suits a menu.
+     *
+     * A document written before schema 8 reads this back as whatever its
+     * `fontSize` was — see [com.cedagova.fastreader.library.store.WordSizeV8Migration].
+     */
+    val wordSize: FontSize = FontSize.MEDIUM,
     /**
      * Colour the recognition letter of each word (REQ-020). On by default; the
      * settings screen calls it "Highlight letter".
@@ -106,22 +127,20 @@ data class ReaderSettings(
     /**
      * These settings as the cue renderer consumes them (LEAF301's seam).
      *
-     * The word size is [FontSize.scale] applied to the renderer's own base size,
-     * *not* left to the font scale that carries the rest of REQ-022. Android's
+     * The word size is [wordSize]'s [FontSize.scale] applied to the renderer's own
+     * base size, *not* left to the font scale that carries [fontSize]. Android's
      * font scaling is non-linear above roughly 20 sp and flat by 36 sp — the exact
      * size the streamed word is drawn at — so at a device font scale of 1.5 a
      * 12 sp label becomes 18 dp while the 36 sp word stays 36 dp. That curve is
-     * right for body text and wrong here: the word *is* the reading surface, and a
-     * reader who asks for larger text and gets a larger library, larger controls
-     * and an identical word has not had their setting applied. See
-     * [com.cedagova.fastreader.ui.theme.FastReaderTheme].
+     * right for body text and useless here, which is also why the word has a
+     * setting of its own. See [com.cedagova.fastreader.ui.theme.FastReaderTheme].
      */
     val cues: CueSettings get() = CueSettings(
         highlightEnabled = highlightEnabled,
         focusAlignmentEnabled = focusAlignmentEnabled,
         pivotColor = pivotColor,
         guideMarksEnabled = guideMarksEnabled,
-        wordSizeSp = CueSettings.DEFAULT_WORD_SIZE_SP * fontSize.scale,
+        wordSizeSp = CueSettings.DEFAULT_WORD_SIZE_SP * wordSize.scale,
     )
 
     /** True when nothing has been changed from [DEFAULTS] — the reset control's enabled state. */
@@ -183,18 +202,14 @@ enum class LibraryOrder {
 }
 
 /**
- * The bounded font-size set (REQ-022).
+ * The bounded size ladder (REQ-022), shared by the two size settings.
  *
- * [scale] multiplies the device's own font scale rather than replacing it, so a
- * reader who has already enlarged system text gets larger app text still, and a
- * reader who has not gets exactly these steps.
- *
- * It reaches the app by two routes, and both are needed. The theme applies it to
- * the density's font scale, which carries every ordinary `sp` in the app — library
- * rows, reader chrome, this screen's own text. [ReaderSettings.cues] applies it
- * again, linearly, to the streamed word, because Android's font-scale curve is
- * deliberately flat at the size that word is drawn at and would otherwise leave
- * the one thing a reader actually reads exactly as it was.
+ * As [ReaderSettings.fontSize], [scale] multiplies the device's own font scale
+ * rather than replacing it, so a reader who has already enlarged system text gets
+ * larger app text still, and a reader who has not gets exactly these steps. As
+ * [ReaderSettings.wordSize], it is applied linearly to the streamed word by
+ * [ReaderSettings.cues], because Android's font-scale curve is deliberately flat
+ * at the size that word is drawn at.
  */
 @Serializable
 enum class FontSize(val scale: Float) {

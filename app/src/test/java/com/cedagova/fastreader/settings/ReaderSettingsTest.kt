@@ -93,21 +93,33 @@ class ReaderSettingsTest {
      * the word its own size, in step order.
      */
     @Test
-    fun `the word size follows the font-size setting`() {
-        val sizes = FontSize.entries.map { ReaderSettings.DEFAULTS.copy(fontSize = it).cues.wordSizeSp }
+    fun `the word size follows the word-size setting`() {
+        val sizes = FontSize.entries.map { ReaderSettings.DEFAULTS.copy(wordSize = it).cues.wordSizeSp }
 
         assertEquals(sizes.sorted(), sizes)
         assertEquals(sizes.distinct().size, sizes.size)
         assertEquals(
             CueSettings.DEFAULT_WORD_SIZE_SP,
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.MEDIUM).cues.wordSizeSp,
+            ReaderSettings.DEFAULTS.copy(wordSize = FontSize.MEDIUM).cues.wordSizeSp,
             0f,
         )
         assertEquals(
             CueSettings.DEFAULT_WORD_SIZE_SP * FontSize.EXTRA_LARGE.scale,
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE).cues.wordSizeSp,
+            ReaderSettings.DEFAULTS.copy(wordSize = FontSize.EXTRA_LARGE).cues.wordSizeSp,
             0f,
         )
+    }
+
+    /** The two sizes are independent: the app's text size leaves the word alone. */
+    @Test
+    fun `the text size does not touch the word`() {
+        FontSize.entries.forEach { size ->
+            assertEquals(
+                CueSettings.DEFAULT_WORD_SIZE_SP,
+                ReaderSettings.DEFAULTS.copy(fontSize = size).cues.wordSizeSp,
+                0f,
+            )
+        }
     }
 
     /** The step the screens were designed at has to be the neutral one. */

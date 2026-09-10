@@ -175,11 +175,12 @@ private fun Token.toReaderWord(): ReaderWord = when (this) {
 /**
  * The sample stream, written out rather than parsed.
  *
- * Fifteen tokens carrying the three boundaries pause strength actually scales — a
- * clause comma, a full stop, and the paragraph end that closes the loop — so the
- * difference between `off` and `strong` is visible within one pass. Building them
- * by hand keeps the preview independent of the EPUB pipeline and makes the
- * durations in `SettingsPreviewTest` exact.
+ * Two sentences about the preview itself, then the pangram, so every letter the
+ * reader's settings will be drawn in goes past at least once. The tokens carry
+ * the three boundaries pause strength actually scales — a clause comma, a full
+ * stop, and the paragraph end that closes the loop — so the difference between
+ * `off` and `strong` is visible within one pass. Building them by hand keeps the
+ * preview independent of the EPUB pipeline.
  */
 private val SAMPLE: List<Token> = listOf(
     sample(0, "Words"),
@@ -196,7 +197,16 @@ private val SAMPLE: List<Token> = listOf(
     sample(11, "Your", sentence = 1),
     sample(12, "eyes", sentence = 1),
     sample(13, "stay", sentence = 1),
-    sample(14, "still", trailing = ".", boundary = Boundary.PARAGRAPH, sentence = 1),
+    sample(14, "still", trailing = ".", boundary = Boundary.SENTENCE, sentence = 1),
+    sample(15, "The", sentence = 2),
+    sample(16, "quick", sentence = 2),
+    sample(17, "brown", sentence = 2),
+    sample(18, "fox", sentence = 2),
+    sample(19, "jumps", sentence = 2),
+    sample(20, "over", sentence = 2),
+    sample(21, "the", sentence = 2),
+    sample(22, "lazy", sentence = 2),
+    sample(23, "dog", trailing = ".", boundary = Boundary.PARAGRAPH, sentence = 2),
 )
 
 /** The token the rhythm readout measures: an ordinary word that ends a sentence. */
