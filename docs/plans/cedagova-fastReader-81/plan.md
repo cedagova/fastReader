@@ -51,10 +51,11 @@ root changes only what the dial's number means.
 
 Not `ALREADY_SATISFIED`: at the baseline the engine adds every pause on top
 of `60000 / wpm` (`RsvpTimingEngine.durationMillis`), so no acceptance
-condition of the root holds today. `NEEDS_DECISION` on exactly one point,
-recorded below as an Owner decision brief: what happens to the WPM numbers
-existing readers already set. Every other choice is a constant or tokenizer
-rule that is reversible and testable.
+condition of the root holds today. Not `NEEDS_DECISION`: the one
+material choice, what happens to the WPM numbers readers already set, was
+decided by the owner on 2026-09-10 (Option A, recorded under Assumptions and
+open questions). Every other choice is a constant or tokenizer rule that is
+reversible and testable.
 
 ## Current-state evidence
 
@@ -220,56 +221,17 @@ No orphan or overlapping outcome: the root is the only node.
 
 ## Assumptions and open questions
 
-### Owner decision brief: what happens to the WPM numbers readers already set
+### Owner decision: WPM numbers readers already set
 
-**Problem.** Today the dial names the burst speed of plain words and the
-real average is about 20% lower (mean multiplier 1.18–1.23 on the two
-measured books). After this change the dial names the average. If the
-stored per-book numbers are left as they are, every existing reader's real
-average speed rises by that factor on the next update, silently: a reader
-whose books are stored at 300 was averaging about 245 and will average 300.
-This affects existing users, so it is the owner's call, not the planner's.
-
-**Facts.** The stored value is one integer per book (`ReaderPosition.wpm`,
-`Catalog.wpm`), clamped to 100–1000 on read; no schema carries a per-book
-mean today. The ramp (start at 80%, 20 s) and the 3x re-orientation hold on
-resume soften the first seconds after any change. A reader can move the dial
-at any time during playback (REQ-012). **Assumption:** most readers will
-notice the faster average within their first session and adjust; this has
-not been observed.
-
-**Option A (recommended) — keep the stored numbers.** Behaviour: the number
-on the dial stays what the reader set; the experienced average rises by the
-book's mean multiplier once. Benefit: no migration, no schema change, the
-dial keeps showing a familiar number, and the release notes explain the
-change honestly. Cost: one-time surprise for existing readers; recoverable
-at the dial. Reversibility: full, by the reader. Execution: no extra work.
-
-**Option B — one-time per-book rescale on first open after the update.**
-Behaviour: on first open of each book after the update, the stored value is
-divided by that book's mean multiplier and rounded, so the experienced
-average is unchanged; the dial then shows an unfamiliar number (about 245
-instead of 300). Benefit: nobody's reading speed changes without them
-acting. Cost: a migration marker per book or a stored-schema version bump,
-an extra migration test, a dial that shows a number the reader never chose,
-and the same surprise deferred to "why does it say 245". Reversibility:
-reverting leaves the rescaled numbers in place. Execution: one more commit
-and one more acceptance row in the leaf.
-
-**Option C — do nothing to stored data and show a one-time notice.** A
-notice is UI the root does not ask for and REQ-060's honest-copy rule would
-have to cover it; not recommended.
-
-**Recommendation.** A. For a solo, link-distributed app with a handful of
-readers, a release note plus a dial they already use is the pragmatic
-answer; B adds persistent-state machinery to avoid a surprise it only moves.
-
-**Blocked by this decision.** The root's `Migration and rollback` text and
-this leaf's readiness. Nothing else in the plan changes with the answer; B
-adds one commit and one acceptance row.
-
-**Reply to continue.** `Choose A` or `Choose B` (or a modification, for
-example "A, but also clamp the first session to the old average for 20 s").
+Decided by the owner on 2026-09-10 on the planning PR: **Option A — keep
+the stored per-book WPM numbers unchanged; no migration.** Owner rationale:
+this is a personal app with no current users, so the one-time rise of the
+experienced average (a book stored at 300 was averaging about 245 and will
+average 300) needs no rescale and no notice; the release notes still say
+so. The options considered were A (keep numbers), B (one-time per-book
+rescale on first open, needing a migration marker and showing an unfamiliar
+number) and C (a one-time notice); the owner chose the simplest. No open
+decision remains.
 
 ### Recorded assumptions
 
