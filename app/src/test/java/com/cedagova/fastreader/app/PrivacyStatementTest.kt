@@ -44,9 +44,16 @@ class PrivacyStatementTest {
      * The claims the rest of this repository proves, named here so that softening
      * one of them into an intention has to be a deliberate edit to this test as
      * well. Each maps to a row of the table in `docs/privacy-statement.md`.
+     *
+     * The crash-report claim is the one REQ-303 gained in v1.2.0: #54 gave the
+     * app a report it keeps in private storage, so the statement has to name the
+     * reader-initiated share as the second outbound action beside the browser
+     * hand-off. Nothing holds the Spanish copy of the statement to this one —
+     * lint fails a *missing* translation, not a stale one — so a change here is
+     * a hand edit of `values-es/strings.xml` too.
      */
     @Test
-    fun `the statement still makes the five claims the build backs up`() {
+    fun `the statement still makes the six claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
@@ -54,6 +61,7 @@ class PrivacyStatementTest {
             "hands a web address to your browser",
             "your books stay in the folders you chose",
             "is included in this device's backup or in a transfer to a new phone",
+            "it goes nowhere unless you share it and pick an app to send it to",
             "not added to your list and no permission to it is kept",
         ).forEach { claim ->
             assertTrue("the statement no longer says \"$claim\": $statement",
