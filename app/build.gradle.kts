@@ -118,6 +118,33 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    // The missing-translation gate (AD-15, REQ-206).
+    //
+    // From #55 the app ships `values-es` as well as `values`, and the failure
+    // this block exists to prevent is silent: Android resolves a string that
+    // `values-es` does not define by falling back to the default resource, so a
+    // Spanish device shows an English sentence and nothing anywhere reports it.
+    // The only signal is a reader noticing. `MissingTranslation` is exactly that
+    // report, and `ExtraTranslation` is its mirror — a Spanish string whose
+    // English original was renamed or deleted, which is dead weight the next
+    // translator would trust.
+    //
+    // Both are declared here rather than left at their defaults so that the gate
+    // is a property of this repository and survives a lint baseline, a severity
+    // default changing between AGP versions, or a future `lint.xml`. `lint` runs
+    // on every push and pull request (.github/workflows/checks.yml), and
+    // `abortOnError` makes either finding a red run rather than a warning
+    // somebody reads later.
+    //
+    // The escape hatch, when a string genuinely must not be translated, is
+    // `translatable="false"` on that string in `values/strings.xml` — a visible,
+    // reviewable edit next to the string itself. Loosening this block is not.
+    lint {
+        error += listOf("MissingTranslation", "ExtraTranslation", "MissingQuantity")
+        abortOnError = true
+        warningsAsErrors = false
+    }
 }
 
 // The committed goldens are read by Roborazzi at compare time but are not part
