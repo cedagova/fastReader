@@ -100,6 +100,13 @@ class ReaderViewModel(
      */
     private var chapterPauseEnabled: Boolean = true
 
+    /**
+     * Whether the paragraph stays on screen while the stream runs. Presentation
+     * only: it changes nothing about the session, so it is held here, next to
+     * [publish], rather than on [ReaderSession].
+     */
+    private var paragraphAlwaysShown: Boolean = false
+
     private val _frontMatterOffer = MutableStateFlow<FrontMatterOffer?>(null)
 
     /**
@@ -352,6 +359,20 @@ class ReaderViewModel(
     }
 
     /**
+     * Applies the always-show-paragraph setting, mid-book included.
+     *
+     * The cheapest setter here: no session transition, no durable write, no
+     * rebuild — the next published state simply carries the paragraph or not.
+     * Idempotent, because it is called from a `LaunchedEffect` that re-runs on
+     * recomposition.
+     */
+    fun setParagraphAlwaysShown(enabled: Boolean) {
+        if (enabled == paragraphAlwaysShown) return
+        paragraphAlwaysShown = enabled
+        publish()
+    }
+
+    /**
      * Takes the front-matter offer: the reader lands on the first word of the
      * book's first real chapter (REQ-202).
      *
@@ -469,6 +490,6 @@ class ReaderViewModel(
     private fun publish() {
         val book = view ?: return
         val current = session ?: return
-        _state.value = book.present(current, persistenceFailure)
+        _state.value = book.present(current, persistenceFailure, paragraphAlwaysShown)
     }
 }

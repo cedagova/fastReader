@@ -26,7 +26,7 @@ import kotlinx.serialization.Serializable
  * The definition rules out a free-form theme engine, so every choice here is an
  * enum or a boolean over a small fixed set: three themes, four text sizes, four
  * word sizes, five highlight colours, four pause strengths, three library orders,
- * four toggles.
+ * five toggles.
  * There is deliberately no stored colour value, no stored point size, and no
  * per-multiplier timing panel.
  *
@@ -122,6 +122,17 @@ data class ReaderSettings(
      * see [com.cedagova.fastreader.library.store.LibraryOrderV6Migration].
      */
     val libraryOrder: LibraryOrder = LibraryOrder.RECENTLY_READ,
+    /**
+     * Keep the surrounding paragraph on screen while the stream runs, not only
+     * when it is paused. **Off by default**: the paused paragraph (REQ-010) is
+     * there to pick a thread back up, and a running stream is meant to be one
+     * word on a static page (REQ-062). A reader who wants the prose in view the
+     * whole time opts in; the paragraph then tracks the current word as it goes.
+     *
+     * A document written before schema 9 reads this back as `false` — see
+     * [com.cedagova.fastreader.library.store.ParagraphAlwaysShownV9Migration].
+     */
+    val paragraphAlwaysShown: Boolean = false,
 ) {
 
     /**

@@ -111,6 +111,11 @@ fun ReaderRoute(
         reader.setChapterPause(settings.chapterPauseEnabled)
     }
 
+    // Presentation only: whether the paragraph stays under the running word.
+    LaunchedEffect(reader, settings.paragraphAlwaysShown) {
+        reader.setParagraphAlwaysShown(settings.paragraphAlwaysShown)
+    }
+
     val state by reader.state.collectAsState()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
 

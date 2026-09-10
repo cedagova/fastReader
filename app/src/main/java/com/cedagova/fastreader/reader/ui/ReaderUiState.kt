@@ -62,6 +62,8 @@ sealed interface ReaderUiState {
         val word: ReaderWord,
         /**
          * The paragraph around the current word, with that word marked (REQ-010).
+         * Null while the stream runs, unless the reader chose to keep it on
+         * screen ([com.cedagova.fastreader.settings.ReaderSettings.paragraphAlwaysShown]).
          * Non-null exactly when the stream is stopped, because it is what the
          * reader reads to pick the thread back up.
          */
@@ -191,14 +193,26 @@ class ReaderBookView(
 
     private val chapterEntries = readableChapters.map { ChapterEntry(it.index, it.title) }
 
-    /** Builds the screen state. Pure: the same session always gives the same screen. */
-    fun present(session: ReaderSession, persistenceFailure: String? = null): ReaderUiState.Reading {
+    /**
+     * Builds the screen state. Pure: the same session always gives the same screen.
+     *
+     * [paragraphAlwaysShown] keeps the paragraph in the state while the stream
+     * runs. It is computed per word then — a bounded scan of one paragraph and
+     * at most 91 entries — which is well inside the frame budget the running
+     * stream is measured against, and nothing proportional to the book.
+     */
+    fun present(
+        session: ReaderSession,
+        persistenceFailure: String? = null,
+        paragraphAlwaysShown: Boolean = false,
+    ): ReaderUiState.Reading {
         val chapter = session.currentChapter
+        val showParagraph = session.mode != ReaderMode.PLAYING || paragraphAlwaysShown
         return ReaderUiState.Reading(
             bookTitle = bookTitle,
             mode = session.mode,
             word = session.currentToken.toReaderWord(),
-            context = if (session.mode == ReaderMode.PLAYING) null else session.contextView(),
+            context = if (showParagraph) session.contextView() else null,
             chapterTitle = chapter?.title.orEmpty(),
             chapterNumber = chapter?.let { readableChapters.indexOfFirst { c -> c.index == it.index } + 1 } ?: 0,
             chapterCount = readableChapters.size,

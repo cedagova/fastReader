@@ -68,6 +68,17 @@ class ReaderSettingsTest {
         assertFalse(ReaderSettings.DEFAULTS.copy(chapterPauseEnabled = false).isDefault)
     }
 
+    /**
+     * The paragraph stays paused-only unless asked for: a running stream is one
+     * word on a static page, and nobody who updates gets prose under it unasked.
+     */
+    @Test
+    fun `the paragraph is paused-only by default and is not a cue`() {
+        assertFalse(ReaderSettings.DEFAULTS.paragraphAlwaysShown)
+        assertEquals(CueSettings.DEFAULTS, ReaderSettings.DEFAULTS.copy(paragraphAlwaysShown = true).cues)
+        assertFalse(ReaderSettings.DEFAULTS.copy(paragraphAlwaysShown = true).isDefault)
+    }
+
     /** The two cues are separate choices, so all four combinations are reachable. */
     @Test
     fun `the highlight and the alignment move independently`() {

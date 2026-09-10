@@ -72,6 +72,26 @@ class ReaderBookViewTest {
         assertFalse(playing.canNavigate)
     }
 
+    /**
+     * The opt-in: with the paragraph always shown a running stream carries it too,
+     * marked on the word that is on screen, and nothing else about the running
+     * state changes — navigation stays hidden while the stream runs.
+     */
+    @Test
+    fun `a playing stream keeps the paragraph when the reader asked for it`() {
+        val session = ReaderSession(book).jumpTo(12).play()
+        val playing = view.present(session, paragraphAlwaysShown = true)
+        val context = playing.context!!
+        assertEquals(ReaderMode.PLAYING, playing.mode)
+        assertEquals("extraordinarily", context.words[context.currentOffset].text)
+        assertEquals(at(12).context, context)
+        assertFalse(playing.canNavigate)
+
+        // Two words on, the mark has moved with the stream.
+        val later = view.present(session.advance().advance(), paragraphAlwaysShown = true).context!!
+        assertEquals("Ada", later.words[later.currentOffset].text)
+    }
+
     @Test
     fun `REQ-015 a skip marker is carried through as one, not as book text`() {
         val marker = at(17).word

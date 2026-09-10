@@ -714,7 +714,9 @@ private fun ReadingSurface(
             when (state.mode) {
                 // The word keeps the same place whether the stream is running or
                 // stopped, so pausing reveals the paragraph underneath instead of
-                // moving the word the reader is looking at.
+                // moving the word the reader is looking at. Whether the paragraph
+                // is there is the presenter's call, not the mode's: a reader who
+                // chose to keep it on screen has it while playing too.
                 ReaderMode.PLAYING, ReaderMode.PAUSED -> {
                     Box(
                         modifier = Modifier.fillMaxWidth().weight(1f).testTag("reader_word"),
@@ -723,7 +725,7 @@ private fun ReadingSurface(
                         word(state.word, Modifier.fillMaxSize())
                     }
                     Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
-                        if (state.mode == ReaderMode.PAUSED) PausedContext(state)
+                        if (state.context != null) ParagraphContext(state.context)
                     }
                 }
 
@@ -815,7 +817,9 @@ private fun ColumnScope.FullSurface(content: @Composable () -> Unit) {
 
 /**
  * The paused view (REQ-010): the paragraph the reader stopped in, with the current
- * word marked, so the thread can be picked back up before playing again.
+ * word marked, so the thread can be picked back up before playing again. With
+ * "Always show paragraph" on it is also the running view, and the mark moves
+ * from word to word as the stream goes.
  *
  * The paragraph is rebuilt from each token's own text and the exact separator that
  * followed it, so it reads as the book sets it — `—¿Quién teme a la máquina?
@@ -825,8 +829,7 @@ private fun ColumnScope.FullSurface(content: @Composable () -> Unit) {
  * punctuation is materially harder to pick a thread up from.
  */
 @Composable
-private fun PausedContext(state: ReaderUiState.Reading) {
-    val context = state.context
+private fun ParagraphContext(context: ReaderContext) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -836,31 +839,29 @@ private fun PausedContext(state: ReaderUiState.Reading) {
             .testTag("reader_paused"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (context != null) {
-            val highlight = MaterialTheme.colorScheme.primary
-            val ellipsis = stringResource(R.string.reader_context_continues)
-            val paragraph = buildAnnotatedString {
-                if (context.truncatedStart) append("$ellipsis ")
-                context.words.forEachIndexed { offset, entry ->
-                    if (offset == context.currentOffset) {
-                        withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) {
-                            append(entry.text)
-                        }
-                    } else {
+        val highlight = MaterialTheme.colorScheme.primary
+        val ellipsis = stringResource(R.string.reader_context_continues)
+        val paragraph = buildAnnotatedString {
+            if (context.truncatedStart) append("$ellipsis ")
+            context.words.forEachIndexed { offset, entry ->
+                if (offset == context.currentOffset) {
+                    withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) {
                         append(entry.text)
                     }
-                    append(entry.gapAfter)
+                } else {
+                    append(entry.text)
                 }
-                if (context.truncatedEnd) append(" $ellipsis")
+                append(entry.gapAfter)
             }
-            Text(
-                text = paragraph,
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Start,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().testTag("reader_context"),
-            )
+            if (context.truncatedEnd) append(" $ellipsis")
         }
+        Text(
+            text = paragraph,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Start,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().testTag("reader_context"),
+        )
     }
 }
 

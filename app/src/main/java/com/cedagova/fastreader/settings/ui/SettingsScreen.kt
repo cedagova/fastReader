@@ -76,7 +76,8 @@ private val TouchTarget = 48.dp
  *
  * ## Bounded, exactly as defined
  *
- * Six groups and nothing else: theme and the two sizes (REQ-022), the cue set
+ * Six groups and nothing else: theme, the two sizes and whether the paragraph
+ * stays on screen while the stream runs (REQ-022), the cue set
  * — letter highlight and its palette, fixed focus letter, guide marks (REQ-020,
  * REQ-021) — pause strength (REQ-011), and the chapter-boundary pause (REQ-201).
  * There is no free-form colour picker, no point-size field, and no per-multiplier
@@ -196,6 +197,17 @@ fun SettingsScreen(
                     optionLabel = { stringResource(it.labelRes()) },
                     onSelect = { onSettingsChange(settings.copy(fontSize = it)) },
                     tag = "settings_font_size",
+                )
+                // Appearance rather than rhythm: it changes what is on the page
+                // while the stream runs, not when anything is shown or for how
+                // long. Off by default — one word on a static page is the
+                // reading surface, and the paragraph is opt-in company for it.
+                SwitchRow(
+                    label = stringResource(R.string.settings_paragraph_always_shown),
+                    summary = stringResource(R.string.settings_paragraph_always_shown_summary),
+                    checked = settings.paragraphAlwaysShown,
+                    onCheckedChange = { onSettingsChange(settings.copy(paragraphAlwaysShown = it)) },
+                    tag = "settings_paragraph_always_shown",
                 )
 
                 SectionHeading(stringResource(R.string.settings_section_cues))

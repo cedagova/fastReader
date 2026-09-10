@@ -98,6 +98,10 @@ class SettingsAccessibilityTest {
             "the guide-marks switch should name what it toggles, got $labels",
             labels.any { it.startsWith("Guide marks.") },
         )
+        assertTrue(
+            "the always-show-paragraph switch should name what it toggles, got $labels",
+            labels.any { it.startsWith("Always show paragraph. Keeps the paragraph under the word") },
+        )
         // REQ-106: the only outbound action in the app says where it goes in its
         // own announcement, not only in the line drawn next to it.
         assertTrue(

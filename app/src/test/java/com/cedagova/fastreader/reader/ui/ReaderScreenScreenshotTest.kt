@@ -68,6 +68,16 @@ class ReaderScreenScreenshotTest {
         capture("reader_paused", pausedAt(12))
     }
 
+    /**
+     * "Always show paragraph" on: the stream runs with the paragraph under the
+     * word, the mark on the word being shown, and no navigation — the transport
+     * is still the running one.
+     */
+    @Test
+    fun theParagraphStaysUnderTheRunningWordWhenAlwaysShown() {
+        capture("reader_playing_paragraph", view.present(ReaderSession(book).jumpTo(12).play(), paragraphAlwaysShown = true))
+    }
+
     // --- REQ-206, the Spanish interface --------------------------------------
 
     /**

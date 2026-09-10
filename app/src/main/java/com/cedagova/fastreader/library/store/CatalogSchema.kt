@@ -47,8 +47,11 @@ object CatalogSchema {
      * - **8** — the streamed word gets a size of its own (`wordSize`), written as
      *   the document's `fontSize` so an updating reader's word stays exactly the
      *   size it was while their app text becomes a separate choice.
+     * - **9** — the paragraph can stay on screen while the stream runs
+     *   (`paragraphAlwaysShown`, written as `false` so an updating reader keeps
+     *   the paused-only paragraph they had).
      */
-    const val CURRENT_VERSION: Int = 8
+    const val CURRENT_VERSION: Int = 9
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -63,6 +66,7 @@ object CatalogSchema {
         5 to LibraryOrderV6Migration,
         6 to ContentFingerprintV7Migration,
         7 to WordSizeV8Migration,
+        8 to ParagraphAlwaysShownV9Migration,
     )
 }
 

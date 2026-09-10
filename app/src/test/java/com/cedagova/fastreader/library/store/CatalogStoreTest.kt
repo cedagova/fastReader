@@ -608,6 +608,52 @@ class CatalogStoreTest {
         assertTrue(decoded.catalog.settings.chapterPauseEnabled)
         assertEquals(LibraryOrder.RECENTLY_READ, decoded.catalog.settings.libraryOrder)
         assertEquals(FontSize.MEDIUM, decoded.catalog.settings.wordSize)
+        assertFalse(decoded.catalog.settings.paragraphAlwaysShown)
+    }
+
+    /**
+     * Schema 9 makes the running-stream paragraph a choice. The updating reader
+     * keeps the paused-only paragraph they had: `paragraphAlwaysShown` comes
+     * forward as `false`, written out, with every other setting where it was.
+     */
+    @Test
+    fun `a version 8 document keeps the paragraph paused-only`() {
+        val v8 = """
+            {"schemaVersion":8,"books":[],"folders":[],"readingStates":{},
+             "settings":{"theme":"DARK","fontSize":"LARGE","wordSize":"SMALL","chapterPauseEnabled":false}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v8) as CatalogDecoding.Decoded
+
+        assertEquals(8, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertFalse(decoded.catalog.settings.paragraphAlwaysShown)
+        assertEquals(ThemeChoice.DARK, decoded.catalog.settings.theme)
+        assertEquals(FontSize.LARGE, decoded.catalog.settings.fontSize)
+        assertEquals(FontSize.SMALL, decoded.catalog.settings.wordSize)
+        assertFalse(decoded.catalog.settings.chapterPauseEnabled)
+    }
+
+    /** The step is total: no settings block, or one of the wrong shape, is not thrown over. */
+    @Test
+    fun `a version 8 document without a settings block still migrates`() {
+        val noSettings = """{"schemaVersion":8,"books":[],"folders":[],"readingStates":{}}"""
+        val wrongShape = """{"schemaVersion":8,"books":[],"folders":[],"readingStates":{},"settings":7}"""
+
+        val decoded = CatalogCodec().decode(noSettings) as CatalogDecoding.Decoded
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertFalse(decoded.catalog.settings.paragraphAlwaysShown)
+        assertTrue(CatalogCodec().decode(wrongShape) !is CatalogDecoding.Newer)
+    }
+
+    /** The choice, once made, survives a round trip through the store. */
+    @Test
+    fun `the always-shown paragraph round trips through the store`() {
+        val store = FileCatalogStore(file)
+        store.save(Catalog(settings = ReaderSettings.DEFAULTS.copy(paragraphAlwaysShown = true)))
+
+        val loaded = (store.load() as CatalogLoad.Loaded).catalog
+        assertTrue(loaded.settings.paragraphAlwaysShown)
     }
 
     /**

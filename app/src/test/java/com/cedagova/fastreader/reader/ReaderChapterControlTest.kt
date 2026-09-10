@@ -78,6 +78,25 @@ class ReaderChapterControlTest {
         assertEquals(ReaderMode.CHAPTER_PAUSE, playToTheFirstBoundary(reader).mode)
     }
 
+    // --- The always-shown paragraph reaches the published state ----------------
+
+    /** Presentation only, but it has to reach a running stream, mid-book included. */
+    @Test
+    fun `turning the paragraph on mid-stream puts it under the running word`() = runTest(dispatcher) {
+        val reader = openedReader()
+        reader.togglePlay()
+        advanceUntilIdle()
+        assertNull((reader.state.value as ReaderUiState.Reading).context)
+
+        reader.setParagraphAlwaysShown(true)
+        val shown = reader.state.value as ReaderUiState.Reading
+        assertEquals(ReaderMode.PLAYING, shown.mode)
+        assertNotNull(shown.context)
+
+        reader.setParagraphAlwaysShown(false)
+        assertNull((reader.state.value as ReaderUiState.Reading).context)
+    }
+
     // --- REQ-202: the one-time offer -------------------------------------------
 
     @Test
