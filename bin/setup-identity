@@ -5,7 +5,16 @@
 set -eu
 
 expected_account="cedagova"
-repo_root="$(git rev-parse --show-toplevel)"
+# Resolve the MAIN clone, never a linked worktree. credential.helper lives in
+# the shared .git/config, so a worktree-local path would break every push in
+# every worktree (including the main clone) as soon as that worktree is removed.
+common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
+repo_root="$(cd "$(dirname "$common_dir")" && pwd -P)"
+helper="$repo_root/bin/git-credential-personal"
+if [ ! -x "$helper" ]; then
+  echo "Setup failed: credential helper '$helper' is not an executable file." >&2
+  exit 1
+fi
 
 git -C "$repo_root" config core.hooksPath .githooks
 git -C "$repo_root" config credential.useHttpPath true
@@ -14,7 +23,7 @@ git -C "$repo_root" config "credential.https://github.com.username" "$expected_a
 # Replace any inherited helper rather than stacking on top of it.
 git -C "$repo_root" config --unset-all credential.helper || true
 git -C "$repo_root" config --add credential.helper ""
-git -C "$repo_root" config --add credential.helper "$repo_root/bin/git-credential-personal"
+git -C "$repo_root" config --add credential.helper "$helper"
 
 active="$("$repo_root/bin/gh-personal" api user --jq .login)"
 if [ "$active" != "$expected_account" ]; then
@@ -22,4 +31,4 @@ if [ "$active" != "$expected_account" ]; then
   exit 1
 fi
 
-echo "Wired to GitHub account '$expected_account'. Hooks: .githooks"
+echo "Wired to GitHub account '$expected_account'. Hooks: .githooks. Helper: $helper"

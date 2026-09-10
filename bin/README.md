@@ -28,6 +28,14 @@ set per clone or every guard here is silently inert:
 ./bin/setup-identity
 ```
 
+The script records the credential helper by absolute path, resolved from the
+**main clone** (`git rev-parse --git-common-dir`), never from the worktree it
+is run in. `credential.helper` lives in the shared `.git/config`, so a path
+into a linked worktree would break every push from every worktree, the main
+clone included, the moment that worktree is removed. `core.hooksPath` stays
+the relative `.githooks`, which resolves inside whichever worktree runs the
+hook.
+
 ## Rules
 
 - Use `./bin/gh-personal <args>` instead of bare `gh`. It mints a token scoped
