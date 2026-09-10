@@ -74,6 +74,61 @@ class TokenizerTest {
         assertEquals(listOf(1, 2, 3, 1, 2), both.map { it.span })
     }
 
+    // --- breath holds (#81) ---
+
+    @Test
+    fun `a long unpunctuated sentence gets a breath hold before a conjunction`() {
+        val tokens = tokenize("One two three four five six seven eight and nine ten eleven twelve.")
+
+        assertEquals(listOf("eight"), tokens.filter { WordClass.BREATH in it.classes }.map { it.text })
+        // The hold is a rest inside the sentence, not a boundary: the span still counts everything.
+        assertEquals(13, tokens.last().span)
+        assertEquals(Boundary.PARAGRAPH, tokens.last().boundary)
+    }
+
+    @Test
+    fun `a run of seven plain words never gets a breath hold`() {
+        val tokens = tokenize("One two three four five six and seven, eight nine ten eleven twelve thirteen and.")
+
+        assertTrue(tokens.none { WordClass.BREATH in it.classes })
+    }
+
+    @Test
+    fun `a run that reaches fourteen words gets a breath hold whatever follows`() {
+        val words = (1..20).joinToString(" ") { "w$it" }
+        val tokens = tokenize("$words.")
+
+        assertEquals(listOf("w14"), tokens.filter { WordClass.BREATH in it.classes }.map { it.text })
+    }
+
+    @Test
+    fun `a Spanish sentence breathes before y pero que and porque`() {
+        val tokens = tokenize(
+            "La máquina siguió funcionando toda la noche sin descanso y nadie en la casa pudo dormir tranquilo porque el ruido no cesaba.",
+        )
+
+        val breaths = tokens.filter { WordClass.BREATH in it.classes }.map { it.text }
+        assertEquals(listOf("descanso", "tranquilo"), breaths)
+    }
+
+    @Test
+    fun `punctuation and a hold both start the run over`() {
+        // Eight words, a hold before "and", then only six more before the comma:
+        // no second hold, and the comma resets the count for the next clause.
+        val tokens = tokenize("One two three four five six seven eight and nine ten eleven twelve thirteen, fourteen and fifteen.")
+
+        assertEquals(listOf("eight"), tokens.filter { WordClass.BREATH in it.classes }.map { it.text })
+    }
+
+    @Test
+    fun `the stream classifier keeps the tokenizer's breath class`() {
+        val tokens = tokenize("One two three four five six seven eight and extraordinariamente nine ten eleven twelve.")
+        val classified = WordClassifier.classifyStream(tokens).filterIsInstance<WordToken>()
+
+        assertTrue(WordClass.BREATH in classified.first { it.text == "eight" }.classes)
+        assertTrue(WordClass.LONG in classified.first { it.text == "extraordinariamente" }.classes)
+    }
+
     @Test
     fun `the strongest break in a punctuation run wins`() {
         // "estás? —preguntó": a sentence end and a dialogue dash in one run.

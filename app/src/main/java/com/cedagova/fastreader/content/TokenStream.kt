@@ -74,6 +74,17 @@ enum class WordClass {
 
     /** "Sr.", "Dr.", "J." — the trailing period does not end a sentence. */
     ABBREVIATION,
+
+    /**
+     * A breath hold (#81): the word before a conjunction or relative pronoun once
+     * a long run of words has gone by with no punctuation, or the last word of a
+     * run that has gone on too long regardless. Text-to-speech systems insert
+     * these phrase breaks where writers left no commas; without them a long
+     * unpunctuated sentence streams as a volley. Marked by the tokenizer from
+     * the sequence, not by [WordClassifier] from the word, and never a reset of
+     * the word's [WordToken.span].
+     */
+    BREATH,
 }
 
 /** Why a piece of content is represented by a marker instead of its words. */

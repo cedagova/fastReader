@@ -64,6 +64,17 @@ object RsvpTiming {
     const val SPAN_FULL_PAUSE_WORDS: Int = 10
 
     /**
+     * The hold on a breath word (#81, `research-pacing.md`): a rest inside a long
+     * unpunctuated run, milder than the 1.5x emphasis and well under a clause
+     * pause, because nothing is being wrapped up — the reader is only being
+     * given the phrase break the writer left out. Where a breath word also ends a
+     * clause or carries emphasis, `max` applies as everywhere else. The addendum's
+     * simulated value; detection lives in `WordClassifier` (8 plain words at a
+     * conjunction or relative pronoun, 14 unconditionally).
+     */
+    const val BREATH_MULTIPLIER: Double = 1.4
+
+    /**
      * Research timing heuristics: *long word (>11 chars) -> 1.5x*, and
      * *Numbers/ALL-CAPS/rare words treated like long words (~1.5x) by
      * convention*.

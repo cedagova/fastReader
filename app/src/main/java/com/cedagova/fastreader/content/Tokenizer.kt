@@ -139,7 +139,37 @@ internal object Tokenizer {
             gapAfter = "",
         )
         annotateSpans(words)
+        annotateBreaths(words)
         return words
+    }
+
+    /**
+     * Marks breath holds (#81): after [WordClassifier.BREATH_MIN_RUN] words with
+     * no punctuation, the word before a conjunction or relative pronoun gets
+     * [WordClass.BREATH]; after [WordClassifier.BREATH_MAX_RUN] the current word
+     * gets it whatever comes next. A boundary or a hold starts the count over.
+     *
+     * The count is its own thing and never touches [WordToken.span]: a breath
+     * is a rest inside a sentence, not a place the sentence ended, so the full
+     * stop that follows still closes the whole span and earns its whole pause.
+     */
+    private fun annotateBreaths(words: MutableList<WordToken>) {
+        var run = 0
+        for (position in words.indices) {
+            val word = words[position]
+            if (word.boundary >= Boundary.CLAUSE) {
+                run = 0
+                continue
+            }
+            run++
+            val next = words.getOrNull(position + 1)
+            val breathHere = run >= WordClassifier.BREATH_MAX_RUN ||
+                (run >= WordClassifier.BREATH_MIN_RUN && next != null && WordClassifier.isBreathWord(next.text))
+            if (breathHere) {
+                words[position] = word.copy(classes = word.classes + WordClass.BREATH)
+                run = 0
+            }
+        }
     }
 
     /**

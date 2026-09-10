@@ -56,6 +56,10 @@ import kotlin.math.roundToLong
  * markers have no span, and emphasis is a per-word cost that is never scaled. A
  * token without a measured span — a hand-built stream — gets the full pause.
  *
+ * A breath word (#81) holds `BREATH_MULTIPLIER`, again combined by `max`: a rest
+ * inside a long unpunctuated run, milder than emphasis, and gone entirely at
+ * `PauseStrength.OFF` like every other pause.
+ *
  * ## Contract for the scheduler (LEAF203)
  *
  * 1. **Integer milliseconds.** Durations are whole milliseconds, so the
@@ -192,12 +196,13 @@ object RsvpTimingEngine {
         return 1.0 + (full - 1.0) * share
     }
 
-    private fun emphasisMultiplier(token: Token): Double =
-        if (token is WordToken && token.classes.any { it in EMPHASIS_CLASSES }) {
-            RsvpTiming.EMPHASIS_MULTIPLIER
-        } else {
-            1.0
-        }
+    private fun emphasisMultiplier(token: Token): Double {
+        if (token !is WordToken) return 1.0
+        var multiplier = 1.0
+        if (token.classes.any { it in EMPHASIS_CLASSES }) multiplier = RsvpTiming.EMPHASIS_MULTIPLIER
+        if (WordClass.BREATH in token.classes) multiplier = maxOf(multiplier, RsvpTiming.BREATH_MULTIPLIER)
+        return multiplier
+    }
 
     private fun Token.hasClass(wordClass: WordClass): Boolean =
         this is WordToken && wordClass in classes

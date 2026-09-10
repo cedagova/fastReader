@@ -31,6 +31,43 @@ internal object WordClassifier {
     const val RARE_MIN_LENGTH = 8
 
     /**
+     * How many words must run with no punctuation before a breath hold may land
+     * on the word ahead of a conjunction or relative pronoun (#81). The research
+     * addendum's simulated value: shorter, and holds land inside ordinary
+     * clauses; longer, and the volley the hold exists to break is most of the
+     * way through before it lands.
+     */
+    const val BREATH_MIN_RUN = 8
+
+    /** The run length at which a breath hold lands whatever the next word is (#81). */
+    const val BREATH_MAX_RUN = 14
+
+    /**
+     * Words a breath naturally falls before: coordinating and subordinating
+     * conjunctions and relative pronouns, in both languages the app supports
+     * (REQ-019). One list for both, because the tokenizer does not know the
+     * language and a false positive only moves a hold that was due anyway —
+     * [BREATH_MIN_RUN] words have already run when the list is consulted.
+     * Accented forms are as the language writes them, so `si` (if) is here and
+     * `sí` (yes) is not.
+     */
+    private val BREATH_WORDS = setOf(
+        // English
+        "and", "but", "or", "nor", "yet", "so", "because", "although", "though",
+        "while", "whereas", "if", "unless", "until", "when", "whenever", "where",
+        "wherever", "after", "before", "since", "as", "that", "which", "who",
+        "whom", "whose",
+        // Spanish
+        "y", "e", "o", "u", "ni", "pero", "sino", "mas", "aunque", "mientras",
+        "porque", "pues", "si", "como", "cuando", "donde", "que", "quien",
+        "quienes", "cual", "cuales", "cuyo", "cuya", "cuyos", "cuyas", "para",
+        "según",
+    )
+
+    /** True when a breath falls naturally before [word] — see [BREATH_WORDS]. */
+    fun isBreathWord(word: String): Boolean = word.lowercase() in BREATH_WORDS
+
+    /**
      * Abbreviations whose period does not end a sentence.
      *
      * Deliberately short and concrete: honorifics and the handful of publishing
@@ -122,4 +159,31 @@ internal object WordClassifier {
      */
     fun normalize(word: String): String =
         word.filter { it.isLetterOrDigit() }.lowercase()
+
+    /**
+     * The second pass over a finished stream: every word gets its [classify]
+     * result, with rarity counted against the whole book.
+     *
+     * Classes the tokenizer already placed from the *sequence* — today only
+     * [WordClass.BREATH] — are kept, because this pass knows the word and its
+     * count, not where it sits. Lives here rather than in the pipeline so a test
+     * can classify a plain-text stream exactly as a book is classified.
+     */
+    fun classifyStream(tokens: List<Token>): List<Token> {
+        val counts = HashMap<String, Int>()
+        for (token in tokens) {
+            if (token is WordToken) {
+                val key = normalize(token.text)
+                if (key.isNotEmpty()) counts[key] = (counts[key] ?: 0) + 1
+            }
+        }
+        return tokens.map { token ->
+            if (token !is WordToken) {
+                token
+            } else {
+                val key = normalize(token.text)
+                token.copy(classes = token.classes + classify(token.text, counts[key] ?: 1))
+            }
+        }
+    }
 }

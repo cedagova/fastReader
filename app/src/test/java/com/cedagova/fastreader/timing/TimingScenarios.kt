@@ -108,6 +108,7 @@ object TimingScenarios {
         Case("sentence end after three words: 1 + 2.0 * 0.3 = 1.6x", word(boundary = Boundary.SENTENCE, span = 3), STEADY, RUNNING, 384),
         Case("sentence end after ten words earns the full 3.0x", word(boundary = Boundary.SENTENCE, span = 10), STEADY, RUNNING, 720),
         Case("heading pause is never span-scaled", word(boundary = Boundary.HEADING, span = 1), STEADY, RUNNING, 960),
+        Case("breath hold 1.4x", word(classes = setOf(WordClass.BREATH), text = "rested"), STEADY, RUNNING, 336),
         Case(
             "pause strength off is uniform",
             word(boundary = Boundary.HEADING),

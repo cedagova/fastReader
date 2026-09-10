@@ -217,6 +217,23 @@ class RsvpTimingEngineTest {
         }
     }
 
+    // --- #81: breath holds --------------------------------------------------------
+
+    @Test
+    fun aBreathWordHoldsMildlyAndNeverCompounds() {
+        val breath = setOf(WordClass.BREATH)
+        assertEquals(336L, RsvpTimingEngine.durationMillis(word(classes = breath), steady, running))
+        // max(1.4, 1.5): a long breath word is one slow word, not a compounded one.
+        assertEquals(360L, RsvpTimingEngine.durationMillis(word(classes = breath + WordClass.LONG), steady, running))
+        // max(1.4, 3.0): a breath word that also ends a ten-word sentence holds the sentence pause.
+        assertEquals(720L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, classes = breath, span = 10), steady, running))
+        // max(1.4, 1.2): ... and one that ends a one-word sentence holds the breath.
+        assertEquals(336L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, classes = breath, span = 1), steady, running))
+        // Pause strength scales it like every other pause, and OFF removes it.
+        assertEquals(240L, RsvpTimingEngine.durationMillis(word(classes = breath), steady.copy(pauseStrength = PauseStrength.OFF), running))
+        assertEquals(240L + 144L, RsvpTimingEngine.durationMillis(word(classes = breath), steady.copy(pauseStrength = PauseStrength.STRONG), running))
+    }
+
     // --- #81: the dial names the average ---------------------------------------
 
     @Test
