@@ -94,9 +94,15 @@ At the baseline:
   rhythm, REQ-023), reading `plainWordMillis` and `durationMillis` from the
   engine; the sample's spans before its boundaries are 3, 4, 4, 4 and 9.
 - Tests: `RsvpTimingEngineTest`, `TimingScenarios`, `TimingOverRealBookTest`
-  (a real EPUB fixture), `TokenizerTest`, `RemainingTimeTest`,
+  (which parses `ContentFixtures.spanishNovel()`, three hand-written spine
+  items of about 37 tokens through the real pipeline, so "real" means real
+  pipeline, not book-sized), `TokenizerTest`, `RemainingTimeTest`,
   `ReaderPauseStrengthTest`, `ReaderPositionTest`; goldens under
-  `app/screenshots/`.
+  `app/screenshots/`. Every `Reading` golden renders "Under a minute left"
+  from that fixture, because `remainingLabel` is minutes-only. No bundled
+  sample book exists at the baseline: `f71cdb9` removed the shipped samples
+  and their open path, `a05ce4e` the script that built them; the tree holds
+  no `.epub` and no `app/src/main/assets/`.
 - Research measurements (two Gutenberg books, app multipliers): mean
   multiplier 1.18–1.23 today, so a dial of 300 averages 244–255 WPM;
   per-sentence speed p5 0.53–0.63 and p95 0.89–0.91 of the dial. Under the
@@ -156,10 +162,13 @@ position stored at the baseline still resolves.
 
 The settings preview keeps its fixed 250 WPM but normalizes by its own
 sample's mean, so the speed it states is an average too. Decision recorded
-here: the sample's last sentence is lengthened to at least 10 words so the
-previewed sentence pause stays a full 3.0x and the pause-strength contrast
-REQ-023 exists to show is not halved by span-scaling; the resulting golden
-re-record is the intended, stated change.
+here, stated as the outcome: the span closing at the token the rhythm
+readout measures (`SENTENCE_END`, today `SAMPLE[10]` "place." at span 4)
+reaches at least 10 words, so the previewed sentence pause stays a full
+3.0x and the pause-strength contrast REQ-023 exists to show is not halved
+by span-scaling; the resulting golden re-record is the intended, stated
+change. The `Reading` goldens do not move: they render "Under a minute
+left" from a 37-token fixture and never render a duration.
 
 All new constants are stated once in `RsvpTiming` with a research trace to
 `research-pacing.md` and an arithmetic unit test (AD-5). Because the mean is
@@ -186,15 +195,15 @@ gives each one an observable check:
 
 | Root acceptance | Covered by |
 | --- | --- |
-| Whole-book steady-state time equals `tokens × 60000 / wpm` within 0.5% at SUBTLE, NORMAL, STRONG and 100/250/1000 WPM | Direction 1; `TimingOverRealBookTest` |
+| Whole-book steady-state time equals `tokens × 60000 / wpm` within 0.5% or one millisecond per token, whichever is larger, at SUBTLE, NORMAL, STRONG and 100/250/1000 WPM | Direction 1; `TimingOverRealBookTest` on the pipeline fixture and the corpus fixture (the per-token rounding of a ~53 ms plain word at 1000 WPM is systematic, hence the millisecond floor) |
 | Time remaining at the first token equals `tokens / wpm` within 1%; doubling speed halves it (REQ-017) | Direction 1; `RemainingTimeTest` |
 | OFF gives uniform durations; a sentence end after ≥ 10 words holds 3.0x a plain word of the same book (REQ-011) | Directions 1–3; `RsvpTimingEngineTest`, `ReaderPauseStrengthTest` (mean republished on every rebuild) |
 | Full stop after a 3-word span holds less than after 12; emphasis 1.5x unaffected by span | Direction 2; `RsvpTimingEngineTest`, `TokenizerTest` (span) |
 | 20-word unpunctuated sentence gets ≥ 1 breath hold; ≤ 7 plain words never; Spanish equivalent gets one; OFF removes them; a hold at word 8 leaves the full stop at 3.0x | Direction 3; `TokenizerTest`, `RsvpTimingEngineTest` |
-| Real-book fixture at NORMAL/300: sentences of 4+ words p5 ≥ 0.88 and p95 ≤ 1.08; 60-word windows p5 ≥ 0.93 and p95 ≤ 1.07; min/p5/p50/p95/max recorded in the PR | Directions 1–3; `TimingOverRealBookTest` (thresholds taken from the addendum's p5/p95 with a small margin; no universal bound) |
-| `testDebugUnitTest`, `verifyRoborazziDebug`, `lint` pass; only the settings-preview goldens change, by the lengthened sample | Direction 1 and the preview decision; hosted checks |
+| Corpus fixtures (EN and ES, test-only, ≥ 50,000 words each) at NORMAL/300: sentences of 4+ words p5 ≥ 0.88 and p95 ≤ 1.08; 60-word windows p5 ≥ 0.93 and p95 ≤ 1.07; min/p5/p50/p95/max recorded in the PR; breath holds fire on both corpora and never inside a run of ≤ 7 plain words | Directions 1–3; a corpus test beside `TimingOverRealBookTest` (thresholds from the addendum's p5/p95 with a small margin; the 37-token pipeline fixture cannot define a 60-word window and is heading-dense, so it is not the subject of this row) |
+| `testDebugUnitTest`, `verifyRoborazziDebug`, `lint` pass; only the settings-preview goldens change, by the lengthened sample span | Direction 1 and the preview decision; hosted checks; `Reading` goldens are unaffected for the stated reason |
 | `ContentPipelineVersion.CURRENT` unchanged; a baseline-stored position still resolves | Tokenizer note above; `ReaderPositionTest` or `TokenizerTest` |
-| Phone_Mid_API36: remaining time at open equals words ÷ dial; EN and ES samples play a chapter at 300 without stutter; clean `AndroidRuntime:E`; screencaps | Emulator smoke in the leaf's validation |
+| Phone_Mid_API36 with two pushed public-domain EPUBs (EN and ES, each long enough that the readout states minutes): remaining time at open equals words ÷ dial within one minute; each plays a chapter at 300 without stutter; clean `AndroidRuntime:E`; screencaps | Emulator smoke in the leaf's validation (procedure below) |
 | Release notes entry | Direction 1 |
 
 No orphan or overlapping outcome: the root is the only node.
@@ -202,16 +211,33 @@ No orphan or overlapping outcome: the root is the only node.
 ## Validation and feedback
 
 - Unit tests as mapped above, run with `./gradlew testDebugUnitTest`
-  (JDK 21). The per-sentence and per-window figures come from a test over
-  the real-book fixture that prints min/p5/p50/p95/max, so the PR records
-  measured, not simulated, numbers; if the fixture book falls outside the
-  p5/p95 thresholds the implementer reports the figures on the PR and tunes
-  only the three breath constants or the span constant before widening any
-  threshold, and any widening is stated with the measured cause.
+  (JDK 21).
+- **Corpus fixture (test-only).** Two public-domain plain texts, one
+  English and one Spanish, at least 50,000 words each, under
+  `app/src/test/resources` with their licence notice kept and the Project
+  Gutenberg header and footer stripped; they are test bytes, never in the
+  APK, which is the distinction `f71cdb9`/`a05ce4e` drew when the shipped
+  samples were removed. A corpus test splits them into paragraphs on blank
+  lines, runs the real `Tokenizer` and `WordClassifier`, and prints
+  min/p5/p50/p95/max for sentences of 4+ words and for 60-word windows at
+  NORMAL/300, so the PR records measured, not simulated, numbers. If a
+  corpus falls outside the p5/p95 thresholds the implementer reports the
+  figures on the PR and tunes only the three breath constants or the span
+  constant before widening any threshold, and any widening is stated with
+  the measured cause. The 37-token pipeline fixture keeps the identities it
+  can prove: the budget identity, OFF uniformity, the 3-versus-12-word span
+  comparison and the pipeline-version check.
 - `./gradlew verifyRoborazziDebug` and `lint`; hosted checks on the PR.
 - One emulator run on `Phone_Mid_API36` under the shared emulator lock
   (`mkdir ~/worktrees/fastReader/.emulator.lock`, pid inside, `rmdir` when
   done), with screencaps read by the lead, not inferred from exit codes.
+  There is no bundled book, so the implementer downloads two public-domain
+  EPUBs at run time (for example Project Gutenberg's `.epub.noimages`
+  files, one English and one Spanish, each of at least 3,000 words so a
+  dial of 300 reads as minutes), `adb push`es them into a folder on the
+  device, adds that folder in the app's library, opens each book, and
+  checks the time-remaining readout against words ÷ dial before playing a
+  chapter. The EPUBs are not committed.
 - Reviewer verifies in its own detached worktree and never writes into the
   lead's worktree or `docs/evidence/`.
 - Feedback loop: the on-device feel of breath holds is the one criterion
