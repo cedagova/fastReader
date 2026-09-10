@@ -1,0 +1,26 @@
+Vista previa del flujo de palabras con tus ajustes actuales
+A 250 ppm una palabra normal se ve 240 ms y un final de frase 720 ms.
+Apariencia
+Tema
+Claro
+Oscuro
+Sistema
+Tamaño del texto
+Pequeño
+Mediano
+Grande
+Máximo
+Señales visuales
+Letra destacada. Colorea una letra de cada palabra para dar a tu vista un punto donde posarse.
+Color del destacado
+Predeterminado
+Carmesí
+Ámbar
+Verde azulado
+Violeta
+Letra de enfoque fija. Desplaza cada palabra para que la letra destacada caiga siempre en el mismo punto. Desactivado, las palabras quedan centradas.
+Marcas de guía. Dibuja una línea y un pequeño triángulo debajo de la palabra, que marcan el punto donde cae.
+Ritmo
+Fuerza de la pausa
+Atrás
+Ajustes

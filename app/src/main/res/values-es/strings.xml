@@ -1,0 +1,280 @@
+<resources>
+    <!--
+      The Spanish interface (REQ-206, D5, AD-15).
+
+      Register and conventions, so a later string is written the same way:
+
+      * Second person informal ("tú"), like the English original's direct
+        address and like Android's own Spanish. Never "usted".
+      * Neutral Spanish: no regionalism that would read as foreign anywhere
+        the owner's library is read. "Añadir", not "agregar"; "ordenador"
+        never appears because the app says "dispositivo".
+      * Plain and honest, the same rule the English copy follows: no word
+        promises more than the build does. In particular the app says
+        "quitar" (take out of the library) and never "eliminar" or "borrar"
+        for a book, because it never deletes a reader's file.
+      * "ppm" — palabras por minuto — is the Spanish reading-speed unit and
+        replaces "WPM" everywhere it appears, including inside sentences.
+      * FastReader, EPUB, TalkBack, Android, DRM and CC0 are product names
+        or standards and stay as they are.
+
+      The crash report itself is deliberately NOT translated: see the
+      comment on `crash_offer_title` below and `CrashReport.kt`.
+
+      Completeness is a build gate, not a convention: `MissingTranslation`,
+      `ExtraTranslation` and `MissingQuantity` are lint errors (see the
+      `lint` block in app/build.gradle.kts), so a string added to
+      `values/strings.xml` without a line here fails CI rather than falling
+      back to English on a Spanish device.
+    -->
+    <string name="app_name">FastReader</string>
+
+    <!-- Library screen -->
+    <string name="library_title">Biblioteca</string>
+    <string name="library_refresh">Actualizar la biblioteca</string>
+    <string name="library_add_books">Añadir libros</string>
+    <string name="library_add_folder">Añadir carpeta</string>
+
+    <string name="library_search_label">Buscar libros</string>
+    <string name="library_search_placeholder">Título, autor o nombre de archivo</string>
+    <string name="library_search_clear">Borrar la búsqueda</string>
+
+    <string name="library_empty_title">Tu biblioteca está vacía</string>
+    <string name="library_empty_intro">Hay dos maneras de añadir libros:</string>
+    <string name="library_empty_pick">Elegir archivos EPUB sueltos de tu dispositivo.</string>
+    <string name="library_empty_folder">Añadir una carpeta. Todos los EPUB que haya dentro, incluidas las subcarpetas, aparecen aquí, y los libros que añadas a esa carpeta más adelante aparecen la próxima vez que abras la aplicación.</string>
+    <string name="library_empty_in_place">Los libros se leen donde están. FastReader nunca copia, modifica ni borra tus archivos.</string>
+
+    <!-- The bundled sample (REQ-109). The button labels are the languages' own
+         names for themselves, which do not change with the interface language,
+         so they live in BundledSample rather than here. -->
+    <string name="sample_title">Prueba una muestra</string>
+    <string name="sample_intro">La aplicación viene con dos textos breves. No se descarga nada, no se añade nada a tu biblioteca y no queda nada en tu dispositivo.</string>
+    <string name="sample_source">Los dos se escribieron para FastReader y se pusieron en el dominio público (CC0 1.0). Cada uno lo dice en su última página.</string>
+    <string name="sample_open_description">Leer la muestra en %1$s: %2$s</string>
+
+    <string name="library_no_results_title">Ningún libro coincide con “%1$s”</string>
+    <string name="library_no_results_hint">La búsqueda mira el título, el autor y el nombre del archivo.</string>
+
+    <string name="library_unknown_author">Autor desconocido</string>
+    <string name="library_progress">%1$d%% leído</string>
+    <string name="library_remove">Quitar %1$s de la biblioteca. El archivo se queda en tu dispositivo.</string>
+    <string name="library_grant_access">Conceder acceso</string>
+
+    <string name="library_state_corrupt">No se puede leer. Este archivo no es un EPUB válido.</string>
+    <string name="library_state_drm">Protegido contra copia. FastReader no abre libros con DRM.</string>
+    <string name="library_state_missing">Falta el archivo. Se movió o se borró; tu punto de lectura se guarda por si vuelve.</string>
+    <string name="library_state_permission_lost">Se revocó el acceso. Concede el acceso otra vez para leer este libro.</string>
+
+    <string name="library_scan_app_open">Comprobando tus carpetas…</string>
+    <string name="library_scan_manual_refresh">Actualizando tu biblioteca…</string>
+    <string name="library_scan_add_books">Añadiendo libros…</string>
+    <string name="library_scan_add_folder">Explorando la carpeta…</string>
+    <string name="library_scan_counts">%1$d de %2$d</string>
+
+    <!-- REQ-203: the library's order, a reader's choice of three -->
+    <string name="library_order_button">Orden: %1$s</string>
+    <string name="library_order_label">Ordenar los libros. Ahora: %1$s.</string>
+    <string name="library_order_title">Título</string>
+    <string name="library_order_recently_read">Leídos hace poco</string>
+    <string name="library_order_recently_added">Añadidos hace poco</string>
+
+    <string name="library_problem_title">No se pudo actualizar la biblioteca</string>
+    <!-- Reader screen -->
+    <string name="reader_back">Volver a la biblioteca</string>
+    <string name="reader_opening">Abriendo %1$s…</string>
+    <string name="reader_percent">%1$d%%</string>
+    <string name="reader_unavailable_title">Este libro no se puede leer</string>
+    <string name="reader_unavailable_source">No se pudo abrir este libro. Puede que el archivo se haya movido o borrado.</string>
+    <string name="reader_unavailable_corrupt">Este archivo está dañado y no se puede leer.</string>
+    <string name="reader_unavailable_invalid">Este archivo no es un EPUB utilizable.</string>
+    <string name="reader_unavailable_empty">Este libro no tiene texto que leer.</string>
+
+    <string name="reader_play">Reproducir</string>
+    <string name="reader_pause">Pausar</string>
+    <string name="reader_back_sentence">Retroceder una frase</string>
+    <string name="reader_forward_sentence">Avanzar una frase</string>
+    <string name="reader_back_paragraph">Retroceder un párrafo</string>
+    <string name="reader_forward_paragraph">Avanzar un párrafo</string>
+
+    <string name="reader_chapters">Capítulos</string>
+    <string name="reader_chapters_of">Lista de capítulos. %1$s, %2$s.</string>
+    <string name="reader_close">Cerrar</string>
+    <string name="reader_chapter_position">%1$d de %2$d</string>
+    <string name="reader_chapter_pause_hint">Reproduce para seguir leyendo.</string>
+
+    <string name="reader_finished_title">Has llegado al final de</string>
+    <string name="reader_finished_hint">Usa la lista de capítulos o la barra para volver atrás en el libro.</string>
+
+    <string name="reader_progress">%1$d%% leído</string>
+    <string name="reader_remaining_none">Fin del libro</string>
+    <string name="reader_remaining_under_minute">Menos de un minuto</string>
+    <string name="reader_remaining_minutes">Quedan %1$d min</string>
+    <string name="reader_remaining_hours">Quedan %1$d h %2$d min</string>
+    <string name="reader_scrub">Posición en el libro</string>
+
+    <string name="reader_speed_label">Velocidad de lectura</string>
+    <string name="reader_speed">%1$d ppm</string>
+    <string name="reader_speed_hint">Por encima de 450 ppm la mayoría de los lectores retiene menos de lo que lee. La reproducción sigue igual.</string>
+
+    <string name="reader_context_continues">…</string>
+
+    <string name="reader_hide_controls">Ocultar los controles</string>
+    <string name="reader_show_controls">Mostrar los controles</string>
+
+    <!-- REQ-108: the focused-mode speed gesture, its readout, and the screen-reader
+         equivalent of a gesture no accessibility service can perform. -->
+    <string name="reader_focused_speed_hint">Arrastra arriba o abajo para cambiar la velocidad</string>
+    <string name="reader_speed_faster">Aumentar la velocidad de lectura</string>
+    <string name="reader_speed_slower">Reducir la velocidad de lectura</string>
+
+    <string name="reader_persistence_problem_title">Tu punto de lectura no se está guardando</string>
+
+    <!-- REQ-103 / REQ-107: a book handed over by another app, with no library row -->
+    <string name="reader_external_notice">Abierto desde otra aplicación. Solo se recordará tu punto de lectura.</string>
+    <string name="reader_external_add">Añadir a la biblioteca</string>
+    <string name="reader_external_dismiss">Descartar</string>
+
+    <!-- REQ-202: the one-time offer to start past a book's cover and title pages -->
+    <string name="reader_front_matter_notice">Este libro empieza con la cubierta y las páginas de título.</string>
+    <string name="reader_front_matter_skip">Saltar a %1$s</string>
+    <string name="reader_front_matter_stay">Empezar por el principio</string>
+
+    <string name="library_resume_blocked_title">No se pudo volver a %1$s</string>
+    <string name="library_resume_blocked_missing">Su archivo se movió o se borró. Tu punto de lectura se guarda por si vuelve.</string>
+    <string name="library_resume_blocked_permission_lost">Se revocó el acceso a su carpeta. Concede el acceso otra vez para seguir leyendo.</string>
+    <string name="library_resume_blocked_unreadable">No se pudo abrir. Puede que el archivo se haya movido, borrado o dañado.</string>
+    <string name="library_resume_blocked_removed">Lo quitaste de tu biblioteca. Tu punto de lectura se guarda por si lo vuelves a añadir.</string>
+    <string name="library_resume_blocked_gone">Ya no está en tu biblioteca. Tu punto de lectura se guarda por si vuelve.</string>
+    <string name="library_resume_blocked_dismiss">Descartar</string>
+    <string name="library_resume_blocked_unnamed">tu último libro</string>
+
+    <string name="library_open">Abrir %1$s</string>
+
+    <!-- Undo a book removal (REQ-105). The label says what undoing does — the
+         book comes back — because "deshacer eliminar" would suggest the app
+         had deleted a file, which is exactly what it never does. -->
+    <string name="library_undo_removed">Se quitó “%1$s”. El archivo se queda en tu dispositivo y tu punto de lectura se guarda.</string>
+    <string name="library_undo">Deshacer</string>
+    <string name="library_undo_label">Deshacer: devolver %1$s a la biblioteca</string>
+
+    <!-- Added folders (REQ-104).
+
+         Spanish has a CLDR "many" plural category that English does not: a
+         count that is a whole number of millions takes "de" before the noun
+         ("2.000.000 de libros", but "5 libros"). Nobody will own a million
+         books, yet the category is part of a complete Spanish resource and
+         `MissingQuantity` is a gate here, so it is written rather than left
+         to fall back. Where the number sits inside parentheses no "de" is
+         possible, so those two items are identical on purpose. -->
+    <string name="library_folders_open">Carpetas añadidas</string>
+    <plurals name="library_folders_open_count">
+        <item quantity="one">Carpetas añadidas (1)</item>
+        <item quantity="many">Carpetas añadidas (%1$d)</item>
+        <item quantity="other">Carpetas añadidas (%1$d)</item>
+    </plurals>
+    <string name="folders_title">Carpetas añadidas</string>
+    <string name="folders_back">Volver a la biblioteca</string>
+    <string name="folders_intro">Todos los EPUB que hay dentro de estas carpetas están en tu biblioteca. Quitar una carpeta aquí nunca toca los archivos que contiene.</string>
+    <plurals name="folders_book_count">
+        <item quantity="one">1 libro en tu biblioteca</item>
+        <item quantity="many">%1$d de libros en tu biblioteca</item>
+        <item quantity="other">%1$d libros en tu biblioteca</item>
+    </plurals>
+    <string name="folders_status_missing">Falta la carpeta. Se movió, se renombró o se borró.</string>
+    <string name="folders_status_permission_lost">Se revocó el acceso. Añade la carpeta otra vez para leer sus libros.</string>
+    <string name="folders_remove">Quitar %1$s</string>
+    <string name="folders_remove_title">¿Quitar “%1$s”?</string>
+    <plurals name="folders_remove_count">
+        <item quantity="one">1 libro saldrá de tu biblioteca.</item>
+        <item quantity="many">%1$d de libros saldrán de tu biblioteca.</item>
+        <item quantity="other">%1$d libros saldrán de tu biblioteca.</item>
+    </plurals>
+    <string name="folders_remove_none">No saldrá ningún libro de tu biblioteca.</string>
+    <string name="folders_remove_kept">No se borra ni se modifica ningún archivo, y tu punto de lectura en cada libro se guarda.</string>
+    <string name="folders_remove_confirm">Quitar la carpeta</string>
+    <string name="folders_remove_cancel">Cancelar</string>
+    <string name="folders_empty">Todavía no has añadido ninguna carpeta.</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_open">Ajustes</string>
+    <string name="settings_back">Atrás</string>
+
+    <string name="settings_preview_label">Vista previa del flujo de palabras con tus ajustes actuales</string>
+    <string name="settings_rhythm">A %1$d ppm una palabra normal se ve %2$d ms y un final de frase %3$d ms.</string>
+    <string name="settings_rhythm_uniform">A %1$d ppm todas las palabras se ven %2$d ms, sin ninguna pausa añadida.</string>
+
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_theme">Tema</string>
+    <string name="settings_theme_light">Claro</string>
+    <string name="settings_theme_dark">Oscuro</string>
+    <string name="settings_theme_system">Sistema</string>
+    <string name="settings_font_size">Tamaño del texto</string>
+    <string name="settings_font_small">Pequeño</string>
+    <string name="settings_font_medium">Mediano</string>
+    <string name="settings_font_large">Grande</string>
+    <string name="settings_font_extra_large">Máximo</string>
+
+    <string name="settings_section_cues">Señales visuales</string>
+    <string name="settings_highlight">Letra destacada</string>
+    <string name="settings_highlight_summary">Colorea una letra de cada palabra para dar a tu vista un punto donde posarse.</string>
+    <string name="settings_highlight_color">Color del destacado</string>
+    <string name="settings_color_accent">Predeterminado</string>
+    <string name="settings_color_crimson">Carmesí</string>
+    <string name="settings_color_amber">Ámbar</string>
+    <string name="settings_color_teal">Verde azulado</string>
+    <string name="settings_color_violet">Violeta</string>
+    <string name="settings_focus_alignment">Letra de enfoque fija</string>
+    <string name="settings_focus_alignment_summary">Desplaza cada palabra para que la letra destacada caiga siempre en el mismo punto. Desactivado, las palabras quedan centradas.</string>
+    <string name="settings_guide_marks">Marcas de guía</string>
+    <string name="settings_guide_marks_summary">Dibuja una línea y un pequeño triángulo debajo de la palabra, que marcan el punto donde cae.</string>
+
+    <string name="settings_section_rhythm">Ritmo</string>
+    <string name="settings_pause_strength">Fuerza de la pausa</string>
+    <string name="settings_pause_summary">Cuánto más se mantiene el flujo en las comas, los puntos y los finales de párrafo.</string>
+    <string name="settings_pause_off">Ninguna</string>
+    <string name="settings_pause_subtle">Sutil</string>
+    <string name="settings_pause_normal">Normal</string>
+    <string name="settings_pause_strong">Fuerte</string>
+
+    <!-- REQ-201: the chapter-boundary pause, now a choice (D4) -->
+    <string name="settings_section_chapters">Capítulos</string>
+    <string name="settings_chapter_pause">Pausar en los capítulos</string>
+    <string name="settings_chapter_pause_summary">Detiene el flujo en la primera palabra de cada capítulo nuevo y lo nombra. Desactívalo para leer sin interrupciones.</string>
+
+    <string name="settings_on">Activado</string>
+    <string name="settings_off">Desactivado</string>
+
+    <string name="settings_reset">Restablecer los valores predeterminados</string>
+
+    <string name="settings_section_sample">Muestra</string>
+
+    <string name="settings_section_about">Acerca de este lector</string>
+    <string name="settings_version_label">Versión</string>
+    <string name="settings_version_value">%1$s (compilación %2$d)</string>
+    <string name="settings_version_description">Versión %1$s, compilación %2$d</string>
+    <string name="settings_check_updates">Buscar actualizaciones</string>
+    <string name="settings_check_updates_summary">Abre la página de versiones de FastReader en tu navegador. FastReader nunca se conecta a internet por su cuenta.</string>
+    <string name="settings_check_updates_unavailable">Ninguna aplicación de este dispositivo puede abrir un enlace web. La página de versiones es github.com/cedagova/fastReader/releases.</string>
+    <string name="settings_privacy_label">Qué se queda en este dispositivo</string>
+    <string name="settings_privacy">FastReader no tiene permiso de internet, así que no puede enviar ni recibir nada por su cuenta. Buscar actualizaciones solo le pasa una dirección web a tu navegador, y es tu navegador quien hace esa petición. Tus libros se quedan en las carpetas que elegiste; en este dispositivo FastReader guarda únicamente su propia lista de ellos, tus puntos de lectura, tus ajustes y miniaturas pequeñas de las cubiertas, en su almacenamiento privado. Nada de eso entra en la copia de seguridad de este dispositivo ni en una transferencia a un teléfono nuevo, así que una reinstalación o un teléfono nuevo empiezan con la biblioteca vacía. Cuando otra aplicación abre un libro en FastReader y no concede permiso duradero para leerlo, ese libro no se añade a tu lista y no se guarda ningún permiso sobre él; solo se recuerda tu punto de lectura.</string>
+    <string name="settings_visual_only">El flujo de palabras es solo visual. FastReader muestra una palabra cada vez en la pantalla; nunca lee un libro en voz alta, y no hay audio ni lectura por voz en ninguna parte de la aplicación. Todo lo que rodea al flujo —la biblioteca, los controles del lector y esta pantalla— está etiquetado para TalkBack, pero el flujo en sí hay que verlo.</string>
+
+    <!-- The crash report offered on the next launch (REQ-207, AD-14). These
+         strings are the offer, and the offer is what the reader reads, so it
+         is translated. The report's own text is not: `CRASH_REPORT_HEADING`
+         and `MESSAGE_NOTE` in CrashReport.kt stay English on purpose,
+         because the report is a technical artefact read by whoever fixes the
+         crash, and a bug report whose wording changes with the device's
+         language is harder to search, not friendlier. -->
+    <string name="crash_offer_title">FastReader se detuvo la última vez</string>
+    <string name="crash_offer_body">En este dispositivo hay guardado un informe breve sobre lo que salió mal. No sale nada del dispositivo a menos que compartas el informe y elijas una aplicación a la que enviarlo. Borrarlo es definitivo y, en cualquier caso, esto solo se te pregunta una vez.</string>
+    <string name="crash_offer_contents">El informe contiene la versión de la aplicación, el modelo de este dispositivo, su versión de Android y en qué parte de la aplicación se detuvo el código. No contiene ninguna parte de ningún libro, ni títulos de libros, ni nombres de archivo, ni rutas.</string>
+    <string name="crash_offer_share">Compartir el informe</string>
+    <string name="crash_offer_delete">Borrar el informe</string>
+    <string name="crash_offer_chooser">Informe de fallo de FastReader</string>
+    <string name="crash_offer_unavailable">Ninguna aplicación de este dispositivo puede recibir el informe como texto. Sigue aquí y no se ha enviado nada.</string>
+
+    <string name="settings_problem_title">Tus ajustes no se están guardando</string>
+</resources>
