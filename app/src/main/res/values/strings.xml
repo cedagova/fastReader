@@ -87,7 +87,6 @@
 
     <string name="reader_speed_label">Reading speed</string>
     <string name="reader_speed">%1$d WPM</string>
-    <string name="reader_speed_hint">Above 450 WPM most readers take in less of what they read. Playback continues either way.</string>
 
     <string name="reader_context_continues">…</string>
 

@@ -115,7 +115,6 @@
 
     <string name="reader_speed_label">Velocidad de lectura</string>
     <string name="reader_speed">%1$d ppm</string>
-    <string name="reader_speed_hint">Por encima de 450 ppm la mayoría de los lectores retiene menos de lo que lee. La reproducción sigue igual.</string>
 
     <string name="reader_context_continues">…</string>
 

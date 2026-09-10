@@ -80,8 +80,6 @@ sealed interface ReaderUiState {
         /** Time left at the current speed (REQ-017). */
         val remainingMillis: Long,
         val wpm: Int,
-        /** Non-blocking comprehension hint above ~450 WPM (REQ-012). */
-        val showSpeedHint: Boolean,
         /**
          * Why the reader's place is not being saved, or null when it is.
          *
@@ -209,7 +207,6 @@ class ReaderBookView(
             progressFraction = session.progressFraction,
             remainingMillis = remaining.millisAfter(session.index, session.settings),
             wpm = session.settings.effectiveWpm,
-            showSpeedHint = session.settings.effectiveWpm > SPEED_HINT_WPM,
             persistenceFailure = persistenceFailure,
         )
     }
@@ -222,9 +219,6 @@ class ReaderBookView(
  * paragraph continues.
  */
 private const val CONTEXT_RADIUS = 45
-
-/** Above this speed the reader is told, without being stopped, what the research says (REQ-012). */
-const val SPEED_HINT_WPM = 450
 
 private fun Token.toReaderWord(): ReaderWord = when (this) {
     is WordToken -> ReaderWord(

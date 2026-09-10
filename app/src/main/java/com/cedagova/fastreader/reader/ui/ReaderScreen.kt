@@ -1246,14 +1246,6 @@ private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Uni
             modifier = Modifier.clearAndSetSemantics {},
         )
     }
-    if (state.showSpeedHint) {
-        Text(
-            text = stringResource(R.string.reader_speed_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth().testTag("reader_speed_hint"),
-        )
-    }
 }
 
 @Composable

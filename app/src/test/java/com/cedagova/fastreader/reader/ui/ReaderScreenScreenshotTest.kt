@@ -28,7 +28,7 @@ import org.robolectric.annotation.GraphicsMode
  *
  * These renders are the primary proof that each state has its own layout and copy
  * — the paused paragraph with the word marked, the streamed word, the chapter
- * pause, the end of the book, the speed hint, a skip marker — and that the layout
+ * pause, the end of the book, a skip marker — and that the layout
  * survives a cramped screen at a large font scale. What they cannot prove is
  * anything about time: playback smoothness, the screen staying awake, and the
  * foreground-loss pause are all measured on the emulator, because a still image
@@ -131,11 +131,6 @@ class ReaderScreenScreenshotTest {
     @Test
     fun finishingTheBookIsItsOwnState() {
         capture("reader_end", view.present(ReaderSession(book).jumpTo(40).play().advance()))
-    }
-
-    @Test
-    fun aboveFourFiftyWordsPerMinuteTheHintIsVisibleAndPlaybackContinues() {
-        capture("reader_speed_hint", view.present(ReaderSession(book).jumpTo(12).play().withWpm(500)))
     }
 
     /**

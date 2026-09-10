@@ -123,14 +123,6 @@ class ReaderBookViewTest {
     }
 
     @Test
-    fun `REQ-012 the hint appears above 450 WPM and never blocks playback`() {
-        val session = ReaderSession(book).play()
-        assertFalse(view.present(session.withWpm(450)).showSpeedHint)
-        assertTrue(view.present(session.withWpm(451)).showSpeedHint)
-        assertEquals(ReaderMode.PLAYING, view.present(session.withWpm(1000)).mode)
-    }
-
-    @Test
     fun `navigation is offered whenever the stream is stopped and never while it runs`() {
         assertTrue(at(12).canNavigate)
         assertFalse(at(12, ReaderMode.PLAYING).canNavigate)
