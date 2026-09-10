@@ -255,6 +255,25 @@ allow-list, which is the point at which to ask what that field could carry.
   on the side of its own breakpoint that the `sw600dp` resource qualifier would
   have put it on.
 
+### Testing a text field under Robolectric
+
+- **Pause the clock before a field takes focus.** A focused text field blinks
+  its cursor forever, and with `mainClock.autoAdvance` left on, `waitForIdle`
+  chases those frames until the test JVM runs out of heap (the symptom is an
+  `OutOfMemoryError` inside `ShadowTrace`, not a hang). Set
+  `composeRule.mainClock.autoAdvance = false` before the field can be focused.
+- **With the clock paused, settle as sync → frames → sync.** A press only gets
+  composed on the next `waitForIdle`, and what that composes only gets bounds on
+  a later frame. `ReaderSpeedEntryTest.settle()` is the working sequence:
+  `waitForIdle()`, `advanceTimeBy(500)`, `waitForIdle()`. Skip the first sync
+  and the new node is "not displayed"; skip the frames and it is "not found".
+- **A text field inside a `Dialog` never settles at all.** Opening an
+  `AlertDialog` that contains an `OutlinedTextField` makes Robolectric's layout
+  loop even before the field is focused, and under the paused clock the dialog
+  window never registers with the test harness. The WPM entry is an inline swap
+  of the readout for exactly this reason; don't put a text field in a dialog
+  expecting to test it here.
+
 ### Every new string needs a Spanish one (#55)
 
 The app ships two locales: `values/strings.xml` and `values-es/strings.xml`.
