@@ -1,0 +1,53 @@
+== #62 in-place swap transcript (Phone_Mid_API36) ==
+host UTC: 2026-09-10T01:37:24Z
+
+--- back to library, then force-stop the app ---
+device: 2026-09-10T01:37:26Z  force-stop done
+
+--- catalog BEFORE the swap ---
+{"schemaVersion":7,"books":[{"id":"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666","title":"Swap Test","author":"Leaf Sixty Two","language":"en","publicationId":"urn:uuid:leaf62-swap-fixture","hasCover":false,"contentStatus":"READABLE","rejectReason":null,"rejectDetail":null,"sources":[{"uri":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62/document/primary%3ADownload%2Fleaf62%2Fswap-test.epub","origin":"FOLDER","displayName":"swap-test.epub","folderId":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62","sizeBytes":1801,"lastModifiedEpochMs":1598983200000,"availability":"AVAILABLE"}],"addedAtEpochMs":1789004130839,"lastSeenEpochMs":1789004130839}],"folders":[{"id":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62","treeUri":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62","displayName":"leaf62","status":"AVAILABLE","addedAtEpochMs":1789004130839,"lastScannedEpochMs":1789004130839}],"readingStates":{"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666":{"bookDigest":"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666","tokenIndex":14,"pipelineVersion":1,"structuralFingerprint":"zipdir1:a8dd8d0495e124e07ca1a8f085f4b7f00ee496d2d6f1e59838ac9ef2cae31274","progressFraction":0.25,"wpm":250,"updatedAtEpochMs":1789004178479}},"removedBookIds":[],"lastReadBookId":"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666","settings":{"theme":"SYSTEM","fontSize":"MEDIUM","highlightEnabled":true,"focusAlignmentEnabled":false,"pivotColor":"ACCENT","guideMarksEnabled":true,"pauseStrength":"NORMAL","chapterPauseEnabled":true,"libraryOrder":"RECENTLY_READ"},"frontMatterOfferedBookIds":[]}
+
+--- file BEFORE the swap ---
+/sdcard/Download/leaf62/swap-test.epub size=1801 mtime=1598983200
+3c4e671cd6f9a8eb72b4a162f642172a  /sdcard/Download/leaf62/swap-test.epub
+
+--- THE SWAP: same path, same URI, swapped.epub over original.epub ---
+host UTC: 2026-09-10T01:37:39Z
+/private/tmp/claude-501/-Users-chonko-projects-fastReader--claude-worktrees-subagent-spawning-review-cd980d/e41b2c9d-3c79-4845-a432-090593645fe8/scratchpad/leaf62/swapped.epub: 1 file pushed, 0 skipped. 4.8 MB/s (1801 bytes in 0.000s)
+
+--- file AFTER the swap (size and mtime must be identical to BEFORE) ---
+/sdcard/Download/leaf62/swap-test.epub size=1801 mtime=1598983200
+11760b6835b3ae4c1248ab2b05b30a0b  /sdcard/Download/leaf62/swap-test.epub
+
+--- relaunch (cold start; the 60 s app-open rescan interval has lapsed, so a rescan runs) ---
+host UTC: 2026-09-10T01:37:51Z
+Starting: Intent { cmp=com.cedagova.fastreader/.MainActivity }
+
+--- catalog AFTER the rescan, BEFORE reopening the book ---
+{"schemaVersion":7,"books":[{"id":"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666","title":"Swap Test","author":"Leaf Sixty Two","language":"en","publicationId":"urn:uuid:leaf62-swap-fixture","hasCover":false,"contentStatus":"READABLE","rejectReason":null,"rejectDetail":null,"sources":[{"uri":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62/document/primary%3ADownload%2Fleaf62%2Fswap-test.epub","origin":"FOLDER","displayName":"swap-test.epub","folderId":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62","sizeBytes":1801,"lastModifiedEpochMs":1598983200000,"availability":"AVAILABLE"}],"addedAtEpochMs":1789004130839,"lastSeenEpochMs":1789004271603}],"folders":[{"id":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62","treeUri":"content://com.android.externalstorage.documents/tree/primary%3ADownload%2Fleaf62","displayName":"leaf62","status":"AVAILABLE","addedAtEpochMs":1789004130839,"lastScannedEpochMs":1789004271603}],"readingStates":{"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666":{"bookDigest":"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666","tokenIndex":0,"pipelineVersion":1,"structuralFingerprint":"zipdir1:33c9a4b5b4787a97bd55c8cb6c2ec9adf7788cee096e86b70885988ee9ba566c","progressFraction":0.016666668,"wpm":250,"updatedAtEpochMs":1789004272096}},"removedBookIds":[],"lastReadBookId":"sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666","settings":{"theme":"SYSTEM","fontSize":"MEDIUM","highlightEnabled":true,"focusAlignmentEnabled":false,"pivotColor":"ACCENT","guideMarksEnabled":true,"pauseStrength":"NORMAL","chapterPauseEnabled":true,"libraryOrder":"RECENTLY_READ"},"frontMatterOfferedBookIds":[]}
+
+=== Migration half: a shipped v1.1.0 (schema 4) document, no fingerprint ===
+The file on disk at this point is the SWAPPED one (OMEGA).
+Result: schemaVersion 4 -> 7 in one load; the position resumed at word14 (25%).
+Absent stored fingerprint = NO GUARD, never a mismatch. The same open then stored
+zipdir1:33c9a4b5... , arming the guard for this book.
+
+=== Arming proof: swap back to the ORIGINAL file with the guard now armed ===
+host UTC: 2026-09-10T02:11:34Z
+/sdcard/Download/leaf62/swap-test.epub size=1801 mtime=1598983200
+3c4e671cd6f9a8eb72b4a162f642172a  /sdcard/Download/leaf62/swap-test.epub
+folder lastScanned: 1789006298575
+book id: sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666
+{
+ "sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666": {
+  "bookDigest": "sha256:aad0b20363d3cd74e918a3291deb4f37ea34787acc792eef10a8182de5b67666",
+  "tokenIndex": 0,
+  "pipelineVersion": 1,
+  "structuralFingerprint": "zipdir1:a8dd8d0495e124e07ca1a8f085f4b7f00ee496d2d6f1e59838ac9ef2cae31274",
+  "progressFraction": 0.016666668,
+  "wpm": 250,
+  "updatedAtEpochMs": 1789006299012
+ }
+}
+
+--- fixture generator: make-swap-fixture.py in this directory ---

@@ -13,6 +13,8 @@ import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
+import com.cedagova.fastreader.settings.LibraryOrder
+import com.cedagova.fastreader.settings.ReaderSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -446,4 +448,146 @@ class LibraryUiStateTest {
     fun `no removal on offer means no undo banner`() {
         assertNull(buildLibraryUiState(Catalog(), IngestionState.Idle, query = "").undoNotice)
     }
+
+    // --- REQ-203, the three orders -------------------------------------------
+
+    /**
+     * The default an updating reader gets without touching anything, and the
+     * requirement's own acceptance: reading two words of a book moves it up.
+     */
+    @Test
+    fun `recently read is the default order and puts the last book read on top (REQ-203)`() {
+        val catalog = orderedCatalog()
+
+        val state = buildLibraryUiState(catalog, IngestionState.Idle, query = "")
+
+        assertEquals(LibraryOrder.RECENTLY_READ, state.order)
+        assertEquals(listOf("Beowulf", "Anna Karenina", "Candide", "Dubliners"), state.books.map { it.title })
+    }
+
+    /** Reading two words of the book at the bottom is what moves it to the top. */
+    @Test
+    fun `reading a book moves it above one read earlier (REQ-203)`() {
+        val before = orderedCatalog()
+        assertEquals("Beowulf", buildLibraryUiState(before, IngestionState.Idle, "").books.first().title)
+
+        // What the position writer does on the second word: it stamps `now`.
+        val after = before.copy(
+            readingStates = before.readingStates + ("anna" to ReadingState(updatedAtEpochMs = 5_000)),
+        )
+
+        assertEquals("Anna Karenina", buildLibraryUiState(after, IngestionState.Idle, "").books.first().title)
+    }
+
+    /**
+     * The issue's failure behaviour. Candide and Dubliners were never opened, so
+     * they come after both books that were, and they are alphabetical between
+     * themselves rather than in whatever order the catalog happens to hold them.
+     */
+    @Test
+    fun `books never read sort after read ones, alphabetically (REQ-203)`() {
+        val books = buildLibraryUiState(orderedCatalog(), IngestionState.Idle, "").books.map { it.title }
+
+        assertEquals(listOf("Candide", "Dubliners"), books.takeLast(2))
+    }
+
+    /**
+     * A stored position whose timestamp is the `0` the field defaults to is a
+     * book this catalog cannot say was ever read — a v1 document, or a write
+     * that never happened — and it must not jump the queue over one that was.
+     */
+    @Test
+    fun `a stored position with no timestamp does not count as recently read`() {
+        val catalog = orderedCatalog().let {
+            it.copy(readingStates = it.readingStates + ("candide" to ReadingState(progressFraction = 0.4f)))
+        }
+
+        val books = buildLibraryUiState(catalog, IngestionState.Idle, "").books.map { it.title }
+
+        assertEquals(listOf("Beowulf", "Anna Karenina", "Candide", "Dubliners"), books)
+    }
+
+    @Test
+    fun `recently added orders by when the book entered the catalog (REQ-203)`() {
+        val catalog = orderedCatalog(LibraryOrder.RECENTLY_ADDED)
+
+        val state = buildLibraryUiState(catalog, IngestionState.Idle, query = "")
+
+        assertEquals(LibraryOrder.RECENTLY_ADDED, state.order)
+        assertEquals(listOf("Dubliners", "Candide", "Anna Karenina", "Beowulf"), state.books.map { it.title })
+    }
+
+    /** A book added before the catalog kept the timestamp carries `0` and sorts last. */
+    @Test
+    fun `a book with no added timestamp sorts last under recently added`() {
+        val catalog = orderedCatalog(LibraryOrder.RECENTLY_ADDED).let {
+            it.copy(books = it.books + LibraryFixtures.readable("old", "A Very Old Import"))
+        }
+
+        val books = buildLibraryUiState(catalog, IngestionState.Idle, "").books.map { it.title }
+
+        assertEquals("A Very Old Import", books.last())
+    }
+
+    /** Choosing title gives back exactly the list v1 shipped. */
+    @Test
+    fun `title order is the alphabet, whatever the timestamps say (REQ-203)`() {
+        val catalog = orderedCatalog(LibraryOrder.TITLE)
+
+        val state = buildLibraryUiState(catalog, IngestionState.Idle, query = "")
+
+        assertEquals(LibraryOrder.TITLE, state.order)
+        assertEquals(listOf("Anna Karenina", "Beowulf", "Candide", "Dubliners"), state.books.map { it.title })
+    }
+
+    /** Two books read in the same millisecond are alphabetical, not arbitrary. */
+    @Test
+    fun `books read at the same instant fall back to the alphabet`() {
+        val catalog = Catalog(
+            settings = ReaderSettings(libraryOrder = LibraryOrder.RECENTLY_READ),
+            books = listOf(
+                LibraryFixtures.readable("z", "Zeno's Conscience"),
+                LibraryFixtures.readable("a", "Amerika"),
+            ),
+            readingStates = mapOf(
+                "z" to ReadingState(updatedAtEpochMs = 9_000),
+                "a" to ReadingState(updatedAtEpochMs = 9_000),
+            ),
+        )
+
+        val books = buildLibraryUiState(catalog, IngestionState.Idle, "").books.map { it.title }
+
+        assertEquals(listOf("Amerika", "Zeno's Conscience"), books)
+    }
+
+    /** The order applies to what search left, not only to the whole library. */
+    @Test
+    fun `a filtered list keeps the chosen order`() {
+        val catalog = orderedCatalog().copy(
+            settings = ReaderSettings(libraryOrder = LibraryOrder.RECENTLY_ADDED),
+        )
+
+        val books = buildLibraryUiState(catalog, IngestionState.Idle, query = "n").books.map { it.title }
+
+        // "Dubliners", "Candide" and "Anna Karenina" all contain an n.
+        assertEquals(listOf("Dubliners", "Candide", "Anna Karenina"), books)
+    }
+
+    /**
+     * Four books that disagree about every order: alphabetically A, B, C, D;
+     * by reading, only B then A; by addition, exactly backwards.
+     */
+    private fun orderedCatalog(order: LibraryOrder = LibraryOrder.RECENTLY_READ) = Catalog(
+        settings = ReaderSettings(libraryOrder = order),
+        books = listOf(
+            LibraryFixtures.readable("anna", "Anna Karenina", addedAtEpochMs = 2_000),
+            LibraryFixtures.readable("beowulf", "Beowulf", addedAtEpochMs = 1_000),
+            LibraryFixtures.readable("candide", "Candide", addedAtEpochMs = 3_000),
+            LibraryFixtures.readable("dubliners", "Dubliners", addedAtEpochMs = 4_000),
+        ),
+        readingStates = mapOf(
+            "anna" to ReadingState(updatedAtEpochMs = 1_500),
+            "beowulf" to ReadingState(updatedAtEpochMs = 2_500),
+        ),
+    )
 }

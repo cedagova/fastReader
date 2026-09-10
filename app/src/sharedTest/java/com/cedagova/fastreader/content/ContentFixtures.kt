@@ -196,6 +196,89 @@ object ContentFixtures {
         ),
     )
 
+    /**
+     * REQ-202's acceptance shape: a spine that starts with cover, title and
+     * copyright pages before its first real chapter.
+     *
+     * One builder, three books, because the three ways a reader can be offered
+     * the skip differ only in what the package says about itself:
+     *
+     * - neither flag — nothing is declared, so only the chapter titles are left
+     *   and the title heuristic has to carry it;
+     * - [landmarks] — an EPUB 3 `landmarks` nav with a `bodymatter` entry, the
+     *   book stating where its body begins;
+     * - [guide] — the EPUB 2 spelling of the same statement,
+     *   `<guide><reference type="text">`.
+     *
+     * The declared entries deliberately point at `chapter1.xhtml` through a
+     * fragment (`#start`), which is how real books write them, so the resolution
+     * that strips it is exercised rather than assumed.
+     */
+    fun frontMatterBook(landmarks: Boolean = false, guide: Boolean = false): ByteArray {
+        val landmarkNav = if (!landmarks) "" else """
+  <nav epub:type="landmarks">
+    <ol>
+      <li><a epub:type="cover" href="cover.xhtml">Cover</a></li>
+      <li><a epub:type="bodymatter" href="chapter1.xhtml#start">Start of content</a></li>
+    </ol>
+  </nav>"""
+        val guideElement = if (!guide) "" else """
+  <guide>
+    <reference type="cover" title="Cover" href="cover.xhtml"/>
+    <reference type="text" title="Beginning" href="chapter1.xhtml#start"/>
+  </guide>"""
+        return EpubFixtures.buildArchive(
+            listOf(
+                "META-INF/container.xml" to CONTAINER.utf8(),
+                "OEBPS/content.opf" to """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="pub-id">urn:uuid:front-matter</dc:identifier>
+    <dc:title>The Long Approach</dc:title>
+    <dc:creator>Ada Fielding</dc:creator>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
+    <item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>
+    <item id="rights" href="copyright.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch2" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="cover"/>
+    <itemref idref="title"/>
+    <itemref idref="rights"/>
+    <itemref idref="ch1"/>
+    <itemref idref="ch2"/>
+  </spine>$guideElement
+</package>""".utf8(),
+                "OEBPS/nav.xhtml" to """<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<body>
+  <nav epub:type="toc">
+    <ol>
+      <li><a href="cover.xhtml">Cover</a></li>
+      <li><a href="title.xhtml">Title Page</a></li>
+      <li><a href="copyright.xhtml">Copyright</a></li>
+      <li><a href="chapter1.xhtml">Chapter One: The Approach</a></li>
+      <li><a href="chapter2.xhtml">Chapter Two: The Return</a></li>
+    </ol>
+  </nav>$landmarkNav
+</body>
+</html>""".utf8(),
+                "OEBPS/cover.xhtml" to page("""<h1>Cover</h1><p>The Long Approach</p>"""),
+                "OEBPS/title.xhtml" to page("""<h1>Title Page</h1><p>The Long Approach, by Ada Fielding.</p>"""),
+                "OEBPS/copyright.xhtml" to page("""<h1>Copyright</h1><p>All rights reserved.</p>"""),
+                "OEBPS/chapter1.xhtml" to page(
+                    """<h1>Chapter One</h1><p id="start">Dawn came late to the valley.</p>""",
+                ),
+                "OEBPS/chapter2.xhtml" to page("""<h1>Chapter Two</h1><p>They turned for home.</p>"""),
+            ),
+        )
+    }
+
     /** No navigation document and no NCX: titles have to come from headings or position. */
     fun untitledSections(): ByteArray = EpubFixtures.buildArchive(
         listOf(

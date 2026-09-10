@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,6 +48,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,12 +77,16 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.settings.CueSettings
+import com.cedagova.fastreader.ui.LayoutWidth
+import com.cedagova.fastreader.ui.WidthAware
 import com.cedagova.fastreader.timing.RsvpTiming
 import kotlin.math.roundToInt
 
@@ -139,6 +147,25 @@ private val TouchTarget = 48.dp
  * stream keeps the same size and the same background whether the notice is there
  * or not. Nothing about it animates, and it never touches the stream's own
  * luminance (REQ-062).
+ *
+ * ## Two layouts, one screen (REQ-205)
+ *
+ * At [com.cedagova.fastreader.ui.WideLayoutMinWidth] and above — every tablet, and
+ * every phone turned on its side — the control column moves from *under* the
+ * stream to *beside* it, and nothing else changes: the same [ReaderControls] with
+ * the same controls, labels and touch targets, and the same [ReadingSurface] with
+ * the same tap, long press and drag. Below that width the screen is composed
+ * exactly as it was, which is why the phone-portrait goldens are unchanged bytes.
+ *
+ * The wide branch is skipped whenever the chrome is hidden: focused mode has no
+ * control column to place, so it is the same full-bleed stream at every width
+ * (REQ-030), and the speed gesture it carries is unaffected by the breakpoint.
+ *
+ * Landscape is where the reading area is shortest, and moving the controls out of
+ * the column is what gives it back: the stream gets the whole height instead of
+ * roughly half of it. The control column takes [readerControlsWidth] of the width
+ * and scrolls inside itself, so a large font scale lengthens it rather than
+ * cutting the speed slider off the bottom.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -175,6 +202,14 @@ fun ReaderScreen(
     externalNotice: Boolean = false,
     onAddToLibrary: () -> Unit = {},
     onDismissExternalNotice: () -> Unit = {},
+    /**
+     * REQ-202: this book opens on front matter and has not been offered the skip
+     * before, so the screen offers it once. The title is the chapter the skip
+     * lands in; null means no offer.
+     */
+    frontMatterOffer: String? = null,
+    onSkipFrontMatter: () -> Unit = {},
+    onDismissFrontMatterOffer: () -> Unit = {},
     word: @Composable (ReaderWord, Modifier) -> Unit = { token, wordModifier ->
         CueWord(token, cues, wordModifier)
     },
@@ -186,8 +221,9 @@ fun ReaderScreen(
     // to the library there would strand the reader on a dead screen.
     val chromeHidden = focused && state is ReaderUiState.Reading
 
+    WidthAware(modifier.fillMaxSize()) { layout ->
     Scaffold(
-        modifier = modifier.fillMaxSize().testTag("reader_screen"),
+        modifier = Modifier.fillMaxSize().testTag("reader_screen"),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             if (!chromeHidden) {
@@ -245,18 +281,31 @@ fun ReaderScreen(
                                 onDismiss = onDismissExternalNotice,
                             )
                         }
+                        frontMatterOffer?.let { chapterTitle ->
+                            FrontMatterOfferNotice(
+                                chapterTitle = chapterTitle,
+                                onSkip = onSkipFrontMatter,
+                                onDismiss = onDismissFrontMatterOffer,
+                            )
+                        }
                     }
-                    ReadingSurface(
-                        state = state,
-                        onTogglePlay = onTogglePlay,
-                        onToggleFocused = onToggleFocused,
-                        focused = chromeHidden,
-                        speedNotice = speedNotice,
-                        onSpeedStep = onSpeedStep,
-                        word = word,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (!chromeHidden) {
+                    // The two slots the layouts share. Hoisted so the wide branch
+                    // cannot drift from the narrow one: there is one argument list
+                    // for the stream and one for the controls, and the branches
+                    // differ only in where they put them.
+                    val surface: @Composable (Modifier) -> Unit = { slot ->
+                        ReadingSurface(
+                            state = state,
+                            onTogglePlay = onTogglePlay,
+                            onToggleFocused = onToggleFocused,
+                            focused = chromeHidden,
+                            speedNotice = speedNotice,
+                            onSpeedStep = onSpeedStep,
+                            word = word,
+                            modifier = slot,
+                        )
+                    }
+                    val controls: @Composable (Modifier, Arrangement.Vertical) -> Unit = { slot, arrangement ->
                         ReaderControls(
                             state = state,
                             onTogglePlay = onTogglePlay,
@@ -267,11 +316,20 @@ fun ReaderScreen(
                             onForwardParagraph = onForwardParagraph,
                             onScrub = onScrub,
                             onOpenChapters = { chapterPickerOpen = true },
+                            modifier = slot,
+                            verticalArrangement = arrangement,
                         )
+                    }
+                    if (layout.wide && !chromeHidden) {
+                        WideReadingLayout(layout, surface, controls, Modifier.weight(1f))
+                    } else {
+                        surface(Modifier.weight(1f))
+                        if (!chromeHidden) controls(Modifier.fillMaxWidth(), Arrangement.Top)
                     }
                 }
             }
         }
+    }
     }
 
     if (chapterPickerOpen && state is ReaderUiState.Reading) {
@@ -286,6 +344,65 @@ fun ReaderScreen(
         )
     }
 }
+
+/**
+ * REQ-205: the stream and its controls side by side.
+ *
+ * The stream takes the width that is left rather than a share of its own, so the
+ * reading area grows with the screen while the controls stay the size a hand can
+ * work — a 5 mm-per-step slider on a 10" tablet would be worse, not better.
+ *
+ * The column is [androidx.compose.foundation.verticalScroll]ed and centred: at the
+ * largest font size in landscape the five stacked controls can be taller than the
+ * 411 dp the reading area has, and scrolling is the difference between a long
+ * column and a speed slider that is not on the screen at all (REQ-301).
+ *
+ * The divider is the one thing here that is not already on the narrow screen. It
+ * is a hairline of `outlineVariant` and carries no semantics, so it adds nothing
+ * for TalkBack to read and nothing that changes brightness (REQ-302).
+ */
+@Composable
+private fun ColumnScope.WideReadingLayout(
+    layout: LayoutWidth,
+    surface: @Composable (Modifier) -> Unit,
+    controls: @Composable (Modifier, Arrangement.Vertical) -> Unit,
+    modifier: Modifier,
+) {
+    Row(modifier = modifier.fillMaxWidth().testTag("reader_controls_beside")) {
+        surface(Modifier.weight(1f).fillMaxHeight())
+        VerticalDivider()
+        controls(
+            Modifier
+                .width(readerControlsWidth(layout.available))
+                .fillMaxHeight()
+                .verticalScroll(rememberScrollState()),
+            Arrangement.Center,
+        )
+    }
+}
+
+/**
+ * How wide the control column is, from how wide the window is.
+ *
+ * A fraction with both ends pinned, because neither a fraction nor a fixed width
+ * survives the whole range on its own:
+ *
+ * - at the 600 dp boundary the fraction alone would leave 252 dp, and the
+ *   transport row's five 48 dp targets plus its padding need 272 dp — so
+ *   [MinControlsWidth] is the width that keeps REQ-301's targets whole on the
+ *   narrowest wide screen there is;
+ * - on a 10" tablet the fraction alone would spend 538 dp on a slider, so
+ *   [MaxControlsWidth] hands the rest back to the stream.
+ */
+private fun readerControlsWidth(available: Dp): Dp =
+    (available * ControlsWidthFraction).coerceIn(MinControlsWidth, MaxControlsWidth)
+
+private const val ControlsWidthFraction = 0.42f
+
+/** Five 48 dp targets, their arrangement, and the column's own 16 dp padding. */
+private val MinControlsWidth = 280.dp
+
+private val MaxControlsWidth = 420.dp
 
 /**
  * The book-open loading state. LEAF201 parses off the main thread and reports one
@@ -364,6 +481,65 @@ private fun ExternalOpenNotice(onAddToLibrary: () -> Unit, onDismiss: () -> Unit
                         .testTag("reader_external_dismiss"),
                 ) {
                     Text(text = stringResource(R.string.reader_external_dismiss))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * REQ-202: the one-time offer to start past a book's cover and title pages.
+ *
+ * A banner in the same slot and the same shape as [ExternalOpenNotice], and for
+ * the same reasons: it must not stop anyone reading, it must not sit inside the
+ * reading surface where it would change the stream's fixed size or static
+ * background (REQ-062, REQ-302, AD-6), and it goes with the chrome in focused
+ * mode.
+ *
+ * Both buttons answer the question, which is why the second one says what it
+ * does rather than "Dismiss": staying on the cover is a choice about where to
+ * start reading, not the closing of a message. Either way the offer is recorded
+ * as made and this book never shows it again.
+ *
+ * ## Accessibility (REQ-301)
+ *
+ * The skip button names the chapter it goes to, so a reader who cannot see the
+ * sentence above it still learns where the tap lands. That label is as long as
+ * the book's chapter title, which is why the buttons sit in a [FlowRow]: on a
+ * 360 dp screen at a large font scale a plain `Row` gives the second button no
+ * width at all, wraps its label one character to a line, and pushes the way to
+ * decline off the screen — the compact golden beside this one was recorded
+ * against exactly that failure. Both buttons clear [TouchTarget].
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FrontMatterOfferNotice(chapterTitle: String, onSkip: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth().testTag("reader_front_matter_offer"),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                text = stringResource(R.string.reader_front_matter_notice),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = onSkip,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_front_matter_skip"),
+                ) {
+                    Text(text = stringResource(R.string.reader_front_matter_skip, chapterTitle))
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_front_matter_stay"),
+                ) {
+                    Text(text = stringResource(R.string.reader_front_matter_stay))
                 }
             }
         }
@@ -743,8 +919,13 @@ private fun ReaderControls(
     onForwardParagraph: () -> Unit,
     onScrub: (Float) -> Unit,
     onOpenChapters: () -> Unit,
+    modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("reader_controls"),
+        verticalArrangement = verticalArrangement,
+    ) {
         ChapterRow(state = state, onOpenChapters = onOpenChapters)
         ProgressRow(state)
         PositionControl(state = state, onScrub = onScrub)
@@ -760,7 +941,17 @@ private fun ReaderControls(
     }
 }
 
-/** The chapter title doubles as the chapter picker's entry point (REQ-014). */
+/**
+ * The chapter title doubles as the chapter picker's entry point (REQ-014).
+ *
+ * The title takes two lines rather than one, and ellipsises rather than clipping.
+ * On a phone it never needs either — "Chapter One: The Arrival" fits a 379 dp row
+ * at every font size the app allows — but REQ-205's control column is 280 dp at
+ * the 600 dp boundary, where the same title at the largest font size lost "The
+ * Arrival" off the end with no ellipsis to say so. Wrapping costs the narrow
+ * layout nothing: a title that already fits one line is laid out identically, which
+ * is why no phone golden moved when this changed.
+ */
 @Composable
 private fun ChapterRow(state: ReaderUiState.Reading, onOpenChapters: () -> Unit) {
     val position = stringResource(R.string.reader_chapter_position, state.chapterNumber, state.chapterCount)
@@ -777,7 +968,8 @@ private fun ChapterRow(state: ReaderUiState.Reading, onOpenChapters: () -> Unit)
         Text(
             text = state.chapterTitle.ifBlank { stringResource(R.string.reader_chapters) },
             style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
         Spacer(Modifier.width(8.dp))

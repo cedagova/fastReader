@@ -79,12 +79,12 @@ private val TouchTarget = 48.dp
  *
  * ## Bounded, exactly as defined
  *
- * Five groups and nothing else: theme (REQ-022), text size (REQ-022), the cue set
+ * Six groups and nothing else: theme (REQ-022), text size (REQ-022), the cue set
  * — letter highlight and its palette, fixed focus letter, guide marks (REQ-020,
- * REQ-021) — and pause strength (REQ-011). There is no free-form colour picker,
- * no point-size field, and no per-multiplier timing panel. Every control is a
- * choice from a small fixed set, which is also why they are all radio-style chips
- * or switches rather than sliders.
+ * REQ-021) — pause strength (REQ-011), and the chapter-boundary pause (REQ-201).
+ * There is no free-form colour picker, no point-size field, and no per-multiplier
+ * timing panel. Every control is a choice from a small fixed set, which is also
+ * why they are all radio-style chips or switches rather than sliders.
  *
  * ## The two cue toggles (#32)
  *
@@ -238,6 +238,19 @@ fun SettingsScreen(
                     optionLabel = { stringResource(it.labelRes()) },
                     onSelect = { onSettingsChange(settings.copy(pauseStrength = it)) },
                     tag = "settings_pause_strength",
+                )
+
+                // Its own section, not a fourth cue and not a fifth pause
+                // strength: the cue switches change what a word looks like and
+                // pause strength changes how long one is shown, while this decides
+                // whether the stream stops at all (REQ-201, D4).
+                SectionHeading(stringResource(R.string.settings_section_chapters))
+                SwitchRow(
+                    label = stringResource(R.string.settings_chapter_pause),
+                    summary = stringResource(R.string.settings_chapter_pause_summary),
+                    checked = settings.chapterPauseEnabled,
+                    onCheckedChange = { onSettingsChange(settings.copy(chapterPauseEnabled = it)) },
+                    tag = "settings_chapter_pause",
                 )
 
                 Spacer(Modifier.height(16.dp))

@@ -15,11 +15,13 @@ import com.cedagova.fastreader.timing.PauseStrength
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -129,6 +131,65 @@ class LibraryRepositoryTest {
         assertEquals(digest, repository.catalog.value.lastReadBookId)
     }
 
+    // --- The write-path rule for the content-change guard (#62, AD-18) ---
+
+    /**
+     * The one failure mode that would disarm the guard silently.
+     *
+     * A book opened through the streaming archive produces no fingerprint, so the
+     * position it stores carries a null. Writing that null over a fingerprint
+     * already recorded would leave the book unprotected for good, with nothing
+     * anywhere reporting it. So a null keeps what is stored.
+     */
+    @Test
+    fun `a position stored with no fingerprint leaves the recorded one alone`() = runTest {
+        val repository = repository(scope = backgroundScope)
+        val digest = "sha256:abc"
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 100, structuralFingerprint = "zipdir1:feed"),
+        )
+
+        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 200))
+
+        assertEquals(200, repository.readingState(digest)?.tokenIndex)
+        assertEquals("zipdir1:feed", repository.readingState(digest)?.structuralFingerprint)
+    }
+
+    /** A real fingerprint does replace one: reopening a changed file re-arms the guard. */
+    @Test
+    fun `a position stored with a fingerprint replaces the recorded one`() = runTest {
+        val repository = repository(scope = backgroundScope)
+        val digest = "sha256:abc"
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 100, structuralFingerprint = "zipdir1:feed"),
+        )
+
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 0, structuralFingerprint = "zipdir1:beef"),
+        )
+
+        assertEquals("zipdir1:beef", repository.readingState(digest)?.structuralFingerprint)
+    }
+
+    /** The first directory open after the migration is what arms it. */
+    @Test
+    fun `a book with no recorded fingerprint gains one from the next open that has it`() = runTest {
+        val repository = repository(scope = backgroundScope)
+        val digest = "sha256:abc"
+        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 100))
+        assertNull(repository.readingState(digest)?.structuralFingerprint)
+
+        repository.updateReadingState(
+            digest,
+            ReadingState(bookDigest = digest, tokenIndex = 140, structuralFingerprint = "zipdir1:feed"),
+        )
+
+        assertEquals("zipdir1:feed", repository.readingState(digest)?.structuralFingerprint)
+    }
+
     // REQ-002: both the open-rescan and the manual refresh find a newly copied book.
     @Test
     fun `manual refresh finds a new book that the debounced app-open scan skipped`() = runTest {
@@ -139,8 +200,9 @@ class LibraryRepositoryTest {
 
         gateway.putIntoFolder("tree://books", "tree://books/two.epub", EpubFixtures.spanishEpub(), "two.epub")
 
-        // Same instant as the add: the app-open scan is suppressed so returning from
-        // the picker does not immediately rescan the whole tree.
+        // Same instant as the add, so the scan is inside REQ-204's interval and is
+        // skipped: returning from the picker — or from any app the reader stepped
+        // out to — does not re-list the whole tree.
         repository.rescan(ScanTrigger.APP_OPEN)
         assertEquals(1, repository.catalog.value.books.size)
 
@@ -149,6 +211,34 @@ class LibraryRepositoryTest {
         assertEquals(2, repository.catalog.value.books.size)
     }
 
+    /**
+     * REQ-204's first half, at the level the banner is actually decided: a skipped
+     * app-open rescan publishes no [IngestionState.Scanning] at all — not even for
+     * one emission — so there is nothing for the library to draw a scanning banner
+     * from, and the stored catalog stays on screen behind it.
+     */
+    @Test
+    fun `a rescan skipped for recency publishes no scanning state and keeps the catalog`() = runTest {
+        gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
+        val repository = repository(scope = backgroundScope)
+        repository.addFolder("tree://books", "Books")
+
+        val seen = mutableListOf<IngestionState>()
+        val watching = backgroundScope.launch { repository.ingestion.collect { seen += it } }
+        runCurrent()
+        seen.clear()
+
+        // Well inside the interval: a reader who switched away and came straight back.
+        now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS / 2
+        repository.rescan(ScanTrigger.APP_OPEN)
+        runCurrent()
+        watching.cancel()
+
+        assertTrue("a skipped rescan must not announce a scan: $seen", seen.none { it is IngestionState.Scanning })
+        assertEquals(1, repository.catalog.value.books.size)
+    }
+
+    /** The same instant one tick later is the other side of the same line. */
     @Test
     fun `the app-open scan runs once the debounce window has passed`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
@@ -338,9 +428,11 @@ class LibraryRepositoryTest {
     }
 
     /**
-     * The undo window is longer than the app-open rescan debounce, so a rescan
-     * lands inside it every time the reader removes a book and switches away.
-     * Undo has to survive that without duplicating or losing the row.
+     * A rescan can land inside the undo window — the reader removes a book, steps
+     * out long enough for REQ-204's interval to lapse, and comes back while the
+     * offer still stands. Undo has to survive that without duplicating or losing
+     * the row, so the clock here is moved past the interval deliberately rather
+     * than relying on the two windows overlapping.
      */
     @Test
     fun `undo restores exactly one row even when a rescan runs inside the window`() = runTest {
@@ -573,6 +665,44 @@ class LibraryRepositoryTest {
         assertEquals(ThemeChoice.DARK, second.settings.value.theme)
         assertEquals(PauseStrength.OFF, second.settings.value.pauseStrength)
         assertEquals(FontSize.MEDIUM, second.settings.value.fontSize)
+    }
+
+    /**
+     * REQ-201: the chapter pause is an ordinary setting, so it goes down the same
+     * write path as the rest and comes back after a restart.
+     */
+    @Test
+    fun `the chapter pause setting is stored and survives a restart`() = runTest {
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.load()
+        assertTrue("it ships on", first.settings.value.chapterPauseEnabled)
+
+        first.updateSettings { it.copy(chapterPauseEnabled = false) }
+
+        val second = repository(FileCatalogStore(file), backgroundScope)
+        second.load()
+        assertFalse(second.settings.value.chapterPauseEnabled)
+    }
+
+    /**
+     * REQ-202's durable half: the offer is made once per book, and "once" has to
+     * outlive the process that made it.
+     */
+    @Test
+    fun `a book offered the front-matter skip stays offered across a restart`() = runTest {
+        val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
+        val first = repository(FileCatalogStore(file), backgroundScope)
+        first.load()
+        assertTrue(first.catalog.value.frontMatterOfferedBookIds.isEmpty())
+
+        first.markFrontMatterOffered("sha256:abc")
+        // Answering twice must cost one record, not two.
+        first.markFrontMatterOffered("sha256:abc")
+
+        val second = repository(FileCatalogStore(file), backgroundScope)
+        second.load()
+        assertEquals(setOf("sha256:abc"), second.catalog.value.frontMatterOfferedBookIds)
     }
 
     /** REQ-023: reset restores exactly the documented defaults, not "most of" them. */

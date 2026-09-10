@@ -1,0 +1,34 @@
+REQ-204 on Phone_Mid_API36 — the recorded sequence behind the two captures.
+Wall clock is the host's; the device clock in the screenshots is the same run.
+
+  16:26:37  adb shell input tap 880 148            # the Refresh control
+  16:26:40  refresh finished — the library is 3 books, scanned just now
+            (screen at this moment: order-survives-restart-phone-mid-api36.png)
+
+  16:26:40  adb shell input keyevent KEYCODE_HOME  # the reader leaves the app
+  16:26:41  adb push nocturne-field.epub /sdcard/Download/leaf52/
+  16:26:41  adb shell ls /sdcard/Download/leaf52/
+              aurora-nights.epub
+              meridian-drift.epub
+              nocturne-field.epub      <-- on disk, in the added folder
+              zephyr-lane.epub
+
+  16:26:44  adb shell am start -n com.cedagova.fastreader/.MainActivity
+            screenshot: still 3 books, no scanning banner.
+
+            Four seconds after the last scan, so the app-open rescan is inside
+            the 60 s interval and is skipped. The screen is byte-for-byte the
+            screen from before the reader left —
+            sha1 eb054ee58e608de8212bf044ababc14c47085f83 for both — which is
+            the whole of "returning within the interval does not re-list every
+            folder": nothing scanned, nothing announced, nothing moved.
+
+  16:27:01  adb shell input tap 880 148            # Refresh again
+            screenshot: manual-refresh-finds-the-new-book-phone-mid-api36.png
+            Nocturne Field is in the library. The manual refresh always runs.
+
+  16:27:16  adb push polaris-run.epub /sdcard/Download/leaf52/  (app backgrounded)
+  16:28:36  adb shell am start ...                 # 95 s after the last scan
+            screenshot: rescan-resumes-after-the-interval-phone-mid-api36.png
+            Polaris Run is in the library with no refresh tapped, so the
+            interval throttles the app-open rescan rather than disabling it.

@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,18 +18,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,18 +54,23 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -67,7 +82,11 @@ import com.cedagova.fastreader.content.BundledSample
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
+import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.ui.SampleOffer
+import com.cedagova.fastreader.ui.LayoutWidth
+import com.cedagova.fastreader.ui.WideLayoutMinWidth
+import com.cedagova.fastreader.ui.WidthAware
 import com.cedagova.fastreader.ui.rememberSampleOrder
 
 /** Smallest comfortable touch target; Android's accessibility minimum is 48dp (REQ-060). */
@@ -81,6 +100,30 @@ private val TouchTarget = 48.dp
  * Stateless on purpose — every state it can show is reachable from a
  * [LibraryUiState] value, which is what lets the Roborazzi renders be the UI
  * regression gate. [LibraryRoute] supplies the real repository-backed state.
+ *
+ * ## Two layouts, one screen (REQ-205)
+ *
+ * At [com.cedagova.fastreader.ui.WideLayoutMinWidth] and above the screen spends
+ * the width it has in two places, and nowhere else changes:
+ *
+ * - **the header is one row**, search beside the two add buttons instead of above
+ *   them, whenever [headerFitsOneRow]. That is width used, and it is also ~72 dp
+ *   of height given back to the book list — which is what landscape, where the
+ *   whole window is 411 dp tall, actually needs.
+ * - **the list is a grid** of [bookColumnMinWidth]-wide columns instead of one
+ *   full-width column, so a 10" tablet shows three or four books across rather
+ *   than one book and a lot of nothing.
+ *
+ * The column minimum is font-scaled, which is the whole of how the grid keeps
+ * REQ-205's "no clipped text at the largest font size": a book row's cover,
+ * remove button and padding are a fixed 152 dp, and only the title and author
+ * grow with the font, so the width a column needs is
+ * `152 dp + 148 dp x fontScale`. At the largest size a 600 dp tablet therefore
+ * gets one *wide* row rather than two cramped ones — the grid adds a column when
+ * there is room for a whole one and not before.
+ *
+ * Below the breakpoint every one of these composes exactly as it did, which is why
+ * the phone-portrait goldens are unchanged bytes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,10 +152,13 @@ fun LibraryScreen(
     onOpenFolders: () -> Unit = {},
     /** Takes back the removal the undo snackbar is offering (REQ-105). */
     onUndoRemove: () -> Unit = {},
+    /** Stores a new library order (REQ-203). The list re-sorts from the stored value. */
+    onOrderChange: (LibraryOrder) -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
+    WidthAware(modifier.fillMaxSize()) { layout ->
     Scaffold(
-        modifier = modifier.fillMaxSize().testTag("library_screen"),
+        modifier = Modifier.fillMaxSize().testTag("library_screen"),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.library_title)) },
@@ -140,14 +186,42 @@ fun LibraryScreen(
                     samples = samples,
                     folderCount = state.folders.size,
                     onOpenFolders = onOpenFolders,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
 
                 LibraryContent.NO_SEARCH_RESULTS,
                 LibraryContent.BOOKS,
                 -> {
-                    SearchField(query = state.query, onQueryChange = onQueryChange)
-                    AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder)
-                    FoldersEntry(count = state.folders.size, onOpenFolders = onOpenFolders)
+                    if (headerFitsOneRow(layout)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().testTag("library_wide_header"),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SearchField(
+                                query = state.query,
+                                onQueryChange = onQueryChange,
+                                modifier = Modifier.weight(1f),
+                            )
+                            // Natural width, not a weight: at the largest font
+                            // size a half-and-half split squeezes "Add folder"
+                            // onto two lines, and the search field is the one of
+                            // the three that can give room away.
+                            AddActions(
+                                onAddBooks = onAddBooks,
+                                onAddFolder = onAddFolder,
+                                weighted = false,
+                            )
+                        }
+                    } else {
+                        SearchField(query = state.query, onQueryChange = onQueryChange)
+                        AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder)
+                    }
+                    ListControls(
+                        order = state.order,
+                        onOrderChange = onOrderChange,
+                        folderCount = state.folders.size,
+                        onOpenFolders = onOpenFolders,
+                    )
                     if (state.content == LibraryContent.NO_SEARCH_RESULTS) {
                         NoSearchResults(state.query)
                     } else {
@@ -157,11 +231,13 @@ fun LibraryScreen(
                             onGrantAccess = onGrantAccess,
                             onOpen = onOpen,
                             coverLoader = coverLoader,
+                            wide = layout.wide,
                         )
                     }
                 }
             }
         }
+    }
     }
 }
 
@@ -259,16 +335,120 @@ private fun UndoBar(notice: UndoNotice, onUndo: () -> Unit) {
  * Only shown once a folder exists: with none, the list would be a dead end, and
  * "Add folder" is already on the screen right above it.
  */
+/**
+ * The two secondary affordances that sit between the header and the list: how
+ * the list is ordered (REQ-203) and the way into the added folders (REQ-104).
+ *
+ * They share one [FlowRow] rather than taking a row each. The library header is
+ * already three rows deep before the list starts, and on a landscape phone the
+ * whole window is 411 dp tall (REQ-205), so a row that only ever holds one short
+ * control is height the books should have. Side by side when they fit, stacked
+ * when they do not — which is what a large font scale plus a plural folder count
+ * eventually forces, and stacking is the outcome that keeps REQ-301's "nothing
+ * clipped" true without a second breakpoint.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit, horizontalPadding: Dp = 16.dp) {
+private fun ListControls(
+    order: LibraryOrder,
+    onOrderChange: (LibraryOrder) -> Unit,
+    folderCount: Int,
+    onOpenFolders: () -> Unit,
+    horizontalPadding: Dp = 16.dp,
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        OrderControl(order = order, onOrderChange = onOrderChange)
+        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders)
+    }
+}
+
+/**
+ * REQ-203's order control: the current order, and a menu of the three.
+ *
+ * A menu rather than three buttons or a segmented row. Three labels laid out
+ * across a 360 dp phone at the largest font size is the shape that clips, and
+ * the reader is choosing one of a small set they rarely change — the case a
+ * menu is for. The button says which order is on, so the answer to "how is this
+ * sorted?" is on screen without opening anything.
+ *
+ * The menu's own state is [rememberSaveable] because the choice it writes goes
+ * through the repository: the menu must survive the recomposition its own tap
+ * causes, and a configuration change while it is open should not silently close
+ * it.
+ */
+@Composable
+private fun OrderControl(order: LibraryOrder, onOrderChange: (LibraryOrder) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val current = order.label()
+    // One label for the whole control, so TalkBack says what the button does and
+    // which order is on rather than reading "Sort colon Recently read".
+    val label = stringResource(R.string.library_order_label, current)
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .defaultMinSize(minHeight = TouchTarget)
+                .testTag("library_order")
+                .semantics { contentDescription = label },
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(stringResource(R.string.library_order_button, current))
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.testTag("library_order_menu"),
+        ) {
+            LibraryOrder.entries.forEach { choice ->
+                val chosen = choice == order
+                DropdownMenuItem(
+                    text = { Text(choice.label()) },
+                    onClick = {
+                        expanded = false
+                        onOrderChange(choice)
+                    },
+                    // A tick on the current order, and the same fact in the
+                    // semantics tree so TalkBack announces it as selected rather
+                    // than describing an icon.
+                    leadingIcon = {
+                        if (chosen) {
+                            Icon(Icons.Filled.Check, contentDescription = null)
+                        } else {
+                            Spacer(Modifier.size(24.dp))
+                        }
+                    },
+                    modifier = Modifier
+                        .testTag("library_order_${choice.name.lowercase()}")
+                        .semantics { selected = chosen },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryOrder.label(): String = stringResource(
+    when (this) {
+        LibraryOrder.TITLE -> R.string.library_order_title
+        LibraryOrder.RECENTLY_READ -> R.string.library_order_recently_read
+        LibraryOrder.RECENTLY_ADDED -> R.string.library_order_recently_added
+    },
+)
+
+@Composable
+private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit) {
     if (count == 0) return
     TextButton(
         onClick = onOpenFolders,
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding)
             .defaultMinSize(minHeight = TouchTarget)
             .testTag("library_open_folders"),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(pluralStringResource(R.plurals.library_folders_open_count, count, count))
     }
@@ -348,9 +528,15 @@ private fun EmptyLibrary(
     samples: List<BundledSample>,
     folderCount: Int,
     onOpenFolders: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        // A line of prose stops being readable long before it stops fitting, so
+        // on a wide screen this column takes a measure rather than the window.
+        // At every phone width it is already narrower than this and the cap does
+        // nothing (REQ-205 asks the *list* to use the width, not the paragraphs).
+        modifier = modifier
+            .widthIn(max = ReadableTextWidth)
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 24.dp)
@@ -370,7 +556,7 @@ private fun EmptyLibrary(
         AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder, horizontalPadding = 0.dp)
         // An added folder with nothing readable in it still has to be reachable,
         // or the only way to take it back out would be to add a book first.
-        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders, horizontalPadding = 0.dp)
+        FoldersEntry(count = folderCount, onOpenFolders = onOpenFolders)
         Text(
             text = stringResource(R.string.library_empty_in_place),
             style = MaterialTheme.typography.bodyMedium,
@@ -403,22 +589,25 @@ private fun AddActions(
     onAddBooks: () -> Unit,
     onAddFolder: () -> Unit,
     horizontalPadding: Dp = 16.dp,
+    /** Half the row each, which is right when the row is theirs alone. */
+    weighted: Boolean = true,
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .then(if (weighted) Modifier.fillMaxWidth() else Modifier)
             .padding(horizontal = horizontalPadding, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        val share = if (weighted) Modifier.weight(1f) else Modifier
         OutlinedButton(
             onClick = onAddBooks,
-            modifier = Modifier.weight(1f).defaultMinSize(minHeight = TouchTarget).testTag("library_add_books"),
+            modifier = share.defaultMinSize(minHeight = TouchTarget).testTag("library_add_books"),
         ) {
             Text(stringResource(R.string.library_add_books))
         }
         OutlinedButton(
             onClick = onAddFolder,
-            modifier = Modifier.weight(1f).defaultMinSize(minHeight = TouchTarget).testTag("library_add_folder"),
+            modifier = share.defaultMinSize(minHeight = TouchTarget).testTag("library_add_folder"),
         ) {
             Text(stringResource(R.string.library_add_folder))
         }
@@ -426,7 +615,7 @@ private fun AddActions(
 }
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+private fun SearchField(query: String, onQueryChange: (String) -> Unit, modifier: Modifier = Modifier) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -442,7 +631,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
             }
         },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("library_search"),
@@ -477,23 +666,95 @@ private fun BookList(
     onGrantAccess: (LibraryBookItem) -> Unit,
     onOpen: (LibraryBookItem) -> Unit,
     coverLoader: CoverLoader,
+    wide: Boolean = false,
 ) {
-    LazyColumn(
+    if (!wide) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().testTag("library_list"),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            items(items = books, key = { it.id }) { book ->
+                BookRow(
+                    book = book,
+                    onRemove = { onRemove(book) },
+                    onGrantAccess = { onGrantAccess(book) },
+                    onOpen = { onOpen(book) },
+                    coverLoader = coverLoader,
+                )
+                HorizontalDivider()
+            }
+        }
+        return
+    }
+    LazyVerticalGrid(
+        // Adaptive, not a column count: the same rule then covers a 600 dp tablet,
+        // a phone on its side and a 10" tablet, and it is the rule that keeps the
+        // largest font size legible instead of a second breakpoint that would have
+        // to be kept in step with it.
+        columns = GridCells.Adaptive(minSize = bookColumnMinWidth()),
         modifier = Modifier.fillMaxSize().testTag("library_list"),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
-        items(items = books, key = { it.id }) { book ->
-            BookRow(
-                book = book,
-                onRemove = { onRemove(book) },
-                onGrantAccess = { onGrantAccess(book) },
-                onOpen = { onOpen(book) },
-                coverLoader = coverLoader,
-            )
-            HorizontalDivider()
+        gridItems(items = books, key = { it.id }) { book ->
+            // No `fillMaxHeight`/`weight` here, however much the dividers would
+            // like to line up across a row: a lazy grid measures its items with an
+            // unbounded height, where `fillMaxHeight` does nothing and a weight
+            // resolves against infinity — which is how the first draft of this
+            // rendered four books at zero height and an empty screen.
+            Column {
+                // The divider goes *above* the row here, where the list puts it
+                // below. Every cell in a grid row starts at the same y and they
+                // end at different ones, so a leading rule is the only one that
+                // draws as an unbroken line between rows instead of a staircase.
+                HorizontalDivider()
+                BookRow(
+                    book = book,
+                    onRemove = { onRemove(book) },
+                    onGrantAccess = { onGrantAccess(book) },
+                    onOpen = { onOpen(book) },
+                    coverLoader = coverLoader,
+                )
+            }
         }
     }
 }
+
+/**
+ * Whether search and the two add buttons fit on one row at the current font scale.
+ *
+ * The same shape of rule as [bookColumnMinWidth] and for the same reason: the
+ * buttons take the width their labels need, so the width the row needs grows with
+ * the font. At 600 dp and the largest font size the two buttons alone want 317 dp
+ * and the search field is left folding its own label in half — so the boundary
+ * tablet keeps the stacked header at that size, and a phone on its side (914 dp),
+ * where the row genuinely fits, does not.
+ */
+@Composable
+private fun headerFitsOneRow(layout: LayoutWidth): Boolean =
+    layout.wide && layout.available >= WideLayoutMinWidth * LocalDensity.current.fontScale
+
+/**
+ * The narrowest a book column may be, at the current font scale.
+ *
+ * A book row spends [BookRowFixedWidth] on things that do not grow with the font —
+ * the 48 dp cover, the 48 dp remove button, the gaps between them and the row's own
+ * padding — and everything else on the title, author and status line, which do.
+ * So the minimum is a fixed part plus a scaled one, and the grid drops to fewer,
+ * wider columns exactly when the text would otherwise start losing its ends
+ * (REQ-205, REQ-301).
+ */
+@Composable
+private fun bookColumnMinWidth(): Dp =
+    BookRowFixedWidth + BookRowTextWidth * LocalDensity.current.fontScale
+
+/** 48 dp cover + 16 dp gap + 8 dp gap + 48 dp remove button + 2 x 16 dp padding. */
+private val BookRowFixedWidth = 152.dp
+
+/** Room for roughly a dozen characters of title per line at the default size. */
+private val BookRowTextWidth = 148.dp
+
+/** A comfortable measure for a column of prose; the empty library is the only one here. */
+private val ReadableTextWidth = 560.dp
 
 @Composable
 private fun BookRow(
@@ -502,12 +763,13 @@ private fun BookRow(
     onGrantAccess: () -> Unit,
     onOpen: () -> Unit,
     coverLoader: CoverLoader,
+    modifier: Modifier = Modifier,
 ) {
     val author = book.author ?: stringResource(R.string.library_unknown_author)
     val statusLine = book.statusLine()
     val openLabel = stringResource(R.string.library_open, book.title)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 72.dp)
             // A readable book opens in the reader; the rest already explain in

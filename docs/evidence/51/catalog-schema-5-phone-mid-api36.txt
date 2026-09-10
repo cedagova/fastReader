@@ -1,0 +1,12 @@
+Catalog written by the debug build on Phone_Mid_API36 after the run below.
+Read with: adb shell run-as com.cedagova.fastreader cat files/catalog/catalog.json
+
+schemaVersion .................. 5
+settings.chapterPauseEnabled ... false   (turned off in Settings during the run)
+frontMatterOfferedBookIds ...... ["sha256:3b0537a248f2fef8ac29de6e1d80a7ec734f9426e1bdddbc050069e79bc67826"]
+books .......................... ["The Long Approach"]
+readingStates .................. {"sha256:3b0537a248f2fef8ac29de6e1d80a7ec734f9426e1bdddbc050069e79bc67826": {"tokenIndex": 70, "progressFraction": 1.0}}
+
+The book id in frontMatterOfferedBookIds is the same id the book is
+listed under, so the offer is recorded against the book itself and not
+against the file it happened to be read from.

@@ -104,13 +104,13 @@ Rules that make the loops work:
 
 | General concept | Binding here |
 | --- | --- |
-| Build / static | `./gradlew assembleDebug`, `./gradlew lint` (Gradle 8.14.2 wrapper, AGP 8.11.1, versions in `gradle/libs.versions.toml`) |
+| Build / static | `./gradlew assembleDebug`, `./gradlew lint` (Gradle 9.7.1 wrapper, AGP 9.4.0, Kotlin 2.4.20, Compose BOM 2026.09.00, `compileSdk`/`targetSdk` 37, `minSdk` 26; versions in `gradle/libs.versions.toml`) |
 | Isolated tests | `./gradlew testDebugUnitTest` (JUnit4 + Robolectric) |
 | Rendered UI | Roborazzi: `./gradlew recordRoborazziDebug` → PNGs + goldens in `app/screenshots/`; `verifyRoborazziDebug` is the regression gate |
-| Real runtime | AVD matrix (`Phone_Low_API33` … `Tablet_Mid_API36`): `emulator -avd <name> -no-window` → poll `sys.boot_completed` → `./gradlew installDebug` → `adb shell am start` → `adb exec-out screencap -p` → `adb logcat -d -s AndroidRuntime:E` → `adb emu kill` |
+| Real runtime | AVD matrix (`Phone_Low_API33` … `Tablet_Mid_API36`, plus `Phone_Mid_API37` — same 1080x2400 @420dpi as `Phone_Mid_API36`, and the only device that can exercise an Android 17 behaviour change now that `targetSdk` is 37): `emulator -avd <name> -no-window` → poll `sys.boot_completed` → `./gradlew installDebug` → `adb shell am start` → `adb exec-out screencap -p` → `adb logcat -d -s AndroidRuntime:E` → `adb emu kill` |
 | Flows | `adb shell input tap/swipe/text` today; Maestro when flows warrant it |
 | Hosted gate | `.github/workflows/checks.yml` on GitHub Actions (`ubuntu-latest`, free tier): `testDebugUnitTest`, `verifyRoborazziDebug`, `lint` on every push and pull request |
-| Machine-local config | `local.properties` (`sdk.dir=$HOME/Library/Android/sdk`); `JAVA_HOME` must be JDK 21 — Gradle 8.x cannot run on Android Studio's bundled Java 25 |
+| Machine-local config | `local.properties` (`sdk.dir=$HOME/Library/Android/sdk`, plus `platforms;android-37.0` and `build-tools;37.0.0` installed); `JAVA_HOME` must be JDK 21 — the only JDK this project builds and validates on |
 
 ### Goldens and the hosted gate
 
@@ -130,6 +130,49 @@ macOS-recorded goldens verified green unmodified on the runner, and inverting
 - `app/screenshots/` is declared as an input of the unit-test task in
   `app/build.gradle.kts`. Without it, editing a golden left the task up to date
   and `verifyRoborazziDebug` passed over a changed reference image.
+- **A dialog golden now includes the scrim.** Under the old Compose/Roborazzi
+  pair an `AlertDialog` golden showed an undimmed background, which is not what
+  a device shows. Since the 2026-09 refresh the dim layer is composited into the
+  capture, so a dialog golden is darker than its pre-refresh reference and now
+  matches the device.
+- **A menu golden needs both a screen capture and a clock nudge.** A popup —
+  `DropdownMenu` as much as `AlertDialog` — is its own window, so
+  `onRoot().captureRoboImage(...)` fails with "expected exactly 1 node but found
+  2" and `captureScreenRoboImage(...)` is the one that composites it. That alone
+  is not enough for a menu: it opens through an enter transition, and a capture
+  taken straight after `performClick()` succeeds and records the screen *without*
+  the menu — a green test and an empty golden. Advance the compose clock
+  (`composeRule.mainClock.advanceTimeBy(500)`, then `waitForIdle()`) before
+  capturing, and look at the PNG.
+
+### Toolchain refresh notes (2026-09, AGP 9)
+
+Hard-won facts from the AGP 8.11 → 9.4 / Gradle 8.14 → 9.7 move. They are not
+obvious from the error messages, so check here before re-deriving them:
+
+- **No `org.jetbrains.kotlin.android` plugin.** AGP 9 compiles Kotlin itself and
+  refuses to configure when that plugin is applied. `kotlin.plugin.compose` and
+  `kotlin.plugin.serialization` are still applied, at the `kotlin` version in the
+  catalog; the resolved stdlib must match it (`./gradlew :app:dependencies
+  --configuration debugRuntimeClasspath` to confirm).
+- **Extra source directories go on `kotlin`, not `java`.** AGP 9's built-in
+  Kotlin reads the source set's `kotlin` directories. Registering
+  `src/sharedTest/java` on `java` alone still configures and still builds the
+  app, and then fails test compilation with every shared fixture unresolved.
+  Use `getByName("test").kotlin.directories.add(...)`.
+- **Icons are a direct dependency now.** Compose Material3 1.4.0 dropped its
+  transitive `material-icons-core`, so `androidx.compose.material.icons.Icons`
+  stops resolving until the artifact is declared. The Compose BOM still pins it
+  (1.7.8), so no version is chosen by hand.
+- **`OutlinedButton` labels are `onSurface`, not `primary`.** Material3 1.4.0
+  changed the default, so every outlined button's text went from blue to near
+  black. That is a library default, not an app change; the goldens record it.
+- **Older AGP lint could not run on this Mac at all.** At AGP 8.11.1 on Homebrew
+  JDK 21.0.12.1, `./gradlew lint` died with "Can't initialize detector
+  androidx.compose.runtime.lint.AutoboxingStateCreationDetector" while the same
+  commit's hosted `lint` was green on Temurin 21. AGP 9.4.0's lint runs locally
+  again. If lint ever dies in a detector constructor rather than reporting
+  issues, suspect the lint/JDK pair, not the code.
 
 ### Proving a claim about frames, not screenshots
 
@@ -159,6 +202,92 @@ one glance. Two things make it trustworthy:
   spreads a 250 ms launch over more than a second, so a single wrong frame
   becomes tens of captured frames instead of one that sampling could miss. Put
   the scales back to `1.0` afterwards.
+
+### Inducing a crash on a device
+
+Debug builds carry `com.cedagova.fastreader.debug.CrashInducerActivity`, which
+throws in `onCreate` and does nothing else. It is in `src/debug`, so neither the
+class nor its manifest entry exists in a release build, and
+`CrashInducerIsDebugOnlyTest` keeps it there.
+
+```bash
+adb shell am start -n com.cedagova.fastreader/com.cedagova.fastreader.debug.CrashInducerActivity
+adb logcat -d -s AndroidRuntime:E                              # the crash was delivered
+adb shell run-as com.cedagova.fastreader cat files/crash/report.txt
+adb shell am start -n com.cedagova.fastreader/.MainActivity    # the offer, once
+```
+
+It is exported, because `am start` runs as the shell user and the shell may only
+start an activity another uid has exported.
+
+Two things about the run itself:
+
+- **Crashing twice in a row brings up the platform's own "FastReader keeps
+  stopping" dialog**, on top of the app. Dismiss it (`Close app`) and
+  `am force-stop` before relaunching, or the screenshot is of that dialog.
+- **The task restarts itself.** When the inducer crashes above a live
+  `MainActivity`, the system rebuilds the process and resumes the activity
+  underneath — so the app can be back on screen, offer and all, before the
+  `am start` that was meant to relaunch it. Check with `pidof`, not the clock.
+
+### What a shared crash report may contain
+
+Anything that reaches `files/crash/report.txt` is something a reader can hand to
+another app, so the renderer in `crash/CrashReport.kt` keeps a closed shape:
+fixed header lines, exception *types*, and call sites — no exception messages at
+all, and every interpolated value filtered to characters that cannot spell a
+path. Adding a field means adding its line shape to `CrashReportTest`'s
+allow-list, which is the point at which to ask what that field could carry.
+### Compose layout quirks
+
+- **A lazy grid measures its items with an unbounded height.** Inside a
+  `LazyVerticalGrid` item, `Modifier.fillMaxHeight()` does nothing and a
+  `Modifier.weight()` in a `Column` resolves against infinity. The first draft of
+  the tablet library used both to line the row dividers up, and rendered four
+  books at zero height — a build that passed, a screen that was empty, and no
+  error anywhere. The fix that does line them up is a *leading* divider: every
+  cell in a grid row starts at the same y, so a rule above each item draws an
+  unbroken line while a rule below each item draws a staircase.
+- **Compare a `dp` breakpoint in whole pixels.** `600.dp` is the width of
+  `Tablet_Low_API33` exactly, and converting that device's pixel width back to
+  `Dp` can land on 599.99997 at a non-integral density (420 dpi is 2.625x). Round
+  both sides to pixels through the same `Density` and the boundary device lands
+  on the side of its own breakpoint that the `sw600dp` resource qualifier would
+  have put it on.
+
+### Every new string needs a Spanish one (#55)
+
+The app ships two locales: `values/strings.xml` and `values-es/strings.xml`.
+`MissingTranslation`, `ExtraTranslation` and `MissingQuantity` are declared lint
+**errors** with `abortOnError` in the `lint` block of `app/build.gradle.kts`, so
+adding a string to `values/strings.xml` and stopping there turns the hosted
+`lint` step red:
+
+```
+values/strings.xml:202: Error: "settings_chapter_pause" is not translated in "es" (Spanish) [MissingTranslation]
+```
+
+That is the gate working. The fix is the Spanish line, not a lint suppression.
+The one legitimate escape is `translatable="false"` on the string itself, for a
+value that genuinely must not be translated.
+
+Two things that catch people out:
+
+- **Spanish has a plural category English does not.** CLDR gives `es` a `many`
+  bucket for whole millions, which take `de` before the noun — "2.000.000 **de**
+  libros" against "5 libros". Every `<plurals>` in `values-es` needs
+  `one`/`many`/`other`, and `MissingQuantity` will say so if it does not.
+- **A *stale* Spanish string is invisible to the gate.** Lint catches a missing
+  translation, never a Spanish sentence that no longer says what the English one
+  says. When you edit English copy, edit its Spanish line in the same commit.
+  This bites hardest on `settings_privacy`, which `PrivacyStatementTest` already
+  pins to three published Markdown copies — the Spanish copy is a fourth that no
+  test pins.
+
+Register and conventions for the Spanish itself are written at the top of
+`values-es/strings.xml`. Spanish also runs longer than English, so a new string
+wants a look at the `*_spanish_compact_large_font` goldens, not only the
+reference phone.
 
 ### Resource-folder quirk
 

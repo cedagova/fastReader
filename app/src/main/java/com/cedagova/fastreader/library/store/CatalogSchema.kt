@@ -29,8 +29,23 @@ object CatalogSchema {
      *   `highlightEnabled` (the coloured letter, carried forward from the old
      *   flag) and `focusAlignmentEnabled` (the off-centre alignment, now opt-in
      *   and written as `false`).
+     * - **5** — issue #51: the chapter-boundary pause becomes a setting
+     *   (`chapterPauseEnabled`, written as `true` so an updating reader keeps v1
+     *   behaviour), and the catalog remembers which books have already been
+     *   offered the one-time front-matter skip (`frontMatterOfferedBookIds`,
+     *   absent meaning none). The first of increment 002's three steps; issue #52
+     *   takes 6 and issue #62 takes 7 (AD-16).
+     * - **6** — issue #52: the library's order becomes a setting
+     *   (`libraryOrder`, written as `RECENTLY_READ` so an updating reader gets
+     *   the new default rather than v1's alphabetical list). The second of
+     *   increment 002's three steps; issue #62 takes 7 (AD-16).
+     * - **7** — issue #62: a reading position records the structure of the file it
+     *   was taken in (`ReadingState.structuralFingerprint`, written as `null`
+     *   because no earlier document can know one — and null means no guard, so
+     *   every stored position still resumes). The last of increment 002's three
+     *   steps; the chain 5 → 6 → 7 is complete.
      */
-    const val CURRENT_VERSION: Int = 4
+    const val CURRENT_VERSION: Int = 7
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -41,6 +56,9 @@ object CatalogSchema {
         1 to ReadingStateV2Migration,
         2 to SettingsV3Migration,
         3 to CueSplitV4Migration,
+        4 to ChapterPauseV5Migration,
+        5 to LibraryOrderV6Migration,
+        6 to ContentFingerprintV7Migration,
     )
 }
 

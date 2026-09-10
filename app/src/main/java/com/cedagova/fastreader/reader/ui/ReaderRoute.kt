@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
@@ -119,6 +120,12 @@ fun ReaderRoute(
     // the time-remaining index, which is a function of pause strength.
     LaunchedEffect(reader, settings.pauseStrength) { reader.setPauseStrength(settings.pauseStrength) }
 
+    // REQ-201 mid-book: whether a boundary stops the stream. Unlike pause
+    // strength this changes no duration, so nothing is rebuilt.
+    LaunchedEffect(reader, settings.chapterPauseEnabled) {
+        reader.setChapterPause(settings.chapterPauseEnabled)
+    }
+
     val state by reader.state.collectAsState()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
 
@@ -136,6 +143,25 @@ fun ReaderRoute(
     // picker. Either way the notice has to go the moment the book has a row.
     val catalog by repository.catalog.collectAsState()
     val inLibrary = external?.identity?.let { catalog.book(it.value) != null } == true
+
+    // REQ-202. The reader knows this book opens on front matter and that the
+    // reader is still on its first word; only the catalog knows whether the offer
+    // has already been made for this book, so the two are joined here.
+    //
+    // A book with no identity yet — an "Open with" whose digest is still being
+    // computed — has no key to look up, so it is offered: nothing durable was
+    // ever written about it, and answering is what writes the record.
+    val offer by reader.frontMatterOffer.collectAsState()
+    val offeredBefore = offer?.positionKey?.let { it in catalog.frontMatterOfferedBookIds } == true
+    val frontMatterOffer = offer?.takeIf { !offeredBefore }
+    // Answering settles the offer for this book for good, whichever way it was
+    // answered: the requirement is that it is *offered* once (REQ-202).
+    val settleFrontMatterOffer = {
+        offer?.positionKey
+            ?.takeUnless(BundledSample::isSampleIdentity)
+            ?.let { repository.requestMarkFrontMatterOffered(it) }
+        Unit
+    }
     val addToLibrary = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
         if (uris.isNotEmpty()) repository.requestAddPickedBooks(uris.map(Uri::toString))
     }
@@ -186,7 +212,10 @@ fun ReaderRoute(
 
     // `getString` rather than `stringResource`: the text is chosen inside a
     // callback, which is not a composable scope.
-    val context = LocalContext.current
+    // LocalResources, not LocalContext.getString: a Configuration change (locale,
+    // font scale) invalidates this read, so the speed notice is always formatted
+    // with the current configuration. Lint's LocalContextGetResourceValueCall.
+    val resources = LocalResources.current
 
     ReaderScreen(
         state = state,
@@ -213,13 +242,22 @@ fun ReaderRoute(
                 val next = steppedWpm(current, steps)
                 reader.setWpm(next)
                 noticeSerial += 1
-                notice = SpeedNotice(context.getString(R.string.reader_speed, next), noticeSerial)
+                notice = SpeedNotice(resources.getString(R.string.reader_speed, next), noticeSerial)
             }
         },
         onOpenSettings = onOpenSettings,
         externalNotice = external != null && external.resolved && !external.noticeDismissed && !inLibrary,
         onAddToLibrary = { addToLibrary.launch(SafDocumentGateway.PICKER_MIME_TYPES) },
         onDismissExternalNotice = { graph.external.dismissNotice() },
+        frontMatterOffer = frontMatterOffer?.chapterTitle,
+        onSkipFrontMatter = {
+            settleFrontMatterOffer()
+            reader.skipFrontMatter()
+        },
+        onDismissFrontMatterOffer = {
+            settleFrontMatterOffer()
+            reader.dismissFrontMatterOffer()
+        },
     )
 }
 
@@ -312,6 +350,7 @@ internal class CatalogPositions(private val repository: LibraryRepository) : Rea
             position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
             progressFraction = stored.progressFraction,
             wpm = stored.wpm,
+            structuralFingerprint = stored.structuralFingerprint,
         )
     }
 
@@ -329,6 +368,9 @@ internal class CatalogPositions(private val repository: LibraryRepository) : Rea
                 pipelineVersion = position.position.pipelineVersion,
                 progressFraction = position.progressFraction,
                 wpm = position.wpm,
+                // Null when this open read no central directory. The store keeps
+                // whatever it already holds rather than clearing it (AD-18).
+                structuralFingerprint = position.structuralFingerprint,
             ),
         )
     }

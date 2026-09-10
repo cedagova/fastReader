@@ -8,6 +8,7 @@ import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.FontSize
+import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
@@ -410,6 +411,260 @@ class CatalogStoreTest {
         assertFalse(settings.highlightEnabled)
         assertFalse(settings.focusAlignmentEnabled)
         assertFalse(settings.guideMarksEnabled)
+    }
+
+    /**
+     * REQ-201's update half and REQ-208's, as one migration test: the shipped
+     * v1.1.0 document is schema 4, and a reader who installs v1.2.0 over it has to
+     * find the chapter pause **on** — the behaviour they already had — with the
+     * rest of the library and every other setting exactly where they were.
+     */
+    @Test
+    fun `a version 4 document keeps everything and reads the chapter pause on`() {
+        val v4 = """
+            {"schemaVersion":4,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9}},
+             "lastReadBookId":"sha256:abc",
+             "removedBookIds":["sha256:gone"],
+             "settings":{"theme":"DARK","fontSize":"LARGE","highlightEnabled":false,
+                         "focusAlignmentEnabled":true,"pivotColor":"CRIMSON",
+                         "guideMarksEnabled":false,"pauseStrength":"SUBTLE"}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v4) as CatalogDecoding.Decoded
+
+        assertEquals(4, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+
+        val settings = decoded.catalog.settings
+        assertTrue("an updating reader keeps v1's chapter pause", settings.chapterPauseEnabled)
+        // The other half of REQ-208's update proof: the same document walks both
+        // of increment 002's steps, so the library comes up ordered by recently
+        // read rather than by v1's alphabet.
+        assertEquals(LibraryOrder.RECENTLY_READ, settings.libraryOrder)
+
+        // Nothing else moved.
+        assertEquals(listOf("The Long Signal"), decoded.catalog.books.map { it.title })
+        assertEquals("sha256:abc", decoded.catalog.lastReadBookId)
+        assertEquals(setOf("sha256:gone"), decoded.catalog.removedBookIds)
+        assertEquals(77, decoded.catalog.readingStates.getValue("sha256:abc").tokenIndex)
+        assertEquals(400, decoded.catalog.readingStates.getValue("sha256:abc").wpm)
+        assertEquals(ThemeChoice.DARK, settings.theme)
+        assertEquals(FontSize.LARGE, settings.fontSize)
+        assertFalse(settings.highlightEnabled)
+        assertTrue(settings.focusAlignmentEnabled)
+        assertEquals(PivotColor.CRIMSON, settings.pivotColor)
+        assertFalse(settings.guideMarksEnabled)
+        assertEquals(PauseStrength.SUBTLE, settings.pauseStrength)
+        // No book has been offered the front-matter skip: the documented default
+        // for a library that predates the offer.
+        assertTrue(decoded.catalog.frontMatterOfferedBookIds.isEmpty())
+    }
+
+    /**
+     * The step is total. A document with no settings block at all still migrates,
+     * and the chapter pause reads back on from the type's own default rather than
+     * from a key the step had to invent.
+     */
+    @Test
+    fun `a version 4 document with no settings block still reads the chapter pause on`() {
+        val v4 = """{"schemaVersion":4,"books":[],"folders":[],"readingStates":{}}"""
+
+        val decoded = CatalogCodec().decode(v4) as CatalogDecoding.Decoded
+
+        assertTrue(decoded.catalog.settings.chapterPauseEnabled)
+    }
+
+    /**
+     * REQ-203's update half: a v1.2.0-era document from before the order was a
+     * choice comes up ordered by recently read, with every setting the reader had
+     * already chosen — the chapter pause included — exactly where it was.
+     */
+    @Test
+    fun `a version 5 document reads the library order as recently read`() {
+        val v5 = """
+            {"schemaVersion":5,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9}},
+             "frontMatterOfferedBookIds":["sha256:abc"],
+             "settings":{"theme":"DARK","fontSize":"LARGE","highlightEnabled":false,
+                         "focusAlignmentEnabled":true,"pivotColor":"CRIMSON",
+                         "guideMarksEnabled":false,"pauseStrength":"SUBTLE",
+                         "chapterPauseEnabled":false}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v5) as CatalogDecoding.Decoded
+
+        assertEquals(5, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertEquals(LibraryOrder.RECENTLY_READ, decoded.catalog.settings.libraryOrder)
+
+        // Nothing else moved — including the chapter pause this reader turned off.
+        assertFalse(decoded.catalog.settings.chapterPauseEnabled)
+        assertEquals(ThemeChoice.DARK, decoded.catalog.settings.theme)
+        assertEquals(PauseStrength.SUBTLE, decoded.catalog.settings.pauseStrength)
+        assertEquals(listOf("The Long Signal"), decoded.catalog.books.map { it.title })
+        assertEquals(77, decoded.catalog.readingStates.getValue("sha256:abc").tokenIndex)
+        assertEquals(setOf("sha256:abc"), decoded.catalog.frontMatterOfferedBookIds)
+    }
+
+    /**
+     * The step is total. A document with no settings block at all still migrates,
+     * and the order reads back from the type's own default rather than from a key
+     * the step had to invent.
+     */
+    @Test
+    fun `a version 5 document with no settings block still reads the default order`() {
+        val v5 = """{"schemaVersion":5,"books":[],"folders":[],"readingStates":{}}"""
+
+        val decoded = CatalogCodec().decode(v5) as CatalogDecoding.Decoded
+
+        assertEquals(LibraryOrder.RECENTLY_READ, decoded.catalog.settings.libraryOrder)
+    }
+
+    /**
+     * A `settings` value that is not an object must fall through rather than
+     * throw: a throw inside a step escapes [CatalogCodec.decode]'s guard and would
+     * set the reader's whole library aside over one unusable preference.
+     */
+    @Test
+    fun `a version 5 document whose settings are not an object is not thrown over`() {
+        val v5 = """{"schemaVersion":5,"books":[],"folders":[],"readingStates":{},"settings":"corrupt"}"""
+
+        val decoding = CatalogCodec().decode(v5)
+
+        // Decoding still refuses the document, but as a reported Damaged result the
+        // store recovers from, never as an exception out of the migration chain.
+        assertTrue("$decoding", decoding is CatalogDecoding.Damaged)
+    }
+
+    /**
+     * #62's update half: a document from before the guard existed comes forward
+     * with no fingerprint on any position — and no fingerprint means *no guard*,
+     * so every one of those positions still resumes. A migration that refused
+     * what it could not verify would throw away the reader's place in every book
+     * they own.
+     */
+    @Test
+    fun `a version 6 document reads every position back with no fingerprint`() {
+        val v6 = """
+            {"schemaVersion":6,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9}},
+             "lastReadBookId":"sha256:abc",
+             "settings":{"theme":"DARK","libraryOrder":"TITLE","chapterPauseEnabled":false}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v6) as CatalogDecoding.Decoded
+
+        assertEquals(6, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        val state = decoded.catalog.readingStates.getValue("sha256:abc")
+        assertNull("absent means no guard, never a mismatch", state.structuralFingerprint)
+
+        // Nothing else moved, including the two settings this reader had chosen.
+        assertEquals(77, state.tokenIndex)
+        assertEquals(400, state.wpm)
+        assertEquals(0.5f, state.progressFraction, 0f)
+        assertEquals(LibraryOrder.TITLE, decoded.catalog.settings.libraryOrder)
+        assertFalse(decoded.catalog.settings.chapterPauseEnabled)
+        assertEquals("sha256:abc", decoded.catalog.lastReadBookId)
+    }
+
+    /**
+     * The whole shipped chain in one test: v1.1.0's document is schema 4, and a
+     * reader who installs v1.2.0 over it walks 4 → 5 → 6 → 7 in one load. Their
+     * position has to survive all three steps and come back usable.
+     */
+    @Test
+    fun `a shipped v1_1_0 document walks the whole chain and keeps its position`() {
+        val v4 = """
+            {"schemaVersion":4,
+             "books":[{"id":"sha256:abc","title":"The Long Signal","sources":[]}],
+             "folders":[],
+             "readingStates":{"sha256:abc":{"bookDigest":"sha256:abc","tokenIndex":77,
+                                            "pipelineVersion":1,"progressFraction":0.5,
+                                            "wpm":400,"updatedAtEpochMs":9}},
+             "settings":{"theme":"DARK"}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v4) as CatalogDecoding.Decoded
+
+        assertEquals(4, decoded.migratedFrom)
+        assertEquals(7, decoded.catalog.schemaVersion)
+        val state = decoded.catalog.readingStates.getValue("sha256:abc")
+        assertEquals(77, state.tokenIndex)
+        assertNull(state.structuralFingerprint)
+        assertTrue(decoded.catalog.settings.chapterPauseEnabled)
+        assertEquals(LibraryOrder.RECENTLY_READ, decoded.catalog.settings.libraryOrder)
+    }
+
+    /**
+     * The step is total. A `readingStates` value that is not an object, and an
+     * entry inside it that is not an object, must fall through rather than throw:
+     * a throw inside a step escapes [CatalogCodec.decode]'s guard and would set
+     * the reader's whole library aside.
+     */
+    @Test
+    fun `a version 6 document whose reading states are malformed is not thrown over`() {
+        val notAnObject = """{"schemaVersion":6,"books":[],"folders":[],"readingStates":"corrupt"}"""
+        val entryNotAnObject = """{"schemaVersion":6,"books":[],"folders":[],"readingStates":{"a":7}}"""
+
+        // Reported as Damaged, which the store recovers from — never an exception
+        // out of the migration chain.
+        assertTrue("$notAnObject", CatalogCodec().decode(notAnObject) is CatalogDecoding.Damaged)
+        assertTrue("$entryNotAnObject", CatalogCodec().decode(entryNotAnObject) is CatalogDecoding.Damaged)
+    }
+
+    /** A document with no positions at all has nothing to record and is returned as it arrived. */
+    @Test
+    fun `a version 6 document with no reading states still migrates`() {
+        val v6 = """{"schemaVersion":6,"books":[],"folders":[],"readingStates":{}}"""
+
+        val decoded = CatalogCodec().decode(v6) as CatalogDecoding.Decoded
+
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertTrue(decoded.catalog.readingStates.isEmpty())
+    }
+
+    /** #62's durable half: a fingerprint written with a position survives a round trip. */
+    @Test
+    fun `a stored fingerprint round trips through the store`() {
+        val store = FileCatalogStore(file)
+        store.save(
+            Catalog(
+                readingStates = mapOf(
+                    "sha256:abc" to ReadingState(
+                        bookDigest = "sha256:abc",
+                        tokenIndex = 12,
+                        structuralFingerprint = "zipdir1:feed",
+                    ),
+                ),
+            ),
+        )
+
+        val loaded = (store.load() as CatalogLoad.Loaded).catalog
+        assertEquals("zipdir1:feed", loaded.readingStates.getValue("sha256:abc").structuralFingerprint)
+    }
+
+    /** REQ-202's durable half: which books have already been offered survives a round trip. */
+    @Test
+    fun `the front-matter offer record round trips through the store`() {
+        val store = FileCatalogStore(file)
+        store.save(Catalog(frontMatterOfferedBookIds = setOf("sha256:abc", "sha256:def")))
+
+        val loaded = (store.load() as CatalogLoad.Loaded).catalog
+        assertEquals(setOf("sha256:abc", "sha256:def"), loaded.frontMatterOfferedBookIds)
     }
 
     /**

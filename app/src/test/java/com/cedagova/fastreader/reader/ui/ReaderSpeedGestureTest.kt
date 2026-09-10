@@ -97,8 +97,8 @@ class ReaderSpeedGestureTest {
 
         assertEquals(listOf("Increase reading speed", "Decrease reading speed"), actions.map { it.label })
 
-        actions.first { it.label == "Increase reading speed" }.action?.invoke()
-        actions.first { it.label == "Decrease reading speed" }.action?.invoke()
+        actions.first { it.label == "Increase reading speed" }.action()
+        actions.first { it.label == "Decrease reading speed" }.action()
 
         assertEquals(listOf(1, -1), steps)
     }

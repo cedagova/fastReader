@@ -44,6 +44,24 @@ data class Catalog(
      * before schema 3; every field then reads back as its documented default.
      */
     val settings: ReaderSettings = ReaderSettings(),
+    /**
+     * Books that have already been offered the one-time front-matter skip
+     * (REQ-202), by book id.
+     *
+     * The requirement is "offered once, per book", and the only durable place
+     * that can be true is here. Declining counts: the set records that the offer
+     * was *made*, not that it was taken, so a reader who chose to start at the
+     * cover is not asked again the next time they open the book.
+     *
+     * It is a set of ids rather than a flag on [ReadingState] because it is not a
+     * reading position: a book removed from the library keeps its position for a
+     * later re-add (REQ-004), and it should keep this too — being re-added is not
+     * a reason to be asked a second time. Absent in a document written before
+     * schema 5; the documented default is the empty set, which reads as "no book
+     * has been offered yet" and is exactly right for a library that predates the
+     * offer.
+     */
+    val frontMatterOfferedBookIds: Set<String> = emptySet(),
 ) {
     fun book(id: String): Book? = books.firstOrNull { it.id == id }
 
@@ -180,9 +198,14 @@ enum class FolderStatus { AVAILABLE, MISSING, PERMISSION_LOST }
  *   The map key is that same digest today, but storing it makes a position
  *   self-describing rather than only meaningful in the slot it happens to sit in.
  *   Since v1.1.0 the reader is *handed* this identity rather than deriving it
- *   from the bytes it reads (AD-8), so comparing it no longer detects a file
- *   whose content changed under an unchanged catalog entry; the rescan
- *   fingerprint on [BookSource] does that.
+ *   from the bytes it reads (AD-8), so comparing it catches a position given to
+ *   the wrong book and nothing more.
+ * - [structuralFingerprint] — what the file itself looked like (AD-18), which is
+ *   what detects a file replaced in place under an unchanged catalog entry. It is
+ *   the second signal that [bookDigest] stopped being; the rescan fingerprint on
+ *   [BookSource] (size and last-modified) is a different question asked by a
+ *   different caller, and a file edited without changing either is invisible to
+ *   it.
  * - [pipelineVersion] — the tokenization rules the index counts (AD-3). When they
  *   change, the stored index points at a different word; the reader detects that
  *   and falls back to [progressFraction] instead of silently resuming somewhere
@@ -195,6 +218,22 @@ data class ReadingState(
     val tokenIndex: Int = 0,
     /** The tokenization rules [tokenIndex] counts, so a later change is detectable. */
     val pipelineVersion: Int = ContentPipelineVersion.CURRENT,
+    /**
+     * The structure of the file this position was taken in: a digest over the
+     * archive directory's per-entry names, uncompressed sizes and CRC-32 values
+     * (AD-18). Absent in a document written before schema 7, and absent for a
+     * position taken through the streaming archive, which reads no directory.
+     *
+     * The documented default is null, and null means **no guard** — the position
+     * resumes. Never a mismatch: nobody's place is thrown away by the upgrade.
+     * Only a stored value that disagrees with the one just computed refuses a
+     * position, and the refusal is the point — the file changed underneath it.
+     *
+     * A write that carries no fingerprint leaves an already-stored one alone
+     * (see `LibraryRepository.writeReadingState`), so a book only ever gains this
+     * protection.
+     */
+    val structuralFingerprint: String? = null,
     /** Share of the book already shown, `0f..1f`. The library's "% read", and the
      *  fallback position when [pipelineVersion] no longer matches. */
     val progressFraction: Float = 0f,

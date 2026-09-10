@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,8 +26,11 @@ import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.FontSize
+import com.cedagova.fastreader.settings.LibraryOrder
+import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,13 +66,69 @@ class LibraryScreenScreenshotTest {
     /**
      * REQ-109's language rule, proved through the mechanism that actually decides
      * it: the composition's configuration. The `es` qualifier is what a Spanish
-     * device gives the app, and the offer comes back Español first. The interface
-     * around it stays English until the Spanish resource set lands (D5).
+     * device gives the app, and the offer comes back Español first.
+     *
+     * Since #55 the interface around it is Spanish too (REQ-206, D5), so this
+     * golden now also holds the empty-library guidance — the longest prose the
+     * screen shows — in its translated form.
      */
     @Test
     @Config(qualifiers = "+es")
     fun aSpanishDeviceIsOfferedTheSpanishSampleFirst() {
         capture("library_empty_spanish", state(Catalog()))
+    }
+
+    /**
+     * REQ-206 on the library: with the device in Spanish, every word this screen
+     * puts on the page comes from `values-es` and nothing falls back to English.
+     *
+     * The populated state is the one worth holding still, because it is the one
+     * carrying strings from four different leaves at once — the app bar, the
+     * search field, both add buttons, #52's sort control and the per-book
+     * progress — and a fallback would show up as a single English word among
+     * them rather than as a broken screen.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theLibraryIsSpanishOnASpanishDevice() {
+        capture("library_spanish", state(populatedCatalog()))
+    }
+
+    /**
+     * The same screen where Spanish can actually break it: Spanish prose runs
+     * longer than the English it replaces, and the narrow 720p phone at a large
+     * font scale is the first place that costs a line or clips a control. "Orden:
+     * Añadidos hace poco" and the two add buttons are the widest things here.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = "es-$COMPACT_PHONE")
+    fun theSpanishLibrarySurvivesACrampedScreenAtALargeFontScale() {
+        capture(
+            "library_spanish_compact_large_font",
+            state(
+                populatedCatalog().let {
+                    it.copy(settings = it.settings.copy(libraryOrder = LibraryOrder.RECENTLY_ADDED))
+                },
+            ),
+            fontScale = 1.3f,
+        )
+    }
+
+    /**
+     * REQ-206 on the library's notices: the resume-blocked banner, which is the
+     * longest sentence the library can put on screen and the one that has to stay
+     * honest about a reader's place being kept.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theLibraryNoticesAreSpanishOnASpanishDevice() {
+        capture(
+            "library_resume_blocked_spanish",
+            state(
+                catalog = failureCatalog(),
+                resumeBlocked = ResumeBlocked("revoked", ResumeBlockedReason.PERMISSION_LOST),
+            ),
+        )
     }
 
 
@@ -182,6 +242,87 @@ class LibraryScreenScreenshotTest {
         capture("library_font_extra_large", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
     }
 
+    // --- REQ-203, the library's order ----------------------------------------
+
+    /**
+     * REQ-203's acceptance as an image: exactly the books of `library_populated`,
+     * with the timestamps a reader who has actually been reading leaves behind.
+     * Rayuela was read last and is at the top; the two books never opened are at
+     * the bottom, alphabetically, under the two that were.
+     */
+    @Test
+    fun `the default order puts the book last read at the top`() {
+        capture("library_order_recently_read", state(readCatalog()))
+    }
+
+    /** The control open: the three orders, with a tick on the one in force. */
+    @Test
+    fun `the order control offers three orders and marks the current one`() {
+        capture("library_order_menu", state(readCatalog()), click = "library_order")
+    }
+
+    /**
+     * REQ-301 for the new control, on the smallest screen in the matrix at a large
+     * font scale and with a folder to reach as well. Two controls that will not
+     * fit side by side stack instead of clipping.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theOrderControlSurvivesACrampedScreenAtALargeFontScale() {
+        capture("library_order_compact_large_font", state(folderCatalog()), fontScale = 1.4f)
+    }
+
+    // --- REQ-205, the wide layouts -------------------------------------------
+    //
+    // Three widths, because they are three different questions. 600 dp is the
+    // breakpoint itself, on the one AVD in the matrix built to sit exactly on it.
+    // The landscape phone is the same rule reached the other way — no tablet, just
+    // a device on its side — and it is where height, not width, is scarce. The 10"
+    // tablet is where a rule that only ever adds columns would start looking silly.
+    // Each is captured at the largest font size, because that is the size the
+    // acceptance names and the size a column count can go wrong at.
+
+    /**
+     * The boundary: `Tablet_Low_API33` is exactly 600 dp wide, and this is what it
+     * renders. The header is one row — search beside both add buttons — and the
+     * list is two columns of books instead of one column and 300 dp of nothing.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_BOUNDARY)
+    fun atExactlySixHundredDpTheLibraryUsesTheWidth() {
+        capture("library_tablet", state(populatedCatalog()))
+    }
+
+    /**
+     * The same 600 dp at the largest font size, which is the acceptance's own
+     * wording: nothing clipped. The grid answers it by dropping to one wide column
+     * rather than by shrinking two — a column is added when a whole one fits and
+     * not before — so every title, author and status line is complete.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_BOUNDARY)
+    fun theTabletLibraryIsWholeAtTheLargestFontSize() {
+        capture("library_tablet_large_font", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
+    }
+
+    /**
+     * The reference phone on its side at the largest font size. 914 dp is wide
+     * enough for two columns even at 1.5x, and the one-row header is what keeps
+     * more than a single book on a 411 dp-tall screen.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = LANDSCAPE_PHONE)
+    fun theLandscapeLibraryIsWholeAtTheLargestFontSize() {
+        capture("library_landscape_large_font", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
+    }
+
+    /** `Tablet_Mid_API36`, 10" at 1280 x 800 dp: the width genuinely spent. */
+    @Test
+    @Config(sdk = [35], qualifiers = TABLET_LARGE)
+    fun aTenInchTabletShowsSeveralBooksAcross() {
+        capture("library_tablet_large", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
+    }
+
     private fun capture(
         name: String,
         state: LibraryUiState,
@@ -190,6 +331,8 @@ class LibraryScreenScreenshotTest {
         fontSize: FontSize = FontSize.MEDIUM,
         /** A test tag to bring into view before capturing, for content below the fold. */
         scrollTo: String? = null,
+        /** A test tag to tap before capturing, for a state that only a tap reaches. */
+        click: String? = null,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -209,7 +352,16 @@ class LibraryScreenScreenshotTest {
             }
         }
         scrollTo?.let { composeRule.onNodeWithTag(it).performScrollTo() }
-        composeRule.onRoot().captureRoboImage("screenshots/$name.png")
+        if (click == null) {
+            composeRule.onRoot().captureRoboImage("screenshots/$name.png")
+            return
+        }
+        // A menu is its own window, so the compose root is no longer unique; the
+        // screen capture is the only one that contains what the tap opened.
+        composeRule.onNodeWithTag(click).performClick()
+        composeRule.mainClock.advanceTimeBy(500)
+        composeRule.waitForIdle()
+        captureScreenRoboImage("screenshots/$name.png")
     }
 
     @Composable
@@ -258,6 +410,22 @@ class LibraryScreenScreenshotTest {
             "dubliners" to ReadingState(progressFraction = 1f),
         ),
     )
+
+    /**
+     * `populatedCatalog` after some reading: Rayuela most recently, Ficciones
+     * before it, and the other two never opened. The stamps are the ones the
+     * position writer leaves, so this is the catalog a real reader would have.
+     */
+    private fun readCatalog() = populatedCatalog().let { catalog ->
+        catalog.copy(
+            settings = ReaderSettings(libraryOrder = LibraryOrder.RECENTLY_READ),
+            readingStates = mapOf(
+                "ficciones" to ReadingState(progressFraction = 0.37f, updatedAtEpochMs = 1_000),
+                "rayuela" to ReadingState(progressFraction = 0.12f, updatedAtEpochMs = 2_000),
+                "dubliners" to ReadingState(progressFraction = 1f),
+            ),
+        )
+    }
 
     private fun failureCatalog() = Catalog(
         books = listOf(
@@ -319,3 +487,16 @@ internal const val REFERENCE_PHONE = "w411dp-h914dp-xxhdpi"
 
 /** 720p, 2 GB phone, matching the `Phone_Low_API33` AVD used for cramped layouts. */
 internal const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"
+
+/**
+ * The `sw600dp` boundary itself, matching the `Tablet_Low_API33` AVD, which is
+ * exactly 600 dp wide. Every wide-layout claim is made here first: a breakpoint
+ * that is wrong by one dp is wrong only here.
+ */
+internal const val TABLET_BOUNDARY = "w600dp-h960dp-xhdpi"
+
+/** 10" tablet at 2560 x 1600, matching the `Tablet_Mid_API36` AVD: 1280 x 800 dp. */
+internal const val TABLET_LARGE = "w1280dp-h800dp-land-xhdpi"
+
+/** The reference phone turned on its side; the same device the reader's goldens use. */
+internal const val LANDSCAPE_PHONE = "w914dp-h411dp-land-xxhdpi"

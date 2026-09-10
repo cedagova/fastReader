@@ -178,8 +178,13 @@ class LibraryRepository(
      * Rescans added folders and picked files.
      *
      * [ScanTrigger.MANUAL_REFRESH] always runs; [ScanTrigger.APP_OPEN] is skipped
-     * when a scan just finished, so returning from the document picker does not
-     * immediately trigger a second full scan.
+     * when a scan finished less than [DEFAULT_MINIMUM_RESCAN_INTERVAL_MS] ago, so
+     * returning from the document picker — or from any app the reader stepped out
+     * to — does not re-list every added folder (REQ-204).
+     *
+     * A skipped rescan returns before [IngestionState.Scanning] is ever
+     * published, which is the whole of "no scanning banner": the library keeps
+     * showing the stored catalog and says nothing about a scan that did not run.
      */
     suspend fun rescan(trigger: ScanTrigger) = mutate(
         trigger = trigger,
@@ -265,6 +270,27 @@ class LibraryRepository(
     fun requestUpdateSettings(transform: (ReaderSettings) -> ReaderSettings): Job =
         scope.launch { updateSettings(transform) }
 
+    /**
+     * Records that this book has been offered the front-matter skip (REQ-202).
+     *
+     * Written whichever way the reader answered, because the requirement is that
+     * the offer is made *once*: someone who chose to start at the cover has
+     * answered the question and must not be asked it again.
+     *
+     * A book that is already in the set is not rewritten, so answering the offer
+     * on a book that somehow reached it twice costs no catalog write.
+     */
+    suspend fun markFrontMatterOffered(bookId: String) = mutateCatalog { catalog ->
+        if (bookId in catalog.frontMatterOfferedBookIds) {
+            catalog
+        } else {
+            catalog.copy(frontMatterOfferedBookIds = catalog.frontMatterOfferedBookIds + bookId)
+        }
+    }
+
+    /** Fire-and-forget [markFrontMatterOffered], for the reader's callbacks. */
+    fun requestMarkFrontMatterOffered(bookId: String): Job = scope.launch { markFrontMatterOffered(bookId) }
+
     /** The retained position for a book, including one that was removed and re-added. */
     fun readingState(bookId: String): ReadingState? = _catalog.value.readingStates[bookId]
 
@@ -285,10 +311,30 @@ class LibraryRepository(
      * they actually own stays the one launch comes back to, and the external
      * book's position is kept exactly as the definition says, waiting for the
      * file to be added.
+     *
+     * ## The one thing a write must not do (AD-18)
+     *
+     * A position taken from an open that produced no structural fingerprint —
+     * the streaming fallback, or a book whose layout the directory reader refuses
+     * — carries a null. Storing that null over a fingerprint already recorded
+     * would disarm the content-change guard for that book silently and for good:
+     * nothing would report it, and the next swapped file would resume at an
+     * arbitrary word again. So a null keeps what is stored, and only a real
+     * fingerprint replaces one. A book only ever gains this protection.
+     *
+     * Done here rather than at the reader's boundary because this is the single
+     * place a position reaches the store, and it runs under the catalog mutex
+     * with the current document in hand — so the read of the previous value and
+     * the write of the new one cannot interleave with another write.
      */
     private suspend fun writeReadingState(bookId: String, state: ReadingState) = mutateCatalog { catalog ->
+        val storedFingerprint = catalog.readingStates[bookId]?.structuralFingerprint
+        val next = state.copy(
+            structuralFingerprint = state.structuralFingerprint ?: storedFingerprint,
+            updatedAtEpochMs = clock(),
+        )
         catalog.copy(
-            readingStates = catalog.readingStates + (bookId to state.copy(updatedAtEpochMs = clock())),
+            readingStates = catalog.readingStates + (bookId to next),
             lastReadBookId = if (catalog.book(bookId) != null) bookId else catalog.lastReadBookId,
         )
     }
@@ -540,7 +586,33 @@ class LibraryRepository(
     }
 
     companion object {
-        const val DEFAULT_MINIMUM_RESCAN_INTERVAL_MS = 2_000L
+        /**
+         * How recently a scan must have finished for the app-open rescan to be
+         * skipped (REQ-204's "short interval").
+         *
+         * One minute, chosen against the two things the number has to hold apart.
+         *
+         * The behaviour REQ-204 asks for is the app switch: the reader leaves to
+         * answer a message or look something up and comes back, and re-listing
+         * every added folder for that is work nothing asked for and a scanning
+         * banner over a library that has not changed. A minute covers that trip
+         * comfortably; the 2 s this replaces covered almost none of it, and only
+         * ever stopped the picker's own return from scanning twice.
+         *
+         * The other side is the promise the empty-library copy makes in as many
+         * words — books added to a folder later "show up the next time you open
+         * the app". A reader who genuinely goes to a file manager, finds a book,
+         * copies it and comes back has spent more than a minute doing it, so that
+         * still holds automatically; and REQ-204's own second half means the
+         * refresh control finds it either way, immediately, at any point inside
+         * the interval.
+         *
+         * This is deliberately not persisted. [lastScanAtEpochMs] lives in the
+         * process, so a cold start always scans however recently the last one
+         * ran: the interval can only ever suppress a rescan inside one run of
+         * the app, never across a real relaunch.
+         */
+        const val DEFAULT_MINIMUM_RESCAN_INTERVAL_MS = 60_000L
 
         /**
          * How long taking a removal back stays on offer (REQ-105's "short time").

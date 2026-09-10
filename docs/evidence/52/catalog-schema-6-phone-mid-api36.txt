@@ -1,0 +1,40 @@
+Catalog written by the debug build on Phone_Mid_API36 after the run below.
+Read with: adb shell run-as com.cedagova.fastreader cat files/catalog/catalog.json
+
+schemaVersion ........... 6
+settings.libraryOrder ... "TITLE"   (chosen from the control during the run)
+settings ................ {"theme":"SYSTEM","fontSize":"MEDIUM","highlightEnabled":true,
+                           "focusAlignmentEnabled":false,"pivotColor":"ACCENT",
+                           "guideMarksEnabled":true,"pauseStrength":"NORMAL",
+                           "chapterPauseEnabled":true,"libraryOrder":"TITLE"}
+
+books (addedAtEpochMs, in the order they were added)
+  Zephyr Lane ......... 1788992643865
+  Aurora Nights ....... 1788992663141
+  Meridian Drift ...... 1788992669212
+  Nocturne Field ...... 1788992816781
+  Polaris Run ......... 1788992911773
+
+readingStates (updatedAtEpochMs)
+  sha256:4a5d769a090d8…  Zephyr Lane    tokenIndex 10   1788992714218
+  sha256:2c9c7d861eaec…  Aurora Nights  tokenIndex 10   1788992760282
+
+Nothing here is a new per-book field. `addedAtEpochMs` and `updatedAtEpochMs`
+are both v1 columns; "recently added" reads the first and "recently read" the
+second, and the only thing schema 6 adds is the reader's one-word choice
+between them.
+
+--- the migration, on the same device ---
+
+The document above was then edited to schemaVersion 5 with `libraryOrder`
+removed, `chapterPauseEnabled` set to false and the theme set to DARK — a
+v1.1.0-shaped document — and written back over the app's catalog while the
+process was stopped. On the next launch the app read it back as:
+
+  schemaVersion ........... 6
+  settings.libraryOrder ... "RECENTLY_READ"     (written by the migration step)
+  settings.chapterPauseEnabled ... false        (the reader's choice, kept)
+  settings.theme .......... "DARK"              (the reader's choice, kept)
+
+and the library came up ordered by recently read with both positions intact:
+migrated-from-schema-5-phone-mid-api36.png.

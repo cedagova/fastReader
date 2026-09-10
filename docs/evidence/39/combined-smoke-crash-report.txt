@@ -1,0 +1,59 @@
+FastReader crash report
+Version: 1.2.0 (4)
+Device: sdk_gphone64_arm64
+Android: 16 (API 36)
+Exception messages are left out on purpose: they can quote a book, a file name or a path. Types and call sites are kept.
+
+Thrown: java.lang.RuntimeException
+    at android.app.ActivityThread.performLaunchActivity:4280
+    at android.app.ActivityThread.handleLaunchActivity:4467
+    at android.app.servertransaction.LaunchActivityItem.execute:222
+    at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem:133
+    at android.app.servertransaction.TransactionExecutor.executeTransactionItems:103
+    at android.app.servertransaction.TransactionExecutor.execute:80
+    at android.app.ActivityThread$H.handleMessage:2823
+    at android.os.Handler.dispatchMessage:110
+    at android.os.Looper.loopOnce:248
+    at android.os.Looper.loop:338
+    at android.app.ActivityThread.main:9067
+    at java.lang.reflect.Method.invoke:native
+    at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run:593
+    at com.android.internal.os.ZygoteInit.main:932
+Caused by: java.lang.IllegalStateException
+    at com.cedagova.fastreader.debug.CrashInducerActivity.onCreate:37
+    at android.app.Activity.performCreate:9155
+    at android.app.Activity.performCreate:9133
+    at android.app.Instrumentation.callActivityOnCreate:1521
+    at android.app.ActivityThread.performLaunchActivity:4262
+    at android.app.ActivityThread.handleLaunchActivity:4467
+    at android.app.servertransaction.LaunchActivityItem.execute:222
+    at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem:133
+    at android.app.servertransaction.TransactionExecutor.executeTransactionItems:103
+    at android.app.servertransaction.TransactionExecutor.execute:80
+    at android.app.ActivityThread$H.handleMessage:2823
+    at android.os.Handler.dispatchMessage:110
+    at android.os.Looper.loopOnce:248
+    at android.os.Looper.loop:338
+    at android.app.ActivityThread.main:9067
+    at java.lang.reflect.Method.invoke:native
+    at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run:593
+    at com.android.internal.os.ZygoteInit.main:932
+Caused by: java.io.FileNotFoundException
+    at com.cedagova.fastreader.debug.CrashInducerActivity.onCreate:39
+    at android.app.Activity.performCreate:9155
+    at android.app.Activity.performCreate:9133
+    at android.app.Instrumentation.callActivityOnCreate:1521
+    at android.app.ActivityThread.performLaunchActivity:4262
+    at android.app.ActivityThread.handleLaunchActivity:4467
+    at android.app.servertransaction.LaunchActivityItem.execute:222
+    at android.app.servertransaction.TransactionExecutor.executeNonLifecycleItem:133
+    at android.app.servertransaction.TransactionExecutor.executeTransactionItems:103
+    at android.app.servertransaction.TransactionExecutor.execute:80
+    at android.app.ActivityThread$H.handleMessage:2823
+    at android.os.Handler.dispatchMessage:110
+    at android.os.Looper.loopOnce:248
+    at android.os.Looper.loop:338
+    at android.app.ActivityThread.main:9067
+    at java.lang.reflect.Method.invoke:native
+    at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run:593
+    at com.android.internal.os.ZygoteInit.main:932

@@ -39,6 +39,15 @@ import java.util.zip.Inflater
  */
 internal class ZipDirectory private constructor(
     val entryNames: List<String>,
+    /**
+     * A digest over every entry's name, uncompressed size and CRC-32, taken from
+     * the table this reader has already read (AD-18).
+     *
+     * Costs no extra I/O — see [StructuralFingerprint], which explains what it is
+     * for and what it deliberately is not. Non-null whenever a directory was
+     * parsed at all, which is exactly when this class exists.
+     */
+    val structuralFingerprint: String,
     private val entries: Map<String, Entry>,
     private val channel: SeekableByteChannel,
 ) : AutoCloseable {
@@ -186,6 +195,7 @@ internal class ZipDirectory private constructor(
             val directory = read(channel, directoryOffset, directorySize.toInt()) ?: return null
             val names = ArrayList<String>(entryCount)
             val entries = LinkedHashMap<String, Entry>(entryCount)
+            val fingerprint = StructuralFingerprint.builder()
 
             // The streaming reader refuses an archive with more entries than this,
             // so the directory reader must too: an archive that one accepts and the
@@ -200,6 +210,11 @@ internal class ZipDirectory private constructor(
 
                 val flags = directory.short(cursor + 8)
                 val method = directory.short(cursor + 10)
+                // Read for the structural fingerprint alone (AD-18). It is part of
+                // the header this loop already has in memory, so keeping it is free
+                // — discarding it is what left stored positions with nothing to
+                // compare after identity became an input (AD-8).
+                val crc32 = directory.int(cursor + 16).toLong() and UNSIGNED_INT
                 val compressedSize = directory.int(cursor + 20).toLong() and UNSIGNED_INT
                 val uncompressedSize = directory.int(cursor + 24).toLong() and UNSIGNED_INT
                 val nameLength = directory.short(cursor + 28)
@@ -225,6 +240,10 @@ internal class ZipDirectory private constructor(
                 val name = String(directory, nameStart, nameLength, Charsets.UTF_8)
 
                 names += name
+                // Every record takes part, directory entries included: adding or
+                // removing one is a change to the book's structure even though it
+                // carries no bytes of its own.
+                fingerprint.add(name, uncompressedSize, crc32)
                 if (!name.endsWith("/")) {
                     entries.putIfAbsent(
                         name,
@@ -240,7 +259,7 @@ internal class ZipDirectory private constructor(
                 cursor = nameStart + nameLength + extraLength + commentLength
             }
 
-            return ZipDirectory(names, entries, channel)
+            return ZipDirectory(names, fingerprint.build(), entries, channel)
         }
 
         /**

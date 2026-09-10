@@ -182,6 +182,47 @@ class SettingsScreenScreenshotTest {
         )
     }
 
+    // --- REQ-206, the Spanish interface --------------------------------------
+
+    /**
+     * REQ-206 on the densest screen in the app: five section headings, every
+     * option label, three summaries, the About rows and both long statements —
+     * the privacy paragraph and the visual-only paragraph — all from
+     * `values-es`, with nothing falling back to English.
+     *
+     * This is the golden that would catch a missed string fastest, because
+     * settings holds more distinct strings than the rest of the app together.
+     *
+     * Its window is taller than [TALL_PHONE], which the English goldens use,
+     * because REQ-206's acceptance names the visual-only statement explicitly
+     * and Spanish pushes it past 1800 dp. Both closing statements — the privacy
+     * paragraph and the visual-only paragraph — are inside this capture, so the
+     * claim "the statements are translated" is something to look at rather than
+     * something to take on trust.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = "es-$TALL_PHONE_STATEMENTS")
+    fun theSettingsScreenIsSpanishOnASpanishDevice() {
+        capture("settings_spanish", ReaderSettings.DEFAULTS)
+    }
+
+    /**
+     * The same screen where Spanish costs the most: Spanish runs longer than the
+     * English it replaces, so the narrowest phone at the largest text is where a
+     * chip row gains a line, a switch summary gains two, or the version row
+     * loses half of itself. `settings_compact_large_font` is the English twin of
+     * this image, and the pair is the comparison.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = "es-$COMPACT_PHONE_SCROLLED")
+    fun theSpanishSettingsScreenSurvivesTheNarrowestScreenAtTheLargestText() {
+        capture(
+            "settings_spanish_compact_large_font",
+            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE),
+            fontScale = 2f,
+        )
+    }
+
     private fun capture(
         name: String,
         settings: ReaderSettings,
@@ -239,6 +280,13 @@ private const val TALL_PHONE = "w411dp-h1800dp-xxhdpi"
 
 /** The same window, tall enough to hold the whole surface at the largest text size. */
 private const val TALLER_PHONE = "w411dp-h2500dp-xxhdpi"
+
+/**
+ * Tall enough to hold the settings screen down to its last word — including the
+ * visual-only statement, which REQ-206 names and which Spanish pushes below
+ * [TALL_PHONE]'s fold.
+ */
+private const val TALL_PHONE_STATEMENTS = "w411dp-h2900dp-xxhdpi"
 
 /** 720p, 2 GB phone, matching the `Phone_Low_API33` AVD used for cramped layouts. */
 private const val COMPACT_PHONE = "w360dp-h640dp-xhdpi"

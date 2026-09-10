@@ -44,6 +44,13 @@
     <string name="library_scan_add_folder">Scanning the folder…</string>
     <string name="library_scan_counts">%1$d of %2$d</string>
 
+    <!-- REQ-203: the library's order, a reader's choice of three -->
+    <string name="library_order_button">Sort: %1$s</string>
+    <string name="library_order_label">Sort books. Currently %1$s.</string>
+    <string name="library_order_title">Title</string>
+    <string name="library_order_recently_read">Recently read</string>
+    <string name="library_order_recently_added">Recently added</string>
+
     <string name="library_problem_title">The library could not be updated</string>
     <!-- Reader screen -->
     <string name="reader_back">Back to library</string>
@@ -99,6 +106,11 @@
     <string name="reader_external_notice">Opened from another app. Only your reading position will be remembered.</string>
     <string name="reader_external_add">Add to library</string>
     <string name="reader_external_dismiss">Dismiss</string>
+
+    <!-- REQ-202: the one-time offer to start past a book's cover and title pages -->
+    <string name="reader_front_matter_notice">This book starts with cover and title pages.</string>
+    <string name="reader_front_matter_skip">Skip to %1$s</string>
+    <string name="reader_front_matter_stay">Start at the beginning</string>
 
     <string name="library_resume_blocked_title">Could not go back to %1$s</string>
     <string name="library_resume_blocked_missing">Its file was moved or deleted. Your place is kept in case it comes back.</string>
@@ -185,6 +197,11 @@
     <string name="settings_pause_normal">Normal</string>
     <string name="settings_pause_strong">Strong</string>
 
+    <!-- REQ-201: the chapter-boundary pause, now a choice (D4) -->
+    <string name="settings_section_chapters">Chapters</string>
+    <string name="settings_chapter_pause">Pause at chapters</string>
+    <string name="settings_chapter_pause_summary">Stops the stream on the first word of each new chapter and names it. Turn off to read straight through.</string>
+
     <string name="settings_on">On</string>
     <string name="settings_off">Off</string>
 
@@ -200,8 +217,19 @@
     <string name="settings_check_updates_summary">Opens the FastReader releases page in your browser. FastReader never connects to the internet itself.</string>
     <string name="settings_check_updates_unavailable">No app on this device can open a web link. The releases page is github.com/cedagova/fastReader/releases.</string>
     <string name="settings_privacy_label">What stays on this device</string>
-    <string name="settings_privacy">FastReader has no internet permission, so it cannot send or receive anything itself. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings and small cover thumbnails, in its private storage. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
+    <string name="settings_privacy">FastReader has no internet permission, so it cannot send or receive anything itself. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings and small cover thumbnails, in its private storage. If the app stops unexpectedly it also keeps one short report about what went wrong in that private storage: the app version, this device\'s model, its Android version and where in the code it stopped, with no part of any book in it — the next launch offers that report to you once, and it goes nowhere unless you share it and pick an app to send it to. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
     <string name="settings_visual_only">The word stream is visual only. FastReader shows one word at a time on the screen; it never reads a book aloud, and there is no audio or text-to-speech anywhere in the app. Everything around the stream — the library, the reader controls, and this screen — is labelled for TalkBack, but the stream itself has to be seen.</string>
+
+    <!-- The crash report offered on the next launch (REQ-207, AD-14). The
+         report's own text is not localised: it is read by whoever fixes the
+         crash, not by the reader who shares it. These strings are the offer. -->
+    <string name="crash_offer_title">FastReader stopped last time</string>
+    <string name="crash_offer_body">A short report about what went wrong is saved on this device. Nothing leaves it unless you share the report and choose an app to send it to. Deleting it is final, and either way you are only asked this once.</string>
+    <string name="crash_offer_contents">The report holds the app version, this device\'s model, its Android version, and where in the app the code stopped. It holds no part of any book, no book titles, no file names and no paths.</string>
+    <string name="crash_offer_share">Share report</string>
+    <string name="crash_offer_delete">Delete report</string>
+    <string name="crash_offer_chooser">FastReader crash report</string>
+    <string name="crash_offer_unavailable">No app on this device can accept the report as text. It is still here, and nothing has been sent.</string>
 
     <string name="settings_problem_title">Your settings are not being saved</string>
 </resources>

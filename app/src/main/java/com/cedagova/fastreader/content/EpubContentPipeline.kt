@@ -45,6 +45,15 @@ import kotlinx.coroutines.withContext
  *
  * A source that cannot seek still works: it falls back to the forward pass and
  * costs what it always did. See [EpubByteSource.openChannel].
+ *
+ * ## The structural fingerprint (AD-18)
+ *
+ * The directory pass also yields [BookContent.structuralFingerprint], a digest of
+ * every entry's name, uncompressed size and CRC-32. Those are fields the archive
+ * reader already had in hand, so it adds no read to any path and REQ-110's
+ * mechanism and measurement are untouched. It is what lets a stored position be
+ * refused when the file changed under it — see
+ * `com.cedagova.fastreader.reader.ReaderPosition`.
  */
 class EpubContentPipeline(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -104,6 +113,10 @@ class EpubContentPipeline(
         val entries = HashMap(read.entries)
 
         val titles = readTitles(opf, entries)
+        // Read before the spine loop, which consumes entries as it goes: a book
+        // that lists its own navigation document in the spine would otherwise have
+        // had it removed by the time the body-start declaration is wanted.
+        val declaredBody = readDeclaredBodyStart(opf, entries)
         val spineItems = opf.spineItems
         onProgress(ContentProgress(completedItems = 0, totalItems = spineItems.size))
 
@@ -167,10 +180,15 @@ class EpubContentPipeline(
         return BookContentResult.Parsed(
             BookContent(
                 bookDigest = identity?.value.orEmpty(),
+                // Taken from the directory read this parse already did, never from
+                // a second pass (AD-18, REQ-110). Null under the streaming
+                // fallback, which means "no guard" downstream.
+                structuralFingerprint = archive.structuralFingerprint,
                 language = opf.metadata.language,
                 tokens = classify(tokens),
                 chapters = chapters,
                 gaps = gaps,
+                frontMatter = FrontMatterDetector.detect(chapters, declaredBody?.first, declaredBody?.second),
             ),
         )
     }
@@ -240,6 +258,28 @@ class EpubContentPipeline(
                 EpubPaths.resolve("", full)?.let { return it }
             }
         }
+        return null
+    }
+
+    /**
+     * Where the book itself says its body starts, if it says so at all (REQ-202).
+     *
+     * Both declarations come from bytes this parse already holds: the EPUB 3
+     * navigation document was read for its chapter titles, and the EPUB 2 guide
+     * is part of the package document. Detection therefore costs one scan of
+     * markup already in memory and never another read of the archive, which is
+     * what keeps the open cost where REQ-110 needs it.
+     */
+    private fun readDeclaredBodyStart(
+        opf: OpfDocument,
+        entries: Map<String, ByteArray>,
+    ): Pair<String, FrontMatterSource>? {
+        opf.navPath?.let { path ->
+            entries[path]
+                ?.let { TocReader.readBodyMatterLandmark(path, ContentCharsets.decode(it)) }
+                ?.let { return it to FrontMatterSource.LANDMARKS }
+        }
+        opf.guideTextPath?.let { return it to FrontMatterSource.GUIDE }
         return null
     }
 

@@ -78,6 +78,32 @@ class FolderListScreenshotTest {
         capture("folders_compact_large_font", FolderListUiState(folders = folders()), fontScale = 1.3f)
     }
 
+    /**
+     * REQ-206 on the folder list: the intro sentence that promises the files
+     * inside are never touched, both status lines, and the per-folder counts —
+     * which are plurals, so this is also where the Spanish plural set is seen
+     * rendering rather than merely passing lint.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theFolderListIsSpanishOnASpanishDevice() {
+        capture("folders_spanish", FolderListUiState(folders = folders()))
+    }
+
+    /**
+     * REQ-206 on the confirmation, which is the folder screen's notice: the
+     * count of books that would leave, and the sentence saying no file is
+     * deleted. Both have to survive translation intact.
+     */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theRemovalConfirmationIsSpanishOnASpanishDevice() {
+        capture(
+            "folders_remove_confirm_spanish",
+            FolderListUiState(folders = folders(), confirming = folders().first()),
+        )
+    }
+
     private fun folders() = listOf(
         LibraryFolderItem(
             id = "tree://novels",
