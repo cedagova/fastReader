@@ -23,6 +23,10 @@
     <string name="library_unknown_author">Unknown author</string>
     <string name="library_progress">%1$d%% read</string>
     <string name="library_remove">Remove %1$s from the library. The file stays on your device.</string>
+    <string name="library_remove_title">Remove “%1$s”?</string>
+    <string name="library_remove_kept">The file stays on your device and your place in it is kept.</string>
+    <string name="library_remove_confirm">Remove book</string>
+    <string name="library_remove_cancel">Cancel</string>
     <string name="library_grant_access">Grant access</string>
 
     <string name="library_state_corrupt">Cannot be read. This file is not a valid EPUB.</string>

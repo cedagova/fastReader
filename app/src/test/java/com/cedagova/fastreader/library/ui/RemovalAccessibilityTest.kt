@@ -3,6 +3,8 @@ package com.cedagova.fastreader.library.ui
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.FolderStatus
@@ -71,6 +73,45 @@ class RemovalAccessibilityTest {
         val labels = composeRule.actionableNodes().map { it.label() }
         assertTrue("the confirmation needs a way out, got $labels", labels.contains("Cancel"))
         assertTrue("the confirmation needs its action, got $labels", labels.contains("Remove folder"))
+    }
+
+    /** A book's removal asks first, and the question is as reachable as the folder one. */
+    @Test
+    fun `the book removal confirmation is labelled and reachable`() {
+        var removed = 0
+        composeRule.setContent {
+            FastReaderTheme {
+                LibraryScreen(
+                    state = buildLibraryUiState(
+                        Catalog(books = listOf(LibraryFixtures.readable("a", "Ficciones"))),
+                        IngestionState.Idle,
+                        query = "",
+                    ),
+                    onQueryChange = {},
+                    onAddBooks = {},
+                    onAddFolder = {},
+                    onRefresh = {},
+                    onRemove = { removed += 1 },
+                    onGrantAccess = {},
+                    onOpen = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("library_remove_a").performClick()
+
+        assertEquals("nothing leaves before the yes", 0, removed)
+        // Scoped to the dialog: the library rows behind it are LEAF102's surface.
+        val controls = composeRule.actionableNodes().filter { it.testTag().startsWith("library_remove_dialog") }
+        val minimum = with(composeRule.density) { 48.dp.toPx() }
+        assertEquals(listOf("Cancel", "Remove book"), controls.map { it.label() }.sorted())
+        controls.forEach {
+            assertTrue("${it.label()} is ${it.boundsInRoot.height}px tall", it.boundsInRoot.height >= minimum - 1f)
+        }
+
+        composeRule.onNodeWithTag("library_remove_dialog_confirm").performClick()
+
+        assertEquals(1, removed)
     }
 
     /**

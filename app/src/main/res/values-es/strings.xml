@@ -51,6 +51,10 @@
     <string name="library_unknown_author">Autor desconocido</string>
     <string name="library_progress">%1$d%% leído</string>
     <string name="library_remove">Quitar %1$s de la biblioteca. El archivo se queda en tu dispositivo.</string>
+    <string name="library_remove_title">¿Quitar “%1$s”?</string>
+    <string name="library_remove_kept">El archivo se queda en tu dispositivo y tu punto de lectura se guarda.</string>
+    <string name="library_remove_confirm">Quitar el libro</string>
+    <string name="library_remove_cancel">Cancelar</string>
     <string name="library_grant_access">Conceder acceso</string>
 
     <string name="library_state_corrupt">No se puede leer. Este archivo no es un EPUB válido.</string>

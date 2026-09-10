@@ -308,6 +308,12 @@ class LibraryScreenScreenshotTest {
         capture("library_landscape_large_font", state(populatedCatalog()), fontSize = FontSize.EXTRA_LARGE)
     }
 
+    /** Removing a book asks first: the question names the book and says the file stays. */
+    @Test
+    fun removingABookAsksFirst() {
+        capture("library_remove_confirm", state(populatedCatalog()), click = "library_remove_ficciones")
+    }
+
     /** `Tablet_Mid_API36`, 10" at 1280 x 800 dp: the width genuinely spent. */
     @Test
     @Config(sdk = [35], qualifiers = TABLET_LARGE)

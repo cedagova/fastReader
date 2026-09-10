@@ -50,6 +50,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -145,6 +146,18 @@ fun LibraryScreen(
     onOrderChange: (LibraryOrder) -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
 ) {
+    // The book whose removal is waiting on a yes, by id so it survives rotation.
+    // Removal was one tap and an undo bar; a confirmation first is what the
+    // reader asked for, and the undo stays as the second chance after it.
+    var confirmingRemoval by rememberSaveable { mutableStateOf<String?>(null) }
+    val bookToRemove = confirmingRemoval?.let { id -> state.books.firstOrNull { it.id == id } }
+    if (bookToRemove != null) {
+        RemoveBookDialog(
+            book = bookToRemove,
+            onConfirm = { confirmingRemoval = null; onRemove(bookToRemove) },
+            onDismiss = { confirmingRemoval = null },
+        )
+    }
     WidthAware(modifier.fillMaxSize()) { layout ->
     Scaffold(
         modifier = Modifier.fillMaxSize().testTag("library_screen"),
@@ -214,7 +227,7 @@ fun LibraryScreen(
                     } else {
                         BookList(
                             books = state.books,
-                            onRemove = onRemove,
+                            onRemove = { confirmingRemoval = it.id },
                             onGrantAccess = onGrantAccess,
                             onOpen = onOpen,
                             coverLoader = coverLoader,
@@ -685,6 +698,51 @@ private fun BookList(
             }
         }
     }
+}
+
+/**
+ * The question before a book leaves the library. It names the book, says what
+ * removal does and does not do, and its action says "book" rather than a bare
+ * "Remove", the way [FolderListScreen]'s confirmation says "folder".
+ */
+@Composable
+private fun RemoveBookDialog(book: LibraryBookItem, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("library_remove_dialog"),
+        title = {
+            Text(
+                text = stringResource(R.string.library_remove_title, book.title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.library_remove_kept),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_remove_dialog_confirm"),
+            ) {
+                Text(stringResource(R.string.library_remove_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_remove_dialog_cancel"),
+            ) {
+                Text(stringResource(R.string.library_remove_cancel))
+            }
+        },
+    )
 }
 
 /**
