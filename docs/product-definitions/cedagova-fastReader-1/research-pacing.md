@@ -295,3 +295,44 @@ def report(name, p):
 
 report("Pride and Prejudice", "pp.txt"); report("Origin of Species", "origin.txt")
 ```
+
+## Addendum (2026-09-10): re-simulation under the plan's exact rule
+
+Plan #81 fixes the rule more precisely than the script above: the span is
+the number of words since the previous clause-or-stronger boundary token
+(emphasis words and breath holds do not reset it); a breath hold is a word
+class on its own counter (reset by a boundary or by a hold), combined with
+the boundary pause by `max`, never a product. Same two books, same
+constants (span full at 10 words, breath after 8 plain words at a
+conjunction/relative or unconditionally after 14, breath 1.4x), globally
+normalized:
+
+| Book | Mean before normalization | Sentences of 4+ words: min / p5 / p50 / p95 / max | 60-word windows: min / p5 / p95 / max | Plain-word burst |
+|---|---|---|---|---|
+| Pride and Prejudice | 1.143 | 0.71 / 0.91 / 0.99 / 1.03 / 1.07 | 0.91 / 0.96 / 1.04 / 1.08 | 1.14x |
+| On the Origin of Species | 1.122 | 0.67 / 0.93 / 1.00 / 1.02 / 1.05 | 0.77 / 0.97 / 1.03 / 1.06 | 1.12x |
+
+The minimum sentences are short ones carrying several emphasis words, which
+span-scaling cannot help; a universal per-sentence bound is therefore not a
+sensible acceptance criterion, percentiles are.
+
+```python
+# sim3.py — plan #81 rule; reuses load/tokens from the script above and CONJ.
+def plan_rule(tk, span_full=10, breath_min=8, breath_max=14, breath_mult=1.4):
+    words = [w for w, _, _ in tk]; out = []; span = 0; run = 0
+    for i, (w, m, end) in enumerate(tk):
+        span += 1
+        is_boundary = m in (CLAUSE, SENT, PARA); is_emph = (m == EMPH)
+        b = 1.0 + (m - 1.0) * min(1.0, span / span_full) if is_boundary else 1.0
+        e = EMPH if is_emph else 1.0
+        if is_boundary: run = 0
+        else:
+            run += 1
+            nxt = words[i + 1].strip('“"‘\'').lower() if i + 1 < len(words) else ''
+            if (run >= breath_min and nxt in CONJ) or run >= breath_max:
+                e = max(e, breath_mult); run = 0
+        out.append(max(b, e))
+        if is_boundary: span = 0
+    avg = sum(out) / len(out)
+    return [x / avg for x in out], avg
+```
