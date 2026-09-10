@@ -3,6 +3,7 @@ package com.cedagova.fastreader
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -223,16 +224,31 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
             onOpenSettings = { settingsOpen = true },
         )
 
-        else -> LibraryRoute(
-            graph = library,
-            onOpenBook = { openBookId = it },
-            resumeBlocked = resumeBlocked(blockedBookId, blockedReason),
-            onDismissResumeNotice = {
-                blockedBookId = null
-                blockedReason = null
-            },
-            onOpenSettings = { settingsOpen = true },
-        )
+        else -> {
+            // Back from the library goes to the book, not out of the app: the
+            // library is a place to pick the next book, and the one being read
+            // is where a reader who has finished picking wants to be. Only when
+            // there is a readable last-read book — the same rule launch uses —
+            // otherwise back leaves as it always did.
+            val catalog by library.repository.catalog.collectAsState()
+            val resumable = (launchDestination(catalog) as? LaunchDestination.Reader)?.bookId
+            BackHandler(enabled = resumable != null) {
+                openBookId = resumable
+                // Nobody tapped a row, so a book that will not open is the
+                // library's to explain, exactly as after a launch.
+                routedIntoReader = true
+            }
+            LibraryRoute(
+                graph = library,
+                onOpenBook = { openBookId = it },
+                resumeBlocked = resumeBlocked(blockedBookId, blockedReason),
+                onDismissResumeNotice = {
+                    blockedBookId = null
+                    blockedReason = null
+                },
+                onOpenSettings = { settingsOpen = true },
+            )
+        }
     }
 
     // Over whichever destination the launch settled on, and only once the launch
