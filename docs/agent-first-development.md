@@ -255,6 +255,40 @@ allow-list, which is the point at which to ask what that field could carry.
   on the side of its own breakpoint that the `sw600dp` resource qualifier would
   have put it on.
 
+### Every new string needs a Spanish one (#55)
+
+The app ships two locales: `values/strings.xml` and `values-es/strings.xml`.
+`MissingTranslation`, `ExtraTranslation` and `MissingQuantity` are declared lint
+**errors** with `abortOnError` in the `lint` block of `app/build.gradle.kts`, so
+adding a string to `values/strings.xml` and stopping there turns the hosted
+`lint` step red:
+
+```
+values/strings.xml:202: Error: "settings_chapter_pause" is not translated in "es" (Spanish) [MissingTranslation]
+```
+
+That is the gate working. The fix is the Spanish line, not a lint suppression.
+The one legitimate escape is `translatable="false"` on the string itself, for a
+value that genuinely must not be translated.
+
+Two things that catch people out:
+
+- **Spanish has a plural category English does not.** CLDR gives `es` a `many`
+  bucket for whole millions, which take `de` before the noun — "2.000.000 **de**
+  libros" against "5 libros". Every `<plurals>` in `values-es` needs
+  `one`/`many`/`other`, and `MissingQuantity` will say so if it does not.
+- **A *stale* Spanish string is invisible to the gate.** Lint catches a missing
+  translation, never a Spanish sentence that no longer says what the English one
+  says. When you edit English copy, edit its Spanish line in the same commit.
+  This bites hardest on `settings_privacy`, which `PrivacyStatementTest` already
+  pins to three published Markdown copies — the Spanish copy is a fourth that no
+  test pins.
+
+Register and conventions for the Spanish itself are written at the top of
+`values-es/strings.xml`. Spanish also runs longer than English, so a new string
+wants a look at the `*_spanish_compact_large_font` goldens, not only the
+reference phone.
+
 ### Resource-folder quirk
 
 `mipmap-anydpi` without a version qualifier does not link: `aapt2` reports
