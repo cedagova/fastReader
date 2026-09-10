@@ -1,6 +1,8 @@
 package com.cedagova.fastreader.reader.ui
 
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -51,6 +53,20 @@ class ReaderSpeedEntryTest {
         assertEquals(listOf(333), speeds)
         composeRule.onNodeWithTag("reader_speed_entry").assertDoesNotExist()
         composeRule.onNodeWithTag("reader_speed_readout").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the cursor opens after the last digit`() {
+        show()
+
+        composeRule.onNodeWithTag("reader_speed_readout").performClick()
+        settle()
+        // No clearance: the digit goes wherever the cursor landed. Only the end
+        // turns the readout's number into ten times itself.
+        composeRule.onNodeWithTag("reader_speed_entry").performTextInput("0")
+        settle()
+        composeRule.onNodeWithTag("reader_speed_entry")
+            .assert(hasText(playing.wpm.toString() + "0"))
     }
 
     @Test

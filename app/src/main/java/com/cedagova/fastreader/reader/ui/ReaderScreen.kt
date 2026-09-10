@@ -83,6 +83,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.buildAnnotatedString
@@ -1285,8 +1287,13 @@ private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Uni
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SpeedEntry(wpm: Int, onDone: (Int?) -> Unit) {
-    var text by remember { mutableStateOf(wpm.toString()) }
-    val parsed = text.toIntOrNull()?.takeIf { it in RsvpTiming.MIN_WPM..RsvpTiming.MAX_WPM }
+    // The cursor starts after the last digit: the reader came here to change the
+    // number, so a backspace or a typed digit must act on its end, not its front.
+    var field by remember {
+        val initial = wpm.toString()
+        mutableStateOf(TextFieldValue(initial, selection = TextRange(initial.length)))
+    }
+    val parsed = field.text.toIntOrNull()?.takeIf { it in RsvpTiming.MIN_WPM..RsvpTiming.MAX_WPM }
     val focusRequester = remember { FocusRequester() }
     var hadFocus by remember { mutableStateOf(false) }
     var finished by remember { mutableStateOf(false) }
@@ -1297,8 +1304,8 @@ private fun SpeedEntry(wpm: Int, onDone: (Int?) -> Unit) {
         }
     }
     OutlinedTextField(
-        value = text,
-        onValueChange = { text = it.filter(Char::isDigit).take(4) },
+        value = field,
+        onValueChange = { field = it.copy(text = it.text.filter(Char::isDigit).take(4)) },
         isError = parsed == null,
         singleLine = true,
         textStyle = MaterialTheme.typography.labelLarge,
