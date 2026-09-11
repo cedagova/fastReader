@@ -127,15 +127,15 @@ None.
 
 | ID | Title | Decision | Confidence | Review | Planning readiness | Outcome issue | Outcome umbrella |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `A83-F001` | The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly | Candidate | High | Pending | Pending | Not required | Not required |
-| `A83-F002` | No native redirect destination exists in the identity provider's allow-list, the reader-db contract validator rejects custom schemes, and password recovery is link-only | Candidate | High | Pending | Pending | Not required | Not required |
-| `A83-F003` | The core bearer contract already works for any client, but the only sign-in narrative is web-only and the native integrator surface is undocumented | Candidate | High | Pending | Pending | Not required | Not required |
-| `A83-F004` | reader-api cannot name a native client: the client identifier allow-list is `reader-web` only | Candidate | Medium | Pending | Pending | Not required | Not required |
-| `A83-F005` | Native Google sign-in depends on identity-provider settings that no repository manages, and local development has no Google provider at all | Candidate | Medium | Pending | Pending | Not required | Not required |
-| `A83-F006` | The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor | Candidate | Medium | Pending | Pending | Not required | Not required |
-| `A83-F007` | This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so it cannot host an auth experiment without a product-definition change | Candidate | High | Pending | Pending | Not required | Not required |
-| `A83-F008` | The Android client contract: OTP-code sign-in, Keystore-backed session storage excluded from backup, single-flight refresh with margin, and a fixed 401 policy | Candidate | High | Pending | Pending | Not required | Not required |
-| `A83-F009` | The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket | Candidate | Low | Pending | Pending | Not required | Not required |
+| `A83-F001` | The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A83-F002` | No native redirect destination exists in the identity provider's allow-list, the reader-db contract validator rejects custom schemes, and password recovery is link-only | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A83-F003` | The core bearer contract already works for any client, but the only sign-in narrative is web-only and the native integrator surface is undocumented | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A83-F004` | reader-api cannot name a native client: the client identifier allow-list is `reader-web` only | Candidate | Medium | Corroborated | Ready | Not required | Not required |
+| `A83-F005` | Native Google sign-in depends on identity-provider settings that no repository manages, and local development has no Google provider at all | Candidate | Medium | Corroborated | Ready | Not required | Not required |
+| `A83-F006` | The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor | Candidate | Medium | Corroborated | Ready | Not required | Not required |
+| `A83-F007` | This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so it cannot host an auth experiment without a product-definition change | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A83-F008` | The Android client contract: OTP-code sign-in, Keystore-backed session storage excluded from backup, single-flight refresh with margin, and a fixed 401 policy | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A83-F009` | The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket | Candidate | Low | Corroborated | Ready | Not required | Not required |
 
 ## A83-F001 — The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly
 
