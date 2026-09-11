@@ -132,9 +132,10 @@ None.
 | `A83-F003` | The core bearer contract already works for any client, but the only sign-in narrative is web-only and the native integrator surface is undocumented | Candidate | High | Pending | Pending | Not required | Not required |
 | `A83-F004` | reader-api cannot name a native client: the client identifier allow-list is `reader-web` only | Candidate | Medium | Pending | Pending | Not required | Not required |
 | `A83-F005` | Native Google sign-in depends on identity-provider settings that no repository manages, and local development has no Google provider at all | Candidate | Medium | Pending | Pending | Not required | Not required |
-| `A83-F006` | Resource-server session hardening gaps that a mobile fleet exposes: zero clock leeway, a per-IP limiter that may key on the proxy, no anonymous-token policy, no revocation | Candidate | Medium | Pending | Pending | Not required | Not required |
+| `A83-F006` | The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor | Candidate | Medium | Pending | Pending | Not required | Not required |
 | `A83-F007` | This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so it cannot host an auth experiment without a product-definition change | Candidate | High | Pending | Pending | Not required | Not required |
 | `A83-F008` | The Android client contract: OTP-code sign-in, Keystore-backed session storage excluded from backup, single-flight refresh with margin, and a fixed 401 policy | Candidate | High | Pending | Pending | Not required | Not required |
+| `A83-F009` | The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket | Candidate | Low | Pending | Pending | Not required | Not required |
 
 ## A83-F001 — The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly
 
@@ -188,6 +189,18 @@ identity", so the intended standard is multi-client.
   report `binding_mismatch` and refuse sign-in, while omitting it leaves a
   native client with an allow-list it cannot use. Neither repository has a
   test for two clients sharing one projection.
+- Direct (reviewer R4, corroborated by the lead) — the same single-client
+  shape applies to the client-version gate on the same documents:
+  `READER_PRE_AUTH_MIN_CLIENT_VERSION` / `READER_PRE_AUTH_SUPPORTED_CLIENT_MAJOR`
+  (`app/core/settings.py:283-288`) and
+  `READER_CAPABILITY_MIN_CLIENT_VERSION` / `READER_CAPABILITY_SUPPORTED_CLIENT_MAJOR`
+  (`:198-203`) are one deployment-wide floor and major, README lines 94 and
+  111 describe the pre-auth pair as the "native Reader client" floor, and
+  reader-web pins its own version to the constant `'1.0.0'`
+  (`packages/clients/src/api/readerPreAuthClient.ts:10`,
+  `readerCapabilitiesClient.ts:15`). Raising the floor or major for native
+  clients would lock reader-web out, and a native client with its own
+  version line cannot be gated independently.
 
 ### Cause
 
@@ -208,14 +221,15 @@ honour.
 ### Recommended outcome
 
 The pre-auth projection distinguishes client kinds, so each kind receives the
-redirect destinations that belong to it, and reader-web's binding check
-continues to fail closed on its own set without being disturbed by another
-client's entries.
+redirect destinations and the version floor that belong to it, and
+reader-web's binding check continues to fail closed on its own set without
+being disturbed by another client's entries.
 
 ### Outcome boundary
 
-In: how reader-api selects and serves the redirect allow-list (and, if the
-owner prefers, `publicClientId`) per client kind; reader-web's binding check
+In: how reader-api selects and serves the redirect allow-list and the
+client-version floor/major (and, if the owner prefers, `publicClientId`) per
+client kind, on both the pre-auth and capabilities documents; reader-web's binding check
 only insofar as its exact-set semantics must be reconciled with whatever
 reader-api serves; tests that prove two clients can coexist. Out: which native
 redirect destinations exist in the identity provider (F002), the client
@@ -236,11 +250,16 @@ leave each half untestable on its own.
   deployment where native destinations are also configured.
 - A test in reader-api proves both projections from one configuration, and a
   test in reader-web proves its binding still fails closed on a foreign set.
+- A native client with a version below its own floor is refused while
+  reader-web at `1.0.0` is still served, on the same deployment.
 
 ### Planning inputs
 
 - Affected surfaces: `app/features/reader_pre_auth/service.py`,
-  `app/core/settings.py` (`READER_PRE_AUTH_REDIRECT_URIS` and related),
+  `app/features/reader_capabilities/service.py:69-82, 111-132` (version gate),
+  `app/core/settings.py` (`READER_PRE_AUTH_REDIRECT_URIS`,
+  `READER_PRE_AUTH_MIN_CLIENT_VERSION`, `READER_PRE_AUTH_SUPPORTED_CLIENT_MAJOR`,
+  `READER_CAPABILITY_MIN_CLIENT_VERSION`, `READER_CAPABILITY_SUPPORTED_CLIENT_MAJOR`),
   `app/contracts/reader_pre_auth.py` (if the document shape changes),
   `contracts/reader-pre-auth.v1.examples.json`, the OpenAPI contract and the
   generated Kotlin/TypeScript clients; `src/app/authEntryPolicyRuntime.ts` and
@@ -499,10 +518,18 @@ What is missing or wrong for a native integrator (all Direct):
    (`reader_products/repository_db.py:805-809`, `reader_sync/repository_db.py:1464-1468`,
    `publication_imports/repository_db.py:161-165`); vocabulary, notifications,
    and usage pass the raw string.
-6. `docs/error-codes.md:47` documents `auth.forbidden` 403 which no code path
-   raises; `:16` shows a non-UUID `request_id` example;
-   `docs/functional-tests/auth.md:69` names a "Legacy User Header" test that
-   no longer corresponds to code.
+6. `docs/error-codes.md:47` documents `auth.forbidden` 403; the code is
+   produced only by the generic status mapper (`app/api/errors.py:211-212`)
+   and is listed in `tests/test_error_contracts.py:23`, but no route or
+   dependency raises a 403 on the pinned baseline, so an integrator cannot
+   learn from the docs when, if ever, to expect it. `:16` shows a non-UUID
+   `request_id` example; `docs/functional-tests/auth.md:69` names a "Legacy
+   User Header" test that no longer corresponds to code.
+7. Nothing states that revocation is by expiry only: `grep` for `revoke`,
+   `jti`, `denylist` in `app/` finds nothing, and README's security section
+   does not say that a leaked access token stays valid until `exp` or name
+   the hosted access-token lifetime an integrator must plan its refresh
+   margin around.
 
 ### Cause
 
@@ -514,16 +541,18 @@ documentation was written while reader-web was the only client.
 A native integrator must reverse-engineer reader-web to learn the refresh,
 error, and bootstrap expectations, and will type the 401 contract from an
 OpenAPI document that omits the header the server always sends. The
-misstatements (UUID subject, `auth.forbidden`) lead to wrong client-side
-handling.
+misstatements (UUID subject, an `auth.forbidden` code with no documented
+trigger) lead to wrong client-side handling, and the unstated revocation
+model leaves the client's refresh margin unanchored.
 
 ### Recommended outcome
 
 reader-api's own documentation and contract artifacts describe the native
 client contract end to end (bootstrap, sign-in authority, bearer, refresh
 ownership, error codes including the 502 path, first calls after sign-in,
-`publicClientId` semantics), and the documentation discrepancies above are
-corrected so a generated Kotlin client is sufficient.
+`publicClientId` semantics, the statement that revocation is by expiry only
+together with the hosted access-token lifetime), and the documentation
+discrepancies above are corrected so a generated Kotlin client is sufficient.
 
 ### Outcome boundary
 
@@ -546,7 +575,7 @@ pass.
   names who owns refresh.
 - The OpenAPI contract declares `WWW-Authenticate` on 401 responses and the
   regenerated Kotlin client exposes it.
-- The six discrepancies above are corrected or the code is changed to match.
+- The seven discrepancies above are corrected or the code is changed to match.
 
 ### Planning inputs
 
@@ -596,9 +625,14 @@ distinguish a native client from the web client and from unknown traffic.
 - Direct — `GET /v1/reader/capabilities` sets
   `Vary: Authorization, X-Reader-Client` (`app/features/reader_capabilities/api.py:51`),
   so cache partitioning already assumes distinct client names.
-- Direct — reader-web sends four names (`reader-web`,
-  `reader-web-notifications`, `reader-web-sync`, `reader-web-capabilities`),
-  of which only the first is recognised (`packages/clients/src/api/readerSyncClient.ts:38-47`,
+- Direct (count corrected per reviewer R2) — reader-web already sends
+  several distinct names: its production clients use nine `reader-web-*`
+  values (`reader-web`, `-browser`, `-capabilities`, `-library`,
+  `-local-book`, `-notes`, `-notifications`, `-products`,
+  `-publication-imports`, `-reader-cache`, `-sync` appear across
+  `packages/clients/src/api/*.ts` and `packages/*/src`, a further three in
+  tests only), and only `reader-web` is recognised
+  (`packages/clients/src/api/readerSyncClient.ts:38-47`,
   `readerCapabilitiesClient.ts:173-188`).
 - Inference — a native client's traffic is recorded as `client_id="unknown"`,
   indistinguishable from probes and misconfigured callers; F001's per-client
@@ -774,117 +808,102 @@ profile.
 
 Pending.
 
-## A83-F006 — Resource-server session hardening gaps that a mobile fleet exposes: zero clock leeway, a per-IP limiter that may key on the proxy, no anonymous-token policy, no revocation
+## A83-F006 — The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor
 
 - Decision: Candidate
 - Confidence: Medium
 - Review: Pending
 - Planning readiness: Pending
-- Cause status: Hypothesis
+- Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`
 - Outcome issue: Not required
 - Outcome umbrella: Not required
 
 ### Criterion
 
-A resource server that will receive traffic from many devices with untrusted
-clocks, through carrier NAT and a CDN, should tolerate small clock skew, key
-per-client limits on the real client address, state its policy for anonymous
-identities, and know that an issued token cannot be revoked before expiry.
+A token verifier that will accept tokens presented by many devices with
+untrusted clocks should tolerate a small, bounded clock skew, and it should
+state which identities it accepts as full actors, including anonymous ones,
+rather than leave that to whatever the identity provider happens to issue.
 
 ### Condition and evidence
 
 - Direct — no leeway: `jwt.decode` is called without `leeway` or `options`
   (`app/core/auth.py:288-299`); PyJWT 2.13.0 defaults to `leeway=0` and
   enforces `exp`, `nbf`, and `iat` when present (Indirect, from the pinned
-  dependency). A device whose clock runs ahead of the server would present a
-  token whose `iat` is in the future and receive 401 `auth.invalid_token`,
-  which the client contract (F008) treats as "re-authenticate", not
-  "refresh".
-- Direct — the pre-auth limiter keys on `request.client.host`
-  (`app/api/auth_dependencies.py:62-65`; 300 requests per 60 s default,
-  `app/core/settings.py:535-548`), and the container starts uvicorn with
-  `--no-proxy-headers` (`Dockerfile:97`). README lines 592-594 state the app
-  accepts only `CF-Connecting-IP` for the guest-issuance bucket and that
-  `X-Forwarded-For` is ignored; that verified-ingress address is not used by
-  the pre-auth limiter. Inference: behind Render and Cloudflare,
-  `request.client.host` is the ingress hop, so the limiter may be one shared
-  bucket for all callers; a fleet of phones would exhaust it long before any
-  single user misbehaves. Not observed on stage.
+  dependency; the reviewer reproduced that a future `iat` yields
+  `auth.invalid_token`). A device whose clock runs ahead of the server
+  presents a freshly issued token whose `iat` is in the future and receives
+  401 `auth.invalid_token`, which the client contract (F008) treats as
+  "re-authenticate", not "refresh". Supabase's own guidance notes that user
+  devices "can sometimes be off by minutes or even hours" (F008 sources).
 - Direct — no code reads `is_anonymous` (grep in `app/`: none). Anonymous
   sign-in is disabled in the reader-db hosted contract
   (`provider-contract.json:9`; `tools/auth-provider-config.mjs` enforces
   `external_anonymous_users_enabled: false`), so the exposure is latent: if
   it were ever enabled, an anonymous session (`aud=authenticated`, UUID `sub`)
-  would be a full Reader actor.
-- Direct — no revocation, denylist, or `jti` handling exists (grep for
-  `revoke`, `jti`, `denylist` in `app/`: none); a leaked access token is valid
-  until `exp`. reader-db sets `jwt_expiry = 3600` locally
-  (`supabase/config.toml:173`); the hosted lifetime is dashboard state.
-- Direct — subject-is-UUID enforcement is inconsistent across features
-  (F003 item 5), so a malformed subject fails differently per route.
+  would be a full Reader actor with no server-side distinction.
+- Direct — both properties live in the same verifier and are covered by the
+  same test module (`tests/test_auth.py:164-206` covers the claim checks that
+  a leeway or anonymous policy would extend).
 
 ### Cause
 
-Hypothesis. These are defaults left in place when one browser client behind
-one origin was the only caller; the proxy-keyed limiter in particular needs a
-stage observation to move to Confirmed.
+Confirmed. The verifier was written for one browser client whose clock is
+the user's desktop and for a provider profile that never issues anonymous
+sessions; neither assumption holds for a mobile fleet.
 
 ### Effect
 
-Mobile devices with skewed clocks are signed out instead of refreshed; a
-shared limiter bucket would produce correlated 429s across unrelated users;
-the anonymous and revocation policies are undocumented rather than wrong.
+Mobile devices with skewed clocks are signed out instead of refreshed, which
+the client cannot distinguish from a revoked session. Anonymous identity
+remains an unstated policy that a provider setting change would silently
+turn into full access.
 
 ### Recommended outcome
 
-reader-api tolerates a small, bounded clock skew, keys its per-client limiter
-on the verified ingress address it already trusts elsewhere, states its policy
-on anonymous identities (reject by default), and documents that access-token
-lifetime is the only revocation window so the client contract (F008) can set
-its refresh margin accordingly.
+reader-api tolerates a small, bounded clock skew on time claims and states
+its policy on anonymous identities (reject by default), both in code and in
+the README security section.
 
 ### Outcome boundary
 
-In: the verifier's decode options, the pre-auth limiter's key source, an
-`is_anonymous` check or documented policy, the README security section.
-Out: refresh-token semantics (identity provider), the guest cookie path, and
-per-user AI limits.
+In: the verifier's decode options and claim checks (`app/core/auth.py`), the
+tests that pin them, and the README lines that state the policy. Out: the
+limiter key (F009), the revocation statement (F003 item 7), refresh-token
+semantics (identity provider), the guest cookie path, and per-user AI
+limits.
 
 ### Cohesion rationale
 
-All four are properties of "how the resource server treats a token from an
-unknown device", and each is a small, independent hardening that shares the
-same test files.
+Both are decisions about which presented tokens the verifier accepts, made
+in the same function and proven by the same test file; they are two lines of
+policy, not two projects. The limiter and the revocation statement were
+split out because they live on other surfaces (reviewer R1).
 
 ### Outcome acceptance
 
-- A token with `iat` up to an agreed number of seconds in the future is
-  accepted; the bound is documented.
-- Two requests from two distinct public addresses on stage land in two
-  limiter buckets (observed via the limiter's key in logs or a targeted
-  test), or the owner records that the shared bucket is acceptable with its
-  current size.
+- A token with `iat` or `nbf` up to an agreed number of seconds in the future
+  is accepted; the bound is documented and a test pins it.
 - A token carrying `is_anonymous: true` is rejected with a documented code,
-  or the policy to accept it is written down.
-- README states that revocation is by expiry only and names the hosted access
-  token lifetime.
+  or the policy to accept it is written down and tested.
 
 ### Planning inputs
 
-- Affected surfaces: `app/core/auth.py`, `app/api/auth_dependencies.py`,
-  `app/security.py` (verified-ingress address helper), `tests/test_auth.py`,
-  `tests/test_security.py`, README.
+- Affected surfaces: `app/core/auth.py`, `tests/test_auth.py`, README
+  security section.
 - Constraint: keep audience fixed at `authenticated` and algorithms at
-  `ES256`/`RS256`; do not weaken those.
-- Owner question: hosted `jwt_exp` and session timebox values (names only).
+  `ES256`/`RS256`; do not weaken those. A leeway of at most a couple of
+  minutes matches RFC 7519 §4.1.4 ("usually no more than a few minutes").
+- The client-side refresh margin (F008) should be set after the leeway is
+  chosen.
 
 ### Limitations
 
-- The shared-bucket consequence is inferred from `--no-proxy-headers` and the
-  limiter's key; a single stage observation would settle it.
 - Clock-skew impact is inferred from PyJWT defaults; no device with a skewed
-  clock was tested.
+  clock was tested against stage.
+- Anonymous exposure is latent while the hosted provider keeps anonymous
+  sign-in disabled.
 
 ### Decision rationale
 
@@ -1185,6 +1204,18 @@ exactly as they have between reader-web's tests and its runtime.
 - Testing without an IDE: emulator matrix in this repository's guide, a
   stage project for OTP email, and the local Supabase stack with its mail
   catcher for offline runs.
+- Identity-provider rate limits per client address (reviewer R5): the
+  reader-db contract enforces 30 sign-in/sign-up, 30 code verifications, and
+  150 refreshes per window per IP (`supabase/config.toml:195-209`; hosted
+  values `30/30/150` in `tools/auth-provider-config.mjs`). Many phones
+  behind one carrier NAT share those buckets, so the client must surface
+  `429` from the provider as "try later", never as a credential error, and
+  must not retry code verification in a loop.
+- Local emulator loop (reviewer R6): the emulator reaches the local stack at
+  `http://10.0.2.2:54321`, which is cleartext; Android blocks cleartext by
+  default from API 28, so a debug-only network security configuration is
+  needed, and it must be confined to a build that the F007 decision keeps
+  out of the released artifact.
 - Dependencies: F007 (where the code lives), F003 (documented server
   contract), F001/F002/F005 only for redirect and Google flows.
 
@@ -1194,6 +1225,97 @@ exactly as they have between reader-web's tests and its runtime.
   the SDK versions current on that date; they should be re-checked when
   implementation starts.
 - No Android code was written or run during the audit.
+
+### Decision rationale
+
+Pending.
+
+## A83-F009 — The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket
+
+- Decision: Candidate
+- Confidence: Low
+- Review: Pending
+- Planning readiness: Pending
+- Cause status: Hypothesis
+- Expected implementation repositories: `Chunipers/reader-api`
+- Outcome issue: Not required
+- Outcome umbrella: Not required
+
+### Criterion
+
+A per-client rate limit in front of token verification should key on the
+address the deployment already trusts as the real client address, so one
+misbehaving caller cannot exhaust the budget for everyone and a growing
+device fleet does not hit a fixed global ceiling.
+
+### Condition and evidence
+
+- Direct — the pre-auth limiter keys on `request.client.host`
+  (`app/api/auth_dependencies.py:62-65`; 300 requests per 60 s default,
+  `app/core/settings.py:535-548`).
+- Direct — the container starts uvicorn with `--no-proxy-headers`
+  (`Dockerfile:97`), so `request.client.host` is the TCP peer, not a
+  forwarded address.
+- Direct — the app already has a verified-ingress address helper for the
+  guest-issuance bucket: README lines 592-594 state that outside development
+  it accepts only Render's `CF-Connecting-IP`, "which Cloudflare overwrites
+  before Render's load balancer forwards the request", and that
+  caller-controlled `X-Forwarded-For` entries are ignored
+  (`app/security.py:60-84`). The pre-auth limiter does not use it.
+- Inference — behind Render and Cloudflare the TCP peer is the ingress hop,
+  so the pre-auth limiter may be one shared 300-per-minute bucket for all
+  callers. This has not been observed on stage; if Render presents distinct
+  peer addresses per connection the effect is smaller.
+
+### Cause
+
+Hypothesis. The limiter predates the verified-ingress helper, or the two
+were never reconciled; a stage observation is needed before treating this as
+confirmed.
+
+### Effect
+
+If the premise holds, unrelated users receive correlated `429
+rate_limit.exceeded` responses under load, and a mobile fleet reaches the
+ceiling long before any single user misbehaves. If it does not hold, there is
+no defect.
+
+### Recommended outcome
+
+The pre-auth limiter's key is either proven to distinguish clients on stage,
+or it is switched to the verified-ingress address the deployment already
+trusts for guest issuance.
+
+### Outcome boundary
+
+In: the limiter key source in `app/api/auth_dependencies.py` and its tests,
+plus one stage observation. Out: the limiter's size, per-user AI limits,
+the verifier's claim policy (F006).
+
+### Cohesion rationale
+
+One question ("what address does this bucket key on") with one observation
+that settles it and at most one code change.
+
+### Outcome acceptance
+
+- Two requests from two distinct public addresses on stage land in two
+  limiter buckets, observed via the limiter's key in logs or a targeted
+  probe; or the owner records that a shared bucket of the current size is
+  acceptable.
+
+### Planning inputs
+
+- Affected surfaces: `app/api/auth_dependencies.py`, `app/security.py`
+  (verified-ingress helper), `tests/test_security.py`, `Dockerfile` only if
+  proxy headers are to be trusted instead.
+- Do the observation first; the code change may be unnecessary.
+
+### Limitations
+
+- Low confidence: the shared-bucket consequence is inferred from
+  `--no-proxy-headers` and the limiter's key; a single stage observation
+  would settle it either way.
 
 ### Decision rationale
 
@@ -1211,6 +1333,10 @@ Pending.
   client side) and should reference each other.
 - F007 gates F008: nothing in F008 can be exercised in this repository until
   the owner decides where network-capable code lives.
+- F006 and F009 were one finding in the first candidate; the reviewer (R1)
+  asked for independently decidable outcomes, so the verifier policy stays in
+  F006, the limiter key is F009, and the revocation statement moved into
+  F003 as a documentation item.
 
 ### Dependencies
 
@@ -1228,7 +1354,7 @@ Pending.
   is inferred), hosted `jwt_exp`, session timebox and inactivity limits,
   `external_google_additional_client_ids`.
 - Whether the pre-auth limiter distinguishes client addresses on stage
-  (F006).
+  (F009).
 - What value `READER_PRE_AUTH_PUBLIC_CLIENT_ID` carries on stage (name only).
 - Web Push (VAPID) notifications and the `/books` guest cookie are
   browser-shaped post-sign-in surfaces; they are outside the auth question

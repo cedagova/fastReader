@@ -34,7 +34,8 @@ into the real reader unchanged.
 
 ## What we decided
 
-- **Recommended dispositions:** accept all eight findings. F001 to F006 are
+- **Recommended dispositions:** accept F001 to F008; defer F009 until one
+  stage observation confirms or clears its premise. F001 to F006 and F009 are
   owned by Chunipers repositories and are carried across by the owner; F007
   and F008 are owned by this repository and follow its normal definition and
   planning route.
@@ -49,9 +50,10 @@ into the real reader unchanged.
 | reader-api documents the native client contract and fixes six documentation discrepancies (F003) | Chunipers/reader-api | Owner-carried; pending |
 | reader-api recognises a native client identifier in telemetry (F004) | Chunipers/reader-api | Owner-carried; pending |
 | Provider contract manages native Google sign-in fields and local parity (F005) | Chunipers/reader-db | Owner-carried; pending |
-| Resource-server hardening: clock leeway, limiter key, anonymous policy, revocation statement (F006) | Chunipers/reader-api | Owner-carried; pending |
+| Token verifier tolerates clock skew and states its anonymous-identity policy (F006) | Chunipers/reader-api | Owner-carried; pending |
 | Product decision on where a network-capable auth experiment lives in this repository (F007) | cedagova/fastReader | Pending |
 | General Android auth module contract and its proving-ground implementation (F008) | cedagova/fastReader | Pending |
+| Pre-auth rate limiter proven to key on real client addresses, or switched to the trusted ingress address (F009) | Chunipers/reader-api | Owner-carried; pending |
 
 ## Limits and unknowns
 
