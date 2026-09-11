@@ -185,7 +185,7 @@ class EpubContentPipeline(
                 // fallback, which means "no guard" downstream.
                 structuralFingerprint = archive.structuralFingerprint,
                 language = opf.metadata.language,
-                tokens = classify(tokens),
+                tokens = WordClassifier.classifyStream(tokens),
                 chapters = chapters,
                 gaps = gaps,
                 frontMatter = FrontMatterDetector.detect(chapters, declaredBody?.first, declaredBody?.second),
@@ -310,30 +310,6 @@ class EpubContentPipeline(
             sentenceIndex = state.sentenceIndex,
             label = XhtmlExtractor.MISSING_LABEL,
         )
-    }
-
-    /**
-     * Second pass over the finished stream.
-     *
-     * Rarity is defined against the whole book, so it cannot be decided while the
-     * book is still being read.
-     */
-    private fun classify(tokens: List<Token>): List<Token> {
-        val counts = HashMap<String, Int>()
-        for (token in tokens) {
-            if (token is WordToken) {
-                val key = WordClassifier.normalize(token.text)
-                if (key.isNotEmpty()) counts[key] = (counts[key] ?: 0) + 1
-            }
-        }
-        return tokens.map { token ->
-            if (token !is WordToken) {
-                token
-            } else {
-                val key = WordClassifier.normalize(token.text)
-                token.copy(classes = WordClassifier.classify(token.text, counts[key] ?: 1))
-            }
-        }
     }
 
     private fun List<ContentBlock>.firstHeading(): String? =

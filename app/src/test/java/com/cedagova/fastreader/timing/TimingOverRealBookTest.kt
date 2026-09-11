@@ -6,6 +6,7 @@ import com.cedagova.fastreader.content.BookContentResult
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.WordToken
+import com.cedagova.fastreader.reader.RemainingTimeIndex
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -85,7 +86,18 @@ class TimingOverRealBookTest {
 
         assertTrue("the Spanish fixture must contain sentence ends", sentenceEnds.isNotEmpty())
         assertTrue(plainWords.isNotEmpty())
-        assertEquals(setOf(720L), sentenceEnds.map { RsvpTimingEngine.durationMillis(it, settings, steady) }.toSet())
+        // #81: a sentence end holds the full 3.0x once it closes ten or more words;
+        // a shorter sentence holds proportionally less, and always more than a
+        // plain word.
+        for (end in sentenceEnds) {
+            val duration = RsvpTimingEngine.durationMillis(end, settings, steady)
+            val span = (end as WordToken).span!!
+            if (span >= RsvpTiming.SPAN_FULL_PAUSE_WORDS) {
+                assertEquals("${end.text} at span $span", 720L, duration)
+            } else {
+                assertTrue("${end.text} at span $span held ${duration}ms", duration in 241L..719L)
+            }
+        }
         assertEquals(setOf(240L), plainWords.map { RsvpTimingEngine.durationMillis(it, settings, steady) }.toSet())
     }
 
@@ -122,6 +134,34 @@ class TimingOverRealBookTest {
             book.tokens.sumOf { RsvpTimingEngine.durationMillis(it, settings, steady) },
             RsvpTimingEngine.estimatedMillis(book.tokens, settings),
         )
+    }
+
+    /**
+     * #81's budget identity on a real token stream: with the book's measured mean
+     * in the settings, the steady-state stream of the whole book takes exactly
+     * `tokens × 60000 / wpm`, at every strength and speed. The tolerance is 0.5%
+     * or one millisecond per token, whichever is larger, because each token's
+     * duration is rounded to a whole millisecond and at 1000 WPM that rounding is
+     * systematic rather than random.
+     */
+    @Test
+    fun `with the mean the book takes exactly tokens over wpm at every strength`() = runTest {
+        val book = parse(ContentFixtures.spanishNovel())
+        val steady = TimingState(elapsedPlaybackMillis = 60_000L, reorientationPending = false)
+
+        for (strength in listOf(PauseStrength.SUBTLE, PauseStrength.NORMAL, PauseStrength.STRONG)) {
+            val mean = RemainingTimeIndex.build(book, strength).meanMultiplier
+            for (wpm in listOf(100, 250, 1000)) {
+                val settings = TimingSettings(wpm = wpm, pauseStrength = strength, rampEnabled = false, meanMultiplier = mean)
+                val actual = book.tokens.sumOf { RsvpTimingEngine.durationMillis(it, settings, steady) }
+                val budget = book.totalTokens * 60_000.0 / wpm
+                val tolerance = maxOf(budget * 0.005, book.totalTokens.toDouble())
+                assertTrue(
+                    "$strength at $wpm WPM: ${actual}ms vs budget ${budget}ms (mean $mean)",
+                    kotlin.math.abs(actual - budget) <= tolerance,
+                )
+            }
+        }
     }
 
     @Test

@@ -74,6 +74,17 @@ enum class WordClass {
 
     /** "Sr.", "Dr.", "J." — the trailing period does not end a sentence. */
     ABBREVIATION,
+
+    /**
+     * A breath hold (#81): the word before a conjunction or relative pronoun once
+     * a long run of words has gone by with no punctuation, or the last word of a
+     * run that has gone on too long regardless. Text-to-speech systems insert
+     * these phrase breaks where writers left no commas; without them a long
+     * unpunctuated sentence streams as a volley. Marked by the tokenizer from
+     * the sequence, not by [WordClassifier] from the word, and never a reset of
+     * the word's [WordToken.span].
+     */
+    BREATH,
 }
 
 /** Why a piece of content is represented by a marker instead of its words. */
@@ -147,7 +158,8 @@ sealed interface Token {
  *
  * None of this moves a stored position: the same words still produce the same
  * token count in the same order with the same indices, so
- * [ContentPipelineVersion.CURRENT] does not change.
+ * [ContentPipelineVersion.CURRENT] does not change. The same holds for [span]
+ * (#81): it is a per-token annotation, not a change to what the tokens are.
  */
 data class WordToken(
     override val index: Int,
@@ -166,6 +178,20 @@ data class WordToken(
     val trailing: String = "",
     /** What separates this token from the next one's [leading]. Normally `" "`. */
     override val gapAfter: String = " ",
+    /**
+     * How many words this one closes: the count since the previous token whose
+     * boundary was [Boundary.CLAUSE] or stronger, counting this word (#81). A
+     * word right after a comma has span 1; the full stop after "Yes." has span 1
+     * too, and the timing engine scales the pause it carries by that span, so a
+     * pause is proportional to the text it wraps up. Emphasis words do not reset
+     * it, and neither does a breath hold: the span is about punctuation and only
+     * punctuation, and it is a property of the text, not of any setting.
+     *
+     * `null` when the stream was built by hand rather than by the tokenizer —
+     * the settings preview, test streams — and the engine then applies the full
+     * research pause, exactly as it did before spans existed.
+     */
+    val span: Int? = null,
 ) : Token {
 
     /** The word as the book prints it, punctuation included. */

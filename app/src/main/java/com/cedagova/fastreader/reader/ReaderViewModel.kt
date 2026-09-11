@@ -223,6 +223,9 @@ class ReaderViewModel(
                     settings = TimingSettings(
                         wpm = stored?.wpm ?: RsvpTiming.DEFAULT_WPM,
                         pauseStrength = pauseStrength,
+                        // The index was built above, before this session exists,
+                        // so no word is ever shown against an unmeasured book (#81).
+                        meanMultiplier = book.meanMultiplier,
                     ),
                     chapterPauseEnabled = chapterPauseEnabled,
                 )
@@ -437,6 +440,10 @@ class ReaderViewModel(
             }
             if (openRequest?.openKey != openKey || pauseStrength != wanted) return@launch
             view = rebuilt
+            // The mean is part of the same measurement as the index: a rebuilt
+            // index with the old mean would have the dial name one average and
+            // the time remaining another (#81).
+            session = session?.withMeanMultiplier(rebuilt.meanMultiplier)
             publish()
         }
     }

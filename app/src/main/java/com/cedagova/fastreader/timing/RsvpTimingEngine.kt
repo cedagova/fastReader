@@ -18,7 +18,7 @@ import kotlin.math.roundToLong
  * ## The formula
  *
  * ```
- * word    = (60000 / wpm) / rampSpeedFraction      // one plain word, right now
+ * word    = (60000 / wpm / meanMultiplier) / rampSpeedFraction   // one plain word, right now
  * pause   = max(boundaryMultiplier, emphasisMultiplier)
  * hold    = 3.0 on the first token after a start/resume/jump, else 1.0
  * duration = word * hold  +  word * (pause - 1) * pauseStrength.extraPauseScale
@@ -32,12 +32,33 @@ import kotlin.math.roundToLong
  * `PauseStrength.OFF` zeroes the second term, so every token in a book takes the
  * same time.
  *
+ * `meanMultiplier` (#81) is the book's mean `pause` at the current strength,
+ * measured once by `RemainingTimeIndex` and carried in [TimingSettings]. Dividing
+ * the plain word by it makes the dial name the *average* speed of the book,
+ * pauses included: the pauses are redistributed inside a fixed budget of
+ * `tokens × 60000 / wpm` rather than added on top of it. The engine itself never
+ * sees the book; it only divides by the number it is handed, which is `1.0` for
+ * a stream nobody has measured.
+ *
  * `max` rather than a product is deliberate. A twelve-letter word ending a
  * sentence holds for the sentence pause (3x), not 4.5x: LEAF201 already
  * documents its word classes as "one slow word rather than a compounded pause",
  * and the same reasoning applies across the two axes. Compounding also makes
  * time-remaining math (REQ-017) much harder to predict for no comprehension
  * benefit research supports.
+ *
+ * A boundary pause is also *proportional to the span it closes* (#81): the
+ * extra part of a clause, sentence or paragraph pause is scaled by
+ * `min(1, span / SPAN_FULL_PAUSE_WORDS)`, where `span` is the token's own count
+ * of words since the previous clause or stronger boundary. A full stop after
+ * "Yes." no longer costs three words; one after twelve words costs exactly what
+ * research says. Heading pauses are structural and keep their full value, skip
+ * markers have no span, and emphasis is a per-word cost that is never scaled. A
+ * token without a measured span — a hand-built stream — gets the full pause.
+ *
+ * A breath word (#81) holds `BREATH_MULTIPLIER`, again combined by `max`: a rest
+ * inside a long unpunctuated run, milder than emphasis, and gone entirely at
+ * `PauseStrength.OFF` like every other pause.
  *
  * ## Contract for the scheduler (LEAF203)
  *
@@ -156,19 +177,32 @@ object RsvpTimingEngine {
         }
         return when (token.boundary) {
             Boundary.NONE -> 1.0
-            Boundary.CLAUSE -> RsvpTiming.CLAUSE_MULTIPLIER
-            Boundary.SENTENCE -> RsvpTiming.SENTENCE_MULTIPLIER
-            Boundary.PARAGRAPH -> RsvpTiming.PARAGRAPH_MULTIPLIER
+            Boundary.CLAUSE -> spanScaled(token, RsvpTiming.CLAUSE_MULTIPLIER)
+            Boundary.SENTENCE -> spanScaled(token, RsvpTiming.SENTENCE_MULTIPLIER)
+            Boundary.PARAGRAPH -> spanScaled(token, RsvpTiming.PARAGRAPH_MULTIPLIER)
             Boundary.HEADING -> RsvpTiming.HEADING_MULTIPLIER
         }
     }
 
-    private fun emphasisMultiplier(token: Token): Double =
-        if (token is WordToken && token.classes.any { it in EMPHASIS_CLASSES }) {
-            RsvpTiming.EMPHASIS_MULTIPLIER
-        } else {
-            1.0
-        }
+    /**
+     * [full] scaled by the span [token] closes (#81): a short span earns a
+     * proportionally shorter pause, a span of [RsvpTiming.SPAN_FULL_PAUSE_WORDS]
+     * or more earns all of it. Only a [WordToken] carries a span; anything else,
+     * and a word whose span was never measured, holds the full pause.
+     */
+    private fun spanScaled(token: Token, full: Double): Double {
+        val span = (token as? WordToken)?.span ?: return full
+        val share = (span.toDouble() / RsvpTiming.SPAN_FULL_PAUSE_WORDS).coerceIn(0.0, 1.0)
+        return 1.0 + (full - 1.0) * share
+    }
+
+    private fun emphasisMultiplier(token: Token): Double {
+        if (token !is WordToken) return 1.0
+        var multiplier = 1.0
+        if (token.classes.any { it in EMPHASIS_CLASSES }) multiplier = RsvpTiming.EMPHASIS_MULTIPLIER
+        if (WordClass.BREATH in token.classes) multiplier = maxOf(multiplier, RsvpTiming.BREATH_MULTIPLIER)
+        return multiplier
+    }
 
     private fun Token.hasClass(wordClass: WordClass): Boolean =
         this is WordToken && wordClass in classes

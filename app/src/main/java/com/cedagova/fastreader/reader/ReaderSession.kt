@@ -197,6 +197,18 @@ data class ReaderSession(
         copy(settings = settings.copy(pauseStrength = pauseStrength))
 
     /**
+     * Hands the session the book's mean multiplier at the strength now in force
+     * (#81), so the dial names the average speed of *this* book.
+     *
+     * Like [withWpm] it only replaces a setting: nothing restarts, and the very
+     * next word is paced against the new mean. It is called with every
+     * time-remaining index build — at open and after a pause-strength change —
+     * because the index and this number are one measurement.
+     */
+    fun withMeanMultiplier(meanMultiplier: Double): ReaderSession =
+        copy(settings = settings.copy(meanMultiplier = meanMultiplier))
+
+    /**
      * Turns the chapter-boundary stop on or off mid-book (REQ-201).
      *
      * Like [withPauseStrength] this only replaces a setting: the reader is not

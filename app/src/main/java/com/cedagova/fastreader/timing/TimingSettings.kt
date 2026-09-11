@@ -19,10 +19,18 @@ object RsvpTiming {
      */
     const val DEFAULT_WPM: Int = 250
 
-    /** Research "Recommended defaults": range floor. */
+    /**
+     * Research "Recommended defaults": range floor.
+     *
+     * Since #81 the range bounds the *average* speed of a book, pauses included
+     * (see [TimingSettings.meanMultiplier]). A plain word inside the book runs
+     * faster than the dial by the book's mean multiplier — about 1.1–1.15x on
+     * the two books measured in `research-pacing.md` — so the instantaneous
+     * plain-word rate at the ceiling is roughly 1150 WPM, not 1000.
+     */
     const val MIN_WPM: Int = 100
 
-    /** Research "Recommended defaults": range ceiling. */
+    /** Research "Recommended defaults": range ceiling — of the average, see [MIN_WPM]. */
     const val MAX_WPM: Int = 1000
 
     /** Base word duration is `60000 / wpm`, the Squirt constant. */
@@ -39,6 +47,32 @@ object RsvpTiming {
 
     /** Research "Recommended defaults": *heading full stop or >=4x*. */
     const val HEADING_MULTIPLIER: Double = 4.0
+
+    /**
+     * The span, in words, at which a clause, sentence or paragraph pause earns its
+     * full research value (#81, `research-pacing.md`): the extra part of the pause
+     * is scaled by `min(1, span / SPAN_FULL_PAUSE_WORDS)`, so a full stop after a
+     * three-word sentence holds `1 + 2.0 × 0.3 = 1.6x`, not 3.0x.
+     *
+     * The idea is Spritz's — its sentence-end pause grows with sentence length —
+     * and the reading research behind it is Just & Carpenter's wrap-up effect:
+     * the time a reader needs at a boundary scales with how much there is to
+     * integrate. Ten words is the addendum's simulated value; it brings every
+     * 60-word window of two full books within about ±4% of the dial. Heading
+     * pauses are structural, not wrap-up, and are never scaled.
+     */
+    const val SPAN_FULL_PAUSE_WORDS: Int = 10
+
+    /**
+     * The hold on a breath word (#81, `research-pacing.md`): a rest inside a long
+     * unpunctuated run, milder than the 1.5x emphasis and well under a clause
+     * pause, because nothing is being wrapped up — the reader is only being
+     * given the phrase break the writer left out. Where a breath word also ends a
+     * clause or carries emphasis, `max` applies as everywhere else. The addendum's
+     * simulated value; detection lives in `WordClassifier` (8 plain words at a
+     * conjunction or relative pronoun, 14 unconditionally).
+     */
+    const val BREATH_MULTIPLIER: Double = 1.4
 
     /**
      * Research timing heuristics: *long word (>11 chars) -> 1.5x*, and
@@ -100,23 +134,57 @@ enum class PauseStrength(val extraPauseScale: Double) {
 }
 
 /**
- * Everything the engine needs that a person can change.
+ * Everything the engine needs that a person can change, plus the one fact about
+ * the *book* that makes the speed setting honest.
  *
  * [wpm] is stored as the user asked for it and clamped on read, so a value that
  * arrives out of range from persistence or a future settings screen produces a
  * sane duration instead of an exception or a divide-by-zero. Every computation in
  * [RsvpTimingEngine] reads [effectiveWpm], never [wpm].
+ *
+ * ## The dial names the average (#81)
+ *
+ * Every pause the engine adds is a multiple of the plain word, so without
+ * correction the number on the dial is the *burst* speed of plain words and the
+ * speed a reader actually experiences over a book is lower by the book's mean
+ * multiplier — 18–23% on the two books measured in `research-pacing.md`. The
+ * fix is the one Spritz's patent describes and Sprint Reader implements in the
+ * open: measure the mean multiplier over the whole book once, and divide the
+ * plain word by it. Then `tokens × 60000 / wpm` is exactly how long the book
+ * takes, whatever its punctuation, and a comma-rich paragraph and a long
+ * unpunctuated sentence at the same setting average the same speed.
+ *
+ * [meanMultiplier] is that measurement, made by
+ * [com.cedagova.fastreader.reader.RemainingTimeIndex] at the current
+ * [pauseStrength] and handed here by the session. It is not persisted — it is a
+ * property of the open book, not of the reader — and it defaults to `1.0`, so
+ * a settings value built without a book (the index's own reference build, a
+ * hand-written test stream) sees the raw research multipliers. At
+ * [PauseStrength.OFF] every multiplier is 1 and so is the mean.
  */
 data class TimingSettings(
     val wpm: Int = RsvpTiming.DEFAULT_WPM,
     val pauseStrength: PauseStrength = PauseStrength.NORMAL,
     val rampEnabled: Boolean = true,
+    val meanMultiplier: Double = 1.0,
 ) {
     /** [wpm] clamped to the definition's 100-1000 range. */
     val effectiveWpm: Int get() = wpm.coerceIn(RsvpTiming.MIN_WPM, RsvpTiming.MAX_WPM)
 
-    /** Duration of one plain word at target speed, before ramp and modulation. */
-    val targetWordMillis: Double get() = RsvpTiming.MILLIS_PER_MINUTE / effectiveWpm
+    /**
+     * [meanMultiplier] made safe to divide by: a mean below one is impossible
+     * for a stream whose multipliers are all at least one, so anything smaller,
+     * or not a number, is a caller's bug and reads as "no correction".
+     */
+    val effectiveMeanMultiplier: Double
+        get() = if (meanMultiplier.isFinite()) meanMultiplier.coerceAtLeast(1.0) else 1.0
+
+    /**
+     * Duration of one plain word at target speed, before ramp and modulation:
+     * `60000 / wpm` divided by the book's mean multiplier, so that the average
+     * over the book — pauses included — comes out at exactly [effectiveWpm].
+     */
+    val targetWordMillis: Double get() = RsvpTiming.MILLIS_PER_MINUTE / effectiveWpm / effectiveMeanMultiplier
 }
 
 /**

@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.reader
 
+import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.timing.RsvpTimingEngine
 import com.cedagova.fastreader.timing.TimingSettings
 import org.junit.Assert.assertEquals
@@ -260,7 +261,12 @@ class ReaderSessionTest {
         val warm = TimingSettings()
         val plain = RsvpTimingEngine.durationMillis(book.tokens[11], warm, steady())
         val sentenceEnd = RsvpTimingEngine.durationMillis(book.tokens[13], warm, steady())
-        assertTrue("$sentenceEnd should be about 3x $plain", sentenceEnd > plain * 2.5)
+        // Since #81 the pause is proportional to the span it closes: token 13 ends
+        // a four-word sentence, so it holds 1 + 2.0 × 0.4 = 1.8x, and the full 3x
+        // belongs to a sentence of ten words or more.
+        assertEquals(4, (book.tokens[13] as WordToken).span)
+        assertEquals(plain * 18 / 10, sentenceEnd)
+        assertTrue("$sentenceEnd should be well over $plain", sentenceEnd > plain * 1.5)
     }
 
     @Test

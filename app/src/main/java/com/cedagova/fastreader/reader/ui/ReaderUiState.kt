@@ -188,6 +188,15 @@ class ReaderBookView(
 
     private val remaining = RemainingTimeIndex.build(content, pauseStrength)
 
+    /**
+     * The book's mean multiplier at [pauseStrength], for the session's timing
+     * settings (#81). It comes from the same index as the time remaining, so the
+     * two can never disagree about how the book is paced: whoever rebuilds this
+     * view must also hand the session this number — see
+     * [com.cedagova.fastreader.reader.ReaderSession.withMeanMultiplier].
+     */
+    val meanMultiplier: Double get() = remaining.meanMultiplier
+
     /** Chapters that produced text; an empty spine item is not a place to jump to. */
     private val readableChapters = content.chapters.filter { !it.isEmpty }
 

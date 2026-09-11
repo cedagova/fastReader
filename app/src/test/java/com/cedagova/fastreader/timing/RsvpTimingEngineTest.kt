@@ -173,6 +173,92 @@ class RsvpTimingEngineTest {
         assertEquals(840L, marker)
     }
 
+    // --- #81: pauses proportional to the span they close ------------------------
+
+    @Test
+    fun boundaryPausesScaleWithTheSpanTheyClose() {
+        fun at(boundary: Boundary, span: Int?) =
+            RsvpTimingEngine.durationMillis(word(boundary = boundary, span = span), steady, running)
+
+        // 1 + (3.0 - 1) * 3/10 = 1.6x; at ten words and beyond, the full 3.0x.
+        assertEquals(384L, at(Boundary.SENTENCE, 3))
+        assertEquals(720L, at(Boundary.SENTENCE, 10))
+        assertEquals(720L, at(Boundary.SENTENCE, 12))
+        assertEquals(720L, at(Boundary.SENTENCE, null))
+        // A full stop after "Yes." costs 1.2 plain words, not three.
+        assertEquals(288L, at(Boundary.SENTENCE, 1))
+        assertEquals(360L, at(Boundary.CLAUSE, 5))
+        assertEquals(300L, at(Boundary.PARAGRAPH, 1))
+        // Headings are structural, not wrap-up: never scaled.
+        assertEquals(960L, at(Boundary.HEADING, 1))
+        assertTrue(at(Boundary.SENTENCE, 3) < at(Boundary.SENTENCE, 12))
+    }
+
+    @Test
+    fun emphasisIsAPerWordCostThatTheSpanNeverTouches() {
+        val longAtSpanTwo = word(classes = setOf(WordClass.LONG), span = 2)
+        assertEquals(360L, RsvpTimingEngine.durationMillis(longAtSpanTwo, steady, running))
+
+        // A long word ending a three-word sentence: max(1.6, 1.5) = 1.6, not a product.
+        val longSentenceEnd = word(boundary = Boundary.SENTENCE, classes = setOf(WordClass.LONG), span = 3)
+        assertEquals(384L, RsvpTimingEngine.durationMillis(longSentenceEnd, steady, running))
+        // And at span 1 the emphasis wins: max(1.2, 1.5).
+        val longShortSentence = word(boundary = Boundary.SENTENCE, classes = setOf(WordClass.LONG), span = 1)
+        assertEquals(360L, RsvpTimingEngine.durationMillis(longShortSentence, steady, running))
+        // Skip markers carry no span and keep their paragraph pause.
+        assertEquals(840L, RsvpTimingEngine.durationMillis(skipMarker(), steady, running))
+    }
+
+    @Test
+    fun pauseStrengthOffIsUniformWhateverTheSpans() {
+        val off = steady.copy(pauseStrength = PauseStrength.OFF)
+        for (span in listOf(null, 1, 3, 10, 40)) {
+            assertEquals(240L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, span = span), off, running))
+        }
+    }
+
+    // --- #81: breath holds --------------------------------------------------------
+
+    @Test
+    fun aBreathWordHoldsMildlyAndNeverCompounds() {
+        val breath = setOf(WordClass.BREATH)
+        assertEquals(336L, RsvpTimingEngine.durationMillis(word(classes = breath), steady, running))
+        // max(1.4, 1.5): a long breath word is one slow word, not a compounded one.
+        assertEquals(360L, RsvpTimingEngine.durationMillis(word(classes = breath + WordClass.LONG), steady, running))
+        // max(1.4, 3.0): a breath word that also ends a ten-word sentence holds the sentence pause.
+        assertEquals(720L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, classes = breath, span = 10), steady, running))
+        // max(1.4, 1.2): ... and one that ends a one-word sentence holds the breath.
+        assertEquals(336L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, classes = breath, span = 1), steady, running))
+        // Pause strength scales it like every other pause, and OFF removes it.
+        assertEquals(240L, RsvpTimingEngine.durationMillis(word(classes = breath), steady.copy(pauseStrength = PauseStrength.OFF), running))
+        assertEquals(240L + 144L, RsvpTimingEngine.durationMillis(word(classes = breath), steady.copy(pauseStrength = PauseStrength.STRONG), running))
+    }
+
+    // --- #81: the dial names the average ---------------------------------------
+
+    @Test
+    fun theMeanMultiplierDividesThePlainWordAndEverythingBuiltOnIt() {
+        val normalized = steady.copy(meanMultiplier = 1.2)
+
+        // 240 / 1.2: the plain word is faster than the dial by exactly the book's
+        // mean, and every pause is still a multiple of that plain word.
+        assertEquals(200L, RsvpTimingEngine.plainWordMillis(normalized, running))
+        assertEquals(200L, RsvpTimingEngine.durationMillis(word(), normalized, running))
+        assertEquals(3 * 200L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE), normalized, running))
+        assertEquals(3 * 200L, RsvpTimingEngine.durationMillis(word(), normalized, TimingState(60_000L, true)))
+    }
+
+    @Test
+    fun aMeanBelowOneOrNotANumberReadsAsNoCorrection() {
+        // Every multiplier the engine produces is at least one, so a mean below
+        // one cannot come from a measurement; it is a bug upstream, and the safe
+        // reading is "unmeasured".
+        for (bad in listOf(0.0, 0.5, -3.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertEquals("mean=$bad", 240L, RsvpTimingEngine.plainWordMillis(steady.copy(meanMultiplier = bad), running))
+        }
+        assertEquals(1.0, TimingSettings().effectiveMeanMultiplier, 0.0)
+    }
+
     // --- REQ-012: speed, range, and mid-stream change ------------------------
 
     @Test
