@@ -75,7 +75,13 @@ at a reader-web change.
 
 ### Scope changes
 
-None.
+- 2026-09-11, owner direction at Decision ready (revision 5): evaluate the
+  Chunipers-side findings as a move to a multi-thin-client architecture,
+  not as patches to a web-first design; and for the client-side findings,
+  optimise for the long-term Reader product, treating this repository's own
+  product constraints as irrelevant to the outcome. The evidence and
+  finding boundaries are unchanged; recommended outcomes, planning inputs,
+  and the new root-cause finding A83-F010 reflect the direction.
 
 ## Methods
 
@@ -133,9 +139,10 @@ None.
 | `A83-F004` | reader-api cannot name a native client: the client identifier allow-list is `reader-web` only | Candidate | Medium | Corroborated | Ready | Not required | Not required |
 | `A83-F005` | Native Google sign-in depends on identity-provider settings that no repository manages, and local development has no Google provider at all | Candidate | Medium | Corroborated | Ready | Not required | Not required |
 | `A83-F006` | The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor | Candidate | Medium | Corroborated | Ready | Not required | Not required |
-| `A83-F007` | This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so it cannot host an auth experiment without a product-definition change | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A83-F007` | This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so the Android auth work cannot live inside the FastReader app | Candidate | High | Corroborated | Ready | Not required | Not required |
 | `A83-F008` | The Android client contract: OTP-code sign-in, Keystore-backed session storage excluded from backup, single-flight refresh with margin, and a fixed 401 policy | Candidate | High | Corroborated | Ready | Not required | Not required |
 | `A83-F009` | The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket | Candidate | Low | Corroborated | Ready | Not required | Not required |
+| `A83-F010` | The platform has no first-class notion of a client kind: the web client's identity is hard-wired in five places across three repositories, which is the root cause behind F001, F002, F004, and F005 | Candidate | High | Corroborated | Ready | Not required | Not required |
 
 ## A83-F001 — The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly
 
@@ -220,10 +227,13 @@ honour.
 
 ### Recommended outcome
 
-The pre-auth projection distinguishes client kinds, so each kind receives the
-redirect destinations and the version floor that belong to it, and
-reader-web's binding check continues to fail closed on its own set without
-being disturbed by another client's entries.
+The bootstrap and capabilities documents are projections of a registered
+client kind (F010): each kind receives its own redirect destinations,
+version floor, and public client identity, derived from one declaration
+rather than from flat deployment-wide settings, and every client validates
+only its own entry. reader-web's fail-closed binding stays, but it binds to
+the web entry, not to the whole list. This replaces the web-first shape; it
+is not a second list bolted beside the first.
 
 ### Outcome boundary
 
@@ -364,10 +374,14 @@ app.
 
 ### Recommended outcome
 
-The identity-provider contract admits at least one native redirect
-destination per environment through the same reviewed tool and parity
-workflow the web destinations use, and every provider email offers a path a
-native client can complete (a code, or a redirect the client owns).
+The identity-provider contract becomes client-aware: it declares, per client
+kind and per environment, the redirect destinations and the sign-in methods
+that kind uses, and both the hosted Supabase allow-list and reader-api's
+per-client projection (F001) are generated from that one declaration through
+the existing reviewed parity workflow. Every provider email offers a path
+each declared client kind can complete (a code, or a redirect that kind
+owns). Adding a client kind later (iOS, a second web surface) is then a
+declaration, not a validator change.
 
 ### Outcome boundary
 
@@ -547,12 +561,15 @@ model leaves the client's refresh margin unanchored.
 
 ### Recommended outcome
 
-reader-api's own documentation and contract artifacts describe the native
-client contract end to end (bootstrap, sign-in authority, bearer, refresh
-ownership, error codes including the 502 path, first calls after sign-in,
-`publicClientId` semantics, the statement that revocation is by expiry only
-together with the hosted access-token lifetime), and the documentation
-discrepancies above are corrected so a generated Kotlin client is sufficient.
+The client contract is a published, versioned artifact per client kind,
+alongside the OpenAPI document and the generated clients reader-api already
+ships: bootstrap, sign-in authority, bearer, refresh ownership, error codes
+including the 502 path, first calls after sign-in, `publicClientId`
+semantics, and the statement that revocation is by expiry only together with
+the hosted access-token lifetime. reader-web's contract is the first
+instance of that artifact, not a special case, and the documentation
+discrepancies above are corrected so a generated Kotlin client plus the
+artifact is sufficient for any thin client.
 
 ### Outcome boundary
 
@@ -651,9 +668,11 @@ cannot use the existing header.
 
 ### Recommended outcome
 
-reader-api recognises a stable native client identifier (and reader-web's
-existing sub-names, if the owner wants them distinguished), records it in
-telemetry, and documents the accepted values.
+Client identification comes from the registered client model (F010): the
+accepted identifiers are the declared client kinds (and their sub-surfaces,
+if the owner wants them distinguished), the same identifier selects the
+per-client projection in F001, and telemetry records it. The hard-coded
+`reader-web` literal disappears from the three normalisers.
 
 ### Outcome boundary
 
@@ -751,10 +770,13 @@ cannot be exercised on `supabase start`.
 
 ### Recommended outcome
 
-The provider contract and parity tool cover the fields native Google sign-in
-needs, the local configuration offers a Google provider (or an explicit
-documented substitute) so the native flow can be developed offline, and the
-owner records which Google mechanism native clients use.
+Sign-in methods are declared per client kind in the client-aware provider
+contract (F002): the web kind uses redirect OAuth, the Android kind uses the
+platform ID-token exchange, and the provider fields each mechanism needs
+(including the native client-ID registrations) are managed by the parity
+tool like every other hosted setting. The local configuration offers the
+same provider set and an asymmetric signing key so any client kind can be
+developed offline against a stack reader-api accepts.
 
 ### Outcome boundary
 
@@ -909,7 +931,7 @@ split out because they live on other surfaces (reviewer R1).
 
 Pending.
 
-## A83-F007 — This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so it cannot host an auth experiment without a product-definition change
+## A83-F007 — This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so the Android auth work cannot live inside the FastReader app
 
 - Decision: Candidate
 - Confidence: High
@@ -963,39 +985,50 @@ the product's public contract.
 
 ### Recommended outcome
 
-The owner decides, through this repository's normal product-definition route,
-how the proving ground coexists with REQ-050: for example an experiment that
-never reaches the released build, or a separately identified build whose own
-privacy statement and gate are honest. The shipped speed reader keeps its
-no-network guarantee unless the owner explicitly redefines it.
+The proving ground is not the FastReader app. The Android auth work lives as
+a standalone, reusable module with its own minimal host app and its own
+application id, built to be lifted into the real Reader client unchanged.
+FastReader's product, manifest, release gate, and privacy statement are left
+exactly as they are. Owner direction (2026-09-11): optimise for the long-term
+Reader product; this repository's own product constraints are irrelevant to
+the outcome.
 
 ### Outcome boundary
 
-In: this repository's product definition, release gate, privacy statement,
-and build configuration as they relate to an auth experiment. Out: the auth
-implementation itself (F008), and anything in Chunipers.
+In: where the reusable module and its host app live (this repository as a
+separate Gradle module with its own application id, or a repository of its
+own), and the build rules that keep it out of the FastReader artifact. Out:
+any change to the FastReader app, its definition, or its guarantees; the
+auth implementation itself (F008); anything in Chunipers.
 
 ### Cohesion rationale
 
-One product decision (does this app ever talk to a network, and in which
-build) governs the gate, the statement, and the manifest together.
+One placement decision (a separate module and host app, untouched
+FastReader) removes the whole conflict; splitting it into "gate", "statement",
+and "manifest" work would only make sense if FastReader itself were to gain
+network access, which the owner has ruled out.
 
 ### Outcome acceptance
 
-- A definition in this repository states where the auth experiment lives and
-  what the released build promises; the release gate and privacy statement
-  agree with it.
-- `scripts/release.sh` on the released build still passes with the promise
-  the definition makes.
+- The reusable module and its host app build and run without any change to
+  the FastReader application module, manifest, release script, or privacy
+  statement.
+- `scripts/release.sh` on the FastReader release APK still passes with no
+  network permission.
+- The module has no dependency on FastReader code, so the real Reader client
+  can depend on it directly.
 
 ### Planning inputs
 
-- Affected surfaces: `docs/product-definitions/`, `scripts/release.sh`,
-  `docs/privacy-statement.md`, `README.md`, `app/build.gradle.kts` (flavours
-  or a separate module/application id), `AppVersionTest` if it asserts on
-  the manifest.
-- Constraint: the backup exclusion already in place must be kept for any
-  build that stores tokens.
+- Affected surfaces: `settings.gradle.kts` and a new module (or a new
+  repository), a minimal host `AndroidManifest.xml` with `INTERNET` and its
+  own backup exclusion rules; nothing under `app/`.
+- Constraint: the module's host app carries the same full-domain backup
+  exclusion FastReader already proves (`res/xml/data_extraction_rules.xml`,
+  `backup_rules.xml`), because it stores tokens.
+- Decide during planning, not here: same repository (dossier and issues
+  already live here) versus a dedicated repository the Reader client will
+  import.
 - This is client-owned: it is handled through this repository's own
   definition and planning route, not carried to Chunipers.
 
@@ -1321,6 +1354,148 @@ that settles it and at most one code change.
 
 Pending.
 
+## A83-F010 — The platform has no first-class notion of a client kind: the web client's identity is hard-wired in five places across three repositories, which is the root cause behind F001, F002, F004, and F005
+
+- Decision: Candidate
+- Confidence: High
+- Review: Corroborated
+- Planning readiness: Ready
+- Cause status: Confirmed
+- Expected implementation repositories: `Chunipers/reader-api`, `Chunipers/reader-db`, `Chunipers/reader-web`
+- Outcome issue: Not required
+- Outcome umbrella: Not required
+
+### Criterion
+
+A backend and identity provider that serve several thin clients (web now,
+Android next, others later) should declare each client kind once, with its
+redirect destinations, sign-in methods, version line, and public identity,
+and derive every client-facing surface from that declaration. Adding a client
+should be a declaration, not a change to validators, allow-lists, normalisers,
+and binding checks in three repositories.
+
+### Condition and evidence
+
+All evidence is already recorded in the facet findings; this finding names
+the pattern they share. The web client's identity is implicit in:
+
+1. Direct — reader-api's bootstrap settings: one flat redirect list
+   (`app/core/settings.py:277-279`), one flat provider list
+   (`:713-721`), one version floor and major per document (`:198-203`,
+   `:283-288`), projected verbatim
+   (`app/features/reader_pre_auth/service.py:160-176`). See F001.
+2. Direct — reader-api's client identification: the literal `"reader-web"`
+   in three normalisers (`app/security.py:221-223`,
+   `app/api/request_logging.py:25-34`,
+   `app/infra/observability/schema.py:455`). See F004.
+3. Direct — reader-db's provider contract: callbacks are keyed by
+   environment only, with fixed purposes and locales and an origin-equality
+   validator that cannot express a non-web destination
+   (`supabase/auth/provider-contract.json:36-50`,
+   `tools/auth-provider-config.mjs:13-14, 124-146, 379`), and sign-in methods
+   are one flat set (`provider-contract.json:4-10`). See F002 and F005.
+4. Direct — reader-db's managed hosted fields cover exactly what the web
+   flow needs and omit the native Google registrations
+   (`tools/auth-provider-config.mjs:28-68`). See F005.
+5. Direct — reader-web's binding treats the deployment-wide list as its own
+   exact set (`src/app/authEntryPolicyRuntime.ts:35-39, 82-97`). See F001.
+6. Direct — the design intent was multi-client: reader-api's README
+   describes the bootstrap surface as the "native" client identity and
+   redirect allow-list (lines 99-114), and its redirect validator already
+   accepts private-use schemes (`app/core/settings.py:33-52`). The
+   implementation shipped with one client and the abstraction was never
+   introduced.
+7. Inference — because each place encodes the same fact independently,
+   every new client kind would need coordinated edits in all of them, and
+   F001 shows that editing one of them (the redirect list) breaks the
+   existing client.
+
+### Cause
+
+Confirmed. The bootstrap, provider contract, and binding were each built
+while reader-web was the only client, and each captured "the client" as a
+set of flat values rather than as an entry in a registry.
+
+### Effect
+
+Patching the facets one by one (a second redirect list, a second literal in
+the normalisers, a special case in the validator) would leave the same
+five-way coupling in place and reproduce this audit for the next client
+kind. The owner's stated direction is a multi-thin-client architecture, so
+the facets should be planned as one architectural change with F001, F002,
+F004, and F005 as its delivery increments.
+
+### Recommended outcome
+
+One client-aware identity contract: client kinds are declared once (the
+reader-db provider contract is the natural home, since it already owns the
+hosted provider settings and is consumer-synced to reader-api and
+reader-web), each declaration carries that kind's redirect destinations,
+sign-in methods, version line, and public client identity, and the Supabase
+allow-list, reader-api's per-client bootstrap and capabilities projections,
+its client identification, and each client's binding check are all derived
+from it. An architecture decision record captures the choice and the
+migration for the web client.
+
+### Outcome boundary
+
+In: the declaration's schema and home, how it reaches reader-api and
+reader-web (consumer sync or generated artifacts), and the migration of the
+existing web client onto it. Out: the token verifier (F006), the limiter
+(F009), the per-client contract artifact's prose (F003), the Android module
+itself (F008). F001, F002, F004, and F005 remain separately accepted
+findings and become increments of this outcome; they are not duplicated
+here.
+
+### Cohesion rationale
+
+The four facets share one cause and one fix shape; planning them as isolated
+patches would produce four inconsistent partial registries. The verifier,
+limiter, documentation, and client-side findings do not share that cause and
+stay separate.
+
+### Outcome acceptance
+
+- A new client kind can be added by editing the declaration and running the
+  parity workflow, with no change to validators, normalisers, or the web
+  client's code.
+- The web client's existing behaviour (its exact eight destinations, its
+  version floor, its fail-closed binding) is unchanged after migration,
+  proven by its existing tests.
+- reader-api serves different bootstrap documents to two declared kinds from
+  one configuration, and identifies each in telemetry, from the same
+  declaration.
+- An architecture decision record exists and is linked from the outcome.
+
+### Planning inputs
+
+- Sequence suggestion, not a plan: declaration schema and ADR first
+  (reader-db), then reader-api projection and identification (F001, F004),
+  then reader-web binding migration (F001), then native destinations and
+  methods (F002, F005) as the first non-web entry.
+- Constraint: the reader-web pre-auth revision constant
+  (`acceptedReaderPreAuthRevision = '2026-09-05.2'`) and the provider
+  contract `schemaVersion` (`reader.supabase-auth.v1`) both pin the current
+  shape; a coordinated revision bump and release is part of the migration.
+- Constraint: consumer sync today copies only four TypeScript files from
+  reader-db to reader-api and reader-web; the declaration needs a delivery
+  path to a Python consumer as well (generated artifact, or a checked-in
+  copy validated in CI).
+- Dependency: F003's per-client contract artifact should be generated from
+  or validated against the same declaration.
+
+### Limitations
+
+- This finding synthesises evidence already graded in F001, F002, F004, and
+  F005; it adds no new baseline observation beyond the README design-intent
+  reading (item 6).
+- Whether the declaration lives in reader-db or reader-api is a planning
+  choice; the evidence only shows that today it lives nowhere.
+
+### Decision rationale
+
+Pending.
+
 ## Cross-finding analysis
 
 ### Duplicates and interactions
@@ -1337,6 +1512,11 @@ Pending.
   asked for independently decidable outcomes, so the verifier policy stays in
   F006, the limiter key is F009, and the revocation statement moved into
   F003 as a documentation item.
+- F010 (revision 5, owner direction) is the root cause behind F001, F002,
+  F004, and F005. Those four keep their own evidence, boundaries, and
+  acceptance and become increments of F010's outcome; F010 adds the
+  declaration, its home, and the web-client migration, which none of the
+  facets owns.
 
 ### Dependencies
 
@@ -1345,6 +1525,11 @@ Pending.
 - Native Google requires F005 and, if the redirect fallback is chosen instead,
   F001 and F002.
 - The client refresh margin in F008 depends on the leeway decision in F006.
+- F001, F002, F004, and F005 depend on F010's declaration existing first if
+  the owner accepts F010; if F010 is rejected, each can still be delivered
+  as the narrower per-repository change its own sections describe.
+- F007 no longer depends on a FastReader product decision: the module lives
+  beside the app, not inside it.
 
 ### Residual unknowns
 
