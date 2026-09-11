@@ -50,8 +50,10 @@ object CatalogSchema {
      * - **9** — the paragraph can stay on screen while the stream runs
      *   (`paragraphAlwaysShown`, written as `false` so an updating reader keeps
      *   the paused-only paragraph they had).
+     * - **10** — the progress readouts become a choice (`progressShown`, written
+     *   as `true` so an updating reader keeps the percent and time they had).
      */
-    const val CURRENT_VERSION: Int = 9
+    const val CURRENT_VERSION: Int = 10
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -67,6 +69,7 @@ object CatalogSchema {
         6 to ContentFingerprintV7Migration,
         7 to WordSizeV8Migration,
         8 to ParagraphAlwaysShownV9Migration,
+        9 to ProgressShownV10Migration,
     )
 }
 

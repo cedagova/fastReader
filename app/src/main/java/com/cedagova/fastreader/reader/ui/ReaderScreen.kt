@@ -199,6 +199,8 @@ fun ReaderScreen(
     onChapterSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
     cues: CueSettings = CueSettings(),
+    /** REQ-017's readouts, the percent read and the time left. Off hides only them: the bar and chapter row stay. */
+    progressShown: Boolean = true,
     /** REQ-030: chrome hidden, stream and cues left alone. */
     focused: Boolean = false,
     onToggleFocused: () -> Unit = {},
@@ -332,6 +334,7 @@ fun ReaderScreen(
                             onBackParagraph = onBackParagraph,
                             onForwardParagraph = onForwardParagraph,
                             onScrub = onScrub,
+                            progressShown = progressShown,
                             onOpenChapters = { chapterPickerOpen = true },
                             modifier = slot,
                             verticalArrangement = arrangement,
@@ -961,6 +964,7 @@ private fun ReaderControls(
     onForwardParagraph: () -> Unit,
     onScrub: (Float) -> Unit,
     onOpenChapters: () -> Unit,
+    progressShown: Boolean,
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
 ) {
@@ -969,7 +973,7 @@ private fun ReaderControls(
         verticalArrangement = verticalArrangement,
     ) {
         ChapterRow(state = state, onOpenChapters = onOpenChapters)
-        ProgressRow(state)
+        if (progressShown) ProgressRow(state)
         PositionControl(state = state, onScrub = onScrub)
         Transport(
             state = state,

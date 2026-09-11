@@ -218,6 +218,7 @@ fun ReaderRoute(
         onChapterSelected = reader::jumpToChapter,
         modifier = modifier,
         cues = settings.cues,
+        progressShown = settings.progressShown,
         focused = focused,
         onToggleFocused = { focused = !focused },
         speedNotice = notice?.text,

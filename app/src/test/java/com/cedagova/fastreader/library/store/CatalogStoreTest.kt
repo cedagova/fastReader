@@ -647,6 +647,49 @@ class CatalogStoreTest {
     }
 
     /** The choice, once made, survives a round trip through the store. */
+    /**
+     * Schema 10 makes the progress readouts a choice. The updating reader keeps
+     * the percent and time they had: `progressShown` comes forward as `true`,
+     * written out, with every other setting where it was.
+     */
+    @Test
+    fun `a version 9 document keeps the progress readouts`() {
+        val v9 = """
+            {"schemaVersion":9,"books":[],"folders":[],"readingStates":{},
+             "settings":{"theme":"DARK","fontSize":"LARGE","wordSize":"SMALL","paragraphAlwaysShown":true}}
+        """.trimIndent()
+
+        val decoded = CatalogCodec().decode(v9) as CatalogDecoding.Decoded
+
+        assertEquals(9, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertTrue(decoded.catalog.settings.progressShown)
+        assertTrue(decoded.catalog.settings.paragraphAlwaysShown)
+        assertEquals(ThemeChoice.DARK, decoded.catalog.settings.theme)
+        assertEquals(FontSize.LARGE, decoded.catalog.settings.fontSize)
+        assertEquals(FontSize.SMALL, decoded.catalog.settings.wordSize)
+    }
+
+    @Test
+    fun `a version 9 document without a settings block still migrates`() {
+        val noSettings = """{"schemaVersion":9,"books":[],"folders":[],"readingStates":{}}"""
+        val wrongShape = """{"schemaVersion":9,"books":[],"folders":[],"readingStates":{},"settings":7}"""
+
+        val decoded = CatalogCodec().decode(noSettings) as CatalogDecoding.Decoded
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertTrue(decoded.catalog.settings.progressShown)
+        assertTrue(CatalogCodec().decode(wrongShape) !is CatalogDecoding.Newer)
+    }
+
+    @Test
+    fun `hidden progress readouts round trip through the store`() {
+        val store = FileCatalogStore(file)
+        store.save(Catalog(settings = ReaderSettings.DEFAULTS.copy(progressShown = false)))
+
+        val loaded = (store.load() as CatalogLoad.Loaded).catalog
+        assertFalse(loaded.settings.progressShown)
+    }
+
     @Test
     fun `the always-shown paragraph round trips through the store`() {
         val store = FileCatalogStore(file)

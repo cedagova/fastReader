@@ -209,6 +209,17 @@ fun SettingsScreen(
                     onCheckedChange = { onSettingsChange(settings.copy(paragraphAlwaysShown = it)) },
                     tag = "settings_paragraph_always_shown",
                 )
+                // The two readouts are numbers about the session, not the page.
+                // A reader who finds them a pull on the eye turns them off and
+                // keeps the bar, which is also the scrub control, and the
+                // chapter row, which is the way to the picker.
+                SwitchRow(
+                    label = stringResource(R.string.settings_progress_shown),
+                    summary = stringResource(R.string.settings_progress_shown_summary),
+                    checked = settings.progressShown,
+                    onCheckedChange = { onSettingsChange(settings.copy(progressShown = it)) },
+                    tag = "settings_progress_shown",
+                )
 
                 SectionHeading(stringResource(R.string.settings_section_cues))
                 SwitchRow(

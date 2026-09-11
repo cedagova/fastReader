@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -121,6 +122,19 @@ class ReaderScreenScreenshotTest {
             pausedAt(0),
             frontMatterOffer = "Chapter One: The Approach",
         )
+    }
+
+    /**
+     * "Show progress" off: the percent and time-left readouts go, and nothing else
+     * does — the chapter row above them and the bar, which is the scrub control,
+     * below them stay exactly where they were.
+     */
+    @Test
+    fun hidingProgressRemovesOnlyTheTwoReadouts() {
+        capture("reader_progress_hidden", pausedAt(12), progressShown = false)
+        composeRule.onNodeWithTag("reader_progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("reader_scrub").assertExists()
+        composeRule.onNodeWithTag("reader_chapters").assertExists()
     }
 
     @Test
@@ -516,6 +530,7 @@ class ReaderScreenScreenshotTest {
         externalNotice: Boolean = false,
         speedNotice: String? = null,
         frontMatterOffer: String? = null,
+        progressShown: Boolean = true,
     ) {
         composeRule.setContent {
             ScaledFonts(fontScale) {
@@ -536,6 +551,7 @@ class ReaderScreenScreenshotTest {
                         externalNotice = externalNotice,
                         speedNotice = speedNotice,
                         frontMatterOffer = frontMatterOffer,
+                        progressShown = progressShown,
                     )
                 }
             }

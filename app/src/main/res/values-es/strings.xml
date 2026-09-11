@@ -217,6 +217,8 @@
     <string name="settings_font_extra_large">Máximo</string>
     <string name="settings_paragraph_always_shown">Mostrar siempre el párrafo</string>
     <string name="settings_paragraph_always_shown_summary">Mantiene el párrafo bajo la palabra mientras lees, no solo en pausa.</string>
+    <string name="settings_progress_shown">Mostrar progreso</string>
+    <string name="settings_progress_shown_summary">El porcentaje leído y el tiempo restante, sobre la barra de progreso.</string>
 
     <string name="settings_section_cues">Señales visuales</string>
     <string name="settings_highlight">Letra destacada</string>

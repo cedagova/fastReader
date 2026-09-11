@@ -133,6 +133,16 @@ data class ReaderSettings(
      * [com.cedagova.fastreader.library.store.ParagraphAlwaysShownV9Migration].
      */
     val paragraphAlwaysShown: Boolean = false,
+    /**
+     * Show the percent read and the time left above the progress bar (REQ-017).
+     * **On by default**, which is what every reader has had. Off hides the two
+     * readouts only: the bar, which is also the scrub control, and the chapter
+     * row stay, because both are ways to move rather than numbers to glance at.
+     *
+     * A document written before schema 10 reads this back as `true` — see
+     * [com.cedagova.fastreader.library.store.ProgressShownV10Migration].
+     */
+    val progressShown: Boolean = true,
 ) {
 
     /**

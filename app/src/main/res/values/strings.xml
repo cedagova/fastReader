@@ -176,6 +176,8 @@
     <string name="settings_font_extra_large">Largest</string>
     <string name="settings_paragraph_always_shown">Always show paragraph</string>
     <string name="settings_paragraph_always_shown_summary">Keeps the paragraph under the word while reading, not only when paused.</string>
+    <string name="settings_progress_shown">Show progress</string>
+    <string name="settings_progress_shown_summary">The percent read and the time left, above the progress bar.</string>
 
     <string name="settings_section_cues">Cues</string>
     <string name="settings_highlight">Highlight letter</string>

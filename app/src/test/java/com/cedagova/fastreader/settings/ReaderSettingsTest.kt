@@ -79,6 +79,13 @@ class ReaderSettingsTest {
         assertFalse(ReaderSettings.DEFAULTS.copy(paragraphAlwaysShown = true).isDefault)
     }
 
+    /** The progress readouts are on by default, and hiding them is a change from the defaults. */
+    @Test
+    fun `the progress readouts are shown by default`() {
+        assertTrue(ReaderSettings.DEFAULTS.progressShown)
+        assertFalse(ReaderSettings.DEFAULTS.copy(progressShown = false).isDefault)
+    }
+
     /** The two cues are separate choices, so all four combinations are reachable. */
     @Test
     fun `the highlight and the alignment move independently`() {
