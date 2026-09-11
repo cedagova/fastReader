@@ -2,7 +2,7 @@
 
 - Audit ID: `A83`
 - Audit key: `android-client-auth`
-- Status: Decision ready
+- Status: Complete
 - Dossier PR: https://github.com/cedagova/fastReader/pull/83
 - Started: 2026-09-11
 - Decision owner: Cesar Gonzalez (cedagova)
@@ -135,27 +135,27 @@ at a reader-web change.
 
 | ID | Title | Decision | Confidence | Review | Planning readiness | Outcome issue | Outcome umbrella |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `A83-F001` | The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A83-F002` | No native redirect destination exists in the identity provider's allow-list, the reader-db contract validator rejects custom schemes, and password recovery is link-only | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A83-F003` | The core bearer contract already works for any client, but the only sign-in narrative is web-only and the native integrator surface is undocumented | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A83-F004` | reader-api cannot name a native client: the client identifier allow-list is `reader-web` only | Candidate | Medium | Corroborated | Ready | Not required | Not required |
-| `A83-F005` | Native Google sign-in depends on identity-provider settings that no repository manages, and local development has no Google provider at all | Candidate | Medium | Corroborated | Ready | Not required | Not required |
-| `A83-F006` | The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor | Candidate | Medium | Corroborated | Ready | Not required | Not required |
-| `A83-F007` | This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so the Android auth work cannot live inside the FastReader app | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A83-F008` | The Android client contract: OTP-code sign-in, Keystore-backed session storage excluded from backup, single-flight refresh with margin, and a fixed 401 policy | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A83-F009` | The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket | Candidate | Low | Corroborated | Ready | Not required | Not required |
-| `A83-F010` | The platform has no first-class notion of a client kind: the web client's identity is hard-wired in five places across three repositories, which is the root cause behind F001, F002, F004, and F005 | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A83-F001` | The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/86 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F002` | No native redirect destination exists in the identity provider's allow-list, the reader-db contract validator rejects custom schemes, and password recovery is link-only | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/87 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F003` | The core bearer contract already works for any client, but the only sign-in narrative is web-only and the native integrator surface is undocumented | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/88 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F004` | reader-api cannot name a native client: the client identifier allow-list is `reader-web` only | Accepted | Medium | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/89 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F005` | Native Google sign-in depends on identity-provider settings that no repository manages, and local development has no Google provider at all | Accepted | Medium | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/90 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F006` | The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor | Accepted | Medium | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/91 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F007` | This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so the Android auth work cannot live inside the FastReader app | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/92 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F008` | The Android client contract: OTP-code sign-in, Keystore-backed session storage excluded from backup, single-flight refresh with margin, and a fixed 401 policy | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/93 | https://github.com/cedagova/fastReader/issues/94 |
+| `A83-F009` | The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket | Deferred | Low | Corroborated | Ready | Not required | Not required |
+| `A83-F010` | The platform has no first-class notion of a client kind: the web client's identity is hard-wired in five places across three repositories, which is the root cause behind F001, F002, F004, and F005 | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/85 | https://github.com/cedagova/fastReader/issues/94 |
 
 ## A83-F001 — The pre-auth bootstrap is a single-client projection: one static redirect allow-list that reader-web requires to match its own set exactly
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`, `Chunipers/reader-web`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/86
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -295,18 +295,17 @@ leave each half untestable on its own.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 as an increment of A83-F010.
 ## A83-F002 — No native redirect destination exists in the identity provider's allow-list, the reader-db contract validator rejects custom schemes, and password recovery is link-only
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-db`, `Chunipers/reader-web`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/87
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -447,18 +446,17 @@ flow.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 as an increment of A83-F010; the App Link versus private-use scheme choice is left to planning.
 ## A83-F003 — The core bearer contract already works for any client, but the only sign-in narrative is web-only and the native integrator surface is undocumented
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/88
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -614,18 +612,17 @@ pass.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11; the per-client contract artifact should be validated against the A83-F010 declaration.
 ## A83-F004 — reader-api cannot name a native client: the client identifier allow-list is `reader-web` only
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: Medium
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/89
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -710,18 +707,17 @@ is the only coherent unit.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 as an increment of A83-F010.
 ## A83-F005 — Native Google sign-in depends on identity-provider settings that no repository manages, and local development has no Google provider at all
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: Medium
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-db`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/90
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -830,18 +826,17 @@ profile.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 as an increment of A83-F010, keeping the local-parity half inside this finding.
 ## A83-F006 — The token verifier has no clock leeway and no anonymous-identity policy, so a device with a skewed clock is signed out instead of refreshed and an anonymous session would be a full actor
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: Medium
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/91
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -931,18 +926,17 @@ split out because they live on other surfaces (reviewer R1).
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 as verifier hardening independent of the architecture change.
 ## A83-F007 — This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so the Android auth work cannot live inside the FastReader app
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/92
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -1040,18 +1034,17 @@ network access, which the recorded owner direction does not ask for.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 with the direction that FastReader's own constraints are irrelevant: the Android auth work is a standalone module beside the app.
 ## A83-F008 — The Android client contract: OTP-code sign-in, Keystore-backed session storage excluded from backup, single-flight refresh with margin, and a fixed 401 policy
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/93
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -1263,11 +1256,10 @@ exactly as they have between reader-web's tests and its runtime.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 as the known best-practice client contract.
 ## A83-F009 — The pre-auth rate limiter keys on the TCP peer address behind a proxy that strips forwarding headers, so all callers may share one bucket
 
-- Decision: Candidate
+- Decision: Deferred
 - Confidence: Low
 - Review: Corroborated
 - Planning readiness: Ready
@@ -1354,18 +1346,17 @@ that settles it and at most one code change.
 
 ### Decision rationale
 
-Pending.
-
+Deferred by the decision owner on 2026-09-11 until one stage observation confirms or clears the shared-bucket premise; no outcome issue is created for a deferred finding.
 ## A83-F010 — The platform has no first-class notion of a client kind: the web client's identity is hard-wired in five places across three repositories, which is the root cause behind F001, F002, F004, and F005
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`, `Chunipers/reader-db`, `Chunipers/reader-web`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/85
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/94
 
 ### Criterion
 
@@ -1496,8 +1487,7 @@ stay separate.
 
 ### Decision rationale
 
-Pending.
-
+Accepted by the decision owner on 2026-09-11 with the direction to treat the Chunipers-side findings as a multi-thin-client architecture change rather than patches; F001, F002, F004, and F005 are its increments.
 ## Cross-finding analysis
 
 ### Duplicates and interactions
@@ -1554,15 +1544,15 @@ Pending.
 - [x] Every target has a full baseline commit SHA.
 - [x] The coverage inventory accounts for every in-scope surface.
 - [x] Every claim has proportionate, reproducible evidence.
-- [ ] The independent review is complete.
-- [ ] Every review challenge and gap is reconciled or named as unresolved.
-- [ ] Every finding is accepted, rejected, or deferred.
+- [x] The independent review is complete.
+- [x] Every review challenge and gap is reconciled or named as unresolved.
+- [x] Every finding is accepted, rejected, or deferred.
 - [x] Every finding records the evidence-backed repositories expected to change if its recommendation is accepted.
-- [ ] Every accepted finding has `Planning readiness: Ready` from the independent reviewer.
-- [ ] Every accepted finding links a planning-ready outcome issue.
-- [ ] Every outcome issue is a native child of the audit's same-repository outcome umbrella.
-- [ ] `summary.md` answers the original question.
-- [ ] The Decision-ready semantic anchor has an approved independent review verdict.
-- [ ] Any post-review completion delta is limited to mechanical owner decisions and handoff fields.
-- [ ] Structural validation passes.
-- [ ] The dossier pull request is complete and ready to coordinate downstream delivery.
+- [x] Every accepted finding has `Planning readiness: Ready` from the independent reviewer.
+- [x] Every accepted finding links a planning-ready outcome issue.
+- [x] Every outcome issue is a native child of the audit's same-repository outcome umbrella.
+- [x] `summary.md` answers the original question.
+- [x] The Decision-ready semantic anchor has an approved independent review verdict.
+- [x] Any post-review completion delta is limited to mechanical owner decisions and handoff fields.
+- [x] Structural validation passes.
+- [x] The dossier pull request is complete and ready to coordinate downstream delivery.

@@ -2,9 +2,9 @@
 
 - Audit ID: `A83`
 - Audit key: `android-client-auth`
-- Status: Decision ready
+- Status: Complete
 - Prepared: 2026-09-11
-- Completed: Not complete
+- Completed: 2026-09-11
 - Dossier PR: https://github.com/cedagova/fastReader/pull/83
 
 ## Answer
@@ -44,25 +44,30 @@ into the real reader unchanged.
 - **Recommended dispositions:** accept F001 to F008 and F010; defer F009
   until one stage observation confirms or clears its premise. F010 is the
   architectural outcome and F001, F002, F004, and F005 are its increments.
-  F001 to F006, F009, and F010 are owned by Chunipers repositories and are
-  carried across by the owner; F007 and F008 are owned by this repository
-  and follow its normal definition and planning route.
-- **Owner decisions:** Pending
+- **Owner decisions:** recorded 2026-09-11 (`approve all, defer 9`).
+- **Accepted:** F001, F002, F003, F004, F005, F006, F007, F008, F010. By
+  owner decision every outcome issue lives in this repository under one
+  umbrella; the Chunipers-owned ones are carried across by the owner.
+- **Rejected:** none.
+- **Deferred:** F009, pending one stage observation of the pre-auth limiter's
+  key; no outcome issue is created for it.
 
 ## What happens next
 
 | Outcome | Owner | Tracking issue |
 | --- | --- | --- |
-| Pre-auth bootstrap serves per-client redirect destinations without breaking the web app (F001) | Chunipers/reader-api, Chunipers/reader-web | Owner-carried; pending |
-| Identity provider admits a native redirect destination and every email offers a code or an app-owned link (F002) | Chunipers/reader-db (web host for App Links) | Owner-carried; pending |
-| reader-api documents the native client contract and fixes seven documentation discrepancies (F003) | Chunipers/reader-api | Owner-carried; pending |
-| reader-api recognises a native client identifier in telemetry (F004) | Chunipers/reader-api | Owner-carried; pending |
-| Provider contract manages native Google sign-in fields and local parity (F005) | Chunipers/reader-db | Owner-carried; pending |
-| Token verifier tolerates clock skew and states its anonymous-identity policy (F006) | Chunipers/reader-api | Owner-carried; pending |
-| Android auth work lives in a standalone reusable module with its own host app; FastReader untouched (F007) | cedagova/fastReader | Pending |
-| General Android auth module contract and its proving-ground implementation (F008) | cedagova/fastReader | Pending |
-| Pre-auth rate limiter proven to key on real client addresses, or switched to the trusted ingress address (F009) | Chunipers/reader-api | Owner-carried; pending |
-| One client-aware identity contract: client kinds declared once, everything derived from it, web client migrated onto it (F010; F001, F002, F004, F005 become its increments) | Chunipers/reader-db, Chunipers/reader-api, Chunipers/reader-web | Owner-carried; pending |
+| Pre-auth bootstrap serves per-client redirect destinations without breaking the web app (F001) | Chunipers/reader-api, Chunipers/reader-web | https://github.com/cedagova/fastReader/issues/86 |
+| Identity provider admits a native redirect destination and every email offers a code or an app-owned link (F002) | Chunipers/reader-db (web host for App Links) | https://github.com/cedagova/fastReader/issues/87 |
+| reader-api documents the native client contract and fixes seven documentation discrepancies (F003) | Chunipers/reader-api | https://github.com/cedagova/fastReader/issues/88 |
+| reader-api recognises a native client identifier in telemetry (F004) | Chunipers/reader-api | https://github.com/cedagova/fastReader/issues/89 |
+| Provider contract manages native Google sign-in fields and local parity (F005) | Chunipers/reader-db | https://github.com/cedagova/fastReader/issues/90 |
+| Token verifier tolerates clock skew and states its anonymous-identity policy (F006) | Chunipers/reader-api | https://github.com/cedagova/fastReader/issues/91 |
+| Android auth work lives in a standalone reusable module with its own host app; FastReader untouched (F007) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/92 |
+| General Android auth module contract and its proving-ground implementation (F008) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/93 |
+| Pre-auth rate limiter proven to key on real client addresses, or switched to the trusted ingress address (F009) | Chunipers/reader-api | Deferred; no issue |
+| One client-aware identity contract: client kinds declared once, everything derived from it, web client migrated onto it (F010; F001, F002, F004, F005 become its increments) | Chunipers/reader-db, Chunipers/reader-api, Chunipers/reader-web | https://github.com/cedagova/fastReader/issues/85 |
+
+Outcome umbrella (all accepted findings, this repository): https://github.com/cedagova/fastReader/issues/94
 
 ## Limits and unknowns
 
