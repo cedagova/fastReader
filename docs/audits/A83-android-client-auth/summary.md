@@ -2,7 +2,7 @@
 
 - Audit ID: `A83`
 - Audit key: `android-client-auth`
-- Status: In progress
+- Status: Decision ready
 - Prepared: 2026-09-11
 - Completed: Not complete
 - Dossier PR: https://github.com/cedagova/fastReader/pull/83
@@ -28,7 +28,7 @@ plaintext default storage.
 
 The owner wants the real Android reader's backend sign-in to be solved before
 that app exists. This audit says what is already solved (most of it), which
-four backend and provider changes must land for redirect-based flows and
+backend and provider changes must land for redirect-based flows and
 Google, and what the client must do so the proving-ground code can be lifted
 into the real reader unchanged.
 
@@ -47,7 +47,7 @@ into the real reader unchanged.
 | --- | --- | --- |
 | Pre-auth bootstrap serves per-client redirect destinations without breaking the web app (F001) | Chunipers/reader-api, Chunipers/reader-web | Owner-carried; pending |
 | Identity provider admits a native redirect destination and every email offers a code or an app-owned link (F002) | Chunipers/reader-db (web host for App Links) | Owner-carried; pending |
-| reader-api documents the native client contract and fixes six documentation discrepancies (F003) | Chunipers/reader-api | Owner-carried; pending |
+| reader-api documents the native client contract and fixes seven documentation discrepancies (F003) | Chunipers/reader-api | Owner-carried; pending |
 | reader-api recognises a native client identifier in telemetry (F004) | Chunipers/reader-api | Owner-carried; pending |
 | Provider contract manages native Google sign-in fields and local parity (F005) | Chunipers/reader-db | Owner-carried; pending |
 | Token verifier tolerates clock skew and states its anonymous-identity policy (F006) | Chunipers/reader-api | Owner-carried; pending |

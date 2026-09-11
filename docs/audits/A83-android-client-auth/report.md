@@ -2,12 +2,12 @@
 
 - Audit ID: `A83`
 - Audit key: `android-client-auth`
-- Status: Review
+- Status: Decision ready
 - Dossier PR: https://github.com/cedagova/fastReader/pull/83
 - Started: 2026-09-11
 - Decision owner: Cesar Gonzalez (cedagova)
 - Lead investigator: Claude (audit-lead, cedagova)
-- Independent reviewer: cedagova-codex-reviewer[bot] (audit-reviewer; elected by claim on the dossier PR)
+- Independent reviewer: cedagova-codex-reviewer[bot] (audit-reviewer; approved review https://github.com/cedagova/fastReader/pull/83#pullrequestreview-5180254937 on the revision-2 head; the Decision-ready fields below are the candidate presented for the exact-head verdict)
 
 ## Question
 
@@ -141,8 +141,8 @@ None.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`, `Chunipers/reader-web`
 - Outcome issue: Not required
@@ -289,8 +289,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-db`, `Chunipers/reader-web`
 - Outcome issue: Not required
@@ -437,8 +437,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`
 - Outcome issue: Not required
@@ -601,8 +601,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: Medium
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`
 - Outcome issue: Not required
@@ -625,13 +625,13 @@ distinguish a native client from the web client and from unknown traffic.
 - Direct — `GET /v1/reader/capabilities` sets
   `Vary: Authorization, X-Reader-Client` (`app/features/reader_capabilities/api.py:51`),
   so cache partitioning already assumes distinct client names.
-- Direct (count corrected per reviewer R2) — reader-web already sends
-  several distinct names: its production clients use nine `reader-web-*`
-  values (`reader-web`, `-browser`, `-capabilities`, `-library`,
-  `-local-book`, `-notes`, `-notifications`, `-products`,
-  `-publication-imports`, `-reader-cache`, `-sync` appear across
-  `packages/clients/src/api/*.ts` and `packages/*/src`, a further three in
-  tests only), and only `reader-web` is recognised
+- Direct (list corrected per reviewer R2 and R8) — reader-web already sends
+  several distinct names. Its non-test source uses `reader-web`,
+  `reader-web-browser`, `-capabilities`, `-library`, `-notes-support`,
+  `-notifications`, `-products`, `-publication-imports`, `-reader-cache`,
+  and `-sync` (plus a dev-login credentials key); four more values appear
+  only in tests (`-exact-boundary`, `-local-book`, `-notes`,
+  `-one-byte-over`). Only `reader-web` is recognised
   (`packages/clients/src/api/readerSyncClient.ts:38-47`,
   `readerCapabilitiesClient.ts:173-188`).
 - Inference — a native client's traffic is recorded as `client_id="unknown"`,
@@ -695,8 +695,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: Medium
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-db`
 - Outcome issue: Not required
@@ -812,8 +812,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: Medium
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `Chunipers/reader-api`
 - Outcome issue: Not required
@@ -913,8 +913,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -1011,8 +1011,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -1234,8 +1234,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: Low
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `Chunipers/reader-api`
 - Outcome issue: Not required
