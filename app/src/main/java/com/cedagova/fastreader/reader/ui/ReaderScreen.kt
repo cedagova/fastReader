@@ -54,8 +54,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -830,36 +833,60 @@ private fun ColumnScope.FullSurface(content: @Composable () -> Unit) {
  */
 @Composable
 private fun ParagraphContext(context: ReaderContext) {
+    val highlight = MaterialTheme.colorScheme.primary
+    val ellipsis = stringResource(R.string.reader_context_continues)
+    // Where the marked word starts in the text below, so the layout can say
+    // which line it landed on.
+    var currentStart = 0
+    val paragraph = buildAnnotatedString {
+        if (context.truncatedStart) append("$ellipsis ")
+        context.words.forEachIndexed { offset, entry ->
+            if (offset == context.currentOffset) {
+                currentStart = length
+                withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) {
+                    append(entry.text)
+                }
+            } else {
+                append(entry.text)
+            }
+            append(entry.gapAfter)
+        }
+        if (context.truncatedEnd) append(" $ellipsis")
+    }
+
+    // Landscape and large font scales can leave less room than the paragraph
+    // needs. The column scrolls, and it scrolls itself to the section of lines
+    // holding the marked word, so the mark never sits below the fold: whichever
+    // way the reader got here — pausing deep in a long paragraph, or the stream
+    // carrying the mark down the shown lines — the word is on screen (REQ-010).
+    val scrollState = rememberScrollState()
+    var viewportHeight by remember { mutableIntStateOf(0) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    LaunchedEffect(layout, viewportHeight, currentStart) {
+        val lines = layout ?: return@LaunchedEffect
+        // A layout of the previous text: the fresh one re-runs this. Keying on
+        // the text alone would scroll to a line measured on words no longer shown.
+        if (lines.layoutInput.text != paragraph) return@LaunchedEffect
+        if (viewportHeight <= 0 || lines.lineCount == 0) return@LaunchedEffect
+        val current = lines.getLineForOffset(currentStart)
+        val first = sectionStartLine(lines.lineCount, viewportHeight.toFloat(), current, lines::getLineTop, lines::getLineBottom)
+        scrollState.scrollTo(lines.getLineTop(first).roundToInt())
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // Landscape and large font scales can leave less room than the
-            // paragraph needs; scrolling is better than losing the end of it.
-            .verticalScroll(rememberScrollState())
+            // Outside the scroll: the size here is the viewport, not the text.
+            .onSizeChanged { viewportHeight = it.height }
+            .verticalScroll(scrollState)
             .testTag("reader_paused"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val highlight = MaterialTheme.colorScheme.primary
-        val ellipsis = stringResource(R.string.reader_context_continues)
-        val paragraph = buildAnnotatedString {
-            if (context.truncatedStart) append("$ellipsis ")
-            context.words.forEachIndexed { offset, entry ->
-                if (offset == context.currentOffset) {
-                    withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) {
-                        append(entry.text)
-                    }
-                } else {
-                    append(entry.text)
-                }
-                append(entry.gapAfter)
-            }
-            if (context.truncatedEnd) append(" $ellipsis")
-        }
         Text(
             text = paragraph,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Start,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            onTextLayout = { layout = it },
             modifier = Modifier.fillMaxWidth().testTag("reader_context"),
         )
     }

@@ -185,6 +185,34 @@ object ContentFixtures {
      * A download interrupted after the first chapter: the spine declares three
      * content documents and the archive holds one.
      */
+    /**
+     * EPUB 3 English book whose one chapter is a single paragraph of some 230
+     * words: the paused view's token windowing and line sectioning, which no
+     * paragraph in [englishNovel] is long enough to reach.
+     */
+    fun longParagraphNovel(): ByteArray = EpubFixtures.buildArchive(
+        listOf(
+            "META-INF/container.xml" to CONTAINER.utf8(),
+            "OEBPS/content.opf" to minimalOpf("urn:uuid:long-paragraph", listOf("chapter1.xhtml")).utf8(),
+            "OEBPS/chapter1.xhtml" to page("""<h1>The Eleventh Day</h1><p>$LONG_PARAGRAPH</p>"""),
+        ),
+    )
+
+    private const val LONG_PARAGRAPH = "The machine had been running for eleven days when Ada first noticed " +
+        "the change. It was not a sound, because the machine made none, and it was not a light, because " +
+        "every lamp on the panel had stayed the same dull amber since the day it was switched on. It was, " +
+        "she decided afterwards, a quality of attention, as if the room had begun to listen. She put down " +
+        "her pen and waited. Nothing moved. The clock above the door went on measuring the afternoon in " +
+        "its small dry ticks, and the rain went on against the window, and the machine went on doing " +
+        "whatever it did behind its plain grey face. Still the feeling did not leave her. She stood, " +
+        "walked once around the long table, and stopped at the far end where the cables ran down into " +
+        "the floor. From there she could see the whole of it at once, the cabinets and the panel and the " +
+        "single chair, and it looked exactly as it had looked every day for eleven days. That, she " +
+        "thought, was the trouble. A thing that changed would have given her something to write down. " +
+        "A thing that only seemed to change gave her nothing, and nothing was the one result Dr. " +
+        "Fielding had told her never to report. So she sat again, picked up the pen, and wrote the time, " +
+        "and beside the time she wrote the single word that was true, which was: quiet."
+
     fun interruptedMidBook(): ByteArray = EpubFixtures.buildArchive(
         listOf(
             "META-INF/container.xml" to CONTAINER.utf8(),

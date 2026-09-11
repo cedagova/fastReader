@@ -36,6 +36,11 @@ object ReaderFixtures {
     /** EPUB 2, Spanish: inverted punctuation, accents and dialogue dashes. */
     val spanishNovel: BookContent by lazy { parse(ContentFixtures.spanishNovel()) }
 
+    /** EPUB 3, one chapter that is one paragraph of some 230 words. */
+    val longParagraph: BookContent by lazy { parse(ContentFixtures.longParagraphNovel(), LONG_PARAGRAPH_ID) }
+
+    const val LONG_PARAGRAPH_ID = "sha256:0000000000000000000000000000000000000000000000000000000000000e03"
+
     /** A download that stopped after chapter one: chapters two and three are gaps. */
     val interrupted: BookContent by lazy { parse(ContentFixtures.interruptedMidBook()) }
 

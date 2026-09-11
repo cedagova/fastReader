@@ -312,6 +312,38 @@ class ReaderScreenScreenshotTest {
             .present(ReaderSession(spanish).jumpTo(longWord).play())
     }
 
+    /**
+     * A paragraph longer than the token window (REQ-010), paused deep enough in
+     * that the window is cut at both ends: the marked word sits in the middle of
+     * the shown lines, not below them. Landscape leaves the fewest lines under
+     * the word, so the mark is the first thing to fall below the fold there.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = LANDSCAPE_PHONE)
+    fun theShownLinesFollowTheWordDownALongParagraphInLandscape() {
+        capture("reader_paused_long_paragraph_landscape", longParagraphAt(60))
+    }
+
+    /**
+     * The shown lines follow the mark. With the stream running under "Always show
+     * paragraph" on the cramped phone at a large font scale, the window is taller
+     * than the area under the word, and the mark is past the lines that fit. The
+     * view scrolls to the section of whole lines holding the word — cut from the
+     * top of the window, so the reader sees the lines turn rather than creep — and
+     * the mark is on screen.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theShownLinesFollowTheRunningWordDownALongParagraphAtALargeFontScale() {
+        capture("reader_playing_long_paragraph_compact_large_font", longParagraphAt(120, playing = true), fontScale = 1.3f)
+    }
+
+    private fun longParagraphAt(index: Int, playing: Boolean = false): ReaderUiState.Reading {
+        val long = ReaderFixtures.longParagraph
+        val session = ReaderSession(long).jumpTo(index).let { if (playing) it.play() else it }
+        return ReaderBookView(LONG_PARAGRAPH_TITLE, long).present(session, paragraphAlwaysShown = playing)
+    }
+
     /** Cramped 720p phone (`Phone_Low_API33`) at a large system font scale (REQ-060). */
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)
@@ -528,6 +560,8 @@ class ReaderScreenScreenshotTest {
 private const val BOOK_TITLE = "The Quiet Machine"
 
 private const val SPANISH_TITLE = "¿Quién teme a la máquina?"
+
+private const val LONG_PARAGRAPH_TITLE = "The Eleventh Day"
 
 /** 1080p reference phone, matching the `Phone_Mid_API36` AVD used for the emulator pass. */
 private const val REFERENCE_PHONE = "w411dp-h914dp-xxhdpi"
