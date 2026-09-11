@@ -1260,6 +1260,18 @@ private fun PauseGlyph(color: Color) {
     }
 }
 
+/**
+ * The slider's ceiling, below the range's own [RsvpTiming.MAX_WPM].
+ *
+ * The track is a phone width minus the readout, and over the full 100–1000
+ * range each 25 WPM step was a few pixels of thumb travel — too fine for a
+ * thumb to stop on the step meant rather than the one beside it. Halving the
+ * span doubles the travel per step. Speeds past 600 stay reachable: the typed
+ * entry and the focused-mode drag still take the whole range, and a speed
+ * above the slider's end simply shows the thumb at the end.
+ */
+private const val SLIDER_MAX_WPM: Int = 600
+
 /** REQ-012: speed is adjustable at any time, including mid-stream, and never stops playback. */
 @Composable
 private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Unit) {
@@ -1274,7 +1286,7 @@ private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Uni
         Slider(
             value = state.wpm.toFloat(),
             onValueChange = { onWpmChange((it / SPEED_STEP_WPM).roundToInt() * SPEED_STEP_WPM) },
-            valueRange = RsvpTiming.MIN_WPM.toFloat()..RsvpTiming.MAX_WPM.toFloat(),
+            valueRange = RsvpTiming.MIN_WPM.toFloat()..SLIDER_MAX_WPM.toFloat(),
             modifier = Modifier
                 .weight(1f)
                 .testTag("reader_speed")
