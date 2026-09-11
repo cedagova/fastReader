@@ -7,7 +7,7 @@
 - Started: 2026-09-11
 - Decision owner: Cesar Gonzalez (cedagova)
 - Lead investigator: Claude (audit-lead, cedagova)
-- Independent reviewer: cedagova-codex-reviewer[bot] (audit-reviewer; approved review https://github.com/cedagova/fastReader/pull/83#pullrequestreview-5180254937 on the revision-2 head; the Decision-ready fields below are the candidate presented for the exact-head verdict)
+- Independent reviewer: cedagova-codex-reviewer[bot] (audit-reviewer; the authoritative verdict is the latest native review on the dossier PR whose marker names this head; the Decision-ready fields below are the candidate presented for that exact-head verdict)
 
 ## Question
 
@@ -79,9 +79,11 @@ at a reader-web change.
   Chunipers-side findings as a move to a multi-thin-client architecture,
   not as patches to a web-first design; and for the client-side findings,
   optimise for the long-term Reader product, treating this repository's own
-  product constraints as irrelevant to the outcome. The evidence and
-  finding boundaries are unchanged; recommended outcomes, planning inputs,
-  and the new root-cause finding A83-F010 reflect the direction.
+  product constraints as irrelevant to the outcome, which places the Android
+  auth work in a standalone module beside the app with FastReader untouched.
+  Evidence sections are unchanged. Recommended outcomes of F001 to F005 were
+  rewritten; F007's title, outcome, boundary, cohesion, acceptance, and
+  planning inputs were rewritten; the root-cause finding A83-F010 was added.
 
 ## Methods
 
@@ -1006,7 +1008,7 @@ auth implementation itself (F008); anything in Chunipers.
 One placement decision (a separate module and host app, untouched
 FastReader) removes the whole conflict; splitting it into "gate", "statement",
 and "manifest" work would only make sense if FastReader itself were to gain
-network access, which the owner has ruled out.
+network access, which the recorded owner direction does not ask for.
 
 ### Outcome acceptance
 

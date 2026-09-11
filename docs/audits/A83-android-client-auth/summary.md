@@ -18,11 +18,14 @@ backend's sign-in bootstrap document can only describe one client's redirect
 destinations at a time (and the web app refuses to work if that list changes),
 the identity provider trusts only web addresses for redirects, native Google
 sign-in needs provider settings no repository manages, and the backend's
-integrator documentation only tells the web story. Those four gaps share one
-root cause: the platform has no notion of a "client kind" at all, so the
-web client's identity is hard-wired in five places across three
-repositories. The right move for a multi-client Reader is to declare each
-client kind once and derive everything from it, rather than patch each place.
+integrator documentation only tells the web story, and the backend cannot
+even tell Android traffic apart from unknown traffic. The bootstrap,
+redirect, Google, and client-identification gaps share one root cause: the
+platform has no notion of a "client kind" at all, so the web client's
+identity is hard-wired in five places across three repositories. The right
+move for a multi-client Reader is to declare each client kind once and derive
+everything from it, rather than patch each place. The documentation gap is
+separate and is fixed by publishing a contract per client kind.
 On the client side, the Android auth work should be a standalone reusable
 module with its own small host app, not a change to the FastReader app, and
 it must avoid the now-deprecated encrypted-preferences library and the
