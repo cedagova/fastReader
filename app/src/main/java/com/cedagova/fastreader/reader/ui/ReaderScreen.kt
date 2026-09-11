@@ -126,11 +126,19 @@ private val TouchTarget = 48.dp
  * therefore contains no animation API at all: no `AnimatedContent`, no
  * `Crossfade`, no `animate*AsState`, and the progress bar is drawn by hand
  * ([ProgressBar]) rather than with the Material indicator, whose progress
- * variant animates. The reading surface keeps a fixed size and a fixed background
- * in every mode, and the transport controls are disabled rather than hidden while
- * the stream runs, so starting and stopping never reflows the screen. What changes
- * between two frames of a running stream is glyphs, plus the odd percent or
- * minute; nothing alternates in brightness at any speed.
+ * variant animates. The reading surface keeps a fixed background in every mode,
+ * and while the stream runs nothing but the surface is on the page at all. What
+ * changes between two frames of a running stream is glyphs; nothing alternates
+ * in brightness at any speed.
+ *
+ * ## The chrome goes while the stream runs
+ *
+ * A running stream is the word and, if the reader asked for it, the paragraph —
+ * and nothing else: the top bar and the entire control column are not composed
+ * while the mode is [ReaderMode.PLAYING], so the page is the background and the
+ * reading. Pausing brings all of it back. The controls used to stay on screen
+ * disabled; a dimmed transport is still a transport in the corner of the eye,
+ * which is the one thing a stream should not have.
  *
  * ## The presentation seam
  *
@@ -141,10 +149,11 @@ private val TouchTarget = 48.dp
  *
  * ## Focused mode (REQ-030)
  *
- * [focused] is the whole of it: with it set, the top bar and the entire control
- * column are not composed, leaving the stream and its cues alone on the page. It
- * is a parameter rather than session state because it is a property of this
- * screen, not of the book — which also lets the goldens render it directly.
+ * [focused] hides the same chrome while the stream is *paused*: with it set, the
+ * top bar and the control column stay away in every mode, leaving the stream and
+ * its cues alone on the page. It is a parameter rather than session state because
+ * it is a property of this screen, not of the book — which also lets the goldens
+ * render it directly.
  *
  * ## Speed without the controls (REQ-108)
  *
@@ -235,10 +244,11 @@ fun ReaderScreen(
 ) {
     var chapterPickerOpen by remember { mutableStateOf(false) }
 
-    // Focused mode only applies to the reader proper. A book that is still opening
-    // or cannot be opened has no stream to be focused on, and hiding the way back
-    // to the library there would strand the reader on a dead screen.
-    val chromeHidden = focused && state is ReaderUiState.Reading
+    // The chrome goes while the stream runs, and in focused mode whether or not it
+    // runs. Only for the reader proper: a book that is still opening or cannot be
+    // opened has no stream to hide it for, and hiding the way back to the library
+    // there would strand the reader on a dead screen.
+    val chromeHidden = state is ReaderUiState.Reading && (focused || state.mode == ReaderMode.PLAYING)
 
     WidthAware(modifier.fillMaxSize()) { layout ->
     Scaffold(
@@ -317,7 +327,8 @@ fun ReaderScreen(
                             state = state,
                             onTogglePlay = onTogglePlay,
                             onToggleFocused = onToggleFocused,
-                            focused = chromeHidden,
+                            focused = focused,
+                            chromeHidden = chromeHidden,
                             speedNotice = speedNotice,
                             onSpeedStep = onSpeedStep,
                             word = word,
@@ -638,13 +649,14 @@ private fun Unavailable(state: ReaderUiState.Unavailable, modifier: Modifier) {
  * carries the actions, so TalkBack offers "Pause" and "Hide the controls" on the
  * reading surface rather than leaving focused mode undiscoverable without sight.
  *
- * ## The third gesture, in focused mode only (REQ-108)
+ * ## The third gesture, only while the chrome is hidden (REQ-108)
  *
  * With the chrome hidden the speed slider is gone, so the surface takes a
  * **vertical drag**: up faster, down slower, one 25 WPM step per
- * [SpeedStepDistance]. It is added only when [focused], because the slider is the
- * speed control everywhere else and a drag on an unfocused surface would only be
- * a second way to do the same thing.
+ * [SpeedStepDistance]. It is added only when [chromeHidden] — focused mode, or a
+ * running stream — because the slider is the speed control everywhere else and a
+ * drag on a surface with the slider under it would only be a second way to do
+ * the same thing.
  *
  * It cannot collide with the two gestures above. A drag consumes the pointer past
  * touch slop, which cancels `combinedClickable`'s press, and the drag node sits
@@ -668,7 +680,10 @@ private fun ReadingSurface(
     state: ReaderUiState.Reading,
     onTogglePlay: () -> Unit,
     onToggleFocused: () -> Unit,
+    /** What the long press toggles; the label names it. */
     focused: Boolean,
+    /** Nothing but this surface is on the page, so the speed drag lives here. */
+    chromeHidden: Boolean,
     speedNotice: String?,
     onSpeedStep: (Int) -> Unit,
     word: @Composable (ReaderWord, Modifier) -> Unit,
@@ -713,9 +728,9 @@ private fun ReadingSurface(
                 // After the clickable, never before: the inner node sees each
                 // pointer event first, so a real drag is consumed here and the
                 // press above it is cancelled instead of also firing.
-                .then(if (focused) Modifier.speedGesture(onSpeedStep) else Modifier)
+                .then(if (chromeHidden) Modifier.speedGesture(onSpeedStep) else Modifier)
                 .padding(horizontal = 20.dp)
-                .testTag(if (focused) "reader_surface_focused" else "reader_surface"),
+                .testTag(if (chromeHidden) "reader_surface_focused" else "reader_surface"),
         ) {
             when (state.mode) {
                 // The word keeps the same place whether the stream is running or

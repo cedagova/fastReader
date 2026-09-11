@@ -32,8 +32,9 @@ class ReaderSpeedEntryTest {
     val composeRule = createComposeRule()
 
     private val book = ReaderFixtures.englishNovel
-    private val playing = ReaderBookView("The Quiet Machine", book)
-        .present(ReaderSession(book).jumpTo(12).play())
+    // Paused: the readout is chrome, and the chrome is off the page while the stream runs.
+    private val paused = ReaderBookView("The Quiet Machine", book)
+        .present(ReaderSession(book).jumpTo(12))
 
     private val speeds = mutableListOf<Int>()
 
@@ -66,7 +67,7 @@ class ReaderSpeedEntryTest {
         composeRule.onNodeWithTag("reader_speed_entry").performTextInput("0")
         settle()
         composeRule.onNodeWithTag("reader_speed_entry")
-            .assert(hasText(playing.wpm.toString() + "0"))
+            .assert(hasText(paused.wpm.toString() + "0"))
     }
 
     @Test
@@ -95,7 +96,7 @@ class ReaderSpeedEntryTest {
         composeRule.setContent {
             FastReaderTheme {
                 ReaderScreen(
-                    state = playing,
+                    state = paused,
                     onBack = {},
                     onTogglePlay = {},
                     onWpmChange = { speeds += it },

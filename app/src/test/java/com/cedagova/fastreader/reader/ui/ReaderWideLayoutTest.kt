@@ -69,7 +69,8 @@ class ReaderWideLayoutTest {
 
     private fun render(focused: Boolean = false) {
         val book = ReaderFixtures.englishNovel
-        val state = ReaderBookView("The Quiet Machine", book).present(ReaderSession(book).jumpTo(12).play())
+        // Paused: a running stream has no control column to place at any width.
+        val state = ReaderBookView("The Quiet Machine", book).present(ReaderSession(book).jumpTo(12))
         composeRule.setContent {
             FastReaderTheme {
                 ReaderScreen(

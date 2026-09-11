@@ -41,8 +41,11 @@ class ReaderSpeedGestureTest {
     val composeRule = createComposeRule()
 
     private val book = ReaderFixtures.englishNovel
-    private val playing = ReaderBookView("The Quiet Machine", book)
-        .present(ReaderSession(book).jumpTo(12).play())
+    private val view = ReaderBookView("The Quiet Machine", book)
+    private val playing = view.present(ReaderSession(book).jumpTo(12).play())
+
+    /** Paused and unfocused is the one state with the slider on screen, so the surface has no drag. */
+    private val paused = view.present(ReaderSession(book).jumpTo(12))
 
     private val steps = mutableListOf<Int>()
     private var taps = 0
@@ -66,6 +69,16 @@ class ReaderSpeedGestureTest {
         assertTrue("steps were $steps", steps.sum() < 0)
     }
 
+    /** A running stream has no slider on screen either, so it carries the drag without focused mode. */
+    @Test
+    fun `dragging the running stream changes speed without focused mode`() {
+        show(focused = false)
+
+        composeRule.onNodeWithTag("reader_surface_focused").performTouchInput { swipeUp() }
+
+        assertTrue("steps were $steps", steps.sum() > 0)
+    }
+
     /** A drag is not a tap and not a long press; the two v1 gestures are untouched. */
     @Test
     fun `a drag does not also play, pause, or leave focused mode`() {
@@ -80,7 +93,7 @@ class ReaderSpeedGestureTest {
     /** Out of scope for this issue: with the chrome up, the slider is the speed control. */
     @Test
     fun `dragging the unfocused surface changes nothing`() {
-        show(focused = false)
+        show(focused = false, state = paused)
 
         composeRule.onNodeWithTag("reader_surface").performTouchInput { swipeUp() }
 
@@ -106,7 +119,7 @@ class ReaderSpeedGestureTest {
     /** Nothing offers a speed action where the slider already is. */
     @Test
     fun `the unfocused surface has no speed actions`() {
-        show(focused = false)
+        show(focused = false, state = paused)
 
         val actions = composeRule.onNodeWithTag("reader_surface")
             .fetchSemanticsNode()
@@ -124,11 +137,11 @@ class ReaderSpeedGestureTest {
         composeRule.onNodeWithText("500 WPM").assertIsDisplayed()
     }
 
-    private fun show(focused: Boolean, notice: String? = null) {
+    private fun show(focused: Boolean, notice: String? = null, state: ReaderUiState = playing) {
         composeRule.setContent {
             FastReaderTheme {
                 ReaderScreen(
-                    state = playing,
+                    state = state,
                     onBack = {},
                     onTogglePlay = { taps += 1 },
                     onWpmChange = {},
