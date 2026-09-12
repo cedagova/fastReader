@@ -138,6 +138,9 @@ their proof together:
    rejects a future `iat`, that an `is_anonymous: true` token is rejected
    with the new reason and reaches the client as the documented 401 code,
    and that the setting defaults to `120` and rejects out-of-range values.
+   The one existing test that must change is the expired case
+   (`exp = now − 1 s`), which the default leeway now accepts; it moves
+   clearly outside the bound. Every other existing auth test stays as is.
 
 Observability: the new failure reason is carried by the existing
 auth-failure log field and metric; no new event, dashboard, or alert is
@@ -156,8 +159,10 @@ note); the leaf's code, tests, README, and PR live in `Chunipers/reader-api`
 on `stage`, as the root's `Expected implementation repositories` line
 states. The implementation PR body links the root; because the Chunipers
 worker identity cannot write to `cedagova/fastReader`, GitHub will not
-auto-close the root, and the implementation lead closes it as completed
-after post-merge verification.
+auto-close the root and the implementation lead cannot close it either. The
+owner (`cedagova`) closes #91 as completed after the implementation lead
+reports the merged `stage` SHA and post-merge verification; the umbrella #94
+closes the same way once its outcomes are done.
 
 ## Acceptance coverage
 
@@ -220,8 +225,9 @@ value is reversible by configuration. No open decision remains.
   implementation choices within the stated `auth.<reason>` and
   `SUPABASE_JWKS_*`-style conventions; the plan names recommended values so
   the client contract (#93) can reference them.
-- Root closure is manual (see the manifest note) because the implementation
-  identity cannot close a `cedagova/fastReader` issue.
+- Root closure is an owner action (see the manifest note) because neither
+  the implementation identity nor its reviewer can close a
+  `cedagova/fastReader` issue.
 
 ## Satisfaction proof
 
