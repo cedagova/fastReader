@@ -157,7 +157,7 @@ makes that move a copy rather than a refactor.
 
 | Key | Kind | Parent | Repository | Title | Delivery | Blocked by | Issue |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ROOT | LEAF | None | cedagova/fastReader | Standalone Android auth module and host app beside FastReader | None | None | https://github.com/cedagova/fastReader/issues/92 |
+| ROOT | LEAF | None | cedagova/fastReader | A83-F007 — This repository's no-network product guarantee (REQ-050) is enforced by a release gate and a published privacy statement, so the Android auth work cannot live inside the FastReader app | None | None | https://github.com/cedagova/fastReader/issues/92 |
 
 ## Acceptance coverage
 
