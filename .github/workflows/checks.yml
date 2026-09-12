@@ -60,5 +60,7 @@ jobs:
           path: |
             app/build/reports/
             app/build/outputs/roborazzi/
+            reader-auth/build/reports/
+            reader-auth-host/build/reports/
           if-no-files-found: ignore
           retention-days: 14

@@ -1,0 +1,52 @@
+# reader-auth
+
+The reusable Android library for Reader authentication. It is developed in
+this repository beside FastReader as a proving ground (#92, audit finding
+A83-F007) and is built to be lifted into the real Reader client unchanged:
+
+- it depends on nothing under `:app` and on no `com.cedagova.fastreader`
+  symbol, and nothing in its name, path, namespace or resources says
+  `fastreader`;
+- its toolchain comes from the root `gradle/libs.versions.toml`, nothing is
+  pinned inline.
+
+At this stage it is a skeleton (`ReaderAuth`), so that a host can depend on
+it and prove the wiring on a device. The sign-in contract and implementation
+are #93.
+
+## What the library declares for its hosts
+
+`src/main/AndroidManifest.xml` declares `android.permission.INTERNET`. It is
+the only permission the library asks for, and manifest merging delivers it to
+every host, so a host does not declare it again. `ReaderAuth.REQUIRED_PERMISSION`
+names it so a host can read the merge result back.
+
+## What every host must declare for itself
+
+A library manifest cannot impose these; each host — the proving-ground app
+`:reader-auth-host` now, the real Reader client later — owns them, and a
+host that omits one has a host defect, not a library defect. The host in
+this repository guards each with a unit test (`HostManifestTest`), which is
+the pattern to copy.
+
+1. **Full exclusion from backup and device-to-device transfer.** The module
+   will store tokens, and no token may leave the device in a cloud backup or
+   a setup-wizard transfer. The `<application>` element sets
+   `android:allowBackup="false"`,
+   `android:dataExtractionRules="@xml/data_extraction_rules"` and
+   `android:fullBackupContent="@xml/backup_rules"`. Both rule files exclude
+   **all nine domains** — `root`, `file`, `database`, `sharedpref`,
+   `external`, `device_root`, `device_file`, `device_database`,
+   `device_sharedpref` — and `data_extraction_rules.xml` does so in **both**
+   its `<cloud-backup>` and `<device-transfer>` sections, with no `<include>`
+   anywhere. The domains are siblings, not a hierarchy: excluding `root`
+   alone still hands `files/`, `databases/` and `shared_prefs/` to the
+   transport. `reader-auth-host/src/main/res/xml/` holds a copy to take.
+2. **No cleartext allowance in a release build.** A debug build may permit
+   cleartext to the emulator loopback `10.0.2.2` (and nothing else) through a
+   network security configuration that lives **only in the debug source
+   set**; the main manifest references no configuration and no manifest ever
+   sets `android:usesCleartextTraffic`. A release build therefore has no
+   `networkSecurityConfig` attribute at all.
+3. **Its own application id**, distinct from any other app the module is
+   developed beside. The host here is `com.cedagova.reader.auth.host`.

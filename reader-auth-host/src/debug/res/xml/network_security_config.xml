@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only cleartext allowance for the emulator loopback (#92; input from the
+  #93 review). 10.0.2.2 is the address under which an Android emulator reaches
+  the development machine, so a debug host can talk to a locally running server
+  without TLS. Nothing else is allowed cleartext, subdomains included, and the
+  base configuration says so explicitly rather than relying on the targetSdk
+  default. HostManifestTest asserts this file names 10.0.2.2 and only that.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

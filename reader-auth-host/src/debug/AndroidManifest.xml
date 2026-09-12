@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only. Merged over the main manifest, this adds the one attribute
+  a release build must never carry: a network security configuration that lets
+  a debug host reach a server on the development machine through the emulator
+  loopback (10.0.2.2) without TLS. The file it points at lives in this source
+  set too, so neither the attribute nor the allowance exists in a release APK.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+
+</manifest>
