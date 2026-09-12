@@ -1,0 +1,12 @@
+# adb shell pm list packages | grep cedagova
+package:com.cedagova.reader.auth.host
+package:com.cedagova.fastreader
+
+# adb logcat -d -s ReaderAuthHost:I (attempt 0 online, attempt 1 in airplane mode)
+--------- beginning of main
+09-12 13:12:41.399  5362  5362 I ReaderAuthHost: package=com.cedagova.reader.auth.host internetGranted=true
+09-12 13:12:42.567  5362  5362 I ReaderAuthHost: probe attempt=0 HTTPS 204 from www.gstatic.com
+09-12 13:12:42.567  5362  5362 I ReaderAuthHost: probe attempt=0 HTTPS 204 from www.gstatic.com
+09-12 13:13:07.157  5362  5362 I ReaderAuthHost: probe attempt=1 Failed: UnknownHostException — Unable to resolve host "www.gstatic.com": No address associated with hostname
+
+# adb logcat -d -s AndroidRuntime:E — line count 0 (empty)

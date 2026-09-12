@@ -1,0 +1,30 @@
+# aapt2 dump badging (release, unsigned)
+package: name='com.cedagova.reader.auth.host' versionCode='1' versionName='0.1' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'
+targetSdkVersion:'37'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.cedagova.reader.auth.host.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+
+# aapt2 dump xmltree --file AndroidManifest.xml (release): every line mentioning a permission, backup or network attribute
+13:      E: uses-permission (line=27)
+14:        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.INTERNET" (Raw: "android.permission.INTERNET")
+18:      E: uses-permission (line=33)
+24:        A: http://schemas.android.com/apk/res/android:allowBackup(0x01010280)=false
+27:        A: http://schemas.android.com/apk/res/android:fullBackupContent(0x010104eb)=@0x7f0b0000
+29:        A: http://schemas.android.com/apk/res/android:dataExtractionRules(0x0101063e)=@0x7f0b0001
+networkSecurityConfig occurrences in the release manifest: 0
+network_security_config resource in the release APK: 0
+
+# aapt2 dump xmltree --file AndroidManifest.xml (debug): the same lines
+14:        A: http://schemas.android.com/apk/res/android:name(0x01010003)="android.permission.INTERNET" (Raw: "android.permission.INTERNET")
+25:        A: http://schemas.android.com/apk/res/android:allowBackup(0x01010280)=false
+29:        A: http://schemas.android.com/apk/res/android:networkSecurityConfig(0x01010527)=@0x7f0b0002
+
+# aapt2 dump xmltree --file res/xml/network_security_config.xml (debug)
+E: network-security-config (line=10)
+    E: base-config (line=11)
+      A: cleartextTrafficPermitted=false
+    E: domain-config (line=12)
+      A: cleartextTrafficPermitted=true
+        E: domain (line=13)
+          A: includeSubdomains=false
+            T: '10.0.2.2'
