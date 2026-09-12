@@ -147,9 +147,9 @@ At `ed90c4a6479e849c7f0001951870c139e5072df5`:
 ## Selected implementation direction
 
 One PR on `main`, after #92 has merged, touching only `reader-auth/`,
-`reader-auth-host/`, the version catalog, and documentation under `docs/`.
-Nothing under `app/`, `scripts/release.sh`, or `docs/privacy-statement.md`
-changes.
+`reader-auth-host/`, the version catalog, `docs/` (agent-first guide and
+`docs/evidence/93/`), and one sentence in `README.md`. Nothing under `app/`,
+`scripts/release.sh`, or `docs/privacy-statement.md` changes.
 
 1. **Contract document** — one Markdown file inside the library module
    (beside the module README #92 creates, so it lifts with the code). It is
@@ -227,8 +227,11 @@ changes.
    reads them from the untracked `local.properties` (or environment) into
    `BuildConfig`; the module receives them as a plain configuration value
    together with `clientId = reader-android` and `clientVersion = 1.0.0`.
-   No service key anywhere. The host's debug cleartext allowance for
-   `10.0.2.2` (from #92) stays debug-only.
+   No service key anywhere. The hosted CI runner has none of the three
+   values, so the host must build, lint, and pass its unit tests with them
+   absent (empty `BuildConfig` defaults) and refuse at runtime with a clear
+   "not configured" message instead of calling anything. The host's debug
+   cleartext allowance for `10.0.2.2` (from #92) stays debug-only.
 8. **Host proving ground** — the #92 probe screen becomes a minimal sign-in
    screen: email and code entry, password entry, recovery, a signed-in view
    showing the verified user id, the capabilities call result, and the two
@@ -264,7 +267,7 @@ an observable check:
 | Root acceptance | Covered by |
 | --- | --- |
 | The contract document exists and names its sources (dossier, reader-api contract, platform documents) | Direction 1; the file is in the PR and its sources section lists each URL; review reads it against directions 2–6 |
-| Unit tests prove: tokens never written to plain shared preferences or files; concurrent refresh calls collapse to one; refresh happens before expiry with the documented margin; 401 `auth.expired_token` triggers one refresh and one retry; other `auth.*` codes clear the session | Directions 3–5; `./gradlew :reader-auth:testDebugUnitTest` with a fake cipher and clock and a Ktor mock engine: the persisted file bytes never contain the token and no `shared_prefs` file appears; N concurrent callers produce exactly one refresh request; a token inside the margin refreshes and one outside does not; the four 401/502/429/403 branches produce the exact request sequence above |
+| Unit tests prove: tokens never written to plain shared preferences or files; concurrent refresh calls collapse to one; refresh happens before expiry with the documented margin; 401 `auth.expired_token` triggers one refresh and one retry; other `auth.*` codes clear the session | Directions 3–5; `./gradlew :reader-auth:testDebugUnitTest` with a fake cipher and clock and a Ktor mock engine: the persisted file bytes never contain the token and no `shared_prefs` file appears; N concurrent callers produce exactly one refresh request; a token inside the margin refreshes and one outside does not; the four 401/502/429/403 branches produce the exact request sequence above. The in-scope operations the root's own acceptance does not name — password sign-in, recovery code request and verify plus password set, profile upsert, and "sign out other devices" — each get one mock-engine test asserting the exact request sequence and session effect, so nothing in scope ships unproven; they are not part of the emulator run |
 | On an emulator against stage: sign-up and sign-in with an emailed code succeed, `GET /v1/reader/capabilities` returns a capability document, the session survives process death and a reboot, and sign-out revokes locally | Directions 2, 4, 5, 6, 8; one `Phone_Mid_API36` run: code sign-up, code sign-in, capabilities 200 shown on screen, `am force-stop` then relaunch still signed in, `adb reboot` then relaunch still signed in, sign-out leaves the store empty; screencaps and logcat under `docs/evidence/93/` |
 | A backup/transfer test proves the session store is excluded | Direction 3 and the #92 host rules; the `docs/evidence/46/` procedure on the signed-in host (`bmgr backupnow` on the local and D2D transports moves nothing; a reinstall or `bmgr restore` yields a signed-out host); transcript under `docs/evidence/93/` |
 
@@ -275,8 +278,13 @@ prerequisite #92 is not part of this graph; it is consumed as delivered code.
 
 - Bounded builds and tests: `./gradlew :reader-auth:testDebugUnitTest
   :reader-auth-host:testDebugUnitTest lint` and both `assembleDebug` tasks
-  (JDK 21); hosted `checks.yml` on the PR. Unit tests use a fake cipher,
-  fake clock, in-memory store, and a Ktor mock engine; no network, no device.
+  (JDK 21); hosted `checks.yml` on the PR, which runs without
+  `local.properties`, so the configuration-absent build is proven by CI
+  itself. Unit tests use a fake cipher, fake clock, in-memory store, and a
+  Ktor mock engine; no network, no device. The "no `shared_prefs` file"
+  assertion needs either Robolectric in `:reader-auth` (today only `:app`
+  has it) or an assertion at the store's own path seam; the implementer
+  picks one. The real Keystore path is proven only on the emulator.
 - Emulator: one run on `Phone_Mid_API36` against the stage project under
   the shared emulator lock (`mkdir ~/worktrees/fastReader/.emulator.lock`,
   pid inside, `rmdir` when done), driven with `adb shell input`. The emailed
