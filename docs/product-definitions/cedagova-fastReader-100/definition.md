@@ -2,8 +2,8 @@
 
 - Product definition issue: https://github.com/cedagova/fastReader/issues/100
 - Product definition PR: https://github.com/cedagova/fastReader/pull/101
-- Requirements brief: Pending
-- Status: Draft ready
+- Requirements brief: https://github.com/cedagova/fastReader/issues/100#issuecomment-5657177459
+- Status: Ready for planning
 - Classification: REFINE
 - Definition lead: cedagova
 - Started: 2026-09-13
@@ -494,7 +494,9 @@ The root owns REQ-401 to REQ-414; there are no outcome children.
 
 ## Publication verification
 
-- Requirements Brief published: Pending.
-- Graph: single root; reconciliation pending.
-- Semantic-anchor review: pending.
+- Requirements Brief published: https://github.com/cedagova/fastReader/issues/100#issuecomment-5657177459
+- Graph: single root, no children; root issue metadata written and
+  `definition verify-graph` valid (1 row, 2026-09-13).
+- Owner approval and semantic-anchor review: recorded on the PR against the
+  presented head.
 - Next action: `plan https://github.com/cedagova/fastReader/issues/100`.
