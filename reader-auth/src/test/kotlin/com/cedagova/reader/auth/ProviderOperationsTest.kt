@@ -1,6 +1,7 @@
 package com.cedagova.reader.auth
 
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -230,6 +231,57 @@ class ProviderOperationsTest {
         assertEquals(listOf(REFRESH_GRANT, LOGOUT_OTHERS), servers.routes())
         assertEquals("access-2", servers.requests[1].bearer)
         assertNotNull(client.currentState() as? ReaderSessionState.SignedIn)
+        client.close()
+    }
+}
+
+class SignOutOrderingTest {
+
+    private val clock = FakeClock()
+    private val waiter = RecordingWaiter()
+
+    @Test
+    fun `sign-out waits for a refresh in flight and the refreshed session is not re-saved`() = kotlinx.coroutines.test.runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val servers = FakeServers()
+        servers.on(REFRESH_GRANT, gated(gate) { json(sessionJson("access-2", "refresh-2")) })
+        var bearerAtLogout: String? = null
+        servers.on(LOGOUT_LOCAL) { bearerAtLogout = it.bearer; json("{}", HttpStatusCode.NoContent) }
+        val store = InMemorySessionStore(session(expiresAt = clock.expiring(60)))
+        val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter)
+        client.awaitReady()
+
+        val foreground = async { client.onForeground() }
+        repeat(50) { kotlinx.coroutines.yield() }
+        val signOut = async { client.signOut() }
+        repeat(50) { kotlinx.coroutines.yield() }
+        assertTrue("sign-out must not run while the refresh is in flight", servers.requestsTo("/auth/v1/logout").isEmpty())
+        gate.complete(Unit)
+        foreground.await()
+        signOut.await()
+
+        assertEquals(listOf(REFRESH_GRANT, LOGOUT_LOCAL), servers.routes())
+        assertEquals("access-2", bearerAtLogout)
+        assertNull("the refreshed session was re-saved after sign-out", store.session)
+        assertEquals(ReaderSessionState.SignedOut, client.currentState())
+        client.close()
+    }
+
+    @Test
+    fun `a 401 on the public pre-auth route never signs the device out`() = kotlinx.coroutines.test.runTest {
+        val servers = FakeServers()
+        servers.on(PRE_AUTH) { json(apiError("auth.unauthorized", "req-pre"), HttpStatusCode.Unauthorized) }
+        val store = InMemorySessionStore(session(expiresAt = clock.expiring(3600)))
+        val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter)
+        client.awaitReady()
+
+        val failure = runCatching { client.bootstrap() }.exceptionOrNull()
+
+        assertTrue("$failure", failure is ReaderAuthException.ApiError)
+        assertEquals("auth.unauthorized", (failure as ReaderAuthException.ApiError).code)
+        assertEquals(listOf(PRE_AUTH), servers.routes())
+        assertNotNull(store.session)
+        assertTrue(client.currentState() is ReaderSessionState.SignedIn)
         client.close()
     }
 }

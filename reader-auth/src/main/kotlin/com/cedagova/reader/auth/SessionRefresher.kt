@@ -54,6 +54,13 @@ internal class SessionRefresher(
         if (latest.accessToken == rejectedAccessToken) refresh(latest) else latest
     }
 
+    /**
+     * Runs [block] while no refresh is in flight and holds off any refresh
+     * until it returns. Sign-out uses it so a refresh that started a moment
+     * earlier cannot re-save a session after the store was cleared.
+     */
+    suspend fun <T> withoutRefresh(block: suspend () -> T): T = mutex.withLock { block() }
+
     /** Runs under [mutex]. */
     private suspend fun refresh(session: UserSession): UserSession {
         var retried = 0

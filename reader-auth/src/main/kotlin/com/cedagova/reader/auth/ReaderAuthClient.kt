@@ -180,9 +180,11 @@ class ReaderAuthClient internal constructor(
     /**
      * Local sign-out: the store is cleared first, then the provider is told
      * with `local` scope on a best-effort basis; a provider failure never
-     * leaves the device signed in (CONTRACT.md, "Sign-out semantics").
+     * leaves the device signed in (CONTRACT.md, "Sign-out semantics"). It
+     * waits for any refresh in flight and blocks the next one, so a refresh
+     * that started a moment earlier cannot re-save a session afterwards.
      */
-    suspend fun signOut() {
+    suspend fun signOut() = refresher.withoutRefresh {
         store.clear()
         try {
             auth.signOut(SignOutScope.LOCAL)

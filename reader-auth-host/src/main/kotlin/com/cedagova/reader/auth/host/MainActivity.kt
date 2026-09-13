@@ -124,8 +124,8 @@ private fun AuthScreen(client: ReaderAuthClient) {
 @Composable
 private fun SignedOutView(client: ReaderAuthClient, run: (String, suspend () -> String) -> Unit) {
     var email by rememberSaveable { mutableStateOf("") }
-    var code by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var newAccount by rememberSaveable { mutableStateOf(false) }
     val codeSent = stringResource(R.string.host_status_code_sent)
     val recoverySent = stringResource(R.string.host_status_recovery_sent)
@@ -189,7 +189,7 @@ private fun SignedOutView(client: ReaderAuthClient, run: (String, suspend () -> 
 @Composable
 private fun SignedInView(client: ReaderAuthClient, session: ReaderSessionState.SignedIn, run: (String, suspend () -> String) -> Unit) {
     var capabilities by rememberSaveable { mutableStateOf("") }
-    var newPassword by rememberSaveable { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
     val capabilitiesText = stringResource(R.string.host_status_capabilities)
     val signedOut = stringResource(R.string.host_status_signed_out)
     val othersSignedOut = stringResource(R.string.host_status_others_signed_out)

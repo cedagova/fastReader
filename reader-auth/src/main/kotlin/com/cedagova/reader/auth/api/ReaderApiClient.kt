@@ -42,8 +42,9 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * - 401 `auth.expired_token`: one single-flight refresh and one retry, then
  *   surfaced as [ReaderAuthException.ApiError] with the session intact;
- * - any other 401 `auth.*`: the session is cleared and
- *   [ReaderAuthException.SignedOut] is thrown;
+ * - any other 401 `auth.*` on a protected call: the session is cleared and
+ *   [ReaderAuthException.SignedOut] is thrown (a public route's 401 is an
+ *   [ReaderAuthException.ApiError]; it said nothing about the session);
  * - 403: [ReaderAuthException.Forbidden], session intact;
  * - 429, and 502 `auth.jwks_dependency_failed`: one retry after `Retry-After`
  *   (default 10 s), then [ReaderAuthException.TryLater];
@@ -121,7 +122,7 @@ class ReaderApiClient internal constructor(
                             ?: throw ReaderAuthException.SignedOut(error.code, error.requestId)
                         continue
                     }
-                    if (error.code != ReaderAuthPolicy.EXPIRED_TOKEN_CODE && error.code?.startsWith(AUTH_CODE_PREFIX) == true) {
+                    if (session != null && error.code != ReaderAuthPolicy.EXPIRED_TOKEN_CODE && error.code?.startsWith(AUTH_CODE_PREFIX) == true) {
                         auth.clearSession()
                         throw ReaderAuthException.SignedOut(error.code, error.requestId)
                     }

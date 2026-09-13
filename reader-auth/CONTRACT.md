@@ -133,7 +133,7 @@ errors are `{code, message, category, retryable, request_id}` with
 | Answer | Client behaviour |
 | --- | --- |
 | 401 `auth.expired_token` | One single-flight refresh and one retry; a second expiry is surfaced with its code and `request_id`, session intact. |
-| 401 any other `auth.*` (`auth.invalid_token`, `auth.anonymous_identity_rejected`, `auth.malformed_token`, `auth.missing_sub_claim`, `auth.missing_token`, `auth.unauthorized`) | The session is cleared; the device is signed out. |
+| 401 any other `auth.*` (`auth.invalid_token`, `auth.anonymous_identity_rejected`, `auth.malformed_token`, `auth.missing_sub_claim`, `auth.missing_token`, `auth.unauthorized`) on a protected call | The session is cleared; the device is signed out. (A 401 on a public route such as pre-auth carried no bearer and says nothing about the session: surfaced with its code, session intact.) |
 | 403 | Surfaced as forbidden; session intact. |
 | 429 | One retry after `Retry-After` (default 10 s), then try later; session intact. |
 | 502 `auth.jwks_dependency_failed` | One retry after `Retry-After` (default 10 s), then try later; session intact. |
@@ -153,7 +153,10 @@ keeping a session the server rejects would only repeat the rejection.
 
 - **Local sign-out clears the store first**, then tells the provider with
   `POST /auth/v1/logout?scope=local` on a best-effort basis. **A provider
-  failure never leaves the device signed in.** This is a deliberate divergence
+  failure never leaves the device signed in.** Sign-out takes the same
+  mutex as refresh: it waits for a refresh in flight and holds off the next
+  one, so a refresh that began a moment earlier cannot re-save a session
+  after the store was cleared. This is a deliberate divergence
   from reader-web, which restores the session when the provider call fails:
   on a device, local revocation is the user's intent, and the stored refresh
   token is the thing to destroy.
