@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The proving-ground host for :reader-auth.
+
+  No permission element here: INTERNET arrives through manifest merging from the
+  library, which is the one place it is declared (reader-auth/README.md). What
+  this manifest does declare is what a host owes the library and cannot inherit:
+
+  - allowBackup="false", dataExtractionRules and fullBackupContent exclude every
+    domain from cloud backup and from the device-to-device transfer that API 31+
+    performs regardless of the attribute. The module will store tokens; nothing
+    it keeps may leave the device that way. HostManifestTest keeps this in place.
+  - no network security configuration attribute and no cleartext attribute.
+    The debug source set adds a configuration permitting cleartext to the
+    emulator loopback only (src/debug/AndroidManifest.xml); a release build
+    has none.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

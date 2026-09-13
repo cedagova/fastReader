@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Reader auth host</string>
+    <string name="probe_title">Reader auth host</string>
+    <string name="probe_package">Package: %1$s</string>
+    <string name="probe_permission_granted">INTERNET via reader-auth: granted</string>
+    <string name="probe_permission_missing">INTERNET via reader-auth: MISSING</string>
+    <string name="probe_target">HTTPS GET %1$s</string>
+    <string name="probe_running">Probing…</string>
+    <string name="probe_again">Probe again</string>
+</resources>

@@ -110,6 +110,20 @@ prior-art form — and the off-center **Fixed focus letter** alignment is an
 opt-in toggle that ships off. Passing the APK to someone who asks for it is
 fine; putting it in a store is not, until #33 is closed.
 
+## The Reader auth module beside FastReader
+
+This repository also carries two Gradle modules that are **not part of
+FastReader**: `reader-auth/`, a reusable Android library for the future Reader
+client's sign-in, and `reader-auth-host/`, a minimal app that installs beside
+FastReader under its own application id, `com.cedagova.reader.auth.host`, to
+exercise that library on an emulator. They share this repository's toolchain
+and nothing else: FastReader's `app/` module does not depend on them,
+`scripts/release.sh` never builds them, and the statement above — FastReader
+has no internet permission — is unchanged and applies to the FastReader app you
+install from a release. The host app does declare the internet permission; that
+is the point of it, a place to prove network-backed work without touching
+FastReader. See [reader-auth/README.md](reader-auth/README.md).
+
 ## Build it yourself
 
 ```bash
