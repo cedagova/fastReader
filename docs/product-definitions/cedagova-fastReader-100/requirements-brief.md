@@ -32,6 +32,9 @@ every published promise is rewritten to be true.
   library's Keystore-encrypted no-backup store, and is gone after sign out.
 - A build without the three public backend values builds and tests green and
   shows not configured at runtime.
+- `:reader-auth-host` is retired; FastReader is the library's only host and
+  carries its two host proofs; the deferred stage run is completed from
+  FastReader.
 - The privacy statement (English, Spanish, README, release-notes block) says
   what now leaves the device and to whom; the README drops "no internet
   permission at all"; `scripts/release.sh` proves "INTERNET and no other
@@ -51,7 +54,7 @@ consumer polish beyond the existing accessibility bar.
 ## Product outcomes
 
 One root, no children: https://github.com/cedagova/fastReader/issues/100
-owns REQ-401 to REQ-413.
+owns REQ-401 to REQ-414.
 
 ## Important constraints and success measures
 
@@ -74,8 +77,7 @@ release gate, and the REQ-050/REQ-303/REQ-107 promises being replaced.
 
 Assumptions: the owner has the stage values for `local.properties`; the
 stage email template delivers the code; the three-place statement test
-stays. Uncertainty: the fate of `:reader-auth-host` (owner question);
-placement and visual treatment inside Settings (design).
+stays. Uncertainty: placement and visual treatment inside Settings (design).
 
 ## Owner decisions
 
@@ -83,7 +85,8 @@ placement and visual treatment inside Settings (design).
 no-network promise; FastReader is a testing app, not a consumer product;
 network access is whatever the backend contract needs; sign-in optional and
 the app usable signed out; scope is account, session and capabilities; client
-kind `reader-android`; stage only.
+kind `reader-android`; stage only; `:reader-auth-host` retired ("retire,
+unnecesary") with its proofs moved to FastReader.
 
 ## Links and next action
 

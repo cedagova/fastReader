@@ -3,7 +3,7 @@
 - Product definition issue: https://github.com/cedagova/fastReader/issues/100
 - Product definition PR: https://github.com/cedagova/fastReader/pull/101
 - Requirements brief: Pending
-- Status: Needs input
+- Status: Draft ready
 - Classification: REFINE
 - Definition lead: cedagova
 - Started: 2026-09-13
@@ -90,6 +90,9 @@ already installs and uses, is the app where that proof belongs.
 6. The `:reader-auth` contract is neither duplicated nor contradicted: what
    FastReader adds is a product surface over the library; the auth behaviour
    stays the library's.
+7. FastReader is the library's only host in this repository: the
+   proving-ground `:reader-auth-host` is retired, and what it proved is
+   proved from FastReader instead.
 
 ## Product behavior and flows
 
@@ -286,6 +289,24 @@ Requirement numbers start at REQ-401 so they do not collide with REQ-0xx
   *Accept:* stage pre-auth reports `compatibility.status: compatible` for
   the app and the installed package is still `com.cedagova.fastreader`.
 
+### Retiring the proving-ground host
+
+- **REQ-414** `:reader-auth-host` is retired: the module is removed from the
+  build, the two host-side proofs it carried (backup-exclusion and
+  cleartext-policy manifest checks; configuration read with the
+  not-configured fallback) hold for FastReader as the host, and the
+  repository's documentation (`README.md`, `reader-auth/README.md`,
+  `docs/agent-first-development.md`, `docs/evidence/93/README.md`) names
+  FastReader as the host and the place where the deferred stage run is
+  completed. The library itself is unchanged and still depends on nothing
+  under `:app`.
+  *Accept:* `settings.gradle.kts` includes `:app` and `:reader-auth` only;
+  no `reader-auth-host/` directory remains; the unit tests that pinned the
+  host's manifest and configuration behaviour now pass against FastReader;
+  `grep -ri "reader-auth-host" docs README.md reader-auth` matches only
+  historical records (audit dossier, release notes, plan and evidence
+  directories of #92/#93).
+
 ## Accessibility and content
 
 - The account surface meets the existing bar (REQ-060/REQ-301): every
@@ -441,6 +462,7 @@ automated gate. Assumption: stage continues to declare `reader-android`
 | 2026-09-13 | Scope: account, session and capabilities discovery; later definitions add the rest. | Smallest end-to-end proof of the client contract. | Desired outcomes, REQ-407, non-goals |
 | 2026-09-13 | Client kind `reader-android` 1.0.0; no FastReader-specific kind. | Stage already declares it; FastReader is the Android reader for now. | REQ-413 |
 | 2026-09-13 | Backend target: stage only; production promotion is a Chunipers decision outside this definition. | Production is not promoted. | Constraints |
+| 2026-09-13 | "retire, unnecesary": `:reader-auth-host` is retired in this delivery — module dropped, its two host proofs move to FastReader, `docs/evidence/93/` points at FastReader for the deferred stage run. All lead drafting choices below stand. | One host, one set of proofs; the README sentence justifying the host stops being true once FastReader is the client. | REQ-410, REQ-414, desired outcome 7 |
 
 Lead drafting choices, recorded as overturnable (not owner decisions):
 
@@ -459,10 +481,6 @@ Lead drafting choices, recorded as overturnable (not owner decisions):
 
 ## Remaining uncertainty
 
-- **Fate of `:reader-auth-host`** — open owner question (see PR): retire it
-  once FastReader is the client, keep it as the library's sample, or leave
-  it untouched. Affects README wording (REQ-410) and where the host tests
-  live; does not affect FastReader's behaviour.
 - Exact placement and wording within Settings, and the visual treatment of
   the capabilities document — design choices inside REQ-401/REQ-407.
 
@@ -472,7 +490,7 @@ Lead drafting choices, recorded as overturnable (not owner decisions):
 | --- | --- | --- | --- | --- |
 | ROOT | ROOT | None | FastReader signs in to a Reader account through :reader-auth (stage) | https://github.com/cedagova/fastReader/issues/100 |
 
-The root owns REQ-401 to REQ-413; there are no outcome children.
+The root owns REQ-401 to REQ-414; there are no outcome children.
 
 ## Publication verification
 
