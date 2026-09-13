@@ -10,9 +10,26 @@ A83-F007) and is built to be lifted into the real Reader client unchanged:
 - its toolchain comes from the root `gradle/libs.versions.toml`, nothing is
   pinned inline.
 
-At this stage it is a skeleton (`ReaderAuth`), so that a host can depend on
-it and prove the wiring on a device. The sign-in contract and implementation
-are #93.
+[CONTRACT.md](CONTRACT.md) is the client contract — sign-in methods in
+preference order, bootstrap, the Keystore-encrypted session store, the
+single-flight refresh policy, the reader-api 401/403/429/502 policy, sign-out
+semantics, and what a host must provide — and this module implements exactly
+it (#93, audit finding A83-F008). `ReaderAuthClient` is the entry point:
+
+```kotlin
+val client = ReaderAuthClient.create(context, ReaderAuthConfig(supabaseUrl, publishableKey, readerApiBaseUrl))
+client.awaitReady()                       // reads the stored session
+client.requestEmailCode(email, createUser = true)
+client.verifyEmailCode(email, code)       // stores the session
+client.capabilities()                     // refreshes first when inside the margin
+client.signOut()
+```
+
+Every failure is one branch of the sealed `ReaderAuthException`. The
+contract's constants live in `ReaderAuthPolicy`, and the unit tests under
+`src/test/` (fake cipher, fake clock, Ktor mock engine; no network, no device)
+pin each rule; the real Keystore path and the stage flow are proven on an
+emulator from the host app (`docs/evidence/93/`).
 
 ## What the library declares for its hosts
 

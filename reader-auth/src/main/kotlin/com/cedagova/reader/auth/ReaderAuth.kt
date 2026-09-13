@@ -3,12 +3,10 @@ package com.cedagova.reader.auth
 import android.Manifest
 
 /**
- * The entry point of the Reader authentication library.
+ * Manifest-level facts of the Reader authentication library.
  *
- * At this stage (#92) the module is a skeleton: it exists so that a host can
- * depend on it, receive its manifest, and prove the wiring on a device before
- * any authentication code is written. The sign-in contract and its
- * implementation land under #93 and grow from here.
+ * The runtime entry point is [ReaderAuthClient]; the rules it implements are
+ * written in `CONTRACT.md` beside this module's README.
  */
 object ReaderAuth {
 
