@@ -1,0 +1,10 @@
+# Phone_Mid_API36 (sdk_gphone64_arm64, Android 16), host built from d9fdb7e7bd5fa0292cd4d0b245504071024d40d5 with the three stage values in the untracked local.properties, 2026-09-13
+
+# adb shell am start -n com.cedagova.reader.auth.host/.MainActivity; screencap host-signed-out-phone-mid-api36.png;
+# then nobody@example.com + a wrong password, tap 'Sign in with password' (pre-auth bootstrap against stage reader-api, then the stage provider's password grant); screencap host-wrong-password-phone-mid-api36.png
+# adb logcat -d -s ReaderAuthHost:I AndroidRuntime:E
+09-13 11:24:03.130  6459  6459 I ReaderAuthHost: package=com.cedagova.reader.auth.host configured=true
+09-13 11:24:03.211  6459  6459 I ReaderAuthHost: foreground state=SignedOut
+09-13 11:24:21.210  6459  6459 I ReaderAuthHost: signInWithPassword failed: ProviderRejected provider rejected (HTTP 400 invalid_credentials): Invalid login credentials
+
+# adb logcat -d -s AndroidRuntime:E — line count 0

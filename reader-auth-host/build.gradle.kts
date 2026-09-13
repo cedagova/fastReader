@@ -1,6 +1,8 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-// The minimal host application for :reader-auth (#92, A83-F007).
+// The minimal host application for :reader-auth (#92, A83-F007; sign-in
+// screen #93, A83-F008).
 //
 // It exists so the library can be installed, launched and exercised on an
 // emulator under an application id of its own, beside FastReader and never
@@ -13,6 +15,24 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// The three service values the host hands :reader-auth (CONTRACT.md, "Host
+// requirements"). They are public browser-runtime values of the Reader
+// deployment, but they are never committed: they come from the untracked
+// local.properties or the environment, and an absent value becomes an empty
+// BuildConfig string. The hosted CI runner has none of them, so every build,
+// lint and unit test must pass with all three empty; at runtime the host then
+// shows "not configured" and calls nothing.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) file.inputStream().use { load(it) }
+}
+
+fun readerValue(propertyKey: String, environmentKey: String): String =
+    (localProperties.getProperty(propertyKey) ?: System.getenv(environmentKey) ?: "")
+        .trim()
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 android {
     namespace = "com.cedagova.reader.auth.host"
     compileSdk = 37
@@ -23,6 +43,14 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1"
+
+        buildConfigField("String", "READER_SUPABASE_URL", "\"${readerValue("reader.supabaseUrl", "READER_SUPABASE_URL")}\"")
+        buildConfigField(
+            "String",
+            "READER_SUPABASE_PUBLISHABLE_KEY",
+            "\"${readerValue("reader.supabasePublishableKey", "READER_SUPABASE_PUBLISHABLE_KEY")}\"",
+        )
+        buildConfigField("String", "READER_API_BASE_URL", "\"${readerValue("reader.apiBaseUrl", "READER_API_BASE_URL")}\"")
     }
 
     buildTypes {
@@ -40,6 +68,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
@@ -63,7 +92,10 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

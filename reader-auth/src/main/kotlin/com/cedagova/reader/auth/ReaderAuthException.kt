@@ -1,0 +1,57 @@
+package com.cedagova.reader.auth
+
+import kotlin.time.Duration
+
+/**
+ * Every failure the module surfaces to a host, as one closed set so a host can
+ * render each without parsing messages. Which branch a server or provider
+ * answer lands in is fixed by `CONTRACT.md`; `ReaderApiPolicyTest` and
+ * `ProviderOperationsTest` pin the mapping.
+ */
+sealed class ReaderAuthException(message: String) : Exception(message) {
+
+    /** The host passed a [ReaderAuthConfig] with a blank service value; nothing was called. */
+    class NotConfigured : ReaderAuthException("reader-auth is not configured")
+
+    /**
+     * The reader-api pre-auth document does not describe this client's
+     * configuration (wrong application id, publishable key, or authority), so
+     * sign-in was refused before any provider call.
+     */
+    class ConfigurationMismatch(val reason: String) :
+        ReaderAuthException("pre-auth does not match this client: $reason")
+
+    /** The network was unreachable or the request timed out; nothing was cleared. */
+    class NetworkUnavailable(cause: Throwable) :
+        ReaderAuthException("network unavailable: ${cause.javaClass.simpleName}") {
+        init { initCause(cause) }
+    }
+
+    /**
+     * The provider or reader-api answered 429 or 5xx (after the one permitted
+     * retry where the contract allows one). The session is intact; the user
+     * should try later. Never a credential error.
+     */
+    class TryLater(val status: Int, val code: String?, val retryAfter: Duration?, val requestId: String? = null) :
+        ReaderAuthException("try later: HTTP $status${code?.let { " $it" } ?: ""}")
+
+    /**
+     * The server rejected the session, and the module cleared it: any reader-api
+     * 401 `auth.*` other than an expiry, or a provider refresh failure that
+     * names a revoked or missing session. The host must show the sign-in screen.
+     */
+    class SignedOut(val code: String?, val requestId: String? = null) :
+        ReaderAuthException("signed out by the server${code?.let { ": $it" } ?: ""}")
+
+    /** reader-api 403: the caller is authenticated but not allowed; the session is intact. */
+    class Forbidden(val code: String?, val requestId: String?) :
+        ReaderAuthException("forbidden${code?.let { ": $it" } ?: ""}")
+
+    /** The identity provider rejected the operation itself (wrong code, bad password, weak password, ...). */
+    class ProviderRejected(val status: Int, val code: String?, val description: String) :
+        ReaderAuthException("provider rejected (HTTP $status${code?.let { " $it" } ?: ""}): $description")
+
+    /** Any other reader-api error, surfaced with the server's `code` and `request_id`. */
+    class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String) :
+        ReaderAuthException("reader-api HTTP $status${code?.let { " $it" } ?: ""}: $description")
+}

@@ -1,11 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Reader auth host</string>
-    <string name="probe_title">Reader auth host</string>
-    <string name="probe_package">Package: %1$s</string>
-    <string name="probe_permission_granted">INTERNET via reader-auth: granted</string>
-    <string name="probe_permission_missing">INTERNET via reader-auth: MISSING</string>
-    <string name="probe_target">HTTPS GET %1$s</string>
-    <string name="probe_running">Probing…</string>
-    <string name="probe_again">Probe again</string>
+    <string name="host_title">Reader auth host</string>
+    <string name="host_package">Package: %1$s</string>
+    <string name="host_not_configured">Not configured: set reader.supabaseUrl, reader.supabasePublishableKey and reader.apiBaseUrl in local.properties (or READER_SUPABASE_URL, READER_SUPABASE_PUBLISHABLE_KEY, READER_API_BASE_URL) and rebuild. Nothing is called.</string>
+    <string name="host_loading">Reading the stored session…</string>
+    <string name="host_signed_out">Signed out</string>
+    <string name="host_signed_in">Signed in</string>
+    <string name="host_user_id">User id: %1$s</string>
+    <string name="host_email">Email: %1$s</string>
+    <string name="host_expires">Access token expires: %1$s</string>
+    <string name="host_field_email">Email</string>
+    <string name="host_field_code">6-digit code</string>
+    <string name="host_field_password">Password</string>
+    <string name="host_field_new_password">New password</string>
+    <string name="host_new_account">New account (sign up)</string>
+    <string name="host_section_code">Email code</string>
+    <string name="host_section_password">Password</string>
+    <string name="host_section_recovery">Recovery</string>
+    <string name="host_send_code">Send code</string>
+    <string name="host_verify_code">Verify code</string>
+    <string name="host_sign_in_password">Sign in with password</string>
+    <string name="host_send_recovery">Send recovery code</string>
+    <string name="host_verify_recovery">Verify recovery code</string>
+    <string name="host_set_password">Set password</string>
+    <string name="host_capabilities">Load capabilities</string>
+    <string name="host_sign_out">Sign out</string>
+    <string name="host_sign_out_others">Sign out other devices</string>
+    <string name="host_status_idle">Ready.</string>
+    <string name="host_status_working">Working…</string>
+    <string name="host_status_code_sent">Code sent — check the inbox and type the 6 digits.</string>
+    <string name="host_status_recovery_sent">Recovery code sent — type it, then set a new password.</string>
+    <string name="host_status_password_set">Password set.</string>
+    <string name="host_status_signed_out">Signed out locally.</string>
+    <string name="host_status_others_signed_out">Other devices signed out.</string>
+    <string name="host_status_capabilities">Capabilities %1$s</string>
 </resources>

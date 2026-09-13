@@ -122,7 +122,9 @@ and nothing else: FastReader's `app/` module does not depend on them,
 has no internet permission — is unchanged and applies to the FastReader app you
 install from a release. The host app does declare the internet permission; that
 is the point of it, a place to prove network-backed work without touching
-FastReader. See [reader-auth/README.md](reader-auth/README.md).
+FastReader. See [reader-auth/README.md](reader-auth/README.md); the client
+contract the library implements — sign-in methods, session storage, refresh,
+error policy, sign-out — is [reader-auth/CONTRACT.md](reader-auth/CONTRACT.md).
 
 ## Build it yourself
 
