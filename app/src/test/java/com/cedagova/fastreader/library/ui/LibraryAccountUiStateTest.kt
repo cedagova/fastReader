@@ -1,0 +1,324 @@
+package com.cedagova.fastreader.library.ui
+
+import com.cedagova.fastreader.account.library.AccountBook
+import com.cedagova.fastreader.account.library.AccountLibraryState
+import com.cedagova.fastreader.account.library.AccountSyncError
+import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.library.Catalog
+import com.cedagova.fastreader.library.IngestionState
+import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.reader.library.model.ReaderCapabilityReason
+import com.cedagova.reader.library.model.ReaderLibraryStatus
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * The account half of the shelf (LEAF703), proven where it is decided: the
+ * merge, the shelf states and the one status the shelf reports back are plain
+ * functions of the catalog and the account store, so this is the primary proof
+ * and the Roborazzi renders only show what these values look like.
+ */
+class LibraryAccountUiStateTest {
+
+    // --- REQ-501, one row per content identity (AD-23) ------------------------
+
+    @Test
+    fun `a device book and an account book with the same sha256 are one row`() {
+        val state = shelf(
+            catalog = catalogOf(FICCIONES to "Ficciones"),
+            account = accountOf(accountBook("acc-1", "Ficciones", FICCIONES_HEX)),
+        )
+
+        assertEquals(1, state.books.size)
+        val row = state.books.single()
+        assertEquals("acc-1", row.account?.bookId)
+        assertTrue("a merged row is still on this device", row.account?.onThisDevice == true)
+        assertTrue("a merged row still opens", row.canOpen)
+    }
+
+    /**
+     * The `sha256:` prefix the catalog stores is not part of the identity, and
+     * the backend types `checksum` as a free-form string: both sides normalise
+     * to the same 64 hex characters or they do not merge at all.
+     */
+    @Test
+    fun `the sha256 prefix and letter case do not decide the merge`() {
+        val state = shelf(
+            catalog = catalogOf(FICCIONES to "Ficciones"),
+            account = accountOf(accountBook("acc-1", "Ficciones", "SHA256:" + FICCIONES_HEX.uppercase())),
+        )
+
+        assertEquals(1, state.books.size)
+        assertEquals("acc-1", state.books.single().account?.bookId)
+    }
+
+    @Test
+    fun `the same title and file name do not merge two different books`() {
+        val state = shelf(
+            catalog = catalogOf(FICCIONES to "Ficciones"),
+            // Same title, same file name, different bytes: two books.
+            account = accountOf(accountBook("acc-1", "Ficciones", RAYUELA_HEX)),
+        )
+
+        assertEquals(2, state.books.size)
+        assertEquals(setOf(null, "acc-1"), state.books.map { it.account?.bookId }.toSet())
+    }
+
+    @Test
+    fun `an account book with no checksum merges with nothing`() {
+        val state = shelf(
+            catalog = catalogOf(FICCIONES to "Ficciones"),
+            account = accountOf(accountBook("acc-1", "Ficciones", contentSha256 = null)),
+        )
+
+        assertEquals(2, state.books.size)
+        assertTrue(state.books.any { it.isAccountOnly })
+    }
+
+    @Test
+    fun `an account book this device does not have says so and does not open`() {
+        val state = shelf(
+            catalog = Catalog(),
+            account = accountOf(accountBook("acc-1", "Dubliners", RAYUELA_HEX, author = "James Joyce")),
+        )
+
+        val row = state.books.single()
+        assertEquals("Dubliners", row.title)
+        assertEquals("James Joyce", row.author)
+        assertTrue("it is the account's and not this device's", row.isAccountOnly)
+        assertFalse("there is nothing here to open until increment 003", row.canOpen)
+        assertFalse("a cover is bytes, and the bytes are not here", row.hasCover)
+        assertEquals(LibraryContent.BOOKS, state.content)
+    }
+
+    @Test
+    fun `an account-only row is searched by title and author`() {
+        val account = accountOf(accountBook("acc-1", "Dubliners", RAYUELA_HEX, author = "James Joyce"))
+
+        assertEquals(1, shelf(Catalog(), account, query = "joyce").books.size)
+        assertEquals(0, shelf(Catalog(), account, query = "borges").books.size)
+        assertEquals(LibraryContent.NO_SEARCH_RESULTS, shelf(Catalog(), account, query = "borges").content)
+    }
+
+    // --- REQ-516 / D4, signed out --------------------------------------------
+
+    @Test
+    fun `signed out the shelf is exactly the device shelf`() {
+        val catalog = catalogOf(FICCIONES to "Ficciones")
+
+        val signedOut = shelf(catalog, AccountLibraryState.SIGNED_OUT)
+        val v160 = buildLibraryUiState(catalog, IngestionState.Idle, "")
+
+        assertEquals(v160, signedOut)
+        assertNull("signed out says nothing about an account", signedOut.accountNotice)
+        assertTrue(signedOut.books.all { it.account == null })
+    }
+
+    @Test
+    fun `a build with no stage values shows no account notice`() {
+        val state = shelf(
+            catalog = catalogOf(FICCIONES to "Ficciones"),
+            account = AccountLibraryState(
+                phase = AccountSyncPhase.SIGNED_OUT,
+                lastError = AccountSyncError.NotConfigured,
+            ),
+        )
+
+        assertNull(state.accountNotice)
+    }
+
+    // --- REQ-508 / REQ-509, removal ------------------------------------------
+
+    @Test
+    fun `a removed account book leaves the shelf and its device book stays readable`() {
+        // What the engine publishes after a removal is admitted: the tombstoned
+        // row is not in `books` at all.
+        val state = shelf(
+            catalog = catalogOf(FICCIONES to "Ficciones"),
+            account = accountOf(),
+        )
+
+        val row = state.books.single()
+        assertNull("the account half is gone", row.account)
+        assertTrue("the device book is untouched and still opens", row.canOpen)
+    }
+
+    @Test
+    fun `an account-only book that was removed leaves the shelf entirely`() {
+        val state = shelf(catalog = Catalog(), account = accountOf())
+
+        assertEquals(emptyList<LibraryBookItem>(), state.books)
+        assertEquals(LibraryContent.EMPTY_LIBRARY, state.content)
+    }
+
+    // --- the states table ----------------------------------------------------
+
+    @Test
+    fun `bootstrapping is said, not silent`() {
+        val notice = shelf(Catalog(), AccountLibraryState(phase = AccountSyncPhase.BOOTSTRAPPING)).accountNotice
+
+        assertEquals(AccountNoticeKind.BOOTSTRAPPING, notice?.kind)
+        assertFalse("a live state clears itself", notice?.dismissible == true)
+    }
+
+    @Test
+    fun `offline names how many changes are waiting`() {
+        val notice = shelf(
+            Catalog(),
+            AccountLibraryState(phase = AccountSyncPhase.OFFLINE, queued = 2),
+        ).accountNotice
+
+        assertEquals(AccountNoticeKind.OFFLINE, notice?.kind)
+        assertEquals(2, notice?.queued)
+    }
+
+    @Test
+    fun `a capability the backend has not made available is shown with its own reason`() {
+        val notice = shelf(
+            Catalog(),
+            AccountLibraryState(
+                phase = AccountSyncPhase.DEFERRED,
+                capabilityReason = ReaderCapabilityReason.SERVICE_NOT_ENABLED,
+            ),
+        ).accountNotice
+
+        assertEquals(AccountNoticeKind.UNAVAILABLE, notice?.kind)
+        assertEquals("service_not_enabled", notice?.code)
+    }
+
+    @Test
+    fun `a backend asking for a retry later is deferred, never a sign-out`() {
+        val notice = shelf(
+            Catalog(),
+            AccountLibraryState(
+                phase = AccountSyncPhase.DEFERRED,
+                lastError = AccountSyncError.TryLater(503, null, 30, "req-1"),
+            ),
+        ).accountNotice
+
+        assertEquals(AccountNoticeKind.UNAVAILABLE, notice?.kind)
+        assertEquals("HTTP 503", notice?.code)
+        assertEquals("req-1", notice?.requestId)
+    }
+
+    @Test
+    fun `a session the backend no longer accepts shows its reason and can be put away`() {
+        val notice = shelf(
+            Catalog(),
+            AccountLibraryState(
+                phase = AccountSyncPhase.SIGNED_OUT,
+                lastError = AccountSyncError.SessionGone("session_revoked", "req-9"),
+            ),
+        ).accountNotice
+
+        assertEquals(AccountNoticeKind.SESSION_GONE, notice?.kind)
+        assertEquals("session_revoked", notice?.code)
+        assertTrue("the table says it is shown once", notice?.dismissible == true)
+    }
+
+    @Test
+    fun `a refused change shows the backend's own code`() {
+        val notice = shelf(
+            Catalog(),
+            AccountLibraryState(
+                phase = AccountSyncPhase.IDLE,
+                lastError = AccountSyncError.Rejected("acc-1", "invalid_payload", "bad", retryable = false),
+            ),
+        ).accountNotice
+
+        assertEquals(AccountNoticeKind.REJECTED, notice?.kind)
+        assertEquals("invalid_payload", notice?.code)
+    }
+
+    @Test
+    fun `dismissing one notice cannot hide a different one`() {
+        val first = AccountNotice(AccountNoticeKind.SESSION_GONE, code = "session_revoked")
+        val second = AccountNotice(AccountNoticeKind.REJECTED, code = "invalid_payload")
+
+        assertFalse(first.key == second.key)
+    }
+
+    // --- library status ------------------------------------------------------
+
+    @Test
+    fun `a book read to its last word is reported finished once`() {
+        val catalog = catalogOf(FICCIONES to "Ficciones").let {
+            it.copy(readingStates = mapOf(FICCIONES to ReadingState(progressFraction = 1f)))
+        }
+
+        val reading = shelf(catalog, accountOf(accountBook("acc-1", "Ficciones", FICCIONES_HEX)))
+        assertEquals(listOf("acc-1"), finishedAccountBooks(reading.books))
+
+        val settled = shelf(
+            catalog,
+            accountOf(accountBook("acc-1", "Ficciones", FICCIONES_HEX, status = ReaderLibraryStatus.FINISHED)),
+        )
+        assertEquals(emptyList<String>(), finishedAccountBooks(settled.books))
+    }
+
+    @Test
+    fun `an unfinished book reports nothing`() {
+        val catalog = catalogOf(FICCIONES to "Ficciones").let {
+            it.copy(readingStates = mapOf(FICCIONES to ReadingState(progressFraction = 0.99f)))
+        }
+
+        val state = shelf(catalog, accountOf(accountBook("acc-1", "Ficciones", FICCIONES_HEX)))
+
+        assertEquals(emptyList<String>(), finishedAccountBooks(state.books))
+    }
+
+    @Test
+    fun `opening a device book finds the account book it is`() {
+        val account = accountOf(accountBook("acc-1", "Ficciones", FICCIONES_HEX))
+
+        assertEquals("acc-1", accountBookIdForDevice(FICCIONES, account))
+        assertNull(accountBookIdForDevice("sha256:" + RAYUELA_HEX, account))
+        assertNull("a book with no content identity maps to nothing", accountBookIdForDevice("ficciones", account))
+    }
+
+    // --- helpers -------------------------------------------------------------
+
+    private fun shelf(
+        catalog: Catalog,
+        account: AccountLibraryState,
+        query: String = "",
+    ): LibraryUiState = buildLibraryUiState(
+        catalog = catalog,
+        ingestion = IngestionState.Idle,
+        query = query,
+        account = account,
+    )
+
+    private fun catalogOf(vararg books: Pair<String, String>) = Catalog(
+        books = books.map { (id, title) -> LibraryFixtures.readable(id, title, fileName = "$title.epub") },
+    )
+
+    private fun accountOf(vararg books: AccountBook) = AccountLibraryState(
+        phase = AccountSyncPhase.IDLE,
+        userId = "user-1",
+        books = books.toList(),
+    )
+
+    private fun accountBook(
+        bookId: String,
+        title: String,
+        contentSha256: String? = null,
+        author: String? = null,
+        status: ReaderLibraryStatus = ReaderLibraryStatus.READING,
+    ) = AccountBook(
+        bookId = bookId,
+        title = title,
+        author = author,
+        contentSha256 = contentSha256,
+        status = status,
+    )
+
+    private companion object {
+        const val FICCIONES_HEX = "11111111111111111111111111111111111111111111111111111111aaaaaaaa"
+        const val RAYUELA_HEX = "22222222222222222222222222222222222222222222222222222222bbbbbbbb"
+        const val FICCIONES = "sha256:$FICCIONES_HEX"
+    }
+}

@@ -70,7 +70,9 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -142,6 +144,12 @@ fun LibraryScreen(
     onOpenFolders: () -> Unit = {},
     /** Takes back the removal the undo snackbar is offering (REQ-105). */
     onUndoRemove: () -> Unit = {},
+    /** Removes the book from the Reader account, on every device (REQ-508). */
+    onRemoveFromAccount: (LibraryBookItem) -> Unit = {},
+    /** Takes back the account removal, as the contract's one immediate Undo (REQ-508). */
+    onUndoAccountRemove: () -> Unit = {},
+    /** Puts away an account notice that is a verdict about the past, not a live state. */
+    onDismissAccountNotice: () -> Unit = {},
     /** Stores a new library order (REQ-203). The list re-sorts from the stored value. */
     onOrderChange: (LibraryOrder) -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
@@ -156,6 +164,18 @@ fun LibraryScreen(
             book = bookToRemove,
             onConfirm = { confirmingRemoval = null; onRemove(bookToRemove) },
             onDismiss = { confirmingRemoval = null },
+        )
+    }
+    // The same shape for the account removal, and deliberately a *second* piece
+    // of state: the two removals mean different things, and a reader who has
+    // said yes to one must never have said yes to the other.
+    var confirmingAccountRemoval by rememberSaveable { mutableStateOf<String?>(null) }
+    val bookToRemoveFromAccount = confirmingAccountRemoval?.let { id -> state.books.firstOrNull { it.id == id } }
+    if (bookToRemoveFromAccount != null) {
+        RemoveFromAccountDialog(
+            book = bookToRemoveFromAccount,
+            onConfirm = { confirmingAccountRemoval = null; onRemoveFromAccount(bookToRemoveFromAccount) },
+            onDismiss = { confirmingAccountRemoval = null },
         )
     }
     WidthAware(modifier.fillMaxSize()) { layout ->
@@ -174,10 +194,19 @@ fun LibraryScreen(
                 },
             )
         },
-        bottomBar = { state.undoNotice?.let { UndoBar(it, onUndoRemove) } },
+        bottomBar = {
+            // Both offers can be on screen in principle, so both are laid out
+            // rather than one hiding the other: each names its own book and its
+            // own Undo, and a reader must never press the wrong one.
+            Column {
+                state.accountUndoNotice?.let { AccountUndoBar(it, onUndoAccountRemove) }
+                state.undoNotice?.let { UndoBar(it, onUndoRemove) }
+            }
+        },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             state.failureMessage?.let { FailureBanner(it) }
+            state.accountNotice?.let { AccountNoticeBanner(it, onDismissAccountNotice) }
             state.resumeNotice?.let { ResumeNoticeBanner(it, onDismissResumeNotice) }
             state.scan?.let { ScanBanner(it) }
             when (state.content) {
@@ -228,6 +257,7 @@ fun LibraryScreen(
                         BookList(
                             books = state.books,
                             onRemove = { confirmingRemoval = it.id },
+                            onRemoveFromAccount = { confirmingAccountRemoval = it.id },
                             onGrantAccess = onGrantAccess,
                             onOpen = onOpen,
                             coverLoader = coverLoader,
@@ -327,6 +357,177 @@ private fun UndoBar(notice: UndoNotice, onUndo: () -> Unit) {
     ) {
         Text(stringResource(R.string.library_undo_removed, notice.title))
     }
+}
+
+/**
+ * What the shelf says about the account library (REQ-501, the states table).
+ *
+ * One banner for every account state that is not "settled and online", because
+ * the definition's rule is that none of them is ever silent: bootstrapping,
+ * offline with the queue named, a capability the backend has not made
+ * available, a session it no longer accepts, and a change it refused outright.
+ * Signed out there is no notice at all — that is D4's v1.6.0 shelf — and the
+ * one exception, a session that went away, is the one the table says shows its
+ * reason once.
+ *
+ * It is a polite live region so TalkBack announces the change rather than
+ * leaving a reader who is not looking at the screen to discover it (REQ-060).
+ * The backend's own code and request id are shown under the sentence: the
+ * sentence is for the reader and the code is what finds a server log.
+ */
+@Composable
+private fun AccountNoticeBanner(notice: AccountNotice, onDismiss: () -> Unit) {
+    val body = when (notice.kind) {
+        AccountNoticeKind.BOOTSTRAPPING -> stringResource(R.string.library_account_bootstrapping)
+        AccountNoticeKind.OFFLINE -> stringResource(R.string.library_account_offline)
+        AccountNoticeKind.UNAVAILABLE -> stringResource(R.string.library_account_unavailable)
+        AccountNoticeKind.SESSION_GONE -> stringResource(R.string.library_account_session_gone)
+        AccountNoticeKind.REJECTED -> stringResource(R.string.library_account_rejected)
+        AccountNoticeKind.PROBLEM -> stringResource(R.string.library_account_problem)
+    }
+    val queued = if (notice.kind == AccountNoticeKind.OFFLINE && notice.queued > 0) {
+        pluralStringResource(R.plurals.library_account_queued, notice.queued, notice.queued)
+    } else {
+        null
+    }
+    val detail = listOfNotNull(
+        notice.code?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.library_account_code, it) },
+        notice.requestId?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.library_account_request, it) },
+    ).joinToString(" \u00b7 ")
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("library_account_notice")
+            .semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.library_account_notice_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(text = body, style = MaterialTheme.typography.bodyMedium)
+                queued?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                if (detail.isNotEmpty()) {
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            if (notice.dismissible) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                        .testTag("library_account_notice_dismiss"),
+                ) {
+                    Text(stringResource(R.string.library_resume_blocked_dismiss))
+                }
+            } else {
+                Spacer(Modifier.width(16.dp))
+            }
+        }
+    }
+}
+
+/**
+ * The account removal the reader can still take back (REQ-508).
+ *
+ * The same shape as the library's own undo bar, and deliberately a different
+ * sentence: this removal reaches every device the account is signed in on, and
+ * it left this device's file and this device's place in the book alone. That
+ * distinction is the whole reason the two removals are separate controls.
+ */
+@Composable
+private fun AccountUndoBar(notice: AccountUndoNotice, onUndo: () -> Unit) {
+    val undoLabel = stringResource(R.string.library_account_undo_label, notice.title)
+    Snackbar(
+        modifier = Modifier.padding(12.dp).testTag("library_account_undo"),
+        action = {
+            TextButton(
+                onClick = onUndo,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.inversePrimary,
+                ),
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_account_undo_action")
+                    .semantics { contentDescription = undoLabel },
+            ) {
+                Text(stringResource(R.string.library_undo))
+            }
+        },
+    ) {
+        Text(stringResource(R.string.library_account_undo_removed, notice.title))
+    }
+}
+
+/**
+ * The question before a book leaves the account (REQ-508).
+ *
+ * It says the thing a reader would otherwise have to find out afterwards: this
+ * removal is not local. The book leaves the Reader account on every device
+ * signed in to it — and the file on this device, and the reader's place in it,
+ * are not touched.
+ */
+@Composable
+private fun RemoveFromAccountDialog(book: LibraryBookItem, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("library_account_remove_dialog"),
+        title = {
+            Text(
+                text = stringResource(R.string.library_account_remove_title, book.title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(
+                    if (book.isAccountOnly) {
+                        R.string.library_account_remove_body_account_only
+                    } else {
+                        R.string.library_account_remove_body
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_account_remove_dialog_confirm"),
+            ) {
+                Text(stringResource(R.string.library_account_remove_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_account_remove_dialog_cancel"),
+            ) {
+                Text(stringResource(R.string.library_remove_cancel))
+            }
+        },
+    )
 }
 
 /**
@@ -644,6 +845,7 @@ private fun NoSearchResults(query: String) {
 private fun BookList(
     books: List<LibraryBookItem>,
     onRemove: (LibraryBookItem) -> Unit,
+    onRemoveFromAccount: (LibraryBookItem) -> Unit,
     onGrantAccess: (LibraryBookItem) -> Unit,
     onOpen: (LibraryBookItem) -> Unit,
     coverLoader: CoverLoader,
@@ -658,6 +860,7 @@ private fun BookList(
                 BookRow(
                     book = book,
                     onRemove = { onRemove(book) },
+                    onRemoveFromAccount = { onRemoveFromAccount(book) },
                     onGrantAccess = { onGrantAccess(book) },
                     onOpen = { onOpen(book) },
                     coverLoader = coverLoader,
@@ -691,6 +894,7 @@ private fun BookList(
                 BookRow(
                     book = book,
                     onRemove = { onRemove(book) },
+                    onRemoveFromAccount = { onRemoveFromAccount(book) },
                     onGrantAccess = { onGrantAccess(book) },
                     onOpen = { onOpen(book) },
                     coverLoader = coverLoader,
@@ -786,6 +990,7 @@ private val ReadableTextWidth = 560.dp
 private fun BookRow(
     book: LibraryBookItem,
     onRemove: () -> Unit,
+    onRemoveFromAccount: () -> Unit,
     onGrantAccess: () -> Unit,
     onOpen: () -> Unit,
     coverLoader: CoverLoader,
@@ -801,7 +1006,7 @@ private fun BookRow(
             // A readable book opens in the reader; the rest already explain in
             // their status line why there is nothing to open.
             .then(
-                if (book.isReadable) {
+                if (book.canOpen) {
                     Modifier.clickable(onClickLabel = openLabel, onClick = onOpen)
                 } else {
                     Modifier
@@ -842,6 +1047,23 @@ private fun BookRow(
                 },
                 modifier = Modifier.padding(top = 4.dp),
             )
+            // A new slot under the status line, beside the re-grant button that
+            // was already there: removing a book from the account is a different
+            // act from removing its row here, so it is a different control that
+            // says which one it is (REQ-508).
+            if (book.account != null) {
+                val accountRemoveLabel = stringResource(R.string.library_account_remove_label, book.title)
+                TextButton(
+                    onClick = onRemoveFromAccount,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("library_account_remove_${book.id}")
+                        .semantics { contentDescription = accountRemoveLabel },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(stringResource(R.string.library_account_remove))
+                }
+            }
             if (book.status == BookStatus.PERMISSION_LOST) {
                 TextButton(
                     onClick = onGrantAccess,
@@ -855,20 +1077,34 @@ private fun BookRow(
             }
         }
         Spacer(Modifier.width(8.dp))
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier.size(TouchTarget).testTag("library_remove_${book.id}"),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Clear,
-                contentDescription = stringResource(R.string.library_remove, book.title),
-            )
+        // Removing the *row* is removing this device's copy from this device's
+        // library, and an account-only row has no copy here to remove: its only
+        // removal is the account one above. Every device row keeps this button
+        // exactly as it was.
+        if (!book.isAccountOnly) {
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(TouchTarget).testTag("library_remove_${book.id}"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Clear,
+                    contentDescription = stringResource(R.string.library_remove, book.title),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun LibraryBookItem.statusLine(): String = when (status) {
+private fun LibraryBookItem.statusLine(): String = when {
+    // The account has this book and this device does not. Said plainly, and
+    // without a way to open it: the download is increment 003's.
+    isAccountOnly -> stringResource(R.string.library_account_not_on_device)
+    else -> deviceStatusLine()
+}
+
+@Composable
+private fun LibraryBookItem.deviceStatusLine(): String = when (status) {
     BookStatus.READABLE -> stringResource(R.string.library_progress, progressPercent)
     BookStatus.CORRUPT -> stringResource(R.string.library_state_corrupt)
     BookStatus.DRM_PROTECTED -> stringResource(R.string.library_state_drm)

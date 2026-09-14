@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
+import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
@@ -25,6 +26,8 @@ import com.cedagova.fastreader.library.saf.SafDocumentGateway
 @Composable
 fun LibraryRoute(
     graph: LibraryGraph,
+    /** The signed-in account's library and its operations (#114). */
+    account: AccountShelf,
     onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
     resumeBlocked: ResumeBlocked? = null,
@@ -35,11 +38,29 @@ fun LibraryRoute(
     val catalog by repository.catalog.collectAsState()
     val ingestion by repository.ingestion.collectAsState()
     val undoableRemoval by repository.undoableRemoval.collectAsState()
+    val accountLibrary by account.state.collectAsState()
+    val accountRemoval by account.undo.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     var foldersOpen by rememberSaveable { mutableStateOf(false) }
-    val state = remember(catalog, ingestion, query, resumeBlocked, undoableRemoval) {
-        buildLibraryUiState(catalog, ingestion, query, resumeBlocked, undoableRemoval)
+    // Which account notice the reader has put away, by the notice's own key, so
+    // dismissing "your session went away" cannot also hide the different thing
+    // that happens next. A primitive, so it survives process death as cheaply
+    // as it survives rotation.
+    var dismissedAccountNotice by rememberSaveable { mutableStateOf<String?>(null) }
+    val accountUndo = accountRemoval?.let { AccountUndoNotice(it.bookId, it.title) }
+    val built = remember(catalog, ingestion, query, resumeBlocked, undoableRemoval, accountLibrary, accountUndo) {
+        buildLibraryUiState(catalog, ingestion, query, resumeBlocked, undoableRemoval, accountLibrary, accountUndo)
     }
+    val state = if (built.accountNotice?.key == dismissedAccountNotice) built.copy(accountNotice = null) else built
+
+    // The one status the shelf can see the backend does not yet have: a book
+    // read to its last word here is finished (REQ-018), and finishing records
+    // `finished` for the account. Derived from the rows that are on screen, so
+    // it is the same fact the row's 100% states, and it settles after one
+    // admission because the backend's canonical payload comes back as
+    // `finished`.
+    val finished = remember(built.books) { finishedAccountBooks(built.books) }
+    LaunchedEffect(finished) { finished.forEach(account::recordFinished) }
     val coverLoader = remember(graph) { CoverStoreLoader(graph.covers) }
 
     val pickBooks = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
@@ -71,9 +92,19 @@ fun LibraryRoute(
         onQueryChange = { query = it },
         onAddBooks = { pickBooks.launch(SafDocumentGateway.PICKER_MIME_TYPES) },
         onAddFolder = { pickFolder.launch(null) },
-        onRefresh = { repository.requestRescan(ScanTrigger.MANUAL_REFRESH) },
+        // One refresh control, both libraries: the reader asked for the shelf to
+        // be up to date, and half of it being the account's is not their problem.
+        onRefresh = {
+            repository.requestRescan(ScanTrigger.MANUAL_REFRESH)
+            account.refresh()
+        },
         onRemove = { repository.requestRemoveBook(it.id) },
         onUndoRemove = { repository.requestUndoRemoveBook() },
+        onRemoveFromAccount = { book ->
+            book.account?.let { account.removeFromAccount(it.bookId, book.title) }
+        },
+        onUndoAccountRemove = { account.undoRemove() },
+        onDismissAccountNotice = { dismissedAccountNotice = state.accountNotice?.key },
         onOpenFolders = { foldersOpen = true },
         onOpen = { onOpenBook(it.id) },
         onGrantAccess = { book ->

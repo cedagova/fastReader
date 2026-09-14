@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.library.ui
 
+import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
@@ -43,6 +44,14 @@ data class LibraryUiState(
     val folders: List<LibraryFolderItem> = emptyList(),
     /** Set while a removal can still be taken back (REQ-105). */
     val undoNotice: UndoNotice? = null,
+    /**
+     * What the shelf says about the account library, when it has something to
+     * say (REQ-501, the definition's states table). Null signed out, which is
+     * D4's whole point: the signed-out shelf is v1.6.0's.
+     */
+    val accountNotice: AccountNotice? = null,
+    /** Set while an account removal can still be taken back (REQ-508). */
+    val accountUndoNotice: AccountUndoNotice? = null,
     /**
      * The order [books] is in, so the control can say which one is on (REQ-203).
      * It is the reader's stored choice, read from the same catalog the list came
@@ -109,8 +118,26 @@ data class LibraryBookItem(
      * it was picked directly and must be picked again to restore the grant.
      */
     val regrantTreeUri: String? = null,
+    /**
+     * The account half of this row, when the signed-in account has this book
+     * (REQ-501). Null for a device book the account does not know, which is
+     * every row signed out.
+     */
+    val account: AccountRow? = null,
 ) {
     val isReadable: Boolean get() = status == BookStatus.READABLE
+
+    /** True for a book the account has and this device does not. */
+    val isAccountOnly: Boolean get() = account?.onThisDevice == false
+
+    /**
+     * Whether tapping this row opens it.
+     *
+     * An account-only row has no bytes here: downloading and opening one is
+     * increment 003's, so until then the row says where the book is and offers
+     * nothing to tap. Everything else opens exactly as it did.
+     */
+    val canOpen: Boolean get() = isReadable && !isAccountOnly
 
     /** The name to show when one is needed; a book is normally reachable from one place. */
     val fileName: String? get() = fileNames.firstOrNull()
@@ -155,10 +182,15 @@ fun buildLibraryUiState(
     query: String,
     resumeBlocked: ResumeBlocked? = null,
     undoableRemoval: RemovedBook? = null,
+    /** The signed-in account's library, or [AccountLibraryState.SIGNED_OUT] when there is none. */
+    account: AccountLibraryState = AccountLibraryState.SIGNED_OUT,
+    /** Set while an account removal can still be taken back (REQ-508). */
+    accountUndo: AccountUndoNotice? = null,
 ): LibraryUiState {
     val order = catalog.settings.libraryOrder
     val all = catalog.books
         .map { book -> book.toItem(catalog.readingStates[book.id]?.progressFraction ?: 0f) }
+        .withAccountBooks(account)
         .sortedWith(catalog.comparatorFor(order))
     val matches = all.filter { it.matches(query) }
     val content = when {
@@ -198,6 +230,8 @@ fun buildLibraryUiState(
         },
         folders = buildFolderItems(catalog),
         undoNotice = undoableRemoval?.let { UndoNotice(it.bookId, it.title) },
+        accountNotice = accountNoticeFor(account),
+        accountUndoNotice = accountUndo,
         order = order,
     )
 }
