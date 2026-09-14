@@ -14,6 +14,13 @@
 # nothing is built, signed, published, or downloaded for real. It asserts that
 # both paths reach `gh release create` and that only the pre-release one passes
 # `--prerelease`.
+#
+# Since #100 it is also where the manifest gate's "fails it" half is proven
+# (REQ-411): the stub aapt2 emits the two permissions a release may carry and a
+# clean manifest by default, and four negative runs hand it a third permission,
+# a missing INTERNET line, a networkSecurityConfig attribute, and a
+# usesCleartextTraffic attribute — each must die before `gh release create`,
+# and no rogue APK is ever built to prove it.
 
 set -euo pipefail
 
@@ -31,6 +38,14 @@ CERT_SHA256="$(sed -n 's/^EXPECTED_CERT_SHA256="\(.*\)"$/\1/p' "$REPO_ROOT/scrip
 [ -n "$CERT_SHA256" ] || { echo "test: could not read EXPECTED_CERT_SHA256 from release.sh" >&2; exit 1; }
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
+
+# What the stub aapt2 reports for the badging's uses-permission lines and for
+# the manifest's <application> attributes. The defaults are a compliant release;
+# a negative case overrides one of them before calling run_release.
+PERMISSIONS_DEFAULT="android.permission.INTERNET
+com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+PERMISSIONS="$PERMISSIONS_DEFAULT"
+MANIFEST_EXTRA_ATTRIBUTES=""
 
 # Builds one disposable repository root with every external tool stubbed, then
 # runs the real release script in it. Extra arguments go to release.sh.
@@ -68,13 +83,38 @@ Signer #1 key size (bits): 4096
 CERTS
 STUB
 
+  # Answers the two queries release.sh makes: `dump badging` (package line,
+  # SDK lines, one uses-permission line per PERMISSIONS entry) and
+  # `dump xmltree` (a minimal manifest whose <application> element carries
+  # whatever MANIFEST_EXTRA_ATTRIBUTES names).
+  local permission_lines=""
+  local p
+  while IFS= read -r p; do
+    [ -n "$p" ] && permission_lines="$permission_lines
+uses-permission: name='$p'"
+  done <<< "$PERMISSIONS"
   cat > "$ROOT/sdk/build-tools/36.0.0/aapt2" <<STUB
 #!/bin/bash
-cat <<'BADGING'
-package: name='com.cedagova.fastreader' versionCode='$VERSION_CODE' versionName='$VERSION_NAME' compileSdkVersion='36'
+case "\${1:-} \${2:-}" in
+  "dump badging")
+    cat <<'BADGING'
+package: name='com.cedagova.fastreader' versionCode='$VERSION_CODE' versionName='$VERSION_NAME' compileSdkVersion='37'
 minSdkVersion:'26'
-targetSdkVersion:'36'
+targetSdkVersion:'37'$permission_lines
 BADGING
+    ;;
+  "dump xmltree")
+    cat <<'XMLTREE'
+N: android=http://schemas.android.com/apk/res/android
+  E: manifest (line=2)
+    A: package="com.cedagova.fastreader" (Raw: "com.cedagova.fastreader")
+    E: application (line=20)
+      A: http://schemas.android.com/apk/res/android:allowBackup(0x0101027a)=false
+      A: http://schemas.android.com/apk/res/android:label(0x01010001)=@0x7f0e0000$MANIFEST_EXTRA_ATTRIBUTES
+XMLTREE
+    ;;
+  *) echo "stub aapt2: unexpected \$*" >&2; exit 2 ;;
+esac
 STUB
 
   # Records every call one argument per line, and answers the four queries
@@ -146,6 +186,19 @@ expect_success() {
   [ -n "$CREATE_CALL" ] || fail "$name: release.sh never reached 'gh release create'"
 }
 
+# The gate must die with the named reason, and nothing may have been published.
+expect_gate_failure() {
+  local name="$1" reason="$2"
+  [ "$status" -ne 0 ] || fail "$name: release.sh exited 0 although the gate should have failed"
+  grep -q "$reason" "$ROOT/stderr.log" || {
+    sed -n '1,40p' "$ROOT/stderr.log" >&2
+    fail "$name: release.sh did not die with '$reason'"
+  }
+  [ -z "$CREATE_CALL" ] || fail "$name: release.sh reached 'gh release create' despite the failed gate"
+  grep -q 'unbound variable' "$ROOT/stderr.log" && fail "$name: bash reported an unbound variable"
+  printf 'ok   %s: gate died with "%s" before any publish\n' "$name" "$reason"
+}
+
 has_arg() { grep -qxF -- "$1" "$CREATE_CALL"; }
 
 printf 'bash under test: %s\n' "$("$BASH32" --version | head -1)"
@@ -167,4 +220,28 @@ has_arg "v$VERSION_NAME-rc1"    || fail "prerelease: tag missing from gh release
 has_arg "--prerelease"          || fail "prerelease: gh release create lost --prerelease"
 printf 'ok   pre-release path still passes --prerelease: %s\n' "$(tr '\n' ' ' < "$CREATE_CALL")"
 
-printf '\nPASS: both publish paths reach gh release create under bash 3.2.\n'
+# --- REQ-411, the "fails it" half of the manifest gate ------------------------
+
+PERMISSIONS="$PERMISSIONS_DEFAULT
+android.permission.ACCESS_NETWORK_STATE"
+run_release extra-permission
+expect_gate_failure "extra-permission" "not exactly INTERNET plus the platform self-permission"
+grep -q "ACCESS_NETWORK_STATE" "$ROOT/stderr.log" || fail "extra-permission: the offending line was not printed"
+
+PERMISSIONS="com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+run_release missing-internet
+expect_gate_failure "missing-internet" "not exactly INTERNET plus the platform self-permission"
+PERMISSIONS="$PERMISSIONS_DEFAULT"
+
+MANIFEST_EXTRA_ATTRIBUTES="
+      A: http://schemas.android.com/apk/res/android:networkSecurityConfig(0x01010527)=@0x7f100000"
+run_release network-security-config
+expect_gate_failure "network-security-config" "carries a networkSecurityConfig"
+
+MANIFEST_EXTRA_ATTRIBUTES="
+      A: http://schemas.android.com/apk/res/android:usesCleartextTraffic(0x010104ec)=true"
+run_release cleartext
+expect_gate_failure "cleartext" "sets usesCleartextTraffic"
+MANIFEST_EXTRA_ATTRIBUTES=""
+
+printf '\nPASS: both publish paths reach gh release create under bash 3.2, and the manifest gate fails its four negatives.\n'

@@ -12,7 +12,12 @@
 # Every run builds the signed release APK from the current worktree and then
 # proves, on the artifact itself:
 #   * it is signed by the one fastReader release key (pinned certificate SHA-256);
-#   * it declares no android.permission.INTERNET (REQ-050 release proof);
+#   * its uses-permission lines are exactly android.permission.INTERNET (the
+#     Reader account, #100) and the platform's own
+#     com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION — any
+#     other line, or either missing, fails (REQ-411 release proof);
+#   * its manifest carries no networkSecurityConfig and no usesCleartextTraffic,
+#     so every connection is TLS (REQ-411);
 #   * it declares minSdkVersion 26 (REQ-040 "Android 8.0+");
 #   * its versionCode/versionName match version.properties.
 #
@@ -32,6 +37,13 @@ cd "$REPO_ROOT"
 # with any other key fails before it can be published: Android only allows an
 # in-place update when the new APK carries this exact certificate.
 EXPECTED_CERT_SHA256="d476be8e7efbee3fe81dca8dd89f13c3434f26689a9a6979c01da54629e6485d"
+
+# The exact permission set a release may request, sorted as `sort` orders it.
+# INTERNET serves the Reader account (#100) and nothing else; the second line
+# is the self-permission Android adds for its own broadcast plumbing. Adding a
+# permission means editing this list on purpose, in the same change.
+EXPECTED_PERMISSIONS="android.permission.INTERNET
+com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 
 GH_COMMAND="${GH_COMMAND:-$REPO_ROOT/bin/gh-personal}"
 GITHUB_REPO="cedagova/fastReader"
@@ -135,14 +147,28 @@ ACTUAL_CERT="$(printf '%s\n' "$SIGNER_OUTPUT" | sed -n 's/.*certificate SHA-256 
 step "Verify release manifest"
 BADGING="$("$AAPT2" dump badging "$APK")"
 printf '%s\n' "$BADGING" | grep -E "^package:|^minSdkVersion|^targetSdkVersion|^uses-permission" || true
-if printf '%s\n' "$BADGING" | grep -q "uses-permission: name='android.permission.INTERNET'"; then
-  die "release APK requests android.permission.INTERNET; reading data must never leave the device (REQ-050)"
+# The permission set is compared whole, not searched: an extra line fails as
+# surely as a missing one (REQ-411).
+ACTUAL_PERMISSIONS="$(printf '%s\n' "$BADGING" | sed -n "s/^uses-permission: name='\([^']*\)'.*/\1/p" | sort)"
+EXPECTED_SORTED="$(printf '%s\n' "$EXPECTED_PERMISSIONS" | sort)"
+if [ "$ACTUAL_PERMISSIONS" != "$EXPECTED_SORTED" ]; then
+  printf 'expected permissions:\n%s\nactual permissions:\n%s\n' "$EXPECTED_SORTED" "${ACTUAL_PERMISSIONS:-<none>}" >&2
+  die "release APK's permissions are not exactly INTERNET plus the platform self-permission (REQ-411)"
+fi
+# No cleartext: the debug-only loopback allowance must not have shipped, and
+# nothing may have set the attribute that would allow cleartext everywhere.
+MANIFEST_TREE="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK")"
+if printf '%s\n' "$MANIFEST_TREE" | grep -q "networkSecurityConfig"; then
+  die "release manifest carries a networkSecurityConfig; the loopback allowance is debug-only (REQ-411)"
+fi
+if printf '%s\n' "$MANIFEST_TREE" | grep -q "usesCleartextTraffic"; then
+  die "release manifest sets usesCleartextTraffic; every connection must be TLS (REQ-411)"
 fi
 printf '%s\n' "$BADGING" | grep -q "^minSdkVersion:'26'" \
   || die "release APK does not declare minSdkVersion 26"
 printf '%s\n' "$BADGING" | grep -q "^package: name='com.cedagova.fastreader' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" \
   || die "APK version does not match version.properties ($VERSION_CODE / $VERSION_NAME)"
-printf 'no INTERNET permission, minSdk 26, version matches version.properties\n'
+printf 'permissions are exactly INTERNET + the platform self-permission, no cleartext, minSdk 26, version matches version.properties\n'
 
 STAGED="app/build/outputs/apk/release/$APK_NAME"
 cp -f "$APK" "$STAGED"

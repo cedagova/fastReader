@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.settings.AppVersion
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,16 +49,23 @@ class PrivacyStatementTest {
      * The crash-report claim is the one REQ-303 gained in v1.2.0: #54 gave the
      * app a report it keeps in private storage, so the statement has to name the
      * reader-initiated share as the second outbound action beside the browser
-     * hand-off. Nothing holds the Spanish copy of the statement to this one —
-     * lint fails a *missing* translation, not a stale one — so a change here is
-     * a hand edit of `values-es/strings.xml` too.
+     * hand-off. The four account claims are #100's (REQ-409): the app now holds
+     * the internet permission for the optional Reader account, and the
+     * statement says what that sends, to whom, and what never goes — the old
+     * "no internet permission" claim is gone with the promise it stated.
+     * Nothing holds the Spanish copy of the statement to this one — lint fails
+     * a *missing* translation, not a stale one — so a change here is a hand
+     * edit of `values-es/strings.xml` too.
      */
     @Test
-    fun `the statement still makes the six claims the build backs up`() {
+    fun `the statement still makes the nine claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
-            "no internet permission",
+            "has the internet permission and uses it for one thing only: the optional Reader account",
+            "your email address, the code or password you type and the account's session go to the Reader identity provider and the Reader API",
+            "your books, your reading positions, your settings and any crash report stay on this device and are never sent",
+            "kept encrypted on this device, outside its backup, and is removed when you sign out",
             "hands a web address to your browser",
             "your books stay in the folders you chose",
             "is included in this device's backup or in a transfer to a new phone",
@@ -67,6 +75,10 @@ class PrivacyStatementTest {
             assertTrue("the statement no longer says \"$claim\": $statement",
                 statement.contains(claim, ignoreCase = true))
         }
+        assertFalse(
+            "the retired promise must not survive in the statement: $statement",
+            statement.contains("no internet permission", ignoreCase = true),
+        )
     }
 
     /**

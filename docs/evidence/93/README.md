@@ -54,3 +54,8 @@ for FastReader in `docs/evidence/46/`.
 
 The steps to run it are in `docs/agent-first-development.md` ("Host sign-in
 run against stage").
+
+**Since #100** the host is retired and FastReader is the library's host;
+[`docs/evidence/100/`](../100/README.md) records what was proven from
+FastReader without an emailed code. The emailed-code run above stays the
+owner's own (owner decision, 2026-09-14).

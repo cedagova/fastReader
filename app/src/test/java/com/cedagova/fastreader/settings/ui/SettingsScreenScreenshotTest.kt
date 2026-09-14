@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.account.ReaderAccountSummary
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
@@ -241,6 +242,8 @@ class SettingsScreenScreenshotTest {
                         onBack = {},
                         version = GOLDEN_VERSION,
                         onCheckForUpdates = {},
+                        readerAccount = ReaderAccountSummary.SignedOut,
+                        onOpenReaderAccount = {},
                         updateHandoffUnavailable = updateHandoffUnavailable,
                         heldPreviewToken = PREVIEW_HELD_TOKEN,
                     )

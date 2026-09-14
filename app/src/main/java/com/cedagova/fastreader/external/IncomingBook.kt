@@ -16,7 +16,9 @@ object ExternalOpenActions {
  * The only scheme an incoming book may arrive on.
  *
  * Deliberately narrow. `file://` would need a storage permission this app does
- * not ask for and `http(s)://` would need a network permission REQ-303 forbids,
+ * not ask for and `http(s)://` would mean fetching a book over the network,
+ * which this app never does (its internet permission serves the Reader account
+ * alone, #100),
  * so offering FastReader for either would put its name in a chooser for a book it
  * then could not open. The manifest filters say the same thing; this is the
  * runtime half, because an intent can always name a scheme the filter did not.

@@ -42,8 +42,8 @@ data class AppVersion(val name: String, val code: Long) {
 /**
  * Where releases are published, and the only address FastReader ever hands out.
  *
- * The app holds no network permission: "Check for updates" starts an
+ * The app never checks for updates itself: "Check for updates" starts an
  * `ACTION_VIEW` for this URL and the reader's browser makes the request
- * (REQ-106, REQ-303).
+ * (REQ-106).
  */
 const val RELEASES_URL = "https://github.com/cedagova/fastReader/releases"

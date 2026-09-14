@@ -17,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.cedagova.fastreader.account.ReaderAccountController
+import com.cedagova.fastreader.account.ui.ReaderAccountRoute
 import com.cedagova.fastreader.crash.CrashReportStore
 import com.cedagova.fastreader.crash.ui.CrashReportOfferHost
 import com.cedagova.fastreader.external.incomingBook
@@ -68,7 +70,7 @@ class MainActivity : ComponentActivity() {
             // without either screen knowing the settings exist.
             val settings by library.repository.settings.collectAsState()
             FastReaderTheme(darkTheme = settings.theme.isDark(), fontSize = settings.fontSize) {
-                FastReaderApp(library, app.crashReports)
+                FastReaderApp(library, app.crashReports, app.readerAccount)
             }
         }
     }
@@ -114,7 +116,8 @@ private fun LibraryGraph.acceptIfExternal(intent: Intent?) {
  *
  * Three destinations is not a navigation graph. Settings sit *over* whichever of
  * the other two opened them — the state that says which book is open is not
- * cleared — so closing them puts the reader back where they were. What is worth
+ * cleared — so closing them puts the reader back where they were, and the Reader
+ * account surface sits over Settings in turn (#100). What is worth
  * spelling out is the *first* one: the app reads the stored catalog before it draws anything, and
  * goes straight into the last-read book when that book can still be read. That
  * is what makes "open the app, press play" two interactions rather than three.
@@ -125,7 +128,7 @@ private fun LibraryGraph.acceptIfExternal(intent: Intent?) {
  *
  */
 @Composable
-private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore) {
+private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore, readerAccount: ReaderAccountController) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
     // A book handed over by another app (REQ-103). Not saved state: it belongs to
@@ -139,6 +142,9 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
     // Settings sit over whichever destination opened them, so closing them returns
     // the reader to their book rather than to the library.
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    // The Reader account sits over Settings the same way (#100): back returns to
+    // Settings, and Settings still remembers what it was opened over.
+    var accountOpen by rememberSaveable { mutableStateOf(false) }
 
     // An "Open with" outranks everything the app would otherwise be showing: the
     // reader asked for this book from another app, so the book they were in, the
@@ -152,6 +158,7 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
         blockedBookId = null
         blockedReason = null
         settingsOpen = false
+        accountOpen = false
         routed = true
     }
 
@@ -189,9 +196,16 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore)
         !routed || (library.external.handoverPending && external == null) ->
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
 
+        settingsOpen && accountOpen -> ReaderAccountRoute(
+            controller = readerAccount,
+            onBack = { accountOpen = false },
+        )
+
         settingsOpen -> SettingsRoute(
             graph = library,
+            readerAccount = readerAccount,
             onBack = { settingsOpen = false },
+            onOpenReaderAccount = { accountOpen = true },
         )
 
         external != null -> ReaderRoute(

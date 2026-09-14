@@ -13,6 +13,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
+import com.cedagova.fastreader.account.ReaderAccountController
+import com.cedagova.fastreader.account.summary
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.RELEASES_URL
@@ -37,10 +39,9 @@ import com.cedagova.fastreader.settings.ReaderSettings
  *
  * ## The update hand-off (REQ-106)
  *
- * This is the only outbound action in the app, and it is not a request: the route
- * starts an `ACTION_VIEW` for [RELEASES_URL] and the reader's browser goes to
- * GitHub. FastReader holds no network permission, so there is nothing here to
- * fail over a connection.
+ * This is not a request: the route starts an `ACTION_VIEW` for [RELEASES_URL]
+ * and the reader's browser goes to GitHub. FastReader never checks for updates
+ * itself, so there is nothing here to fail over a connection.
  *
  * A device with no app able to open a web link would otherwise take the uncaught
  * `ActivityNotFoundException` down with it, so the miss is caught and shown as a
@@ -50,12 +51,15 @@ import com.cedagova.fastreader.settings.ReaderSettings
 @Composable
 fun SettingsRoute(
     graph: LibraryGraph,
+    readerAccount: ReaderAccountController,
     onBack: () -> Unit,
+    onOpenReaderAccount: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val repository = graph.repository
     val settings by repository.settings.collectAsState()
     val persistenceFailure by repository.persistenceFailure.collectAsState()
+    val accountState by readerAccount.state.collectAsState()
 
     val context = LocalContext.current
     val version = remember(context) { AppVersion.of(context) }
@@ -77,6 +81,8 @@ fun SettingsRoute(
                 true
             }
         },
+        readerAccount = accountState.summary(),
+        onOpenReaderAccount = onOpenReaderAccount,
         modifier = modifier,
         persistenceFailure = persistenceFailure,
         updateHandoffUnavailable = updateHandoffUnavailable,

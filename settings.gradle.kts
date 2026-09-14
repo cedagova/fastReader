@@ -22,8 +22,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "fastReader"
 include(":app")
-// The standalone Reader auth library and its proving-ground host app (#92).
-// Neither depends on :app and :app depends on neither; they share only the
-// toolchain. See reader-auth/README.md.
+// The reusable Reader auth library (#92, #93). It depends on nothing under
+// :app; since #100 FastReader's :app is its host. See reader-auth/README.md.
 include(":reader-auth")
-include(":reader-auth-host")

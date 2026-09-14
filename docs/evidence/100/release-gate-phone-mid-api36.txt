@@ -1,0 +1,33 @@
+# scripts/release.sh (verify only) on the #100 candidate, 2026-09-13 — the signed release APK's own proof.
+# Gradle task lines omitted; the four verification steps as printed.
+
+== Toolchain
+JDK          openjdk version "21.0.12.1" 2026-08-18
+build-tools  /Users/chonko/Library/Android/sdk/build-tools/37.0.0
+
+== Version
+versionCode  8
+versionName  1.6.0
+tag          v1.6.0
+== Verify signature
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+V3.0 Signer: certificate SHA-256 digest: d476be8e7efbee3fe81dca8dd89f13c3434f26689a9a6979c01da54629e6485d
+V3.0 Signer: key size (bits): 4096
+
+== Verify release manifest
+package: name='com.cedagova.fastreader' versionCode='8' versionName='1.6.0' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'
+minSdkVersion:'26'
+targetSdkVersion:'37'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+permissions are exactly INTERNET + the platform self-permission, no cleartext, minSdk 26, version matches version.properties
+
+verified artifact: app/build/outputs/apk/release/fastReader-1.6.0.apk (2489695 bytes, sha256 59593660b0bb72bb5ba4e1d4c37c825803587a61cc5734841e7751395125b191)
+
+Build and verification complete. Re-run with --publish to create v1.6.0.
+
+# The verified artifact installed on Phone_Mid_API36 (adb install; flags show no DEBUGGABLE),
+# Settings > Reader account, nobody@example.com + a wrong password, Sign in with password, 8 s:
+[42,263][1038,369] The sign-in service rejected this (HTTP 400 · invalid_credentials): Invalid login credentials
+# AndroidRuntime:E empty — the R8-shrunk build reaches stage and renders the provider's answer.

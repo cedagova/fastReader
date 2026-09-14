@@ -1,0 +1,29 @@
+package com.cedagova.fastreader.account.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import com.cedagova.fastreader.account.ReaderAccountController
+
+/**
+ * The account screen wired to the process-scoped [ReaderAccountController]:
+ * its state in, the reader's taps out. Back returns to Settings, which is
+ * where this surface was opened from and which stays underneath it.
+ */
+@Composable
+fun ReaderAccountRoute(
+    controller: ReaderAccountController,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val state by controller.state.collectAsState()
+    BackHandler(onBack = onBack)
+    ReaderAccountScreen(
+        state = state,
+        actions = controller,
+        onBack = onBack,
+        modifier = modifier,
+    )
+}
