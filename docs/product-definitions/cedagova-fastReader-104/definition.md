@@ -202,16 +202,27 @@ Opening an account book records last-opened for the account; finishing it
 records finished; both are the backend's `library_item` fields and are what
 reader-web's Continue reading card reads.
 
+### Signing out (decision D4)
+
+Explicit sign-out and a session the backend no longer accepts lead to the
+same **signed out** state; the latter additionally shows the reason once.
+Account-only rows leave the shelf. Downloaded copies stay on the device and
+remain openable as ordinary device books — they are the owner's books, read
+without network, and sign-out never deletes reading data. Account actions
+queued while offline are held and sent at the next sign-in to the same
+account; a sign-in to a different account discards them. Signing back in to
+the same account restores the account rows and re-associates the copies.
+
 ## States and failure behavior
 
 | State | What the owner sees |
 | --- | --- |
-| Signed out | v1.6.0 library, no account surface in the library. |
+| Signed out (explicit, or session gone) | v1.6.0 shelf: account-only rows gone; downloaded copies remain as device books; queued account actions held for the same account. Session gone shows the reason once. |
 | Signed in, bootstrapping | Account books appear as the load completes; device books are untouched. |
 | Signed in, offline | Account library as last known; account actions queue and say so; device books fully usable; downloaded copies readable. |
 | Cursor expired / ahead (`rebootstrap_required`) | Full reload without duplicated writes; nothing lost; a brief note. |
 | Sync capability unavailable (`reader.sync.v1` unavailable in capabilities, or 5xx retryable) | Account library shown as last known, actions deferred with the reason; never a sign-out. |
-| Session gone (per #100 / `:reader-auth`) | Signed out; account books remain listed as last known but read-only until sign-in; downloaded copies still open. |
+| Sign in again (same account) | Account rows return; downloaded copies show as account books again; held actions are sent once. A different account starts with an empty account library and discards the held actions. |
 | Add to account: consent | Plain statement that the file's bytes will be uploaded to the Reader account (stage) and kept there; Add / Cancel. |
 | Add to account: in progress | Progress on the book; cancellable; app death resumes or restarts the transfer without a duplicate book. |
 | Add to account: refused (too large / unsupported / protected / malformed) | The backend's category, plainly worded; the device book unchanged. |
@@ -235,8 +246,8 @@ Requirement numbers start at REQ-501 (REQ-4xx is #100). Requirements marked
   book's appears once. Signed out, the library is v1.6.0.
   *Accept:* with a book added on reader-web, FastReader signed in lists it
   (title, author) after foreground; the same EPUB picked locally does not
-  produce a second row; signed out, no account row exists and the existing
-  library goldens are unchanged.
+  produce a second row; signed out, no account-only row exists (a downloaded
+  copy shows as a device book) and the existing library goldens are unchanged.
 - **REQ-502** Sign-in bootstraps the account library from the backend and
   then follows the account's change stream; changes made on another device
   (add, remove, Undo, status, last-opened, and position under D1) are
@@ -254,6 +265,15 @@ Requirement numbers start at REQ-501 (REQ-4xx is #100). Requirements marked
   exists.
   *Accept:* concurrent status changes on both clients settle to the same
   value on both after sync, with no prompt on either.
+- **REQ-516** Explicit sign-out and a session the backend no longer accepts
+  produce the same signed-out state: account-only rows leave the shelf,
+  downloaded copies stay and open as device books, offline-queued account
+  actions are held for the next sign-in to the same account and discarded
+  for a different one; nothing is deleted by signing out.
+  *Accept:* sign out with one downloaded copy and one queued removal: the
+  copy still opens in airplane mode, the account rows are gone; sign in to
+  the same account → the removal is admitted once and the rows return; a
+  forced session rejection on stage shows the reason once and the same state.
 
 ### Adding a device book to the account
 
@@ -392,7 +412,7 @@ Requirement numbers start at REQ-501 (REQ-4xx is #100). Requirements marked
   FastReader; remove and Undo in both directions; offline remove replayed
   once; (D1) position both ways; and the Chunipers proposal list filed.
 - **Guardrail:** signed out or offline, FastReader is indistinguishable from
-  v1.6.0.
+  v1.6.0 except for downloaded copies, which behave as device books.
 - **Guardrail:** zero API calls, zero uploaded bytes and zero account
   mutations for a device book until the owner adds it (the backend's own
   device-only cases).
@@ -525,6 +545,7 @@ Direct evidence, pinned at the baselines above.
 | 2026-09-14 | **D1** Sync scope = account library membership, book bytes (import/download), library status and last-opened, and the portable reading position (section + fraction) in both directions. FastReader-only data (WPM, token index, pipeline state, presentation settings, crash report) stays local. Portable preferences are out. | Owner chose the recommended option ("Books + membership + position"). Exercises sync, imports, membership and activity convergence from a second client and surfaces the reader-web progress-merge and portable-locator gaps (CP-3, CP-4). Preferences rejected: the API refuses device-local controls and FastReader's settings are RSVP presentation. | REQ-502, REQ-511, REQ-512, OUT504 |
 | 2026-09-14 | **D2** An account book whose bytes are not on this device is downloaded on open through the backend's grant into FastReader's private storage, SHA-256-verified, and read offline like a device book; a downloaded copy can be freed without leaving the account. This amends AD-1 ("no import copies") for account books only. | Owner chose the recommended option. Makes the multi-device test two-directional and exercises the download-grant path reader-web uses. | REQ-510, OUT503, privacy statement (REQ-513) |
 | 2026-09-14 | **D3** Every Chunipers proposal recorded here (CP-1…CP-5 and any found later) is filed, after the owner approves this definition, as an issue in the owning Chunipers repository with the Chunipers Claude worker identity, evidence-linked, and linked from the root issue. | Owner chose the recommended option; keeps the list from going stale and puts the proposals into Chunipers' own definition/planning flow. | REQ-515, OUT505 |
+| 2026-09-14 | **D4** Explicit sign-out and session-gone are one signed-out state: account-only rows leave the shelf, downloaded copies stay and open as device books, offline-queued account actions are held for the next sign-in to the same account and discarded for a different account; sign-out deletes nothing. | Owner chose the recommended option after the independent review found "signed out" defined two ways. Non-destructive; keeps the v1.6.0 guardrail with one stated exception. | REQ-501, REQ-516, states table, guardrail |
 
 ## Remaining uncertainty
 
@@ -556,5 +577,8 @@ Direct evidence, pinned at the baselines above.
 
 ## Publication verification
 
-Owner decisions D1–D3 recorded 2026-09-14. Pending: outcome publication,
-graph verification, brief, owner approval, semantic-anchor review.
+Owner decisions D1–D4 recorded 2026-09-14. Outcome children OUT501–OUT505
+published and natively attached; `verify-graph` valid (6 rows); brief
+published at the linked comment. Owner approval recorded for the previous
+digest at PR #105; renewed approval for this digest and the independent
+semantic-anchor review are pending.
