@@ -20,6 +20,9 @@ android {
 
     defaultConfig {
         minSdk = 26
+        // What a shrinking host must keep for this module's dependencies; see
+        // the file for why.
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     compileOptions {

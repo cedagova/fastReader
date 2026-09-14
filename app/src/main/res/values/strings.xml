@@ -217,10 +217,18 @@
     <string name="settings_version_value">%1$s (build %2$d)</string>
     <string name="settings_version_description">Version %1$s, build %2$d</string>
     <string name="settings_check_updates">Check for updates</string>
-    <string name="settings_check_updates_summary">Opens the FastReader releases page in your browser. FastReader never connects to the internet itself.</string>
+    <string name="settings_check_updates_summary">Opens the FastReader releases page in your browser. FastReader does not check for updates itself.</string>
     <string name="settings_check_updates_unavailable">No app on this device can open a web link. The releases page is github.com/cedagova/fastReader/releases.</string>
+    <!-- The Reader account row (#100, REQ-401): the one way into the account
+         surface, beside the statement that says what using it sends. -->
+    <string name="settings_reader_account">Reader account</string>
+    <string name="settings_reader_account_loading">…</string>
+    <string name="settings_reader_account_not_configured">Not configured</string>
+    <string name="settings_reader_account_signed_out">Signed out</string>
+    <string name="settings_reader_account_signed_in">Signed in as %1$s</string>
+    <string name="settings_reader_account_summary">Optional. Reading needs no account; this signs in to the Reader stage backend to test it from this app.</string>
     <string name="settings_privacy_label">What stays on this device</string>
-    <string name="settings_privacy">FastReader has no internet permission, so it cannot send or receive anything itself. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings and small cover thumbnails, in its private storage. If the app stops unexpectedly it also keeps one short report about what went wrong in that private storage: the app version, this device\'s model, its Android version and where in the code it stopped, with no part of any book in it — the next launch offers that report to you once, and it goes nowhere unless you share it and pick an app to send it to. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
+    <string name="settings_privacy">FastReader has the internet permission and uses it for one thing only: the optional Reader account under Settings. Nothing is sent unless you use that account. When you do, your email address, the code or password you type and the account\'s session go to the Reader identity provider and the Reader API, and nothing else does: your books, your reading positions, your settings and any crash report stay on this device and are never sent. The account session is kept encrypted on this device, outside its backup, and is removed when you sign out. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings and small cover thumbnails, in its private storage. If the app stops unexpectedly it also keeps one short report about what went wrong in that private storage: the app version, this device\'s model, its Android version and where in the code it stopped, with no part of any book in it — the next launch offers that report to you once, and it goes nowhere unless you share it and pick an app to send it to. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
     <string name="settings_visual_only">The word stream is visual only. FastReader shows one word at a time on the screen; it never reads a book aloud, and there is no audio or text-to-speech anywhere in the app. Everything around the stream — the library, the reader controls, and this screen — is labelled for TalkBack, but the stream itself has to be seen.</string>
 
     <!-- The crash report offered on the next launch (REQ-207, AD-14). The
@@ -235,4 +243,65 @@
     <string name="crash_offer_unavailable">No app on this device can accept the report as text. It is still here, and nothing has been sent.</string>
 
     <string name="settings_problem_title">Your settings are not being saved</string>
+
+    <!-- The Reader account surface (#100, REQ-401 to REQ-407). Three states —
+         not configured, signed out, signed in — and the outcomes of the
+         library's operations, each quoting the provider's or the backend's
+         code and the backend's request id as the library reported them. -->
+    <string name="account_title">Reader account</string>
+    <string name="account_back">Back</string>
+    <string name="account_working">Working…</string>
+    <string name="account_dismiss">Dismiss</string>
+
+    <string name="account_not_configured_title">Not configured</string>
+    <string name="account_not_configured_body">This build has no Reader backend values, so there is no account to sign in to and nothing is called. Missing: %1$s. Set them in local.properties or the environment and rebuild.</string>
+
+    <string name="account_signed_out_title">Signed out</string>
+    <string name="account_signed_out_intro">Optional. FastReader reads books without an account; this signs in to the Reader stage backend to test it. Your email address, the code or password you type and the session go to the Reader identity provider and the Reader API. Nothing about your books does.</string>
+    <string name="account_field_email">Email address</string>
+    <string name="account_section_code">Email code</string>
+    <string name="account_section_code_summary">A 6-digit code is emailed to you and typed here. It is valid for 60 minutes and never re-sent by itself.</string>
+    <string name="account_new_account">Create a new account for this address</string>
+    <string name="account_send_code">Send code</string>
+    <string name="account_field_code">6-digit code</string>
+    <string name="account_verify_code">Verify code</string>
+    <string name="account_section_password">Password</string>
+    <string name="account_field_password">Password</string>
+    <string name="account_password_show">Show</string>
+    <string name="account_password_hide">Hide</string>
+    <string name="account_sign_in_password">Sign in with password</string>
+    <string name="account_section_recovery">Forgotten password</string>
+    <string name="account_section_recovery_summary">A recovery code is emailed to you; verifying it signs you in, and you set a new password on the next screen.</string>
+    <string name="account_send_recovery">Send recovery code</string>
+    <string name="account_verify_recovery">Verify recovery code</string>
+
+    <string name="account_signed_in_title">Signed in as %1$s</string>
+    <string name="account_user_id">User id %1$s</string>
+    <string name="account_capabilities_show">Show capabilities</string>
+    <string name="account_capabilities_refresh">Refresh capabilities</string>
+    <string name="account_capabilities_summary">Fetches this account\'s capabilities document from the Reader API and shows it as returned.</string>
+    <string name="account_capabilities_request_id">Request id %1$s</string>
+    <string name="account_field_new_password">New password</string>
+    <string name="account_set_password">Set password</string>
+    <string name="account_set_password_summary">Completes a recovery, or changes the password of a signed-in account.</string>
+    <string name="account_sign_out">Sign out</string>
+    <string name="account_sign_out_summary">Removes the session from this device, even with no network.</string>
+    <string name="account_sign_out_others">Sign out other devices</string>
+    <string name="account_sign_out_others_summary">Ends this account\'s sessions on every other device; this one stays signed in.</string>
+
+    <string name="account_outcome_code_sent">Code sent. Check your email and type the 6 digits above.</string>
+    <string name="account_outcome_recovery_sent">Recovery code sent. Type it in the code field and verify it, then set a new password.</string>
+    <string name="account_outcome_password_set">Password set.</string>
+    <string name="account_outcome_signed_out">Signed out on this device.</string>
+    <string name="account_outcome_others_signed_out">Other devices were signed out. This device stays signed in.</string>
+    <string name="account_outcome_provider_rejected">The sign-in service rejected this (%1$s): %2$s</string>
+    <string name="account_outcome_try_later">Try again later (%1$s). Nothing was changed.</string>
+    <string name="account_outcome_network">No network. Nothing was sent and nothing was changed.</string>
+    <string name="account_outcome_mismatch">This build\'s Reader configuration does not match the server, so nothing was sent to the sign-in service: %1$s</string>
+    <string name="account_outcome_session_gone">The server no longer accepts this session (%1$s). This device is signed out.</string>
+    <string name="account_outcome_forbidden">Not allowed (%1$s). You are still signed in.</string>
+    <string name="account_outcome_api_error">The Reader API answered with an error (%1$s): %2$s</string>
+    <string name="account_detail_http">HTTP %1$d</string>
+    <string name="account_detail_retry_after">retry after %1$d s</string>
+    <string name="account_detail_request_id">request id %1$s</string>
 </resources>

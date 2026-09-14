@@ -29,7 +29,7 @@ Every failure is one branch of the sealed `ReaderAuthException`. The
 contract's constants live in `ReaderAuthPolicy`, and the unit tests under
 `src/test/` (fake cipher, fake clock, Ktor mock engine; no network, no device)
 pin each rule; the real Keystore path and the stage flow are proven on an
-emulator from the host app (`docs/evidence/93/`).
+emulator from FastReader, the library's host (`docs/evidence/100/`).
 
 ## What the library declares for its hosts
 
@@ -40,11 +40,12 @@ names it so a host can read the merge result back.
 
 ## What every host must declare for itself
 
-A library manifest cannot impose these; each host — the proving-ground app
-`:reader-auth-host` now, the real Reader client later — owns them, and a
-host that omits one has a host defect, not a library defect. The host in
-this repository guards each with a unit test (`HostManifestTest`), which is
-the pattern to copy.
+A library manifest cannot impose these; each host — FastReader's `:app` now
+(#100), the real Reader client later — owns them, and a host that omits one
+has a host defect, not a library defect. FastReader guards each with a unit
+test (`ReaderAccountManifestTest` and `ReaderAccountConfigTest` under
+`app/src/test/java/com/cedagova/fastreader/account/`), which is the pattern
+to copy.
 
 1. **Full exclusion from backup and device-to-device transfer.** The module
    will store tokens, and no token may leave the device in a cloud backup or
@@ -58,7 +59,7 @@ the pattern to copy.
    its `<cloud-backup>` and `<device-transfer>` sections, with no `<include>`
    anywhere. The domains are siblings, not a hierarchy: excluding `root`
    alone still hands `files/`, `databases/` and `shared_prefs/` to the
-   transport. `reader-auth-host/src/main/res/xml/` holds a copy to take.
+   transport. `app/src/main/res/xml/` holds FastReader's copy to take.
 2. **No cleartext allowance in a release build.** A debug build may permit
    cleartext to the emulator loopback `10.0.2.2` (and nothing else) through a
    network security configuration that lives **only in the debug source
@@ -66,4 +67,4 @@ the pattern to copy.
    sets `android:usesCleartextTraffic`. A release build therefore has no
    `networkSecurityConfig` attribute at all.
 3. **Its own application id**, distinct from any other app the module is
-   developed beside. The host here is `com.cedagova.reader.auth.host`.
+   developed beside. The host here is `com.cedagova.fastreader`.

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.account.ReaderAccountSummary
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
@@ -52,6 +53,8 @@ class SettingsAccessibilityTest {
                     onBack = {},
                     version = AppVersion(name = "1.0.1", code = 2),
                     onCheckForUpdates = {},
+                    readerAccount = ReaderAccountSummary.SignedIn("reader@example.test"),
+                    onOpenReaderAccount = {},
                     heldPreviewToken = PREVIEW_HELD_TOKEN,
                 )
             }
@@ -110,6 +113,12 @@ class SettingsAccessibilityTest {
                 it.startsWith("Check for updates. Opens the FastReader releases page in your browser")
             },
         )
+        // #100: the way into the account surface names the account's state
+        // before the tap, and says that reading needs none.
+        assertTrue(
+            "the account row should announce its state, got $labels",
+            labels.any { it.startsWith("Reader account. Signed in as reader@example.test. Optional. Reading needs no account") },
+        )
         // The mechanism's internal vocabulary must not reach a screen reader.
         listOf("pivot", "ORP", "Spritz").forEach { word ->
             assertTrue(
@@ -146,7 +155,7 @@ class SettingsAccessibilityTest {
             allNodes().any { it.label() == "Version 1.0.1, build 2" },
         )
         val privacy = allNodes().map { it.label() }
-            .filter { it.startsWith("FastReader has no internet permission") }
+            .filter { it.startsWith("FastReader has the internet permission and uses it for one thing only") }
         assertEquals("the privacy statement should be exactly one node", 1, privacy.size)
     }
 

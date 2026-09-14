@@ -1,13 +1,18 @@
 # FastReader
 
 An Android speed reader for EPUB files that are already on your phone. It shows
-one word at a time, in place, at a pace you set — no account, no store, no
-network.
+one word at a time, in place, at a pace you set — no store, and no account
+needed to read.
 
-FastReader has **no internet permission at all**. The APK's manifest declares no
-permissions beyond the one Android adds for its own broadcast plumbing, and
-`scripts/release.sh` refuses to publish a build in which
-`android.permission.INTERNET` ever appears.
+FastReader holds **one permission of its own: the internet permission**, and
+uses it for **one thing: the optional Reader account under Settings**. Since
+1.6.0 the app is also the owner's testing app for the Reader stage backend, and
+that screen signs in to it. Reading never touches the network: signed out, or
+with no network at all, every screen outside that one behaves as it always has,
+and nothing about your books is ever sent. `scripts/release.sh` refuses to
+publish a build whose permissions are anything but the internet permission plus
+the one Android adds for its own broadcast plumbing, or whose manifest allows a
+cleartext connection.
 
 ## What it looks like
 
@@ -32,6 +37,8 @@ is a signed APK on a GitHub Release.
 3. Tap **Install**, then **Open**.
 
 Nothing else is needed: no sign-in, no permission prompt, no first-run setup.
+The Reader account under Settings is optional and is for testing the Reader
+backend; the app reads books without it.
 
 **Updating** is the same three steps with a newer APK. Install it *over* the
 installed one — do not uninstall first. Your books, your place in each of them
@@ -77,8 +84,14 @@ This is the same statement the app shows under **Settings → What stays on this
 device**, word for word — a unit test compares the two so they cannot drift.
 
 <!-- privacy-statement:begin -->
-FastReader has no internet permission, so it cannot send or receive anything
-itself. Check for updates only hands a web address to your browser, and your
+FastReader has the internet permission and uses it for one thing only: the
+optional Reader account under Settings. Nothing is sent unless you use that
+account. When you do, your email address, the code or password you type and
+the account's session go to the Reader identity provider and the Reader API,
+and nothing else does: your books, your reading positions, your settings and
+any crash report stay on this device and are never sent. The account session
+is kept encrypted on this device, outside its backup, and is removed when you
+sign out. Check for updates only hands a web address to your browser, and your
 browser makes that request. Your books stay in the folders you chose; on this
 device FastReader keeps only its own list of them, your reading positions, your
 settings and small cover thumbnails, in its private storage. If the app stops
@@ -110,21 +123,24 @@ prior-art form — and the off-center **Fixed focus letter** alignment is an
 opt-in toggle that ships off. Passing the APK to someone who asks for it is
 fine; putting it in a store is not, until #33 is closed.
 
-## The Reader auth module beside FastReader
+## The Reader auth library FastReader hosts
 
-This repository also carries two Gradle modules that are **not part of
-FastReader**: `reader-auth/`, a reusable Android library for the future Reader
-client's sign-in, and `reader-auth-host/`, a minimal app that installs beside
-FastReader under its own application id, `com.cedagova.reader.auth.host`, to
-exercise that library on an emulator. They share this repository's toolchain
-and nothing else: FastReader's `app/` module does not depend on them,
-`scripts/release.sh` never builds them, and the statement above — FastReader
-has no internet permission — is unchanged and applies to the FastReader app you
-install from a release. The host app does declare the internet permission; that
-is the point of it, a place to prove network-backed work without touching
-FastReader. See [reader-auth/README.md](reader-auth/README.md); the client
-contract the library implements — sign-in methods, session storage, refresh,
-error policy, sign-out — is [reader-auth/CONTRACT.md](reader-auth/CONTRACT.md).
+This repository also carries `reader-auth/`, a reusable Android library for the
+Reader client's sign-in, built to be lifted into the real Reader client
+unchanged. Since #100 **FastReader is its host**: `app/` depends on it, the
+Reader account screen under Settings is the library's sign-in, session and
+capabilities surface on a real device against the stage backend, and the
+library's manifest is where the app's internet permission comes from. There is
+no separate host app any more. The library depends on nothing under `app/`.
+See [reader-auth/README.md](reader-auth/README.md); the client contract the
+library implements — sign-in methods, session storage, refresh, error policy,
+sign-out, and what a host must declare — is
+[reader-auth/CONTRACT.md](reader-auth/CONTRACT.md).
+
+Building with the account working needs three public stage values in the
+untracked `local.properties` (`reader.supabaseUrl`,
+`reader.supabasePublishableKey`, `reader.apiBaseUrl`); without them the build,
+lint and tests are unchanged and the screen reads "Not configured".
 
 ## Build it yourself
 

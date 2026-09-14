@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Base64
 import com.cedagova.reader.auth.api.PreAuthDocument
 import com.cedagova.reader.auth.api.ReaderApiClient
+import com.cedagova.reader.auth.api.ReaderApiResponse
 import com.cedagova.reader.auth.api.ReaderProfileUpdate
 import com.cedagova.reader.auth.session.FileSessionStore
 import com.cedagova.reader.auth.session.KeystoreSessionCipher
@@ -157,6 +158,9 @@ class ReaderAuthClient internal constructor(
 
     /** The first authenticated call after sign-in. */
     suspend fun capabilities(): JsonObject = api.capabilities()
+
+    /** [capabilities], with the request id the successful call carried beside the document (#100). */
+    suspend fun capabilitiesResponse(): ReaderApiResponse = api.capabilitiesResponse()
 
     /** The profile upsert that precedes any profile read. */
     suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = api.upsertProfile(update)

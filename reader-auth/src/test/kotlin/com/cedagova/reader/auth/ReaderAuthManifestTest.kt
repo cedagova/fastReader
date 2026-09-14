@@ -18,8 +18,8 @@ import org.robolectric.annotation.Config
  * Robolectric runs this module's tests against the *merged* manifest of the
  * library's own test application, so the assertion is on what a host actually
  * receives from this module — not on the source file — and a host test can
- * then check the same permission arrived on its side (`HostManifestTest` in
- * `:reader-auth-host`).
+ * then check the same permission arrived on its side (FastReader's
+ * `ReaderAccountManifestTest`).
  */
 @RunWith(AndroidJUnit4::class)
 // Robolectric has no API 36+ sandbox yet; the module's compileSdk is unaffected.

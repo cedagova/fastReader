@@ -9,7 +9,7 @@ import android.content.Intent
  * `ACTION_SEND` with `text/plain` and the report as `EXTRA_TEXT`: the text
  * itself travels in the intent, so no file is exposed, no `FileProvider` is
  * needed, and no grant to this app's storage is handed to whatever the reader
- * picks. FastReader holds no network permission and makes no request — the app
+ * picks. FastReader makes no request of its own for it — the app
  * the reader chooses is the one that decides where the text goes, after they
  * choose it.
  *

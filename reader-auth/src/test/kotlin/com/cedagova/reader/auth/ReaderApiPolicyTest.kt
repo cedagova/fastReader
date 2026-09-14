@@ -61,6 +61,32 @@ class ReaderApiPolicyTest {
         client.close()
     }
 
+    /**
+     * The one additive accessor #100 asked for: a successful call reports the
+     * `X-Request-ID` it sent — the same id reader-api echoes — beside the
+     * document, and it is the id of the *successful* attempt, not of an earlier
+     * one that was refreshed or waited on. Nothing about the request changes.
+     */
+    @Test
+    fun `a successful capabilities call reports the request id it carried`() = runTest {
+        servers.queue(
+            CAPABILITIES,
+            { json(apiError("auth.expired_token"), HttpStatusCode.Unauthorized) },
+            { request -> json(CAPABILITIES_BODY, HttpStatusCode.OK, "X-Request-ID" to request.headers["X-Request-ID"]!!) },
+        )
+        servers.on(REFRESH_GRANT) { json(sessionJson("access-2", "refresh-2")) }
+        val client = client()
+
+        val response = client.capabilitiesResponse()
+
+        assertEquals("reader.capabilities.v1", response.document["schemaVersion"]!!.toString().trim('"'))
+        assertEquals(listOf(CAPABILITIES, REFRESH_GRANT, CAPABILITIES), servers.routes())
+        assertEquals(requestIds[0], servers.requests[0].headers["X-Request-ID"])
+        assertEquals(requestIds[1], servers.requests[2].headers["X-Request-ID"])
+        assertEquals("the id of the attempt that succeeded", requestIds[1], response.requestId)
+        client.close()
+    }
+
     @Test
     fun `401 expired_token triggers one refresh and one retry`() = runTest {
         servers.queue(

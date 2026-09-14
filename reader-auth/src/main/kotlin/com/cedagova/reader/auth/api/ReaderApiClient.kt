@@ -66,8 +66,17 @@ class ReaderApiClient internal constructor(
         PreAuthDocument.parse(request(HttpMethod.Get, PRE_AUTH_PATH, authenticated = false, clientVersion = true))
 
     /** `GET /v1/reader/capabilities?clientVersion=…`: the first authenticated call after sign-in. */
-    suspend fun capabilities(): JsonObject =
-        request(HttpMethod.Get, CAPABILITIES_PATH, authenticated = true, clientVersion = true)
+    suspend fun capabilities(): JsonObject = capabilitiesResponse().document
+
+    /**
+     * The same call, with the `X-Request-ID` the successful attempt carried
+     * beside the document (#100). reader-api echoes that id, so it is the one
+     * to quote when reading a server log against what the screen showed. Same
+     * request, same headers, same policy as [capabilities]; only the return
+     * shape differs.
+     */
+    suspend fun capabilitiesResponse(): ReaderApiResponse =
+        requestWithId(HttpMethod.Get, CAPABILITIES_PATH, authenticated = true, clientVersion = true)
 
     /** `PUT /v1/reader/profile`: the upsert that precedes any profile `GET`. */
     suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject =
@@ -86,19 +95,33 @@ class ReaderApiClient internal constructor(
         authenticated: Boolean,
         clientVersion: Boolean = false,
         body: String? = null,
-    ): JsonObject {
+    ): JsonObject = requestWithId(method, path, authenticated, clientVersion, body).document
+
+    /**
+     * One call under the policy above. Every attempt — the first, the one after
+     * a refresh, the one after `Retry-After` — carries a fresh id, and the id
+     * reported is the one the successful attempt sent.
+     */
+    private suspend fun requestWithId(
+        method: HttpMethod,
+        path: String,
+        authenticated: Boolean,
+        clientVersion: Boolean = false,
+        body: String? = null,
+    ): ReaderApiResponse {
         var refreshed = 0
         var waited = 0
         while (true) {
             val session = if (authenticated) {
                 refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
             } else null
+            val requestId = requestIds()
             val response = try {
                 http.request(config.readerApiOrigin + path) {
                     this.method = method
                     header(HEADER_CLIENT, config.clientId)
                     header(HttpHeaders.Accept, ContentType.Application.Json.toString())
-                    header(HEADER_REQUEST_ID, requestIds())
+                    header(HEADER_REQUEST_ID, requestId)
                     session?.let { header(HttpHeaders.Authorization, "Bearer ${it.accessToken}") }
                     if (clientVersion) parameter(QUERY_CLIENT_VERSION, config.clientVersion)
                     if (body != null) {
@@ -111,7 +134,7 @@ class ReaderApiClient internal constructor(
             } catch (e: IOException) {
                 throw ReaderAuthException.NetworkUnavailable(e)
             }
-            if (response.status.isSuccess()) return response.jsonBody()
+            if (response.status.isSuccess()) return ReaderApiResponse(response.jsonBody(), requestId)
 
             val error = ErrorBody.of(response)
             when {

@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
  * an intent and the reader is looking at a list of apps. The report is deleted
  * as the sheet opens, because the offer has been answered — what happens to the
  * text afterwards belongs to the app they pick, and FastReader, which has no
- * network permission, is not part of it.
+ * network request of its own, is not part of it.
  *
  * The one failure worth a word on screen is a device with nothing that accepts
  * `text/plain`. The chooser normally handles that itself, so this is a

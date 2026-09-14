@@ -33,6 +33,26 @@ val keystoreProperties: Properties? = keystorePropertiesPath
     .takeIf { it.isFile }
     ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
 
+// --- Reader account configuration (#100) ------------------------------------
+// The three service values FastReader hands :reader-auth (reader-auth/CONTRACT.md,
+// "Host requirements"). They are public browser-runtime values of the Reader
+// stage deployment, but they are never committed: they come from the untracked
+// local.properties or the environment, and an absent value becomes an empty
+// BuildConfig string. The hosted CI runner has none of them, so every build,
+// lint and unit test must pass with all three empty; at runtime the app then
+// shows "Not configured" under Settings > Reader account and calls nothing.
+// ReaderAccountConfigTest guards that no value fragment is ever committed.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) file.inputStream().use { load(it) }
+}
+
+fun readerValue(propertyKey: String, environmentKey: String): String =
+    (localProperties.getProperty(propertyKey) ?: System.getenv(environmentKey) ?: "")
+        .trim()
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -51,6 +71,14 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "READER_SUPABASE_URL", "\"${readerValue("reader.supabaseUrl", "READER_SUPABASE_URL")}\"")
+        buildConfigField(
+            "String",
+            "READER_SUPABASE_PUBLISHABLE_KEY",
+            "\"${readerValue("reader.supabasePublishableKey", "READER_SUPABASE_PUBLISHABLE_KEY")}\"",
+        )
+        buildConfigField("String", "READER_API_BASE_URL", "\"${readerValue("reader.apiBaseUrl", "READER_API_BASE_URL")}\"")
     }
 
     signingConfigs {
@@ -92,6 +120,8 @@ android {
 
     buildFeatures {
         compose = true
+        // For the three Reader account values above and nothing else.
+        buildConfig = true
     }
 
     // EPUB fixtures are shared by the JVM tests and the on-device SAF test.
@@ -157,6 +187,10 @@ kotlin {
 }
 
 dependencies {
+    // The Reader authentication library (#100). Its manifest is the one place
+    // android.permission.INTERNET is declared; manifest merging delivers it to
+    // this app, and ReaderAccountManifestTest reads the merge back.
+    implementation(project(":reader-auth"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

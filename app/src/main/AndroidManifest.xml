@@ -2,9 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
+      No permission element here, on purpose. Since #100 the app hosts the
+      :reader-auth library, and android.permission.INTERNET arrives from that
+      library's manifest through manifest merging — the one place it is
+      declared. It is used for the optional Reader account under Settings and
+      nothing else; scripts/release.sh proves on the signed APK that the
+      permission set is exactly INTERNET plus the platform's own
+      DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION, and ReaderAccountManifestTest
+      keeps this file free of permissions of its own.
+
       REQ-107 / AD-11 / D3: nothing FastReader stores takes part in the device's
-      own backup. allowBackup="false" covers cloud backup and restore on every
-      supported API level; dataExtractionRules additionally excludes the
+      own backup — and since #100 that includes the Reader session the library
+      keeps under the no-backup directory (reader-auth/CONTRACT.md, host
+      requirement 2). allowBackup="false" covers cloud backup and restore on
+      every supported API level; dataExtractionRules additionally excludes the
       device-to-device transfer that API 31+ performs regardless of that
       attribute, and fullBackupContent states the same exclusion in the API
       26-30 vocabulary. Proven on the emulator with the platform's backup
@@ -57,10 +68,11 @@
                 type.
 
                 Only content:// is registered, deliberately. file:// would need a
-                storage permission this app does not ask for and http(s):// would
-                need the network permission REQ-303 forbids, so listing either
-                would put FastReader in a chooser for a book it could not then
-                open.
+                storage permission this app does not ask for, and http(s):// would
+                mean fetching a book over the network, which this app never does
+                (its internet permission serves the Reader account alone, #100),
+                so listing either would put FastReader in a chooser for a book it
+                could not then open.
             -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only cleartext allowance for the emulator loopback (#92, moved from the
+  retired :reader-auth-host in #100). 10.0.2.2 is the address under which an
+  Android emulator reaches the development machine, so a debug build can talk
+  to a locally running reader-api without TLS. Nothing else is allowed
+  cleartext, subdomains included, and the base configuration says so
+  explicitly rather than relying on the targetSdk default. This file lives in
+  the debug source set only; a release build has no network security
+  configuration at all, which scripts/release.sh proves on the signed APK and
+  ReaderAccountManifestTest keeps true in the tree.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

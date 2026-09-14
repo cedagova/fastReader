@@ -54,3 +54,7 @@ for FastReader in `docs/evidence/46/`.
 
 The steps to run it are in `docs/agent-first-development.md` ("Host sign-in
 run against stage").
+
+**Completed from FastReader in #100:** the host was retired and FastReader
+became the library's host; the deferred run above is recorded in
+[`docs/evidence/100/`](../100/README.md).

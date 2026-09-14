@@ -1,8 +1,8 @@
 # Releasing fastReader
 
 fastReader ships as a signed APK attached to a GitHub Release. Anyone with the
-link can download and sideload it; there is no store, no account, and no
-network call from the app itself. This page is the whole procedure.
+link can download and sideload it; there is no store, and reading needs no
+account. This page is the whole procedure.
 
 ## Prerequisites
 
@@ -54,7 +54,8 @@ on the artifact itself:
 | --- | --- |
 | v2/v3 APK signature present | Android 8.0+ verifies these schemes |
 | Signer certificate SHA-256 equals the pinned value | The same key must sign every release forever, or in-place updates break |
-| No `android.permission.INTERNET` | REQ-050 — reading data never leaves the device |
+| The `uses-permission` lines are exactly `android.permission.INTERNET` and `com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — any other, or either missing, fails | REQ-411 — the internet permission serves the Reader account (#100) and nothing else asks for anything; the second is the self-permission Android adds for its own broadcast plumbing |
+| The release manifest has no `networkSecurityConfig` and no `usesCleartextTraffic` | REQ-411 — the debug-only loopback allowance never ships; every connection is TLS |
 | `minSdkVersion` is 26 | REQ-040 — installs on Android 8.0+ |
 | `versionCode`/`versionName` match `version.properties` | The tag, the file, and the artifact cannot drift |
 
@@ -87,7 +88,11 @@ It runs the real `scripts/release.sh --publish` under `/bin/bash` inside a
 throwaway sandbox with stubbed `gradlew`, `apksigner`, `aapt2`, `java`, `gh`,
 and `curl`. Nothing is built, signed, published, or downloaded; it asserts that
 both the stable and the `--prerelease` path reach `gh release create` and that
-only the pre-release one passes `--prerelease`.
+only the pre-release one passes `--prerelease`, and — since #100 — that the
+manifest gate fails a badging with a third permission, one missing the internet
+permission, and a manifest carrying a `networkSecurityConfig` or a
+`usesCleartextTraffic` attribute (REQ-411's "fails it" half, proven without
+building a rogue APK).
 
 Run it after any edit to `scripts/release.sh`. It exists because macOS ships
 bash 3.2, where `set -u` rejects the expansion of an *empty* array: that broke

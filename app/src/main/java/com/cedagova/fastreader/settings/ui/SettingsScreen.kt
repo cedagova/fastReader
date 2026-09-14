@@ -2,6 +2,7 @@ package com.cedagova.fastreader.settings.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.account.ReaderAccountSummary
 import com.cedagova.fastreader.reader.ui.resolve
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.FontSize
@@ -92,14 +95,17 @@ private val TouchTarget = 48.dp
  * page in front of the reader; the internal words for the mechanism ("pivot",
  * "recognition point") stay in the code and out of the UI.
  *
- * ## About (#46)
+ * ## About (#46, #100)
  *
  * The last section is not a set of choices: it states which build this is
- * (REQ-106), offers the one outbound action in the app — handing the releases
- * page to a browser — and says in plain sentences what stays on the device and
- * what leaves it (REQ-107). It is stateless in the same way the rest of the
- * screen is: the version arrives as a value, and whether the hand-off found a
- * browser arrives as a flag, so both states are reachable from a golden.
+ * (REQ-106), hands the releases page to a browser, opens the Reader account
+ * surface (#100, REQ-401) — the one row here that leads to a further screen —
+ * and says in plain sentences what stays on the device and what leaves it
+ * (REQ-107). The account row sits directly above that statement because the
+ * statement is about it. It is stateless in the same way the rest of the
+ * screen is: the version arrives as a value, whether the hand-off found a
+ * browser arrives as a flag, and the account's summary arrives as a value, so
+ * every state is reachable from a golden.
  *
  * ## REQ-060
  *
@@ -123,6 +129,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     /** Why a change did not stick, or null when the store is accepting writes. */
     persistenceFailure: String? = null,
+    /** What the Reader account row says (#100): not configured, signed out, or signed in as whom. */
+    readerAccount: ReaderAccountSummary,
+    /** Opens the Reader account surface over this screen (#100). */
+    onOpenReaderAccount: () -> Unit,
     /** The last hand-off found no app able to open a web link (REQ-106 edge). */
     updateHandoffUnavailable: Boolean = false,
     /** Holds the preview on one token so a golden captures a deterministic frame. */
@@ -295,6 +305,7 @@ fun SettingsScreen(
                     onCheckForUpdates = onCheckForUpdates,
                     handoffUnavailable = updateHandoffUnavailable,
                 )
+                ReaderAccountRow(summary = readerAccount, onOpen = onOpenReaderAccount)
                 PrivacyStatement()
                 VisualOnlyStatement()
                 Spacer(Modifier.height(24.dp))
@@ -346,8 +357,8 @@ private fun VersionRow(version: AppVersion) {
 /**
  * REQ-106's second half: a hand-off, and copy that says so before it happens.
  *
- * FastReader holds no network permission, so it cannot check anything itself; the
- * action opens the releases page in the reader's browser. The summary says that
+ * FastReader never checks for updates itself; the action opens the releases
+ * page in the reader's browser. The summary says that
  * in the button's own announcement rather than only next to it, so a reader using
  * TalkBack learns where the tap goes before taking it — the same treatment the cue
  * switches give their summaries.
@@ -390,7 +401,61 @@ private fun CheckForUpdatesRow(onCheckForUpdates: () -> Unit, handoffUnavailable
 }
 
 /**
- * REQ-107: what leaves this device and what is kept on it, in four sentences that
+ * The way into the Reader account surface (#100, REQ-401), one tap from here.
+ *
+ * The row states the account's condition as a value — not configured, signed
+ * out, or signed in as whom — so a reader knows before tapping whether there
+ * is anything to sign out of, and the summary says what the account is for
+ * and that reading needs none. One node for TalkBack: the label, the state
+ * and the summary in that order, and the chevron is only a picture.
+ */
+@Composable
+private fun ReaderAccountRow(summary: ReaderAccountSummary, onOpen: () -> Unit) {
+    val label = stringResource(R.string.settings_reader_account)
+    val value = when (summary) {
+        ReaderAccountSummary.Loading -> stringResource(R.string.settings_reader_account_loading)
+        ReaderAccountSummary.NotConfigured -> stringResource(R.string.settings_reader_account_not_configured)
+        ReaderAccountSummary.SignedOut -> stringResource(R.string.settings_reader_account_signed_out)
+        is ReaderAccountSummary.SignedIn -> stringResource(R.string.settings_reader_account_signed_in, summary.email)
+    }
+    val explanation = stringResource(R.string.settings_reader_account_summary)
+    Spacer(Modifier.height(12.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = TouchTarget)
+            .semantics(mergeDescendants = true) { contentDescription = "$label. $value. $explanation" }
+            .clickable(role = Role.Button, onClick = onOpen)
+            .padding(vertical = 8.dp)
+            .testTag("settings_reader_account"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).clearAndSetSemantics {}) {
+            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("settings_reader_account_value"),
+            )
+            Text(
+                text = explanation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            imageVector = Icons.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+    }
+}
+
+/**
+ * REQ-107: what leaves this device and what is kept on it, in sentences that
  * each map to a manifest declaration or to something the app is observed doing.
  *
  * It sits in About next to the version and the update hand-off because those are
