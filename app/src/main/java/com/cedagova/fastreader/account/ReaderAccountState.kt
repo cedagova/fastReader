@@ -14,15 +14,27 @@ package com.cedagova.fastreader.account
  */
 sealed interface ReaderAccountState {
 
+    /** The operation in flight, if any; every control is disabled while one is. Only the two live states can have one. */
+    val activity: AccountActivity?
+
+    /** The last operation's outcome, if it has not been dismissed. Only the two live states can have one. */
+    val outcome: AccountOutcome?
+
     /** The stored session has not been read yet; the surface draws nothing. */
-    data object Loading : ReaderAccountState
+    data object Loading : ReaderAccountState {
+        override val activity: AccountActivity? get() = null
+        override val outcome: AccountOutcome? get() = null
+    }
 
     /**
      * A build without the stage values: [missingValues] names the absent
      * `local.properties` keys, every action is absent, and nothing is called.
      * `ReaderAuthException.NotConfigured` is this state, not an error.
      */
-    data class NotConfigured(val missingValues: List<String>) : ReaderAccountState
+    data class NotConfigured(val missingValues: List<String>) : ReaderAccountState {
+        override val activity: AccountActivity? get() = null
+        override val outcome: AccountOutcome? get() = null
+    }
 
     /** No session on this device: the sign-in forms, in the contract's preference order. */
     data class SignedOut(
@@ -39,12 +51,6 @@ sealed interface ReaderAccountState {
         /** The last capabilities document fetched, until the next fetch or a sign-out. */
         val capabilities: LoadedCapabilities? = null,
     ) : ReaderAccountState
-
-    /** The operation in flight, if any; every control is disabled while one is. Only the two live states have one. */
-    val activity: AccountActivity? get() = null
-
-    /** The last operation's outcome, if it has not been dismissed. Only the two live states have one. */
-    val outcome: AccountOutcome? get() = null
 }
 
 /** One library operation, from the tap until it returns; the surface runs at most one at a time. */
