@@ -347,7 +347,10 @@ constrained by the invariants and acceptance below.
   downloading binds it when the copy verifies. No path, name or title ever
   identifies a book.
 - **AD-24 — Downloaded copies are device books with an `ACCOUNT_COPY`
-  source.** One forward catalog schema step (version 11) adds the source
+  source.** This is a consequence of two owner decisions, not a new choice:
+  D2 puts bytes on the device and D4 says those bytes stay usable after
+  sign-out, which only a device-catalog row can express. One forward catalog
+  schema step (version 11) adds the source
   origin and lets a source point at a private file path; migration is a no-op
   on existing documents. Copies live under `filesDir` keyed by content
   identity, are verified before first use, open through `EpubByteSource` as a
@@ -398,11 +401,17 @@ own increment.
     LEAF702).
   - wave 4: LEAF704 truthful promises and contract pin for 001 (blocked by
     LEAF703).
-  - Completion rule: `main` green in CI; REQ-501–504, 508–509, 512–514 and
-    516 acceptance recorded on the leaves against stage with reader-web as
-    the other device; AD-27 holds; no import, download or position code
-    reachable from the UI. Precondition at Ready for owner (AD-28): v1.6.0 is
-    published from `main` before this increment merges.
+  - Completion rule: `main` green in CI; acceptance recorded on the leaves
+    against stage with reader-web as the other device for REQ-503, REQ-504,
+    REQ-508, REQ-509, REQ-512, REQ-513, REQ-514, and for REQ-501, REQ-502 and
+    REQ-516 **except their carried clauses**: REQ-501's "a downloaded copy
+    shows as a device book" and REQ-516's "the copy still opens in airplane
+    mode" are recorded against #108 (increment 003), and REQ-502's "position"
+    item against #109 (increment 004). #106 closes with those three carried
+    clauses named in its closing comment as owed by #108 and #109. AD-27
+    holds; no import, download or position code reachable from the UI.
+    Precondition at Ready for owner (AD-28): v1.6.0 is published from `main`
+    before this increment merges.
 - **002 Add a device book to the account (#107)** — topology `COLLECTOR`.
   - wave 1: LEAF801 publication-import client with resumable transfer (in
     `:reader-library`).
@@ -422,7 +431,9 @@ own increment.
   - Completion rule: REQ-510 recorded (a reader-web upload opens on
     FastReader after one download and again in airplane mode; a tampered
     download is refused; the `docs/evidence/46/` backup procedure still moves
-    zero bytes; sign-out keeps the copy openable); AD-27 holds.
+    zero bytes; sign-out keeps the copy openable), plus the clauses carried
+    from increment 001: REQ-501's "a downloaded copy shows as a device book"
+    and REQ-516's "the copy still opens in airplane mode"; AD-27 holds.
 - **004 Position across clients (#109)** — topology `COLLECTOR`.
   - wave 1: LEAF821 portable position mapping and publish/consume through the
     sync engine.
@@ -430,7 +441,9 @@ own increment.
   - Completion rule: REQ-511 recorded (40 % on FastReader shows on
     reader-web's Continue reading in the right chapter; a chapter move on
     reader-web is offered on FastReader; a backward move is admitted; no token
-    index or WPM in any stage row); AD-27 holds.
+    index or WPM in any stage row), plus the clause carried from increment
+    001: REQ-502's "position" item (a position change on another device is
+    reflected on the next foreground); AD-27 holds.
 - **005 Round-trip evidence and proposal log (#110)** — topology `DIRECT`.
   - wave 1: LEAF901 integrated stage round trip recorded under
     `docs/evidence/104/`; proposal log closed.
