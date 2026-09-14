@@ -1,0 +1,42 @@
+# FastReader #100 — device run, Phone_Mid_API36 (Android 16), 2026-09-13
+# The account surface is driven by `adb shell uiautomator dump` bounds and
+# `adb shell input tap/text`; every control carries a visible label.
+
+$ adb shell pm uninstall com.cedagova.reader.auth.host
+Success
+$ adb shell pm list packages | grep cedagova
+package:com.cedagova.fastreader
+
+# --- correct values, debug build -------------------------------------------
+$ ./gradlew installDebug
+$ adb shell dumpsys package com.cedagova.fastreader | grep -E "versionName|INTERNET"
+    versionName=1.6.0
+      android.permission.INTERNET
+      android.permission.INTERNET: granted=true
+$ adb shell am start -n com.cedagova.fastreader/.MainActivity      # lands in the last-read book
+# Play, screencap (06-...), tap to pause; Settings, scroll to About:
+[42,231][1027,345] Reader account. Signed out. Optional. Reading needs no account; ...
+# tap Reader account; type nobody@example.com and a wrong password; Sign in with password; 8 s:
+[42,263][1038,369] The sign-in service rejected this (HTTP 400 · invalid_credentials): Invalid login credentials
+$ adb shell cmd connectivity airplane-mode enable
+# Dismiss; Sign in with password again; 14 s:
+[42,263][1038,316] No network. Nothing was sent and nothing was changed.
+[42,772][1038,940] nobody@example.com                                   # the form is intact
+$ adb shell cmd connectivity airplane-mode disable
+$ adb logcat -d -s AndroidRuntime:E
+(empty)
+
+# --- wrong publishable key, debug build -------------------------------------
+$ ./gradlew installDebug        # reader.supabasePublishableKey set to a wrong value
+# Settings row: Reader account. Signed out.
+# nobody@example.com + a password; Sign in with password; 8 s:
+[42,263][1038,475] This build's Reader configuration does not match the server, so nothing was sent to the sign-in service: authentication.publicClientId differs from the configured publishable key
+
+# --- no values, debug build (the hosted runner's shape) ---------------------
+$ ./gradlew installDebug        # local.properties holds sdk.dir only
+# Settings row: Reader account. Not configured.
+[42,273][1038,336] Not configured
+$ adb shell run-as com.cedagova.fastreader ls -la no_backup/
+ls: no_backup/: No such file or directory                              # no client, no store, nothing called
+$ adb logcat -d -s AndroidRuntime:E
+(empty)
