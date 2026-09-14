@@ -116,13 +116,19 @@ Not `ALREADY_SATISFIED`: at the baseline `settings.gradle.kts` includes
 `:reader-auth`, `app/src/main/AndroidManifest.xml` declares no permission,
 Settings has no account row, `scripts/release.sh` dies on
 `android.permission.INTERNET`, and the statement in three places begins
-"FastReader has no internet permission". Not `NEEDS_DECISION`: the
-definition's owner decisions settle every product, privacy-boundary and
-audience choice; the two technical resolutions below (the release-notes
-block needs a version bump; the success-path request id needs one additive
-library accessor) are ordinary, precedent-backed or behaviour-neutral, and
-are recorded as overturnable in Assumptions. Not `DECOMPOSE`: see the split
-analysis above. Not `RESEARCH_REQUIRED`: the one runtime unknown (the stage
+"FastReader has no internet permission". The delivery shape is not in
+question — the definition's owner decisions settle every product,
+privacy-boundary and audience choice — so the root stays `LEAF`. Two
+interpretive choices where the definition's own sentences conflict (the
+release-notes block against the no-bump non-goal; the success-path request
+id against "the library itself is unchanged") were first recorded as
+overturnable recommendations and, on the independent reviewer's finding
+against head `0ba8b5bf1d9bf83ff81f1fc0ef989a3794e5913f`, were returned to
+the owner: the Owner decision brief in Assumptions awaits the owner's
+one-line replies, and until both are recorded the candidate is not
+re-presented and readiness is blocked. Neither reply changes the graph, the
+topology or the delivery shape — only direction items 4 and 6. Not
+`DECOMPOSE`: see the split analysis above. Not `RESEARCH_REQUIRED`: the one runtime unknown (the stage
 email template delivering the code) is the definition's own assumption with
 the same fallback #93 recorded, and does not change the execution path.
 
@@ -135,7 +141,9 @@ At `820ef28ae97ec13b90c87bfb09fa312f037b9fc4`:
   `NotConfigured` when any of the three values is blank), operations
   `requestEmailCode(email, createUser)`, `verifyEmailCode`,
   `signInWithPassword`, `requestRecoveryCode`, `verifyRecoveryCode`,
-  `setPassword`, `capabilities()`, `onForeground()`, `signOut()`,
+  `setPassword`, `capabilities()`, `upsertProfile(update)` (the contract's
+  `PUT /v1/reader/profile`, which creates the actor's row — a definition
+  non-goal, so it is not wired), `onForeground()`, `signOut()`,
   `signOutOtherDevices()`; `sessionState` as a flow of `Initializing |
   SignedOut | SignedIn(userId, email, expiresAt)`; every failure one branch
   of the sealed `ReaderAuthException` (`NotConfigured`,
@@ -149,10 +157,20 @@ At `820ef28ae97ec13b90c87bfb09fa312f037b9fc4`:
   or unit-test its surface without the SDK needs a seam of its own.
 - **Request id on success is not exposed.** `ReaderApiClient.request`
   generates the lowercase-UUID `X-Request-ID` per call and discards it; a
-  successful `capabilities()` returns only the `JsonObject` body, whose
-  `reader.capabilities.v1` shape (as fixed by the module's own tests) has no
-  `request_id`. Only failures carry `requestId`. REQ-407 asks for the id of
-  each successful call on screen.
+  successful `capabilities()` returns only the `JsonObject` body. The live
+  document carries no id either: on reader-api `origin/stage`
+  `c4e20aa95472c48eb107ed89491a99462430c2d4` (read locally; the repository
+  is private to this identity, so it is cited, not pinned as a baseline)
+  `app/contracts/reader_capabilities.py` defines `ReaderCapabilitiesResponse`
+  with exactly `schemaVersion`, `generatedAt`, `freshUntil`, `staleUntil`,
+  `compatibility`, `capabilities`, and the route in
+  `app/features/reader_capabilities/api.py` returns that model; the request
+  id travels only in the echoed `X-Request-ID` response header
+  (`app/security.py`, exposed by `app/core/settings.py`). The module's test
+  fixture matches. `ReaderAuthClient.build(config, store, engine)` is
+  `internal`, so a host cannot supply a Ktor engine to read the header
+  either. Only failures carry `requestId`. REQ-407 asks for the id of each
+  successful call on screen.
 - **Host as the pattern to move.** `:reader-auth-host` reads
   `reader.supabaseUrl`, `reader.supabasePublishableKey`, `reader.apiBaseUrl`
   from the untracked `local.properties` or the environment
@@ -182,7 +200,7 @@ At `820ef28ae97ec13b90c87bfb09fa312f037b9fc4`:
   over whichever screen opened them. `SettingsScreen` ends with an About
   section: version row, Check for updates, the privacy statement
   (`settings_privacy`, test tag `settings_privacy`) and the visual-only
-  statement. Goldens: 88 PNGs in `app/screenshots/`, eleven of them
+  statement. Goldens: 87 PNGs in `app/screenshots/`, eleven of them
   `settings_*`.
 - **Promise machinery.** `PrivacyStatementTest` holds `settings_privacy`,
   the marked block in `docs/privacy-statement.md`, the README's marked
@@ -262,9 +280,15 @@ behaviour do not change.
    `ReaderAuthException` branch; the app classifies nothing itself, retries
    nothing, never re-sends or re-verifies a code, and treats
    `NotConfigured` as the not-configured state rather than an error. Every
-   contract operation is reachable and no method is added. The capabilities
-   document is shown as returned (pretty-printed JSON, scrollable) with the
-   request id of the call; Refresh re-fetches. The surface depends on a
+   sign-in, session, capabilities and sign-out operation of the contract is
+   reachable — `requestEmailCode`, `verifyEmailCode`, `signInWithPassword`,
+   `requestRecoveryCode`, `verifyRecoveryCode`, `setPassword`,
+   `capabilities`, `signOut`, `signOutOtherDevices`, with `onForeground`
+   called by the application object — and no method is added.
+   `upsertProfile` (`PUT /v1/reader/profile`) is a definition non-goal and
+   is not wired anywhere. The capabilities document is shown as returned
+   (pretty-printed JSON, scrollable) with the request id of the call;
+   Refresh re-fetches. The surface depends on a
    small app-owned gateway interface over the library client so that the
    state model, its unit tests and its goldens run with a fake gateway — no
    SDK, network or Keystore — while the production implementation is a thin
@@ -281,10 +305,12 @@ behaviour do not change.
    reader-api already echoes) — for example a result value beside the
    document, or the id supplied by the caller. Headers, policy, retries and
    `CONTRACT.md` do not change; the library's own mock-engine tests pin the
-   addition. This is the only library edit, recorded as an overturnable
-   resolution in Assumptions because REQ-407 (request id on screen) and
-   REQ-414's sentence "the library itself is unchanged" cannot both hold
-   with the baseline API.
+   addition. This is the only library edit and it is decision 2 of the
+   Owner decision brief in Assumptions, awaiting the owner's reply, because
+   REQ-407 (request id on screen) and REQ-414's sentence "the library itself
+   is unchanged" cannot both hold with the baseline API and the live stage
+   document carries no id. If the owner chooses failures-only, this item is
+   dropped and the surface shows request ids on failures alone.
 5. **Signed-out and offline product unchanged.** Nothing outside Settings
    and the new surface changes; no account prompt appears anywhere else; no
    reading data is sent. The goldens outside `settings_*` and the new
@@ -305,11 +331,14 @@ behaviour do not change.
    claims. The README's opening paragraph and its module section are
    rewritten: the permission, what it is for, that the reading product
    needs no account, and that `reader-auth/` is the library FastReader
-   hosts (no host app). The release-notes block follows the repository's
-   precedent: `version.properties` moves to the next version (1.6.0,
-   versionCode 8) and `docs/release-notes/v1.6.0.md` is written with the
-   new block and this change described, while `v1.5.0.md` stays the
-   historical record of what 1.5.0 promised; no release is cut.
+   hosts (no host app). The release-notes block is decision 1 of the Owner
+   decision brief in Assumptions, awaiting the owner's reply: the
+   recommended path follows the repository's precedent — `version.properties`
+   moves to the next version (1.6.0, versionCode 8) and
+   `docs/release-notes/v1.6.0.md` is written with the new block and this
+   change described, while `v1.5.0.md` stays the historical record of what
+   1.5.0 promised; no release is cut — and the alternative keeps 1.5.0 and
+   rewrites `v1.5.0.md`'s marked block.
 7. **Release gate.** `scripts/release.sh` replaces the INTERNET refusal
    with the new proof on the artifact: the badging's `uses-permission`
    lines are exactly `android.permission.INTERNET` and
@@ -353,8 +382,7 @@ behaviour do not change.
 Reversibility: every piece sits behind the app's gateway seam, the build
 script's value mechanism, or a shell gate; reverting the PR restores the
 1.5.0 promise exactly. The version bump and the library accessor are the
-two choices the owner or reviewer may overturn with one reply each (see
-Assumptions).
+two choices awaiting the owner's one-line replies (see Assumptions).
 
 ## Issue publication manifest
 
@@ -442,44 +470,96 @@ in Assumptions.
 
 ## Assumptions and open questions
 
-Both items below are recorded, overturnable resolutions the lead proceeds
-on; neither is a product decision, and one reply on the planning PR
-overturns either.
+### Owner decision brief — two one-line replies needed to resume
 
-### Release-notes block: bump to 1.6.0 rather than edit the published 1.5.0 notes
+**Status: awaiting the owner's reply.** Both items were first recorded as
+overturnable recommendations; the independent reviewer (review of head
+`0ba8b5bf1d9bf83ff81f1fc0ef989a3794e5913f`, claim
+`76e45a00-0b49-4a6b-9020-34dd32a978ae`) returned them because each sets
+aside one sentence of the owner-approved definition, which is inconsistent
+with itself on both points. The reviewer picks neither side; the lead does
+not decide for the owner. Nothing else in the plan depends on the answers:
+they change direction items 4 and 6 only, never the graph, topology or
+delivery shape. Replies go on the planning PR; the lead then records them
+here, updates the root's leaf contract, and re-presents one head for a
+delta review.
 
-**Problem.** `PrivacyStatementTest` holds the release-notes block in
-`docs/release-notes/v<version the app reports>.md` equal to the statement.
-With the version at 1.5.0, rewriting the statement means either editing
-`v1.5.0.md` — the notes of a release already published with the old
-promise, which the definition's assumption says stay historical — or moving
-the version forward. **Facts:** the v1.2.0 statement change landed as
-"Bump to 1.2.0, write its notes" in one commit with the release cut
-separately (`d86b58c`); `scripts/release.sh --publish` refuses a reused tag,
-so a bump without a release costs nothing. **Assumption:** the next version
-is 1.6.0 / versionCode 8. **Recommended (A):** bump `version.properties`
-and write `v1.6.0.md` with the new block; cutting the release stays a
-separate owner action. **Alternative (B):** keep 1.5.0 and rewrite
-`v1.5.0.md`'s block — simplest diff, but the tracked notes then differ from
-the GitHub Release they describe. **Reply to overturn:** `Edit the 1.5.0
-notes` on the PR.
+#### Decision 1 — where the rewritten release-notes block lives
 
-### Success-path request id: one additive library accessor
+**Problem.** REQ-409 rewrites the privacy statement in four places the
+existing `PrivacyStatementTest` holds equal, one of them
+`docs/release-notes/v<version the app reports>.md`. The app reports 1.5.0,
+whose notes were published with the old "no internet permission" promise.
+The definition says three things that cannot all hold: the non-goal
+"cutting a release (the gate is redefined; a version bump and release are
+separate work)", the assumption "earlier release notes (`v*.md`) are
+historical records and keep their old statement", and "the existing
+mechanism and its test are kept". It matters now because the implementer
+must pick one before the test can pass.
 
-**Problem.** REQ-407 shows the request id of each capabilities call; the
-baseline library discards it on success and only failures carry
-`requestId`. REQ-414 says the library itself is unchanged. **Facts:** the id
-is generated inside the module and echoed by reader-api; the
-`reader.capabilities.v1` body carries none; the client's constructor is
-internal, so the app cannot supply or intercept it. **Recommended (A):**
-one additive, behaviour-neutral library accessor for the id of a successful
-call (direction 4), pinned by the library's tests, `CONTRACT.md` untouched;
-REQ-414's sentence is read as "the retirement does not alter the library",
-which its acceptance criteria test. **Alternative (B):** leave the library
-untouched and show request ids on failures only — REQ-407's success-path
-id and its "Refresh shows a new request id" acceptance are then dropped,
-which is a definition deviation the owner would be accepting. **Reply to
-overturn:** `Request ids on failures only` on the PR.
+**Facts.** The test reads the file named by `AppVersion.name`. The v1.2.0
+statement change landed as "Bump to 1.2.0, write its notes" (`d86b58c`)
+with the release cut separately. `scripts/release.sh --publish` refuses a
+reused tag, so a bump without a release costs nothing and publishes
+nothing. **Assumptions.** The next version is 1.6.0 / versionCode 8.
+
+**Option A — recommended: bump to 1.6.0 and write `v1.6.0.md`.**
+Behaviour: `version.properties` → 1.6.0 / 8; `docs/release-notes/v1.6.0.md`
+carries the new block and describes this change; `v1.5.0.md` and older
+stay exactly as published. Benefit: every tracked notes file keeps
+describing the release it names; matches precedent. Cost: two lines in
+`version.properties` inside this leaf, which the non-goal sentence can be
+read as excluding; no release is cut. Reversibility: trivial. Execution:
+unchanged.
+
+**Option B — keep 1.5.0 and rewrite `v1.5.0.md`'s marked block.**
+Behaviour: the block in the current version's notes is replaced; a note
+outside the block says the published 1.5.0 APK had no internet permission.
+Benefit: no version change at all. Cost: the tracked notes for a published
+release stop describing that release until the next cut, against the
+"historical records" assumption. Reversibility: trivial. Execution:
+unchanged.
+
+A do-nothing option is not viable: the test fails.
+
+**Blocked:** direction item 6's release-notes sentence and REQ-409's
+release-notes copy. **Reply to resume:** `Choose A` (bump to 1.6.0) or
+`Choose B` (edit the 1.5.0 notes) on the planning PR.
+
+#### Decision 2 — the request id of a successful capabilities call
+
+**Problem.** REQ-407 shows the capabilities document "with the request id
+of the call" and its acceptance says "Refresh re-fetches and shows a new
+request id". REQ-414 says "the library itself is unchanged". At the
+baseline the library discards the id it sends on success, and the live
+stage document has none, so both sentences cannot hold.
+
+**Facts.** reader-api `origin/stage`
+`c4e20aa95472c48eb107ed89491a99462430c2d4`: `ReaderCapabilitiesResponse`
+has no request-id field; the id is only the echoed `X-Request-ID` response
+header. `ReaderApiClient.request` generates and discards the id;
+`ReaderAuthClient.build` is `internal`, so the app cannot supply an engine
+to read the header. Failures already carry `requestId`. **Assumptions.**
+None beyond stage staying as read.
+
+**Option A — recommended: one additive, behaviour-neutral library
+accessor.** Behaviour: a successful reader-api call also reports the id it
+carried (a result value beside the document, or a caller-supplied id);
+headers, policy, retries and `CONTRACT.md` unchanged; pinned by the
+library's mock-engine tests. Benefit: REQ-407 met literally; the real
+Reader client will want the same. Cost: one small library edit, against
+the literal reading of REQ-414's sentence (its acceptance criteria do not
+test it). Reversibility: trivial. Execution: unchanged.
+
+**Option B — library untouched; request ids shown on failures only.**
+Behaviour: the document is shown without an id; failures show theirs.
+Benefit: REQ-414 literal. Cost: REQ-407's success-path id and its
+"Refresh shows a new request id" acceptance are dropped — a definition
+deviation. Reversibility: trivial. Execution: direction item 4 removed.
+
+**Blocked:** direction item 4 and the REQ-407 coverage row. **Reply to
+resume:** `Choose A` (add the accessor) or `Choose B` (failures only) on
+the planning PR.
 
 ### Non-material assumptions (implementer may adjust within the invariants)
 
@@ -515,4 +595,10 @@ Implementation work remains; this is not an `ALREADY_SATISFIED` plan.
   (`Product definition`, `Definition root`, `Definition handoff:
   PLANNING_REQUIRED`, `Definition kind: ROOT`, `Requirements brief`) and
   the implementation leaf contract below the preserved definition record.
+- Revision 2 batches the independent reviewer's finding 1 (the reachable
+  operation set excludes `upsertProfile`) and both notes (the stage-verified
+  request-id premise; the golden count) and persists the Owner decision
+  brief. It is not presented for re-review until the owner's two replies
+  are recorded in Assumptions; the next presented head then gets one
+  delta review.
 - Exact-head approval lives in the native PR review, not here.
