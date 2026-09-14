@@ -37,8 +37,9 @@ every published promise is rewritten to be true.
   FastReader.
 - The privacy statement (English, Spanish, README, release-notes block) says
   what now leaves the device and to whom; the README drops "no internet
-  permission at all"; `scripts/release.sh` proves "INTERNET and no other
-  permission, no cleartext" instead of "no INTERNET".
+  permission at all"; `scripts/release.sh` proves "INTERNET plus the
+  platform self-permission and no other, no cleartext" instead of "no
+  INTERNET".
 
 ## Scope and non-goals
 
@@ -66,7 +67,8 @@ owns REQ-401 to REQ-414.
 - Success: the deferred stage run from `docs/evidence/93/` is completed from
   FastReader on `Phone_Mid_API36` and recorded. Guardrails: signed-out
   offline FastReader is unchanged from v1.5.0 outside Settings; the release
-  gate never publishes an APK with a second permission or cleartext.
+  gate never publishes an APK with a permission beyond INTERNET and the
+platform self-permission, or with cleartext.
 
 ## Evidence, assumptions, and uncertainty
 

@@ -267,13 +267,16 @@ Requirement numbers start at REQ-401 so they do not collide with REQ-0xx
   outside the historical release-notes files.
 - **REQ-411** `scripts/release.sh` stops refusing `android.permission.INTERNET`
   and instead proves the new promise on the artifact: the APK requests
-  INTERNET and no other permission, and its release manifest permits no
-  cleartext traffic (no network security configuration that allows it, no
-  `usesCleartextTraffic`). Signing, minSdk 26 and version proofs are kept.
-  `docs/release.md` describes the new proof.
+  `android.permission.INTERNET` and, beyond it, only the platform-generated
+  self-permission `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`
+  (the one Android adds for its own broadcast plumbing, present in every
+  FastReader release today); any other permission fails the gate. Its
+  release manifest permits no cleartext traffic (no network security
+  configuration that allows it, no `usesCleartextTraffic`). Signing, minSdk
+  26 and version proofs are kept. `docs/release.md` describes the new proof.
   *Accept:* a release build with the library merged passes the script's
-  verify step; a build that adds any second permission, or a debug-style
-  cleartext allowance, fails it.
+  verify step; a build that adds any permission other than those two, or a
+  debug-style cleartext allowance, fails it.
 
 ### Configuration and build
 
@@ -359,7 +362,8 @@ Requirement numbers start at REQ-401 so they do not collide with REQ-0xx
 - **Guardrail:** a signed-out, offline FastReader is indistinguishable from
   v1.5.0 outside Settings.
 - **Guardrail:** the release gate never publishes an APK that requests any
-  permission beyond INTERNET or permits cleartext.
+  permission beyond INTERNET and the platform self-permission named in
+  REQ-411, or that permits cleartext.
 - **Guardrail:** no line of `reader-auth/CONTRACT.md` is restated with
   different values anywhere in FastReader; FastReader documentation links to
   the contract instead.
@@ -421,6 +425,12 @@ unless stated:
   FastReader").
 - `scripts/release.sh` — dies on `uses-permission: name='android.permission.INTERNET'`
   citing REQ-050; `docs/release.md` table row "No `android.permission.INTERNET`".
+  `README.md` line 8 and `docs/evidence/56/published/README.md` lines 45–46:
+  every FastReader release APK already carries the platform self-permission
+  `com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` as its
+  one `uses-permission` line; `docs/evidence/92/aapt2-host-manifests.txt`
+  lines 4–5 show the host's release badging as INTERNET plus that
+  self-permission — what FastReader will show once the library is merged.
 - `docs/product-definitions/cedagova-fastReader-1/definition.md` REQ-050
   ("Everything on device; no telemetry, no network transmission of reading
   data"). REQ-303 ("All data stays on device; no network permission") and
@@ -474,8 +484,9 @@ Lead drafting choices, recorded as overturnable (not owner decisions):
   session semantics and costs nothing (REQ-406).
 - The account surface lives under Settings, beside the privacy statement,
   so the promise and the thing it describes sit together (REQ-401).
-- The release gate's new proof is "INTERNET and nothing else, no cleartext"
-  rather than a pinned list of contacted hosts: a network security
+- The release gate's new proof is "INTERNET (plus the platform
+  self-permission) and nothing else, no cleartext" rather than a pinned list
+  of contacted hosts: a network security
   configuration governs cleartext and trust, not which hosts may be reached,
   so a host allowlist would not be a truthful proof (REQ-411).
 
