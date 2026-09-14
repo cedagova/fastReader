@@ -3,7 +3,7 @@
 - Product definition issue: https://github.com/cedagova/fastReader/issues/104
 - Product definition PR: https://github.com/cedagova/fastReader/pull/105
 - Requirements brief: Pending
-- Status: Needs input
+- Status: Draft ready
 - Classification: DECOMPOSE
 - Definition lead: cedagova
 - Started: 2026-09-14
@@ -91,7 +91,7 @@ that to be possible without reading reader-web's source.
 4. The owner can read an account book on this device that was added from
    another device, and a position reached in FastReader is visible on
    reader-web at the granularity the portable contract allows, and vice
-   versa. (Pending owner decisions D1, D2.)
+   versa. (Owner decisions D1, D2, 2026-09-14.)
 5. Books the owner reads only locally are never sent anywhere unless the
    owner adds them; signing in never adopts them; signing out never deletes
    them. Signed out and offline, FastReader is unchanged.
@@ -177,7 +177,7 @@ be reopened unless a later add or Undo wins (`remote-remove-keeps-open-session`)
 Distinct from that, **Remove downloaded copy** (D2) frees this device's copy
 of an account book without touching the account.
 
-### Reading an account book on this device (D2, recommended form)
+### Reading an account book on this device (decision D2)
 
 An account book whose bytes are not on this device shows as such. Opening it
 downloads the bytes through the backend's download grant into FastReader's
@@ -186,7 +186,7 @@ reads them exactly like a device book. The copy is FastReader's to keep or
 free; it is never part of a backup (the existing all-domain exclusion). No
 network is needed to read a downloaded copy.
 
-### Reading position across clients (D1, recommended form)
+### Reading position across clients (decision D1)
 
 For an account book, FastReader publishes the position it can state
 portably — the section (href) and the fraction read — as the account's
@@ -226,8 +226,7 @@ reader-web's Continue reading card reads.
 ## Requirements and acceptance
 
 Requirement numbers start at REQ-501 (REQ-4xx is #100). Requirements marked
-(D1)/(D2) are drafted in the recommended form and become final with the
-owner decisions in the Owner decisions section.
+(D1)/(D2)/(D3) follow the owner decisions of 2026-09-14 recorded below.
 
 ### Account library on the shelf
 
@@ -523,9 +522,9 @@ Direct evidence, pinned at the baselines above.
 
 | Date | Decision | Rationale | Affects |
 | --- | --- | --- | --- |
-| 2026-09-14 | Pending D1 — scope of synced data (recommended: membership + bytes + status/last-opened + portable position; FastReader-only data local) | See PR #105 owner brief | REQ-502, REQ-511, REQ-512 |
-| 2026-09-14 | Pending D2 — account books readable here via downloaded private copy (recommended) vs listed-only | | REQ-510, AD-1 |
-| 2026-09-14 | Pending D3 — Chunipers proposals filed as issues in the owning repos after approval (recommended) vs recorded here only | | REQ-515, graph |
+| 2026-09-14 | **D1** Sync scope = account library membership, book bytes (import/download), library status and last-opened, and the portable reading position (section + fraction) in both directions. FastReader-only data (WPM, token index, pipeline state, presentation settings, crash report) stays local. Portable preferences are out. | Owner chose the recommended option ("Books + membership + position"). Exercises sync, imports, membership and activity convergence from a second client and surfaces the reader-web progress-merge and portable-locator gaps (CP-3, CP-4). Preferences rejected: the API refuses device-local controls and FastReader's settings are RSVP presentation. | REQ-502, REQ-511, REQ-512, OUT504 |
+| 2026-09-14 | **D2** An account book whose bytes are not on this device is downloaded on open through the backend's grant into FastReader's private storage, SHA-256-verified, and read offline like a device book; a downloaded copy can be freed without leaving the account. This amends AD-1 ("no import copies") for account books only. | Owner chose the recommended option. Makes the multi-device test two-directional and exercises the download-grant path reader-web uses. | REQ-510, OUT503, privacy statement (REQ-513) |
+| 2026-09-14 | **D3** Every Chunipers proposal recorded here (CP-1…CP-5 and any found later) is filed, after the owner approves this definition, as an issue in the owning Chunipers repository with the Chunipers Claude worker identity, evidence-linked, and linked from the root issue. | Owner chose the recommended option; keeps the list from going stale and puts the proposals into Chunipers' own definition/planning flow. | REQ-515, OUT505 |
 
 ## Remaining uncertainty
 
@@ -534,7 +533,7 @@ Direct evidence, pinned at the baselines above.
 - Exact stage values of the import policy and capability document for
   `reader-android` (observed at planning).
 
-## Chunipers proposals (candidates, pending D3)
+## Chunipers proposals (to be filed under D3)
 
 | Key | Repository | Proposal | Evidence |
 | --- | --- | --- | --- |
@@ -551,11 +550,11 @@ Direct evidence, pinned at the baselines above.
 | ROOT | ROOT | None | Account library synced through the Reader API from FastReader (stage) | https://github.com/cedagova/fastReader/issues/104 |
 | OUT501 | OUTCOME | ROOT | Account library on the shelf, kept in step, removable with Undo (REQ-501–504, 508–509, 512–514) | Pending |
 | OUT502 | OUTCOME | ROOT | Add a device book to the account through publication import (REQ-505–507) | Pending |
-| OUT503 | OUTCOME | ROOT | Read an account book on this device from a verified downloaded copy (REQ-510) — D2 | Pending |
-| OUT504 | OUTCOME | ROOT | Reading position portable between FastReader and reader-web (REQ-511) — D1 | Pending |
-| OUT505 | OUTCOME | ROOT | Chunipers alignment proposals filed and linked (REQ-515, CP-1…CP-5) — D3 | Pending |
+| OUT503 | OUTCOME | ROOT | Read an account book on this device from a verified downloaded copy (REQ-510) | Pending |
+| OUT504 | OUTCOME | ROOT | Reading position portable between FastReader and reader-web (REQ-511) | Pending |
+| OUT505 | OUTCOME | ROOT | Chunipers alignment proposals filed and linked (REQ-515, CP-1…CP-5) | Pending |
 
 ## Publication verification
 
-Pending: owner decisions D1–D3, content review, outcome publication, graph
-verification, brief, semantic-anchor review.
+Owner decisions D1–D3 recorded 2026-09-14. Pending: outcome publication,
+graph verification, brief, owner approval, semantic-anchor review.
