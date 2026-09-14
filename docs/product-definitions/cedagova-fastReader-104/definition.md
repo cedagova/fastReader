@@ -548,11 +548,11 @@ Direct evidence, pinned at the baselines above.
 | Key | Kind | Parent | Title | Issue |
 | --- | --- | --- | --- | --- |
 | ROOT | ROOT | None | Account library synced through the Reader API from FastReader (stage) | https://github.com/cedagova/fastReader/issues/104 |
-| OUT501 | OUTCOME | ROOT | Account library on the shelf, kept in step, removable with Undo (REQ-501–504, 508–509, 512–514) | Pending |
-| OUT502 | OUTCOME | ROOT | Add a device book to the account through publication import (REQ-505–507) | Pending |
-| OUT503 | OUTCOME | ROOT | Read an account book on this device from a verified downloaded copy (REQ-510) | Pending |
-| OUT504 | OUTCOME | ROOT | Reading position portable between FastReader and reader-web (REQ-511) | Pending |
-| OUT505 | OUTCOME | ROOT | Chunipers alignment proposals filed and linked (REQ-515, CP-1…CP-5) | Pending |
+| OUT501 | OUTCOME | ROOT | Account library on the shelf, kept in step, removable with Undo (REQ-501–504, 508–509, 512–514) | https://github.com/cedagova/fastReader/issues/106 |
+| OUT502 | OUTCOME | ROOT | Add a device book to the account through publication import (REQ-505–507) | https://github.com/cedagova/fastReader/issues/107 |
+| OUT503 | OUTCOME | ROOT | Read an account book on this device from a verified downloaded copy (REQ-510) | https://github.com/cedagova/fastReader/issues/108 |
+| OUT504 | OUTCOME | ROOT | Reading position portable between FastReader and reader-web (REQ-511) | https://github.com/cedagova/fastReader/issues/109 |
+| OUT505 | OUTCOME | ROOT | Chunipers alignment proposals filed and linked (REQ-515, CP-1…CP-5) | https://github.com/cedagova/fastReader/issues/110 |
 
 ## Publication verification
 
