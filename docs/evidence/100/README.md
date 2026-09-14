@@ -17,7 +17,7 @@ host package was uninstalled first; `pm list packages` lists only
    alone, pause brings them back; Settings ends with the new row above the
    statement:
 
-   ![Settings' About section: Version, Check for updates, then "Reader account — Signed out — Optional. Reading needs no account…" with a chevron, above "What stays on this device"](01-settings-reader-account-row-phone-mid-api36.png)
+   ![Settings' About section scrolled to its end: the Reader account row's summary line "Optional. Reading needs no account; this signs in to the Reader stage backend to test it from this app." with the chevron at its right, directly above "What stays on this device" and the rewritten statement — the row's label and "Signed out" state are just above the frame and are in the `settings_*` goldens and the transcript](01-settings-reader-account-row-phone-mid-api36.png)
 
    ![The reader mid-stream: one word, "most", with its focus letter coloured and the guide rail under it, nothing else on the page](06-signed-out-reader-playing-unchanged-phone-mid-api36.png)
 
@@ -51,13 +51,19 @@ host package was uninstalled first; `pm list packages` lists only
 
    ![The account screen reading "Not configured" with the three missing local.properties keys named and no controls](05-not-configured-phone-mid-api36.png)
 
-## The stage acceptance run (owner-relayed code)
+## The stage acceptance run — deferred to the owner's own run (2026-09-14)
 
-IMPLEMENTATION-TODO: the run deferred on 2026-09-13 (`docs/evidence/93/README.md`,
-"What was deferred") — sign-up with an emailed code, sign-in with a code and
-with a password, recovery with a code and a new password, capabilities with
-its request id and a Refresh, `am force-stop` and `adb reboot` survival, sign
-out in airplane mode leaving `no_backup/reader-auth/` without `session.bin`,
-sign out other devices, and the `docs/evidence/46/` backup procedure moving
-zero bytes — needs a person to read the six-digit code from the inbox. It is
-recorded here once the owner relays it.
+The run deferred on 2026-09-13 (`docs/evidence/93/README.md`, "What was
+deferred") — sign-up with an emailed code, sign-in with a code and with a
+password, recovery with a code and a new password, capabilities with its
+request id and a Refresh, `am force-stop` and `adb reboot` survival, sign out
+in airplane mode leaving `no_backup/reader-auth/` without `session.bin`, sign
+out other devices, and the `docs/evidence/46/` backup procedure moving zero
+bytes — needs a person to read the six-digit code from the inbox. **By owner
+decision (2026-09-14, "merge and publish") it is not recorded here: the owner
+runs the emailed-code sign-in themselves from the merged build.** What this
+directory proves is the five items above; the signed-in path (persistence,
+backup exclusion of the live store, recovery, the R8-shrunk signed-in path)
+rests on the library's tests, the moved manifest proofs and the owner's run.
+The steps are in `docs/agent-first-development.md` ("Reader sign-in run
+against stage from FastReader").

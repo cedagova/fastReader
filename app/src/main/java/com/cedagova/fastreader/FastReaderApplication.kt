@@ -59,9 +59,10 @@ class FastReaderApplication : Application() {
 
     /**
      * The one library client, or `null` when the build is not configured — in
-     * which case nothing is ever called. Created on first use rather than in
-     * `onCreate`, so a launch that never reaches the account or the foreground
-     * hook pays nothing for it.
+     * which case nothing is ever called. `onCreate` builds it while wiring the
+     * account controller, so a configured build constructs it on every cold
+     * start; the foreground hook below needs it on every start anyway, and
+     * with no stored session it opens no connection.
      */
     val readerAuth: ReaderAuthClient? by lazy {
         if (readerAccountConfig.isConfigured) ReaderAuthClient.create(this, readerAccountConfig) else null
