@@ -2,8 +2,8 @@
 
 - Product definition issue: https://github.com/cedagova/fastReader/issues/104
 - Product definition PR: https://github.com/cedagova/fastReader/pull/105
-- Requirements brief: Pending
-- Status: Draft ready
+- Requirements brief: https://github.com/cedagova/fastReader/issues/104#issuecomment-5667864121
+- Status: Ready for planning
 - Classification: DECOMPOSE
 - Definition lead: cedagova
 - Started: 2026-09-14
