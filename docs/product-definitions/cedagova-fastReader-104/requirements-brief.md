@@ -34,6 +34,10 @@ settings) stays on the device.
 - The portable position (section + fraction) is published for account books
   and resumed from other clients at the nearest word; who wins is the
   backend's admission order, never a client's (D1).
+- Explicit sign-out and a session the backend no longer accepts are one
+  signed-out state: account-only rows leave the shelf, downloaded copies stay
+  and open as device books, offline-queued account actions are held for the
+  next sign-in to the same account; sign-out deletes nothing (D4).
 - The privacy statement, README, release-notes block and `docs/release.md` are
   rewritten truthfully; the release gate's permission and cleartext proofs are
   unchanged.
@@ -50,7 +54,7 @@ polish, cutting a release.
 ## Product outcomes
 
 - ROOT #104 — the account library from FastReader as the second client.
-- OUT501 — account library on the shelf, kept in step, removable with Undo.
+- OUT501 — account library on the shelf, kept in step, removable with Undo; sign-out per D4 (REQ-516).
 - OUT502 — add a device book to the account through publication import.
 - OUT503 — read an account book here from a verified downloaded copy.
 - OUT504 — reading position portable between FastReader and reader-web.
@@ -66,7 +70,8 @@ policy, `reader-auth/CONTRACT.md`, the `reader-android` client contract.
 Success: the full round trip recorded against stage with reader-web as the
 other device (add both ways, remove and Undo both ways, offline remove
 replayed once, position both ways) and the proposals filed. Guardrails:
-signed out or offline FastReader is indistinguishable from v1.6.0; zero API
+signed out or offline FastReader is indistinguishable from v1.6.0 except for
+downloaded copies, which behave as device books; zero API
 calls, bytes or mutations for a device book until the owner adds it; no
 request outside the published contract; release gate proofs unchanged.
 
@@ -91,7 +96,11 @@ exact stage policy and capability values.
 portable position, FastReader-only data local, no preferences; **D2** account
 books are downloaded on open into a verified private copy (amends AD-1 for
 account books only); **D3** Chunipers proposals are filed as issues in the
-owning repositories after approval and linked from the root.
+owning repositories after approval and linked from the root (filed:
+reader-api #511, #512, #513; reader-web #1907, #1908); **D4** explicit
+sign-out and session-gone are one signed-out state — account-only rows leave,
+downloaded copies stay as device books, queued actions held for the same
+account, nothing deleted.
 
 ## Links and next action
 
