@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/100
 - Planning PR: https://github.com/cedagova/fastReader/pull/102
-- Status: Review
+- Status: Ready for implementation
 - Root classification: LEAF
 - Delivery topology: DIRECT
 - Planner: Planning lead (Claude)
@@ -501,7 +501,7 @@ Implementation work remains; this is not an `ALREADY_SATISFIED` plan.
 
 ## Publication verification
 
-- `plan validate --phase review-ready` on this directory: valid at the
+- `plan validate --phase publication-ready` on this directory: valid at the
   presented head (recorded on the planning PR with the semantic digest).
 - `definition status` for #100 on 2026-09-13: `ready_for_planning`,
   definition PR #101 at head `1c7a1728d7e9a9af05624fb12de69141e3f18a04`,
