@@ -1,0 +1,670 @@
+package com.cedagova.fastreader.account.library
+
+import com.cedagova.fastreader.account.FakeReaderLibraryGateway
+import com.cedagova.fastreader.account.ReaderAccountState
+import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.library.model.ReaderBook
+import com.cedagova.reader.library.model.ReaderBookAsset
+import com.cedagova.reader.library.model.ReaderBookAssetKind
+import com.cedagova.reader.library.model.ReaderCapabilityAvailability
+import com.cedagova.reader.library.model.ReaderCapabilityReason
+import com.cedagova.reader.library.model.ReaderCoverStatus
+import com.cedagova.reader.library.model.ReaderDeltaStatus
+import com.cedagova.reader.library.model.ReaderLibraryItem
+import com.cedagova.reader.library.model.ReaderLibraryResponse
+import com.cedagova.reader.library.model.ReaderLibraryStatus
+import com.cedagova.reader.library.model.ReaderMutationKind
+import com.cedagova.reader.library.model.ReaderProgress
+import com.cedagova.reader.library.model.ReaderProgressListResponse
+import com.cedagova.reader.library.model.ReaderResourceType
+import com.cedagova.reader.library.model.ReaderServerAdmission
+import com.cedagova.reader.library.model.ReaderSyncCapability
+import com.cedagova.reader.library.model.ReaderSyncChange
+import com.cedagova.reader.library.model.ReaderSyncConflict
+import com.cedagova.reader.library.model.ReaderSyncConflictCode
+import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
+import com.cedagova.reader.library.model.ReaderSyncMutationResult
+import com.cedagova.reader.library.model.ReaderSyncRejection
+import com.cedagova.reader.library.model.ReaderSyncRejectionCode
+import com.cedagova.reader.library.model.ReaderSyncStatus
+import java.io.File
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+
+/**
+ * The engine's contract (REQ-502, REQ-503, REQ-504, REQ-516's queue rule),
+ * proved against LEAF701's scripted gateway — no SDK, no network, no Keystore.
+ *
+ * The stage half of this leaf's acceptance (a real round trip against the
+ * backend) belongs to LEAF703's device run: there is no surface to drive yet.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class AccountSyncEngineTest {
+
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
+
+    private val gateway = FakeReaderLibraryGateway()
+    private val session = MutableStateFlow<ReaderAccountState>(ReaderAccountState.Loading)
+    private val directory: File by lazy { File(temporaryFolder.root, "account-library") }
+    private val stores: AccountLibraryStores by lazy { FileAccountLibraryStores(directory) }
+    private var keys = 0
+
+    /**
+     * The engine is process-scoped in the app, so it gets a scope of its own
+     * here too — one that shares the test's scheduler, so `advanceUntilIdle`
+     * drives the engine's own coroutines as well as the test body's.
+     */
+    private val dispatcher = StandardTestDispatcher()
+    private val engineScope = TestScope(dispatcher)
+
+    @After
+    fun tearDown() = engineScope.cancel()
+
+    private fun engine(): AccountSyncEngine = AccountSyncEngine(
+        gateway = gateway,
+        stores = stores,
+        accountState = session,
+        scope = engineScope,
+        ioDispatcher = dispatcher,
+        newIdempotencyKey = { "key-${++keys}" },
+        now = { CLIENT_TIME },
+    )
+
+    // ------------------------------------------------------------- bootstrap
+
+    @Test
+    fun `bootstrap populates the rows and the cursor from the account's lists`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune"), item("book-2", "Emma")))
+        gateway.progressResponses = queueOf(
+            ReaderProgressListResponse(
+                requestId = REQUEST_ID,
+                progress = listOf(ReaderProgress("book-1", 41.5, "2026-09-14T10:01:00Z")),
+            ),
+        )
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "512"))
+
+        val engine = engine()
+        signIn("user-1")
+
+        val state = engine.state.value
+        assertEquals(listOf("Dune", "Emma"), state.books.map { it.title })
+        assertEquals(41.5, state.books.first().progressPercent!!, 0.001)
+        assertEquals(AccountSyncPhase.IDLE, state.phase)
+        assertEquals("512", document("user-1").cursor)
+        // The head is read before the lists, so a change admitted in between is
+        // still after the cursor and arrives with the next delta read.
+        assertEquals(
+            listOf("syncCapability()", "deltas(0, 1)", "library()", "progress()"),
+            gateway.calls,
+        )
+    }
+
+    @Test
+    fun `a delta upsert, delete and restore each move the row`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "2",
+                nextCursor = "2",
+                changes = listOf(
+                    change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", status = "finished")),
+                ),
+            ),
+        )
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+        assertEquals(ReaderLibraryStatus.FINISHED, engine.state.value.books.single().status)
+        assertEquals("2", document("user-1").cursor)
+
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "3",
+                nextCursor = "3",
+                changes = listOf(change("3", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap()))),
+            ),
+        )
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+        assertTrue("a removed book leaves the shelf", engine.state.value.books.isEmpty())
+
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "4",
+                nextCursor = "4",
+                changes = listOf(
+                    change("4", "book-1", ReaderMutationKind.RESTORE, itemPayload("book-1", "Dune", status = "reading")),
+                ),
+            ),
+        )
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+        assertEquals(listOf("Dune"), engine.state.value.books.map { it.title })
+        assertEquals(ReaderLibraryStatus.READING, engine.state.value.books.single().status)
+    }
+
+    @Test
+    fun `the stream is read until has_more is false`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.calls.clear()
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "3",
+                nextCursor = "2",
+                hasMore = true,
+                changes = listOf(change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", status = "finished"))),
+            ),
+            deltas(latestCursor = "3", nextCursor = "3"),
+        )
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+
+        assertEquals(listOf("deltas(1, 100)", "deltas(2, 100)"), gateway.calls)
+        assertEquals("3", document("user-1").cursor)
+    }
+
+    // ---------------------------------------------------------------- outbox
+
+    @Test
+    fun `the same entry sent twice is applied once and replayed once, and the row does not move`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+        advanceUntilIdle()
+        val queuedKey = gateway.submitted.single().single().idempotencyKey
+
+        // The store as it stood with the entry still queued: this is what a
+        // process death between the send and the save leaves behind.
+        val beforeDrain = storeFile("user-1").readText()
+
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.APPLIED, revision = 8, payload = itemPayload("book-1", "Dune", status = "finished"), key = queuedKey),
+        )
+        engine.requestSync(AccountSyncTrigger.MANUAL_REFRESH)
+        advanceUntilIdle()
+        val applied = engine.state.value.books.single()
+        assertEquals(ReaderLibraryStatus.FINISHED, applied.status)
+        assertEquals(0, engine.state.value.queued)
+
+        // Rewind the store to before the save and start a second engine on it:
+        // the key must come back out of the document, not out of a new UUID.
+        storeFile("user-1").writeText(beforeDrain)
+        session.value = ReaderAccountState.Loading
+        advanceUntilIdle()
+        gateway.submitted.clear()
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.REPLAYED, revision = 8, payload = itemPayload("book-1", "Dune", status = "finished"), key = queuedKey, admission = ReaderServerAdmission.REPLAYED),
+        )
+        val second = engine()
+        signIn("user-1")
+
+        assertEquals(
+            "the retry must carry the original key, so the backend replays it",
+            listOf(queuedKey),
+            gateway.submitted.single().map { it.idempotencyKey },
+        )
+        assertEquals(applied, second.state.value.books.single())
+        assertEquals(0, second.state.value.queued)
+    }
+
+    @Test
+    fun `the outbox drains before the stream is read`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.calls.clear()
+        admit("key-1", ReaderMutationKind.DELETE)
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("applyMutations(1)", "deltas(1, 100)"), gateway.calls)
+    }
+
+    @Test
+    fun `a rejection is surfaced with the backend's own code and does not move the row`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.answerMutations(
+            ReaderSyncMutationResult(
+                idempotencyKey = "key-1",
+                resourceType = ReaderResourceType.LIBRARY_ITEM,
+                resourceId = "book-1",
+                mutationKind = ReaderMutationKind.UPSERT,
+                status = ReaderSyncStatus.REJECTED,
+                rejection = ReaderSyncRejection(
+                    code = ReaderSyncRejectionCode.UNSUPPORTED_MUTATION,
+                    detail = "this resource does not accept that",
+                    retryable = false,
+                ),
+            ),
+        )
+        engine.recordStatus("book-1", ReaderLibraryStatus.ARCHIVED)
+        advanceUntilIdle()
+
+        val error = engine.state.value.lastError
+        assertTrue(error is AccountSyncError.Rejected)
+        assertEquals("unsupported_mutation", (error as AccountSyncError.Rejected).code)
+        assertEquals("book-1", error.resourceId)
+        assertEquals("a refused entry is not retried", 0, engine.state.value.queued)
+    }
+
+    @Test
+    fun `a conflict result is adopted, never prompted`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.answerMutations(
+            ReaderSyncMutationResult(
+                idempotencyKey = "key-1",
+                resourceType = ReaderResourceType.LIBRARY_ITEM,
+                resourceId = "book-1",
+                mutationKind = ReaderMutationKind.UPSERT,
+                status = ReaderSyncStatus.CONFLICT,
+                canonicalPayload = itemPayload("book-1", "Dune", status = "archived"),
+                conflict = ReaderSyncConflict(
+                    conflictId = "c-1",
+                    code = ReaderSyncConflictCode.REVISION_CONFLICT,
+                    remoteRevision = 12,
+                    canonicalPayload = itemPayload("book-1", "Dune", status = "archived"),
+                ),
+            ),
+        )
+        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals("the backend's value wins, with no decision asked of anybody", ReaderLibraryStatus.ARCHIVED, row.status)
+        assertEquals(12L, row.revision)
+        assertNull(engine.state.value.lastError)
+        assertEquals(0, engine.state.value.queued)
+    }
+
+    @Test
+    fun `nothing but library_item mutations is ever produced`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        // Each action is answered, so each drains: an envelope the backend does
+        // not answer is deliberately kept and retried under the same key, which
+        // would otherwise pile the earlier ones onto every later batch.
+        admit("key-1", ReaderMutationKind.DELETE)
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+        admit("key-2", ReaderMutationKind.RESTORE)
+        engine.undoRemove("book-1")
+        advanceUntilIdle()
+        admit("key-3", ReaderMutationKind.UPSERT)
+        engine.recordOpened("book-1")
+        advanceUntilIdle()
+        admit("key-4", ReaderMutationKind.UPSERT)
+        engine.recordFinished("book-1")
+        advanceUntilIdle()
+
+        val envelopes = gateway.submitted.flatten()
+        assertTrue(envelopes.isNotEmpty())
+        envelopes.forEach { assertEquals(ReaderResourceType.LIBRARY_ITEM, it.resourceType) }
+        assertEquals(
+            listOf(
+                ReaderMutationKind.DELETE,
+                ReaderMutationKind.RESTORE,
+                ReaderMutationKind.UPSERT,
+                ReaderMutationKind.UPSERT,
+            ),
+            envelopes.map { it.mutationKind },
+        )
+    }
+
+    // ------------------------------------------------------- cursor expiry
+
+    @Test
+    fun `an expired cursor re-bootstraps and sends nothing new`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.APPLIED, revision = 2, payload = itemPayload("book-1", "Dune", status = "finished"), key = "key-1"),
+        )
+        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+        advanceUntilIdle()
+        assertEquals(1, gateway.submitted.size)
+
+        gateway.calls.clear()
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune", status = ReaderLibraryStatus.FINISHED)))
+        gateway.deltaResponses = queueOf(
+            deltas(status = ReaderDeltaStatus.CURSOR_EXPIRED, latestCursor = "77", rebootstrapRequired = true),
+            deltas(latestCursor = "77"),
+        )
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+
+        assertEquals("nothing may be re-sent by a re-bootstrap", 1, gateway.submitted.size)
+        assertEquals(listOf("Dune"), engine.state.value.books.map { it.title })
+        assertEquals("77", document("user-1").cursor)
+        assertFalse(gateway.calls.any { it.startsWith("applyMutations") })
+    }
+
+    // ------------------------------------------------------ capability gate
+
+    @Test
+    fun `an unavailable capability defers with the reason and sends no library request`() = runTest(dispatcher) {
+        gateway.capability = ReaderSyncCapability(
+            availability = ReaderCapabilityAvailability.UNAVAILABLE,
+            reason = ReaderCapabilityReason.SERVICE_NOT_ENABLED,
+        )
+        val engine = engine()
+        signIn("user-1")
+
+        assertEquals(listOf("syncCapability()"), gateway.calls)
+        assertEquals(AccountSyncPhase.DEFERRED, engine.state.value.phase)
+        assertEquals(ReaderCapabilityReason.SERVICE_NOT_ENABLED, engine.state.value.capabilityReason)
+        assertNull("an unavailable capability is not an error", engine.state.value.lastError)
+        assertNull("and never a sign-out", document("user-1").cursor)
+    }
+
+    @Test
+    fun `an undeclared capability is unavailable, not an error`() = runTest(dispatcher) {
+        gateway.capability = ReaderSyncCapability.UNDECLARED
+        val engine = engine()
+        signIn("user-1")
+
+        assertEquals(listOf("syncCapability()"), gateway.calls)
+        assertEquals(AccountSyncPhase.DEFERRED, engine.state.value.phase)
+        assertEquals(ReaderCapabilityReason.UNKNOWN, engine.state.value.capabilityReason)
+    }
+
+    // -------------------------------------------------------------- offline
+
+    @Test
+    fun `offline keeps the queue and the last known rows`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.nextFailure = ReaderAuthException.NetworkUnavailable(java.io.IOException("no network"))
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        assertEquals(AccountSyncPhase.OFFLINE, engine.state.value.phase)
+        assertEquals(AccountSyncError.NetworkUnavailable, engine.state.value.lastError)
+        assertEquals("the queued removal is kept", 1, engine.state.value.queued)
+        assertEquals("key-1", document("user-1").outbox.single().idempotencyKey)
+    }
+
+    // -------------------------------------------------------------- D4
+
+    @Test
+    fun `signing out keeps the store and takes the account rows off the shelf`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+        assertTrue(engine.state.value.books.isNotEmpty())
+
+        session.value = ReaderAccountState.SignedOut()
+        advanceUntilIdle()
+
+        assertEquals(AccountSyncPhase.SIGNED_OUT, engine.state.value.phase)
+        assertTrue(engine.state.value.books.isEmpty())
+        assertTrue("sign-out deletes nothing", storeFile("user-1").isFile)
+        assertEquals(listOf("Dune"), document("user-1").books.map { it.title })
+    }
+
+    @Test
+    fun `signing in again to the same account restores the rows and sends the held queue once`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.nextFailure = ReaderAuthException.NetworkUnavailable(java.io.IOException("no network"))
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+        assertEquals(1, document("user-1").outbox.size)
+
+        session.value = ReaderAccountState.SignedOut()
+        advanceUntilIdle()
+        gateway.submitted.clear()
+        admit("key-1", ReaderMutationKind.DELETE)
+        gateway.libraryResponses = queueOf(libraryOf())
+        signIn("user-1")
+
+        assertEquals(listOf("key-1"), gateway.submitted.single().map { it.idempotencyKey })
+        assertEquals("the queue is admitted once", 0, document("user-1").outbox.size)
+        assertEquals(AccountSyncPhase.IDLE, engine.state.value.phase)
+    }
+
+    @Test
+    fun `a different account starts empty and discards the previous account's held queue`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.nextFailure = ReaderAuthException.NetworkUnavailable(java.io.IOException("no network"))
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+        assertEquals(1, document("user-1").outbox.size)
+
+        gateway.submitted.clear()
+        gateway.libraryResponses = queueOf(libraryOf(item("book-9", "Persuasion")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "40"))
+        signIn("user-2")
+
+        assertEquals(listOf("Persuasion"), engine.state.value.books.map { it.title })
+        assertEquals("the other account's queue must never be sent", 0, gateway.submitted.size)
+        assertEquals("user-1's queue is discarded", 0, document("user-1").outbox.size)
+        assertEquals("but user-1's rows are left alone", listOf("Dune"), document("user-1").books.map { it.title })
+    }
+
+    @Test
+    fun `a session the backend rejects ends in the signed-out state with its reason`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        gateway.nextFailure = ReaderAuthException.SignedOut(code = "session_revoked", requestId = "req-9")
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+
+        assertEquals(AccountSyncPhase.SIGNED_OUT, engine.state.value.phase)
+        assertEquals(
+            AccountSyncError.SessionGone("session_revoked", "req-9"),
+            engine.state.value.lastError,
+        )
+        assertTrue("D4 deletes nothing", storeFile("user-1").isFile)
+
+        // `:reader-auth` drops the session behind this; the reason survives that
+        // transition, and is shown once.
+        session.value = ReaderAccountState.SignedOut()
+        advanceUntilIdle()
+        assertEquals(
+            AccountSyncError.SessionGone("session_revoked", "req-9"),
+            engine.state.value.lastError,
+        )
+    }
+
+    // ------------------------------------------------------------- helpers
+
+    /** Answer the next batch's single envelope as admitted, with an empty canonical payload. */
+    private fun admit(key: String, kind: ReaderMutationKind) {
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.APPLIED, revision = 2, payload = JsonObject(emptyMap()), key = key, kind = kind),
+        )
+    }
+
+    private fun TestScope.signIn(userId: String) {
+        session.value = ReaderAccountState.SignedIn(userId = userId, email = null)
+        advanceUntilIdle()
+    }
+
+    private fun storeFile(userId: String): File {
+        stores.forUser(userId)
+        return directory.listFiles()!!
+            .filter { it.name.endsWith(".json") }
+            .single { file ->
+                val store = FileAccountLibraryStore(file)
+                (store.load() as? AccountLibraryLoad.Loaded)?.document?.userId == userId
+            }
+    }
+
+    private fun document(userId: String): AccountLibraryDocument =
+        (stores.forUser(userId).load() as AccountLibraryLoad.Loaded).document
+
+    private fun <T> queueOf(vararg values: T): ArrayDeque<T> = ArrayDeque(values.toList())
+
+    private fun libraryOf(vararg items: ReaderLibraryItem) =
+        ReaderLibraryResponse(requestId = REQUEST_ID, items = items.toList())
+
+    private fun item(
+        id: String,
+        title: String,
+        status: ReaderLibraryStatus = ReaderLibraryStatus.QUEUED,
+    ) = ReaderLibraryItem(
+        book = ReaderBook(
+            id = id,
+            title = title,
+            createdAt = SERVER_TIME,
+            updatedAt = SERVER_TIME,
+            author = "Frank Herbert",
+            language = "en",
+        ),
+        status = status,
+        createdAt = SERVER_TIME,
+        updatedAt = SERVER_TIME,
+        assets = listOf(
+            ReaderBookAsset(
+                assetId = "asset-$id",
+                bookId = id,
+                kind = ReaderBookAssetKind.EPUB,
+                uploadStatus = "ready",
+                createdAt = SERVER_TIME,
+                updatedAt = SERVER_TIME,
+                checksum = "sha-$id",
+            ),
+        ),
+        coverStatus = ReaderCoverStatus.COVERED,
+    )
+
+    private fun itemPayload(id: String, title: String, status: String) = buildJsonObject {
+        put(
+            "book",
+            buildJsonObject {
+                put("id", JsonPrimitive(id))
+                put("title", JsonPrimitive(title))
+            },
+        )
+        put("status", JsonPrimitive(status))
+        put(
+            "assets",
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("asset_id", JsonPrimitive("asset-$id"))
+                        put("checksum", JsonPrimitive("sha-$id"))
+                    },
+                )
+            },
+        )
+    }
+
+    private fun deltas(
+        status: ReaderDeltaStatus = ReaderDeltaStatus.OK,
+        latestCursor: String,
+        nextCursor: String? = null,
+        changes: List<ReaderSyncChange> = emptyList(),
+        hasMore: Boolean = false,
+        rebootstrapRequired: Boolean = false,
+    ) = ReaderSyncDeltaResponse(
+        requestId = REQUEST_ID,
+        status = status,
+        minimumValidCursor = "0",
+        latestCursor = latestCursor,
+        changes = changes,
+        nextCursor = nextCursor,
+        hasMore = hasMore,
+        rebootstrapRequired = rebootstrapRequired,
+    )
+
+    private fun change(
+        cursor: String,
+        resourceId: String,
+        kind: ReaderMutationKind,
+        payload: JsonObject,
+    ) = ReaderSyncChange(
+        cursor = cursor,
+        resourceType = ReaderResourceType.LIBRARY_ITEM,
+        resourceId = resourceId,
+        revision = cursor.toLong(),
+        kind = kind,
+        serverAdmittedAt = SERVER_TIME,
+        canonicalPayload = payload,
+    )
+
+    private fun result(
+        resourceId: String,
+        status: ReaderSyncStatus,
+        revision: Long,
+        payload: JsonObject,
+        key: String,
+        kind: ReaderMutationKind = ReaderMutationKind.UPSERT,
+        admission: ReaderServerAdmission = ReaderServerAdmission.ACCEPTED,
+    ) = ReaderSyncMutationResult(
+        idempotencyKey = key,
+        resourceType = ReaderResourceType.LIBRARY_ITEM,
+        resourceId = resourceId,
+        mutationKind = kind,
+        status = status,
+        canonicalPayload = payload,
+        serverAdmission = admission,
+        revision = revision,
+        cursor = revision.toString(),
+        serverAdmittedAt = SERVER_TIME,
+    )
+
+    private companion object {
+        const val REQUEST_ID: String = FakeReaderLibraryGateway.REQUEST_ID
+        const val SERVER_TIME: String = "2026-09-14T09:00:00Z"
+        const val CLIENT_TIME: String = "2026-09-14T09:30:00Z"
+    }
+}

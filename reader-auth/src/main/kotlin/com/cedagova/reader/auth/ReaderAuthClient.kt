@@ -280,6 +280,33 @@ class ReaderAuthClient internal constructor(
         }
 
         /**
+         * The same client a host gets from [create], wired to a caller-supplied
+         * [engine] and [store] instead of OkHttp and the Keystore (#112).
+         *
+         * It exists because a module layered on this one — `:reader-library` —
+         * has to prove its operations against the *real* call policy: the
+         * bearer, the single-flight refresh and every 401/403/429/502 branch
+         * are this module's behaviour, and a hand-written double of
+         * [ReaderApiClient] would prove none of it. Every constructor here is
+         * `internal`, so without this seam such a test could only be written
+         * inside this module, where the code under test does not live.
+         *
+         * It is for tests. Nothing about the returned client differs from a
+         * production one — this is [build] with no defaults changed — but a
+         * real host has no reason to choose its own engine, and
+         * [ReaderAuthException.NotConfigured] is still thrown for a blank
+         * service value exactly as [create] throws it.
+         */
+        fun createForTests(
+            config: ReaderAuthConfig,
+            store: SessionStore,
+            engine: HttpClientEngine,
+            clock: ReaderClock = ReaderClock.System,
+            waiter: RetryWaiter = RetryWaiter.Delay,
+            requestIds: () -> String = { UUID.randomUUID().toString().lowercase() },
+        ): ReaderAuthClient = build(config, store, engine, clock, waiter, requestIds)
+
+        /**
          * The wiring shared by production and tests. The three SDK defaults the
          * contract overrides are set here and pinned by `SdkDefaultsTest`:
          *
