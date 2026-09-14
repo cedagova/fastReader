@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/104
 - Planning PR: https://github.com/cedagova/fastReader/pull/111
-- Status: In progress
+- Status: Review
 - Root classification: INCREMENTAL
 - Delivery topology: INCREMENTAL
 - Planner: Planning lead (Claude)
@@ -229,8 +229,9 @@ All FastReader work stays in `cedagova/fastReader`. System-level shape:
    Storage (TUS upload, grant download) use the grant's own headers on a plain
    HTTP client, never the bearer. The module pins the OpenAPI identity above
    and proves that every request and response shape it uses agrees with that
-   pinned document (owner decision P1 below fixes whether the models are
-   hand-written and contract-tested or generated).
+   pinned document: hand-written kotlinx.serialization models on the existing
+   Ktor stack, contract-tested against the committed OpenAPI document (owner
+   decision P1, 2026-09-14: Choose A).
 2. **Account state lives beside the device catalog, not inside it.** A
    per-account store under private storage, keyed by the account's user id,
    holds the account book rows (canonical id, content identity, title, author,
@@ -294,7 +295,7 @@ All FastReader work stays in `cedagova/fastReader`. System-level shape:
    copies, the Spanish twin, the per-sentence table, README and
    `docs/release.md` to describe exactly what leaves the device after that
    increment, and the release gate's verify step passes on a release build
-   (AD-27). Version identity follows owner decision P2.
+   (AD-27). Version identity follows AD-28.
 9. **Increment 005 is the proof and the log.** With 001–004 on `main`, the
    full round trip of the definition's success measure is run once against
    stage with reader-web as the other device and recorded under
@@ -316,8 +317,9 @@ constrained by the invariants and acceptance below.
   did with the gateway seam. The module depends on nothing under `:app`. Its
   models are validated against the pinned OpenAPI identity in unit tests so
   drift against the published contract is caught in CI, mirroring reader-web's
-  drift check. Whether the models are hand-written or generated is owner
-  decision P1.
+  drift check. The models are hand-written on the existing stack (owner
+  decision P1, 2026-09-14: Choose A); generated models may replace them inside
+  the same boundary once Chunipers publishes archives (#512).
 - **AD-20 — Account state is a separate, account-scoped store.** Not the
   device catalog: the codec drops unknown keys, the catalog's schema is the
   device library's contract, and D4 needs per-account isolation. One JSON
@@ -371,9 +373,14 @@ constrained by the invariants and acceptance below.
   table) describe exactly what leaves the device with that increment merged;
   `PrivacyStatementTest` passes; `scripts/release.sh` verify passes on a
   release build with the permission and cleartext proofs unchanged.
-- **AD-28 — Version identity per owner decision P2** (recorded below once
-  decided): whether v1.6.0 is published before 001 merges and how each
-  increment moves `version.properties` and the release-notes file.
+- **AD-28 — Version identity (owner decision P2, 2026-09-14: Choose A).**
+  v1.6.0 is published by the owner before increment 001 merges; INC001's
+  Ready-for-owner gate states that precondition. LEAF704 moves
+  `version.properties` to 1.7.0 / versionCode 9 and writes
+  `docs/release-notes/v1.7.0.md` with the 001 statement; increments 002–004
+  edit the current unreleased notes file in place and bump the version only
+  when the owner has meanwhile published the current one. No leaf cuts a
+  release.
 
 ## Execution graph and waves
 
@@ -394,7 +401,8 @@ own increment.
   - Completion rule: `main` green in CI; REQ-501–504, 508–509, 512–514 and
     516 acceptance recorded on the leaves against stage with reader-web as
     the other device; AD-27 holds; no import, download or position code
-    reachable from the UI.
+    reachable from the UI. Precondition at Ready for owner (AD-28): v1.6.0 is
+    published from `main` before this increment merges.
 - **002 Add a device book to the account (#107)** — topology `COLLECTOR`.
   - wave 1: LEAF801 publication-import client with resumable transfer (in
     `:reader-library`).
@@ -484,7 +492,7 @@ repositories own the contracts and receive proposals only.
   (filed under #110) and 001's stage acceptance waits on it.
 - **Second HTTP/JSON stack.** Generating Kotlin with reader-api's pinned
   options brings OkHttp + Moshi beside Ktor + kotlinx.serialization. Bound:
-  owner decision P1; the recommended option avoids it.
+  owner decision P1 (Choose A avoids it).
 - **TUS transfer on a phone network.** Interrupted uploads, expired grants,
   wrong offsets. Bound: AD-26 — chunk within the grant, HEAD before PATCH,
   re-admit on expiry with the same `client_import_id`; acceptance includes an
@@ -504,7 +512,7 @@ repositories own the contracts and receive proposals only.
   reading the account store, keep the file); acceptance REQ-516 covers copy,
   queue and re-sign-in.
 - **Privacy text getting ahead of `main`.** Bound: AD-27 is a completion rule
-  per increment, and version identity follows P2.
+  per increment, and version identity follows AD-28.
 - **Scope creep into notes, bookmarks, covers, preferences, catalog.**
   Bound: non-goals; the contract module exposes only the operations the
   leaves use.
@@ -526,7 +534,7 @@ under the same idempotency keys (replayed, never re-admitted). Downloaded
 copies are files under private storage: a reverted build ignores them; a
 reinstall removes them (backup exclusion). Server-side data is the account's
 and is untouched by any rollback here. No release is cut by this plan; version
-identity per P2.
+identity per AD-28.
 
 ## Issue publication manifest
 
@@ -562,8 +570,8 @@ identity per P2.
   `post(path, body)` beside `get`/`put`, pinned by its mock-engine tests,
   `CONTRACT.md` untouched. The OpenAPI document at the pinned identity is
   committed under the module with its sha256 recorded, and a unit test proves
-  every shape the module sends or reads agrees with it (P1 decides
-  hand-written-plus-contract-test or generated). App-side: the typed
+  every shape the module sends or reads agrees with it (P1: hand-written
+  models, contract test as the drift gate). App-side: the typed
   library gateway interface, production pass-through and test fake. Owns
   REQ-514's contract pin. Validation: mock-engine tests for each operation
   including `replayed`, `rejected`, `cursor_expired`, 401/429/502 branches;
@@ -604,7 +612,8 @@ identity per P2.
   last-opened for account books; nothing about device books, positions yet,
   WPM, settings or crash reports); `PrivacyStatementTest`'s literal claims
   updated; the pinned OpenAPI identity documented for REQ-514; `version.
-  properties` and release-notes file per P2; `docs/agent-first-development.md`
+  properties` to 1.7.0 / 9 and `docs/release-notes/v1.7.0.md` written with the
+  new block, `v1.6.0.md` untouched (AD-28); `docs/agent-first-development.md`
   gains the `:reader-library` row (mock-engine tests, contract test, the stage
   loop with reader-web). Owns REQ-513 for 001 and REQ-514's documentation.
   Validation: `PrivacyStatementTest`; `scripts/release.sh` verify on a release
@@ -741,12 +750,13 @@ The sync engine's idempotency is proven by the stage ledger (`applied` then
 
 ## Assumptions and open questions
 
-Two material decisions are open; both are recorded here as the Owner
-decision brief presented in the thread. Planning continues on everything
-else; LEAF701's model strategy and LEAF704's version lines are the only text
-that changes with the answers.
+None open. Both material decisions were presented as the Owner decision
+brief below and decided by the owner on 2026-09-14, verbatim "Choose A
+(Recommended)" for each; the brief is kept as the record and the decided
+values are carried in AD-19/AD-28, LEAF701, LEAF704 and INC001's completion
+rule.
 
-### Owner decision brief
+### Owner decision brief (decided 2026-09-14)
 
 **P1 — How FastReader obtains the Reader API request/response shapes.**
 
@@ -796,7 +806,7 @@ publishes real archives; that is a later swap inside LEAF701's boundary.
 
 *Blocked.* LEAF701's model text; nothing else.
 
-*Reply.* `Choose A`, `Choose B` or `Choose C`.
+*Decision (2026-09-14).* Choose A.
 
 **P2 — Version identity while the increments land.**
 
@@ -841,7 +851,7 @@ exact.
 
 *Blocked.* LEAF704's version lines and INC001's precondition; nothing else.
 
-*Reply.* `Choose A` or `Choose B`, or name a different version number.
+*Decision (2026-09-14).* Choose A.
 
 ### Other assumptions (non-material, recorded)
 
@@ -872,6 +882,5 @@ baseline; implementation work remains.
 
 ## Publication verification
 
-Pending: owner decisions P1 and P2, review-ready validation, content review,
-leaf publication, graph reconciliation and verification, semantic-anchor
-review.
+Owner decisions P1 and P2 recorded 2026-09-14. Pending: content review, leaf
+publication, graph reconciliation and verification, semantic-anchor review.
