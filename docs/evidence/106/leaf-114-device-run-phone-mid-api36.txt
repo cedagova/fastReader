@@ -1,0 +1,21 @@
+LEAF703 (#114) — device run, Phone_Mid_API36 (1080p reference phone, Android 16)
+
+Phase A: everything provable with no signed-in session.
+
+  build          app/debug, installDebug at the PR head
+  account state  Settings -> Reader account: "Signed out"
+  shelf          one device book (Pride and Prejudice, Jane Austen), added
+                 through the real SAF picker from /sdcard/Download/fastreader
+  observed       no account notice, no account-only row, no "Remove from
+                 account" control: exactly the v1.6.0 shelf (D4, REQ-516)
+
+  adb logcat -d -s AndroidRuntime:E
+  <no output>
+
+Phase B (signed in against stage, with reader-web as the other device) is
+the OWNER's run: REQ-501, REQ-508, REQ-509 and REQ-516's sign-in half are
+marked pending in the PR until it is done. The device book above is the one
+half of the merge that is already in place; its content SHA-256 is
+c25cf3d9ad4d41147ecc6947debcf981a961fd6b69a4219d9892af50b934c8bb, so
+uploading that same EPUB on reader-web is what the shelf must show as one
+row and not two (AD-23).
