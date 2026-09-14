@@ -127,6 +127,10 @@ fun ReaderAccountScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
+            // First, above the forms: on the reference phone the signed-out
+            // forms run past one viewport, and an outcome under them was a
+            // rejection a reader had to scroll to find (seen on the emulator).
+            ActivityAndOutcome(state, actions)
             when (state) {
                 // Blank rather than a spinner, for the same reason the launch
                 // routing is blank: the stored session is one small file read,
@@ -136,7 +140,6 @@ fun ReaderAccountScreen(
                 is ReaderAccountState.SignedOut -> SignedOut(state, actions)
                 is ReaderAccountState.SignedIn -> SignedIn(state, actions)
             }
-            ActivityAndOutcome(state, actions)
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -329,7 +332,7 @@ private fun Capabilities(capabilities: LoadedCapabilities) {
 }
 
 /**
- * The line under the forms: the operation in flight, or the last outcome. The
+ * The line above the forms: the operation in flight, or the last outcome. The
  * outcome is a live region, so a screen reader hears a rejection when it
  * appears rather than on the next swipe (REQ-060), and it can be dismissed.
  */
@@ -338,8 +341,6 @@ private fun ActivityAndOutcome(state: ReaderAccountState, actions: ReaderAccount
     val activity = state.activity
     val outcome = state.outcome
     if (activity == null && outcome == null) return
-    Spacer(Modifier.height(16.dp))
-    HorizontalDivider()
     Spacer(Modifier.height(12.dp))
     if (activity != null) {
         Text(
@@ -368,6 +369,8 @@ private fun ActivityAndOutcome(state: ReaderAccountState, actions: ReaderAccount
             Text(stringResource(R.string.account_dismiss))
         }
     }
+    Spacer(Modifier.height(4.dp))
+    HorizontalDivider()
 }
 
 /**

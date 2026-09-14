@@ -332,7 +332,7 @@
     <string name="account_sign_out_others">Cerrar sesión en otros dispositivos</string>
     <string name="account_sign_out_others_summary">Termina las sesiones de esta cuenta en todos los demás dispositivos; este mantiene la suya.</string>
 
-    <string name="account_outcome_code_sent">Código enviado. Mira tu correo y escribe los 6 dígitos arriba.</string>
+    <string name="account_outcome_code_sent">Código enviado. Mira tu correo y escribe los 6 dígitos abajo.</string>
     <string name="account_outcome_recovery_sent">Código de recuperación enviado. Escríbelo en el campo del código y verifícalo; después pon una contraseña nueva.</string>
     <string name="account_outcome_password_set">Contraseña establecida.</string>
     <string name="account_outcome_signed_out">Sesión cerrada en este dispositivo.</string>

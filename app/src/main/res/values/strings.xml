@@ -289,7 +289,7 @@
     <string name="account_sign_out_others">Sign out other devices</string>
     <string name="account_sign_out_others_summary">Ends this account\'s sessions on every other device; this one stays signed in.</string>
 
-    <string name="account_outcome_code_sent">Code sent. Check your email and type the 6 digits above.</string>
+    <string name="account_outcome_code_sent">Code sent. Check your email and type the 6 digits below.</string>
     <string name="account_outcome_recovery_sent">Recovery code sent. Type it in the code field and verify it, then set a new password.</string>
     <string name="account_outcome_password_set">Password set.</string>
     <string name="account_outcome_signed_out">Signed out on this device.</string>
