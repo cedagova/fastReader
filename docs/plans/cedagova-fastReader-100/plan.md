@@ -124,10 +124,10 @@ release-notes block against the no-bump non-goal; the success-path request
 id against "the library itself is unchanged") were first recorded as
 overturnable recommendations and, on the independent reviewer's finding
 against head `0ba8b5bf1d9bf83ff81f1fc0ef989a3794e5913f`, were returned to
-the owner: the Owner decision brief in Assumptions awaits the owner's
-one-line replies, and until both are recorded the candidate is not
-re-presented and readiness is blocked. Neither reply changes the graph, the
-topology or the delivery shape — only direction items 4 and 6. Not
+the owner, who decided both on 2026-09-14 ("as recommended": Choose A and
+Choose A, recorded on the planning PR and in the Owner decision brief in
+Assumptions). Neither reply changed the graph, the topology or the delivery
+shape — only direction items 4 and 6. Not
 `DECOMPOSE`: see the split analysis above. Not `RESEARCH_REQUIRED`: the one runtime unknown (the stage
 email template delivering the code) is the definition's own assumption with
 the same fallback #93 recorded, and does not change the execution path.
@@ -305,12 +305,11 @@ behaviour do not change.
    reader-api already echoes) — for example a result value beside the
    document, or the id supplied by the caller. Headers, policy, retries and
    `CONTRACT.md` do not change; the library's own mock-engine tests pin the
-   addition. This is the only library edit and it is decision 2 of the
-   Owner decision brief in Assumptions, awaiting the owner's reply, because
-   REQ-407 (request id on screen) and REQ-414's sentence "the library itself
-   is unchanged" cannot both hold with the baseline API and the live stage
-   document carries no id. If the owner chooses failures-only, this item is
-   dropped and the surface shows request ids on failures alone.
+   addition. This is the only library edit; it is decision 2 of the Owner
+   decision brief in Assumptions, decided by the owner on 2026-09-14
+   (Choose A), because REQ-407 (request id on screen) and REQ-414's sentence
+   "the library itself is unchanged" cannot both hold with the baseline API
+   and the live stage document carries no id.
 5. **Signed-out and offline product unchanged.** Nothing outside Settings
    and the new surface changes; no account prompt appears anywhere else; no
    reading data is sent. The goldens outside `settings_*` and the new
@@ -332,13 +331,12 @@ behaviour do not change.
    rewritten: the permission, what it is for, that the reading product
    needs no account, and that `reader-auth/` is the library FastReader
    hosts (no host app). The release-notes block is decision 1 of the Owner
-   decision brief in Assumptions, awaiting the owner's reply: the
-   recommended path follows the repository's precedent — `version.properties`
+   decision brief in Assumptions, decided by the owner on 2026-09-14
+   (Choose A), following the repository's precedent: `version.properties`
    moves to the next version (1.6.0, versionCode 8) and
    `docs/release-notes/v1.6.0.md` is written with the new block and this
    change described, while `v1.5.0.md` stays the historical record of what
-   1.5.0 promised; no release is cut — and the alternative keeps 1.5.0 and
-   rewrites `v1.5.0.md`'s marked block.
+   1.5.0 promised; no release is cut.
 7. **Release gate.** `scripts/release.sh` replaces the INTERNET refusal
    with the new proof on the artifact: the badging's `uses-permission`
    lines are exactly `android.permission.INTERNET` and
@@ -382,7 +380,7 @@ behaviour do not change.
 Reversibility: every piece sits behind the app's gateway seam, the build
 script's value mechanism, or a shell gate; reverting the PR restores the
 1.5.0 promise exactly. The version bump and the library accessor are the
-two choices awaiting the owner's one-line replies (see Assumptions).
+two choices the owner decided on 2026-09-14 (see Assumptions).
 
 ## Issue publication manifest
 
@@ -470,19 +468,23 @@ in Assumptions.
 
 ## Assumptions and open questions
 
-### Owner decision brief — two one-line replies needed to resume
+### Owner decision brief — decided by the owner on 2026-09-14
 
-**Status: awaiting the owner's reply.** Both items were first recorded as
+**Status: decided.** Owner reply on the planning PR, 2026-09-14, verbatim
+"as recommended": **decision 1 = Choose A** (bump `version.properties` to
+1.6.0 / versionCode 8 and write `docs/release-notes/v1.6.0.md`; no release
+cut; `v1.5.0.md` stays as published) and **decision 2 = Choose A** (one
+additive, behaviour-neutral library accessor for a successful call's
+request id; `CONTRACT.md` untouched; pinned by the library's tests). The
+brief is kept below as the record. Both items were first recorded as
 overturnable recommendations; the independent reviewer (review of head
 `0ba8b5bf1d9bf83ff81f1fc0ef989a3794e5913f`, claim
 `76e45a00-0b49-4a6b-9020-34dd32a978ae`) returned them because each sets
 aside one sentence of the owner-approved definition, which is inconsistent
-with itself on both points. The reviewer picks neither side; the lead does
-not decide for the owner. Nothing else in the plan depends on the answers:
-they change direction items 4 and 6 only, never the graph, topology or
-delivery shape. Replies go on the planning PR; the lead then records them
-here, updates the root's leaf contract, and re-presents one head for a
-delta review.
+with itself on both points. The reviewer picked neither side and the lead
+did not decide for the owner. Nothing else in the plan depended on the
+answers: they fix direction items 4 and 6 only, never the graph, topology
+or delivery shape.
 
 #### Decision 1 — where the rewritten release-notes block lives
 
@@ -522,9 +524,8 @@ unchanged.
 
 A do-nothing option is not viable: the test fails.
 
-**Blocked:** direction item 6's release-notes sentence and REQ-409's
-release-notes copy. **Reply to resume:** `Choose A` (bump to 1.6.0) or
-`Choose B` (edit the 1.5.0 notes) on the planning PR.
+**Blocked until decided:** direction item 6's release-notes sentence and
+REQ-409's release-notes copy. **Owner's reply (2026-09-14):** Choose A.
 
 #### Decision 2 — the request id of a successful capabilities call
 
@@ -557,9 +558,8 @@ Benefit: REQ-414 literal. Cost: REQ-407's success-path id and its
 "Refresh shows a new request id" acceptance are dropped — a definition
 deviation. Reversibility: trivial. Execution: direction item 4 removed.
 
-**Blocked:** direction item 4 and the REQ-407 coverage row. **Reply to
-resume:** `Choose A` (add the accessor) or `Choose B` (failures only) on
-the planning PR.
+**Blocked until decided:** direction item 4 and the REQ-407 coverage row.
+**Owner's reply (2026-09-14):** Choose A.
 
 ### Non-material assumptions (implementer may adjust within the invariants)
 
@@ -598,7 +598,7 @@ Implementation work remains; this is not an `ALREADY_SATISFIED` plan.
 - Revision 2 batches the independent reviewer's finding 1 (the reachable
   operation set excludes `upsertProfile`) and both notes (the stage-verified
   request-id premise; the golden count) and persists the Owner decision
-  brief. It is not presented for re-review until the owner's two replies
-  are recorded in Assumptions; the next presented head then gets one
-  delta review.
+  brief. Revision 3 records the owner's replies of 2026-09-14 (Choose A,
+  Choose A) in Assumptions and in the root's leaf contract and is the head
+  presented for the delta review.
 - Exact-head approval lives in the native PR review, not here.
