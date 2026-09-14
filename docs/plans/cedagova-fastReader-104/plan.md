@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/104
 - Planning PR: https://github.com/cedagova/fastReader/pull/111
-- Status: Review
+- Status: Ready for implementation
 - Root classification: INCREMENTAL
 - Delivery topology: INCREMENTAL
 - Planner: Planning lead (Claude)
@@ -559,17 +559,17 @@ identity per AD-28.
 | INC003 | GROUP | ROOT | cedagova/fastReader | Read an account book on this device from a verified downloaded copy | COLLECTOR | INC002 | https://github.com/cedagova/fastReader/issues/108 |
 | INC004 | GROUP | ROOT | cedagova/fastReader | Reading position portable between FastReader and reader-web | COLLECTOR | INC003 | https://github.com/cedagova/fastReader/issues/109 |
 | INC005 | GROUP | ROOT | cedagova/fastReader | Chunipers alignment proposals filed and linked | DIRECT | INC004 | https://github.com/cedagova/fastReader/issues/110 |
-| LEAF701 | LEAF | INC001 | cedagova/fastReader | Reader library contract module on the authenticated client | None | None | Pending |
-| LEAF702 | LEAF | INC001 | cedagova/fastReader | Account store and foreground sync engine | None | LEAF701 | Pending |
-| LEAF703 | LEAF | INC001 | cedagova/fastReader | Account books on the shelf: keep in step, remove with Undo, sign out | None | LEAF702 | Pending |
-| LEAF704 | LEAF | INC001 | cedagova/fastReader | Truthful promises and contract pin for the account library | None | LEAF703 | Pending |
-| LEAF801 | LEAF | INC002 | cedagova/fastReader | Publication-import client with resumable transfer | None | None | Pending |
-| LEAF802 | LEAF | INC002 | cedagova/fastReader | Add a device book to the account with consent | None | LEAF801 | Pending |
-| LEAF811 | LEAF | INC003 | cedagova/fastReader | Verified private copies on the download grant | None | None | Pending |
-| LEAF812 | LEAF | INC003 | cedagova/fastReader | Download, read offline and free an account book's copy | None | LEAF811 | Pending |
-| LEAF821 | LEAF | INC004 | cedagova/fastReader | Portable position published and consumed through sync | None | None | Pending |
-| LEAF822 | LEAF | INC004 | cedagova/fastReader | Resume offer from another client's position | None | LEAF821 | Pending |
-| LEAF901 | LEAF | INC005 | cedagova/fastReader | Stage round-trip evidence and Chunipers proposal log closure | None | None | Pending |
+| LEAF701 | LEAF | INC001 | cedagova/fastReader | Reader library contract module on the authenticated client | None | None | https://github.com/cedagova/fastReader/issues/112 |
+| LEAF702 | LEAF | INC001 | cedagova/fastReader | Account store and foreground sync engine | None | LEAF701 | https://github.com/cedagova/fastReader/issues/113 |
+| LEAF703 | LEAF | INC001 | cedagova/fastReader | Account books on the shelf: keep in step, remove with Undo, sign out | None | LEAF702 | https://github.com/cedagova/fastReader/issues/114 |
+| LEAF704 | LEAF | INC001 | cedagova/fastReader | Truthful promises and contract pin for the account library | None | LEAF703 | https://github.com/cedagova/fastReader/issues/115 |
+| LEAF801 | LEAF | INC002 | cedagova/fastReader | Publication-import client with resumable transfer | None | None | https://github.com/cedagova/fastReader/issues/116 |
+| LEAF802 | LEAF | INC002 | cedagova/fastReader | Add a device book to the account with consent | None | LEAF801 | https://github.com/cedagova/fastReader/issues/117 |
+| LEAF811 | LEAF | INC003 | cedagova/fastReader | Verified private copies on the download grant | None | None | https://github.com/cedagova/fastReader/issues/118 |
+| LEAF812 | LEAF | INC003 | cedagova/fastReader | Download, read offline and free an account book's copy | None | LEAF811 | https://github.com/cedagova/fastReader/issues/119 |
+| LEAF821 | LEAF | INC004 | cedagova/fastReader | Portable position published and consumed through sync | None | None | https://github.com/cedagova/fastReader/issues/120 |
+| LEAF822 | LEAF | INC004 | cedagova/fastReader | Resume offer from another client's position | None | LEAF821 | https://github.com/cedagova/fastReader/issues/121 |
+| LEAF901 | LEAF | INC005 | cedagova/fastReader | Stage round-trip evidence and Chunipers proposal log closure | None | None | https://github.com/cedagova/fastReader/issues/122 |
 
 ### Planned leaf contracts (summaries; full contracts go to the issues)
 
@@ -895,5 +895,18 @@ baseline; implementation work remains.
 
 ## Publication verification
 
-Owner decisions P1 and P2 recorded 2026-09-14. Pending: content review, leaf
-publication, graph reconciliation and verification, semantic-anchor review.
+- Owner decisions P1 and P2 recorded 2026-09-14.
+- Content review: CHANGES_REQUESTED at `d732f591` (review 5202076361, one
+  required change R1 — carried REQ clauses across increments — plus five
+  non-blocking notes), addressed at `0876f801`; PR #111 review by
+  `cedagova-codex-reviewer[bot]`, claim `a052ad20-03fc-44e6-8e1f-6393ee753342`.
+- Leaf issues published 2026-09-14: LEAF701 #112, LEAF702 #113, LEAF703 #114,
+  LEAF704 #115, LEAF801 #116, LEAF802 #117, LEAF811 #118, LEAF812 #119,
+  LEAF821 #120, LEAF822 #121, LEAF901 #122. Tracking metadata added to root
+  #104; GROUP / sequence / delivery metadata added to increments #106–#110
+  with their definition bodies preserved.
+- `plan validate --phase publication-ready`, `plan reconcile-graph` and
+  `plan verify-graph`: recorded on PR #111 at the published head.
+- Final exact-head validation (`ready-for-implementation` with --head and
+  --reviewed-head) runs after the official marked approval and is recorded on
+  PR #111.
