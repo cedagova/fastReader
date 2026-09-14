@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Empty on purpose. :reader-library adds no permission, no component and no
+  resource: it is typed calls over the authenticated client :reader-auth
+  already owns, and :reader-auth's manifest is what merges INTERNET into a
+  host. A host that merges this module gains nothing it did not already have.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

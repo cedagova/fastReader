@@ -25,3 +25,6 @@ include(":app")
 // The reusable Reader auth library (#92, #93). It depends on nothing under
 // :app; since #100 FastReader's :app is its host. See reader-auth/README.md.
 include(":reader-auth")
+// The Reader account-library client (#112). It depends on :reader-auth and on
+// nothing under :app; see reader-library/README.md.
+include(":reader-library")

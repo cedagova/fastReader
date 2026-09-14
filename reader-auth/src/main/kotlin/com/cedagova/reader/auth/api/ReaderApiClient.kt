@@ -31,7 +31,8 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The one thin reader-api client (CONTRACT.md, "reader-api call policy").
- * It knows the three routes the contract needs and exposes [get] and [put] so
+ * It knows the three routes the contract needs and exposes [get], [put] and
+ * [post] so
  * a host reuses the same headers, timeout, refresh, and error policy for every
  * further route. `ReaderApiPolicyTest` pins each branch.
  *
@@ -88,6 +89,19 @@ class ReaderApiClient internal constructor(
     /** Any further protected `PUT` a host needs, under the same policy. */
     suspend fun put(path: String, body: JsonObject): JsonObject =
         request(HttpMethod.Put, path, authenticated = true, body = body.toString())
+
+    /**
+     * Any further protected `POST` a host needs, under the same policy (#112).
+     *
+     * Additive and behaviour-neutral: it is [put] with a different method, so
+     * the headers, the timeout, the refresh-and-retry and every error branch
+     * above are the same ones [get] and [put] already use, and no existing
+     * caller changes. `CONTRACT.md` describes the policy, not the verb list, so
+     * it is unchanged. [path] may carry a query string; the caller is
+     * responsible for it being a route the published contract declares.
+     */
+    suspend fun post(path: String, body: JsonObject): JsonObject =
+        request(HttpMethod.Post, path, authenticated = true, body = body.toString())
 
     private suspend fun request(
         method: HttpMethod,

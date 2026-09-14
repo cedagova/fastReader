@@ -5,6 +5,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.cedagova.fastreader.account.LibraryReaderAccountGateway
+import com.cedagova.fastreader.account.ReaderApiLibraryGateway
+import com.cedagova.fastreader.account.ReaderLibraryGateway
 import com.cedagova.fastreader.account.ReaderAccountConfiguration
 import com.cedagova.fastreader.account.ReaderAccountController
 import com.cedagova.fastreader.crash.CrashReportStore
@@ -12,6 +14,7 @@ import com.cedagova.fastreader.crash.installCrashReporting
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.reader.auth.ReaderAuthClient
+import com.cedagova.reader.library.ReaderLibraryClient
 import com.cedagova.reader.auth.ReaderAuthConfig
 import com.cedagova.reader.auth.ReaderAuthException
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +69,19 @@ class FastReaderApplication : Application() {
      */
     val readerAuth: ReaderAuthClient? by lazy {
         if (readerAccountConfig.isConfigured) ReaderAuthClient.create(this, readerAccountConfig) else null
+    }
+
+    /**
+     * The account-library seam (#112), or `null` on an unconfigured build for
+     * the same reason [readerAuth] is: there is no client to call through.
+     *
+     * Nothing reads it yet — the account store and sync engine that will
+     * (LEAF702) are the next increment's work. It is wired here so the
+     * production path is the one the tests' fake stands in for, rather than
+     * being assembled for the first time by whoever needs it.
+     */
+    val readerLibrary: ReaderLibraryGateway? by lazy {
+        readerAuth?.let { ReaderApiLibraryGateway(ReaderLibraryClient(it.api)) }
     }
 
     /** The account surface's state model, process-scoped like the library graph. */

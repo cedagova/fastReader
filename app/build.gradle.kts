@@ -191,6 +191,9 @@ dependencies {
     // android.permission.INTERNET is declared; manifest merging delivers it to
     // this app, and ReaderAccountManifestTest reads the merge back.
     implementation(project(":reader-auth"))
+    // The account-library contract module (#112). It depends on :reader-auth;
+    // :app is its host, exactly as it is :reader-auth's.
+    implementation(project(":reader-library"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

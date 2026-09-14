@@ -171,6 +171,15 @@ const val PRE_AUTH = "GET /v1/reader/pre-auth?clientVersion=1.0.0"
 const val CAPABILITIES = "GET /v1/reader/capabilities?clientVersion=1.0.0"
 const val PROFILE = "PUT /v1/reader/profile"
 
+/**
+ * A protected route that is *not* one of the three the contract names, used to
+ * pin the generic `get`/`put`/`post` verbs a host builds further calls on. The
+ * path is deliberately not a real reader-api route: this module knows the
+ * policy, not the route list.
+ */
+const val GENERIC_PATH = "/v1/reader/generic"
+const val GENERIC_POST = "POST /v1/reader/generic"
+
 const val CAPABILITIES_BODY = """{"schemaVersion":"reader.capabilities.v1","capabilities":{"library":"available"}}"""
 
 /** The one hour minus [inMargin] seconds a test needs to place a session on either side of the margin. */
