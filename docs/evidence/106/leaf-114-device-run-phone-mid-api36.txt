@@ -18,6 +18,22 @@ BUILD IDENTITY — the installed build IS this PR's head
   install had actually happened at f9c59a7. This run fixes that: the two SHA-256
   values above are the proof, not a claim.
 
+  Writing this file necessarily creates a later commit than the one it records,
+  so the binding is stated as something a reviewer can check rather than trust.
+  Every commit after 5660f90 on this branch touches ONLY `docs/evidence/106/`,
+  which no Gradle task consumes, so the debug APK is bit-identical at all of
+  them. Two commands settle it at whatever the PR head H is:
+
+    git diff --name-only 5660f90 <H>      # only docs/evidence/106/ paths
+    ./gradlew assembleDebug && shasum -a 256 app/build/outputs/apk/debug/app-debug.apk
+    # -> 2e296ddbc545f47bc2d1998c4e16cee13ffe21cddcb2b0fced4f910afb1576cd
+
+  Both were run here at 591e6bd (the commit that first carried this file): the
+  delta was the three files under docs/evidence/106/, the rebuilt APK hashed to
+  the same 2e296ddb…, it was installed again, and the device's base.apk hashed
+  to the same value a third time. The PR body records the same two checks at the
+  final head.
+
 WHAT WAS DRIVEN
 ---------------
   1. Launched com.cedagova.fastreader/.MainActivity after `adb logcat -c`.
