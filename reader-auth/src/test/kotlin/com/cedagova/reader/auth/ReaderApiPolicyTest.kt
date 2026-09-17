@@ -1,5 +1,6 @@
 package com.cedagova.reader.auth
 
+import com.cedagova.reader.auth.api.ReaderApiClient
 import com.cedagova.reader.auth.api.ReaderProfileUpdate
 import io.ktor.http.HttpStatusCode
 import kotlin.time.Duration.Companion.seconds
@@ -7,6 +8,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -248,6 +254,62 @@ class ReaderApiPolicyTest {
 
         assertTrue("$failure", failure is ReaderAuthException.NetworkUnavailable)
         assertEquals(listOf(CAPABILITIES), servers.routes())
+        assertNotNull(store.session)
+        client.close()
+    }
+
+    /**
+     * The one verb #112 added. It is [ReaderApiClient.put] with a different
+     * method, so the proof is that a `POST` carries the same headers, the same
+     * bearer, the same JSON content type and the caller's body verbatim — and
+     * that it walks the same refresh-and-retry branch on a 401 expiry, which is
+     * the only way to show the policy is shared rather than re-implemented.
+     */
+    @Test
+    fun `a POST carries the same headers, body and refresh policy as every other verb`() = runTest {
+        val body = buildJsonObject { put("mutations", JsonArray(emptyList())) }
+        servers.queue(
+            GENERIC_POST,
+            { json(apiError("auth.expired_token"), HttpStatusCode.Unauthorized) },
+            { json("""{"ok":true}""") },
+        )
+        servers.on(REFRESH_GRANT) { json(sessionJson("access-2", "refresh-2")) }
+        val client = client()
+
+        val document = client.api.post(GENERIC_PATH, body)
+
+        assertEquals(JsonPrimitive(true), document["ok"])
+        assertEquals(listOf(GENERIC_POST, REFRESH_GRANT, GENERIC_POST), servers.routes())
+        val attempts = servers.requestsTo(GENERIC_PATH)
+        assertEquals(2, attempts.size)
+        attempts.forEach { attempt ->
+            assertEquals("POST", attempt.method)
+            assertEquals("api.test", attempt.host)
+            assertEquals("reader-android", attempt.headers["X-Reader-Client"])
+            assertEquals("application/json", attempt.headers["Accept"])
+            assertTrue(attempt.headers["Content-Type"]!!.startsWith("application/json"))
+            assertEquals(body.toString(), attempt.body)
+            assertEquals("", attempt.query)
+        }
+        assertEquals("access-1", attempts[0].bearer)
+        assertEquals("access-2", attempts[1].bearer)
+        client.close()
+    }
+
+    /** The same verb's failures are the same branches: nothing about `POST` is special. */
+    @Test
+    fun `a POST maps 403 and a network failure to the existing branches`() = runTest {
+        servers.on(GENERIC_POST) { json(apiError("reader.forbidden", "req-403"), HttpStatusCode.Forbidden) }
+        val client = client()
+
+        val forbidden = runCatching { client.api.post(GENERIC_PATH, JsonObject(emptyMap())) }.exceptionOrNull()
+        assertTrue("$forbidden", forbidden is ReaderAuthException.Forbidden)
+        assertEquals("req-403", (forbidden as ReaderAuthException.Forbidden).requestId)
+        assertNotNull(store.session)
+
+        servers.on(GENERIC_POST) { networkFailure() }
+        val offline = runCatching { client.api.post(GENERIC_PATH, JsonObject(emptyMap())) }.exceptionOrNull()
+        assertTrue("$offline", offline is ReaderAuthException.NetworkUnavailable)
         assertNotNull(store.session)
         client.close()
     }

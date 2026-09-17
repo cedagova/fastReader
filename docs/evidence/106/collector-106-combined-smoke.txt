@@ -1,0 +1,69 @@
+Effort #106 (increment 001) — combined smoke on the final collector candidate
+
+Head           f8018ccd0df73ef72c61cf4bf5c101fe54f9e214
+Tree           1e3572f8989fb309a1d18d39ccacaca45975e1a5
+Branch         collector/106-account-library
+Device         Phone_Mid_API36 (1080p reference phone, Android 16)
+
+This is the only run that exercises all four leaves together on a real device.
+Each leaf proved its own half; nothing before this proved the combined build
+installs, launches and behaves at version 1.7.0 / 9.
+
+Integrated validation (worktree at the head above)
+
+  ./gradlew testDebugUnitTest verifyRoborazziDebug lint assembleDebug \
+      --no-build-cache --rerun-tasks
+  BUILD SUCCESSFUL - 163 actionable tasks, 163 executed
+
+  git status app/screenshots/   ->  empty
+  Every tracked golden is byte-identical at the combined head: the goldens the
+  leaves re-recorded are the goldens the combined tree carries, and nothing
+  drifted in integration.
+
+Build / install binding
+
+  built    app/build/outputs/apk/debug/app-debug.apk
+  sha256   c014282f6c00f8f4a16e98046658afad5aacf9a6eec3e0fb375999ac6fffd215
+  device   /data/app/~~.../com.cedagova.fastreader-.../base.apk
+  sha256   c014282f6c00f8f4a16e98046658afad5aacf9a6eec3e0fb375999ac6fffd215
+
+  The two digests are equal, so what was observed below is what this head
+  builds. (The digest is not reproducible in another worktree - it binds
+  build to install, and is not offered as a value to re-derive.)
+
+Observed, signed out
+
+  Shelf         one device book: Pride and Prejudice, Jane Austen, cover, 0% read.
+                No account notice, no account-only row, no account control.
+                D4 holds: signed out the shelf is v1.6.0's.
+
+  Shelf text    the complete uiautomator text set is 8 strings -
+                "0% read", "Add books", "Add folder", "Jane Austen", "Library",
+                "Pride and Prejudice", "Search books", "Sort: Recently read".
+                None of LEAF703's 19 account strings is among them. This is a
+                stronger claim than a screenshot: not "I did not see one", but
+                "the screen contains nothing else".
+
+  Settings      Version 1.7.0 (build 9)  <- the LEAF704 bump, on the device
+                Reader account: Signed out
+
+  Statement     the rewritten privacy text renders in full, including the
+                corrected retention sentence that the review round produced:
+                "That copy of the account's list is not deleted when you sign
+                out: it stays in that private storage ... and only uninstalling
+                FastReader or clearing its data removes it."
+
+  Private       adb shell run-as com.cedagova.fastreader ls files/
+  storage         catalog  covers  profileInstalled
+                No account-library/ directory - it is created once you sign in,
+                exactly as the statement says. Signed out, nothing of the
+                account library exists on the device.
+
+  Crashes       adb logcat -d -s AndroidRuntime:E   ->  no output
+                FATAL EXCEPTION / ANR in the whole buffer  ->  0
+
+Not covered here
+
+  Everything that needs a signed-in stage account or reader-web as the other
+  device. Those are owner steps 3-18 of the effort's owner test list and are
+  recorded as pending, never as done.

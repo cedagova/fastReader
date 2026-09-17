@@ -125,6 +125,32 @@
     <string name="library_undo">Undo</string>
     <string name="library_undo_label">Undo removing %1$s</string>
 
+    <!-- The account library on the shelf (#114, REQ-501 / REQ-508 / REQ-516) -->
+    <string name="library_account_not_on_device">In your Reader account. Not on this device.</string>
+    <string name="library_account_remove">Remove from account</string>
+    <string name="library_account_remove_label">Remove %1$s from your Reader account</string>
+    <string name="library_account_remove_title">Remove “%1$s” from your account?</string>
+    <string name="library_account_remove_body">This removes the book from your Reader account, on every device signed in to it. The file on this device and your place in it are not touched.</string>
+    <string name="library_account_remove_body_account_only">This removes the book from your Reader account, on every device signed in to it. Nothing on this device is touched.</string>
+    <string name="library_account_remove_confirm">Remove from account</string>
+    <string name="library_account_undo_removed">Removed “%1$s” from your Reader account.</string>
+    <string name="library_account_undo_label">Undo removing %1$s from your Reader account</string>
+
+    <!-- The account library's states (#114, the definition’s states table) -->
+    <string name="library_account_notice_title">Reader account library</string>
+    <string name="library_account_bootstrapping">Loading the books in your Reader account…</string>
+    <string name="library_account_offline">You are offline. Your account books are as last known, and changes you make are queued and sent when you are back online.</string>
+    <plurals name="library_account_queued">
+        <item quantity="one">1 change waiting to be sent</item>
+        <item quantity="other">%1$d changes waiting to be sent</item>
+    </plurals>
+    <string name="library_account_unavailable">The Reader backend is not syncing your account library right now. Your account books are as last known, and changes you make are kept until it is.</string>
+    <string name="library_account_session_gone">You were signed out: the Reader backend no longer accepts this session. Your books on this device are untouched. Sign in again to see your account books.</string>
+    <string name="library_account_rejected">The Reader backend refused one of your account changes.</string>
+    <string name="library_account_problem">Your account library could not be updated.</string>
+    <string name="library_account_code">Code %1$s</string>
+    <string name="library_account_request">Request %1$s</string>
+
     <!-- Added folders (REQ-104) -->
     <string name="library_folders_open">Added folders</string>
     <plurals name="library_folders_open_count">
@@ -228,7 +254,7 @@
     <string name="settings_reader_account_signed_in">Signed in as %1$s</string>
     <string name="settings_reader_account_summary">Optional. Reading needs no account; this signs in to the Reader stage backend to test it from this app.</string>
     <string name="settings_privacy_label">What stays on this device</string>
-    <string name="settings_privacy">FastReader has the internet permission and uses it for one thing only: the optional Reader account under Settings. Nothing is sent unless you use that account. When you do, your email address, the code or password you type and the account\'s session go to the Reader identity provider and the Reader API, and nothing else does: your books, your reading positions, your settings and any crash report stay on this device and are never sent. The account session is kept encrypted on this device, outside its backup, and is removed when you sign out. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings and small cover thumbnails, in its private storage. If the app stops unexpectedly it also keeps one short report about what went wrong in that private storage: the app version, this device\'s model, its Android version and where in the code it stopped, with no part of any book in it — the next launch offers that report to you once, and it goes nowhere unless you share it and pick an app to send it to. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
+    <string name="settings_privacy">FastReader has the internet permission and uses it for one thing only: the optional Reader account under Settings. Nothing is sent unless you use that account. When you do, your email address, the code or password you type and the account\'s session go to the Reader identity provider and the Reader API. FastReader also asks the Reader API which books your account already holds, and for those books only it tells the Reader API that you opened one, when you last opened it, whether you have finished it, and when you take one out of your account or put it back. That is all that leaves this device: no book file is ever sent, a book that is only on this device is never named to the Reader API, and your reading positions, your reading speed, your other settings and any crash report stay on this device and are never sent. The account session is kept encrypted on this device, outside its backup, and is removed when you sign out. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings, small cover thumbnails and, once you sign in, a copy of your account\'s own book list, in its private storage. That copy of the account\'s list is not deleted when you sign out: it stays in that private storage, so signing in to the same account again picks up where it left off, and only uninstalling FastReader or clearing its data removes it. If the app stops unexpectedly it also keeps one short report about what went wrong in that private storage: the app version, this device\'s model, its Android version and where in the code it stopped, with no part of any book in it — the next launch offers that report to you once, and it goes nowhere unless you share it and pick an app to send it to. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
     <string name="settings_visual_only">The word stream is visual only. FastReader shows one word at a time on the screen; it never reads a book aloud, and there is no audio or text-to-speech anywhere in the app. Everything around the stream — the library, the reader controls, and this screen — is labelled for TalkBack, but the stream itself has to be seen.</string>
 
     <!-- The crash report offered on the next launch (REQ-207, AD-14). The

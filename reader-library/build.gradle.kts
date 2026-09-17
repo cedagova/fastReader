@@ -1,0 +1,58 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+// The Reader account-library client (#112, LEAF701 of #104).
+//
+// It is the contract boundary: typed models and typed operations for the
+// account library, reading progress and the sync protocol, on top of the one
+// authenticated client :reader-auth owns. Like :reader-auth it must stay
+// liftable — no dependency on :app, no com.cedagova.fastreader symbol, no
+// FastReader naming — because it is the half of this work the owner may later
+// propose upstream (AD-19).
+//
+// Tokens never leave :reader-auth: this module holds no session, no refresh
+// and no error policy of its own, and every failure it surfaces is one of
+// ReaderAuthException's existing branches, thrown through unchanged.
+//
+// contracts/ holds the pinned OpenAPI document and its sha256;
+// ReaderLibraryContractTest is the drift gate (owner decision P1).
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.serialization)
+}
+
+android {
+    namespace = "com.cedagova.reader.library"
+    compileSdk = 37
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+dependencies {
+    // api, not implementation: this module's operations take a ReaderApiClient
+    // and every failure they raise is a ReaderAuthException, so a host that
+    // depends on :reader-library must see :reader-auth's types.
+    api(project(":reader-auth"))
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.ktor.client.mock)
+    // The mock-engine harness builds a real ReaderAuthClient over a mock
+    // engine (ReaderAuthClient.createForTests), so the tests need the session
+    // type its store holds.
+    testImplementation(platform(libs.supabase.bom))
+    testImplementation(libs.supabase.auth)
+}
