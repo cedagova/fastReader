@@ -119,6 +119,57 @@ class AccountShelfTest {
         assertNull("the row it named is off the shelf (D4)", shelf.undo.value)
     }
 
+    /**
+     * REQ-512 and REQ-508's "nothing on this device is touched", as an assertion
+     * rather than as a reading of the code.
+     *
+     * [AccountShelf]'s only collaborator is [AccountLibraryActions] — everything
+     * else it is given is the engine's state flow and a scope — so the whole set
+     * of operations this surface can reach is the set this interface declares.
+     * There is no `settings`, `note` or `bookmark` operation in it for the shelf
+     * to call, and no catalog, file or grant operation either. Adding one would
+     * fail here, which is what LEAF704's privacy statement inherits (AD-27).
+     */
+    @Test
+    fun `the shelf's whole library surface is these six operations`() {
+        val declared = AccountLibraryActions::class.java.declaredMethods
+            .map { it.name }
+            .toSortedSet()
+
+        assertEquals(
+            "the shelf can reach no settings, note or bookmark operation, " +
+                "and no catalog, file or grant operation",
+            sortedSetOf(
+                "recordFinished",
+                "recordOpened",
+                "recordStatus",
+                "refresh",
+                "removeFromAccount",
+                "undoRemove",
+            ),
+            declared,
+        )
+    }
+
+    /** The shelf is given the actions above, the engine's state, and a scope — nothing else. */
+    @Test
+    fun `the shelf is given nothing else to reach`() {
+        val parameters = AccountShelf::class.java.declaredConstructors
+            .first { it.parameterCount >= 3 }
+            .parameterTypes
+            .take(3)
+            .map { it.name }
+
+        assertEquals(
+            listOf(
+                AccountLibraryActions::class.java.name,
+                kotlinx.coroutines.flow.StateFlow::class.java.name,
+                kotlinx.coroutines.CoroutineScope::class.java.name,
+            ),
+            parameters,
+        )
+    }
+
     private fun kotlinx.coroutines.test.TestScope.shelf(actions: AccountLibraryActions) = AccountShelf(
         actions = actions,
         state = MutableStateFlow(AccountLibraryState(phase = AccountSyncPhase.IDLE, userId = "user-1")),
