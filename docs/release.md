@@ -37,6 +37,24 @@ account. This page is the whole procedure.
    the app shows, so a release cannot go out with notes that promise something
    different from the build.
 
+   **If the release changes what leaves the device, the statement is part of
+   the release, not a follow-up.** Four copies are held equal by that test —
+   the `settings_privacy` string, the block in
+   [docs/privacy-statement.md](privacy-statement.md), the README's copy and
+   this version's notes — and the Spanish twin in `values-es/strings.xml` is a
+   hand edit in the same commit, because lint fails a *missing* translation and
+   not a stale one. The same test asserts that every retired promise is
+   **absent**: "no internet permission" went with v1.6.0, and v1.7.0 retired
+   "your books, your reading positions, your settings and any crash report stay
+   on this device and are never sent" because the account library now sends
+   `library_item` changes for the books an account already holds. The rule is
+   AD-27: the statement may claim *less* than the shipped code does, never
+   more. The permission and cleartext proofs in the table below did not change
+   for that — the account library rides the client `:reader-auth` already
+   owns — so an unchanged gate here is not evidence that the promise is still
+   accurate. Read the per-sentence table in
+   [docs/privacy-statement.md](privacy-statement.md) against the diff.
+
 4. Publish, from the exact commit that is on `main`:
 
    ```bash
@@ -54,7 +72,7 @@ on the artifact itself:
 | --- | --- |
 | v2/v3 APK signature present | Android 8.0+ verifies these schemes |
 | Signer certificate SHA-256 equals the pinned value | The same key must sign every release forever, or in-place updates break |
-| The `uses-permission` lines are exactly `android.permission.INTERNET` and `com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — any other, or either missing, fails | REQ-411 — the internet permission serves the Reader account (#100) and nothing else asks for anything; the second is the self-permission Android adds for its own broadcast plumbing |
+| The `uses-permission` lines are exactly `android.permission.INTERNET` and `com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` — any other, or either missing, fails | REQ-411 — the internet permission serves the Reader account (#100) and, since #112, the account library that rides the same client; nothing else asks for anything, and the second line is the self-permission Android adds for its own broadcast plumbing |
 | The release manifest has no `networkSecurityConfig` and no `usesCleartextTraffic` | REQ-411 — the debug-only loopback allowance never ships; every connection is TLS |
 | `minSdkVersion` is 26 | REQ-040 — installs on Android 8.0+ |
 | `versionCode`/`versionName` match `version.properties` | The tag, the file, and the artifact cannot drift |

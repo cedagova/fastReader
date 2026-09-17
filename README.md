@@ -87,26 +87,63 @@ device**, word for word — a unit test compares the two so they cannot drift.
 FastReader has the internet permission and uses it for one thing only: the
 optional Reader account under Settings. Nothing is sent unless you use that
 account. When you do, your email address, the code or password you type and
-the account's session go to the Reader identity provider and the Reader API,
-and nothing else does: your books, your reading positions, your settings and
-any crash report stay on this device and are never sent. The account session
-is kept encrypted on this device, outside its backup, and is removed when you
-sign out. Check for updates only hands a web address to your browser, and your
-browser makes that request. Your books stay in the folders you chose; on this
-device FastReader keeps only its own list of them, your reading positions, your
-settings and small cover thumbnails, in its private storage. If the app stops
-unexpectedly it also keeps one short report about what went wrong in that
-private storage: the app version, this device's model, its Android version and
-where in the code it stopped, with no part of any book in it — the next launch
-offers that report to you once, and it goes nowhere unless you share it and
-pick an app to send it to. None of that is included in this device's backup or
-in a transfer to a new phone, so a reinstall or a new phone starts with an
-empty library. When another app opens a book in FastReader and does not give
+the account's session go to the Reader identity provider and the Reader
+API. FastReader also asks the Reader API which books your account already
+holds, and for those books only it tells the Reader API that you opened
+one, when you last opened it, whether you have finished it, and when you
+take one out of your account or put it back. That is all that leaves this
+device: no book file is ever sent, a book that is only on this device is
+never named to the Reader API, and your reading positions, your reading
+speed, your other settings and any crash report stay on this device and are
+never sent. The account session is kept encrypted on this device, outside
+its backup, and is removed when you sign out. Check for updates only hands
+a web address to your browser, and your browser makes that request. Your
+books stay in the folders you chose; on this device FastReader keeps only
+its own list of them, your reading positions, your settings, small cover
+thumbnails and, while you are signed in, a copy of your account's own book
+list, in its private storage. If the app stops unexpectedly it also keeps
+one short report about what went wrong in that private storage: the app
+version, this device's model, its Android version and where in the code it
+stopped, with no part of any book in it — the next launch offers that
+report to you once, and it goes nowhere unless you share it and pick an app
+to send it to. None of that is included in this device's backup or in a
+transfer to a new phone, so a reinstall or a new phone starts with an empty
+library. When another app opens a book in FastReader and does not give
 lasting permission to read it, that book is not added to your list and no
 permission to it is kept; only your place in it is remembered.
 <!-- privacy-statement:end -->
 
 What each sentence rests on, and how it was checked, is in
+[docs/privacy-statement.md](docs/privacy-statement.md).
+
+## Your Reader account's books on the shelf
+
+Signing in under **Settings → Reader account** brings the books that account
+holds onto the shelf beside the ones on this phone.
+
+- **A book in both places is one row.** The match is the file's own SHA-256, so
+  the same EPUB uploaded to the account and sitting in your folder shows once,
+  with this device's cover, author and your place in it — not twice.
+- **A book only the account has is an account-only row.** Title, author and "In
+  your Reader account. Not on this device." No cover, and it does not open:
+  FastReader does not download books yet.
+- **Remove from account** takes a book out of the Reader account on *every*
+  device signed in to it, with an Undo bar for about eight seconds. The file on
+  this phone and your place in it are untouched either way.
+- **Opening and finishing** a book the account already holds is recorded for the
+  account. A book only on this phone records nothing.
+- The shelf's refresh rescans your folders **and** asks the account for its
+  current list.
+
+**This is the owner's own testing app against the Reader *stage* backend**, and
+nothing else. There is no production Reader account here. The three public stage
+values live in the untracked `local.properties` (see
+[the Reader libraries](#the-reader-libraries-fastreader-hosts) below); without
+them the Reader account screen reads "Not configured" and the shelf is exactly
+the device shelf. Signed out, the account library sends nothing at all.
+
+What leaves this device when you use it — and what still never does — is the
+statement above, sentence by sentence, in
 [docs/privacy-statement.md](docs/privacy-statement.md).
 
 ## Personal use, distributed by link
@@ -123,7 +160,7 @@ prior-art form — and the off-center **Fixed focus letter** alignment is an
 opt-in toggle that ships off. Passing the APK to someone who asks for it is
 fine; putting it in a store is not, until #33 is closed.
 
-## The Reader auth library FastReader hosts
+## The Reader libraries FastReader hosts
 
 This repository also carries `reader-auth/`, a reusable Android library for the
 Reader client's sign-in, built to be lifted into the real Reader client
@@ -136,6 +173,29 @@ See [reader-auth/README.md](reader-auth/README.md); the client contract the
 library implements — sign-in methods, session storage, refresh, error policy,
 sign-out, and what a host must declare — is
 [reader-auth/CONTRACT.md](reader-auth/CONTRACT.md).
+
+Since #112 there is a second one, `reader-library/`: the account-library module
+(`com.cedagova.reader.library`). It depends on `:reader-auth` and on nothing
+under `app/`, declares no permission of its own, and offers exactly five typed
+operations — `GET /v1/reader/library`, `GET /v1/reader/progress`,
+`POST /v1/reader/sync/mutations`, `GET /v1/reader/sync/deltas` and the
+`reader.sync.v1` capability read. There is deliberately no generic
+`call(path, body)`. See [reader-library/README.md](reader-library/README.md).
+
+**The Reader API contract it is built against is pinned, by identity, in this
+repository:**
+
+| | |
+| --- | --- |
+| Document | [`reader-library/contracts/reader-api.openapi.json`](reader-library/contracts/reader-api.openapi.json) |
+| Source | `Chunipers/reader-api@a517fc6db64560df309bce656ec4c34e0bc7e1bd`, `contracts/reader-api.openapi.json`, byte for byte |
+| sha256 | `a550abfd7046368681d02aec50e80e80e372b152416c744669dd72ee534c6f9e`, recorded in [`reader-library/contracts/reader-api.openapi.json.sha256`](reader-library/contracts/reader-api.openapi.json.sha256) |
+| Gate | `ReaderLibraryContractTest` recomputes that digest on every run, then checks every field name, JSON type, enum member and required flag the module sends or reads against the document's schemas |
+| Updating the pin | [`reader-library/contracts/PINNED.md`](reader-library/contracts/PINNED.md) |
+
+Drift between the module and a newer published contract is a proposal to
+Chunipers, never a local workaround: the models move to follow the contract, and
+the contract is never bent to follow the models.
 
 Building with the account working needs three public stage values in the
 untracked `local.properties` (`reader.supabaseUrl`,

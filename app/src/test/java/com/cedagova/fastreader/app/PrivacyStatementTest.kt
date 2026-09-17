@@ -49,25 +49,43 @@ class PrivacyStatementTest {
      * The crash-report claim is the one REQ-303 gained in v1.2.0: #54 gave the
      * app a report it keeps in private storage, so the statement has to name the
      * reader-initiated share as the second outbound action beside the browser
-     * hand-off. The four account claims are #100's (REQ-409): the app now holds
-     * the internet permission for the optional Reader account, and the
-     * statement says what that sends, to whom, and what never goes — the old
-     * "no internet permission" claim is gone with the promise it stated.
+     * hand-off. The account claims are #100's (REQ-409) as #115 (REQ-513)
+     * rewrote them: the app holds the internet permission for the optional
+     * Reader account, and since #113 and #114 the account library is a second
+     * thing that account sends — which books it holds, and the reading status
+     * and last-opened time of those books.
+     *
+     * So two promises are retired here, not one. "No internet permission" went
+     * with #100. "Your books, your reading positions, your settings and any
+     * crash report stay on this device and are never sent" goes with #113 and
+     * #114, because the account half of it stopped being true the moment a
+     * `library_item` mutation left the device (AD-27). The replacement narrows
+     * the claim to what the merged code actually does and no further: no book
+     * *file* is sent, a device-only book is never named to the Reader API, and
+     * positions, reading speed, the other settings and crash reports still
+     * never leave. The import, download and position sentences belong to later
+     * increments and are deliberately not here yet.
+     *
      * Nothing holds the Spanish copy of the statement to this one — lint fails
      * a *missing* translation, not a stale one — so a change here is a hand
      * edit of `values-es/strings.xml` too.
      */
     @Test
-    fun `the statement still makes the nine claims the build backs up`() {
+    fun `the statement still makes the fourteen claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
             "has the internet permission and uses it for one thing only: the optional Reader account",
             "your email address, the code or password you type and the account's session go to the Reader identity provider and the Reader API",
-            "your books, your reading positions, your settings and any crash report stay on this device and are never sent",
+            "asks the Reader API which books your account already holds",
+            "for those books only it tells the Reader API that you opened one, when you last opened it, whether you have finished it, and when you take one out of your account or put it back",
+            "no book file is ever sent",
+            "a book that is only on this device is never named to the Reader API",
+            "your reading positions, your reading speed, your other settings and any crash report stay on this device and are never sent",
             "kept encrypted on this device, outside its backup, and is removed when you sign out",
             "hands a web address to your browser",
             "your books stay in the folders you chose",
+            "a copy of your account's own book list, in its private storage",
             "is included in this device's backup or in a transfer to a new phone",
             "it goes nowhere unless you share it and pick an app to send it to",
             "not added to your list and no permission to it is kept",
@@ -75,10 +93,21 @@ class PrivacyStatementTest {
             assertTrue("the statement no longer says \"$claim\": $statement",
                 statement.contains(claim, ignoreCase = true))
         }
-        assertFalse(
-            "the retired promise must not survive in the statement: $statement",
-            statement.contains("no internet permission", ignoreCase = true),
-        )
+        listOf(
+            // Retired with #100: the app has the permission now.
+            "no internet permission",
+            // Retired with #113 and #114: the books half is no longer true.
+            "your books, your reading positions, your settings and any crash report " +
+                "stay on this device and are never sent",
+            // The narrower half of the same retired sentence, in case only its
+            // opening is trimmed rather than the whole clause rewritten.
+            "and nothing else does",
+        ).forEach { retired ->
+            assertFalse(
+                "the retired promise \"$retired\" must not survive in the statement: $statement",
+                statement.contains(retired, ignoreCase = true),
+            )
+        }
     }
 
     /**

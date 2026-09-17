@@ -1,0 +1,50 @@
+LEAF704 (#115) — ./scripts/release.sh verify on a signed release build
+=======================================================================
+
+Effort      https://github.com/cedagova/fastReader/issues/106 (increment 001 of #104)
+Issue       https://github.com/cedagova/fastReader/issues/115
+Worktree    leaf-115, base collector/106-account-library @ 6045a84c53bdb6e42deb7161294f79d11f3d3b09
+Run         2026-09-17, macOS, verify only — no --publish, no tag, no release created.
+Signing     machine-local material at ~/.config/fastreader/signing/ (never printed).
+
+What this proves (#115 acceptance): the signed release APK of the account-library
+increment asks for exactly the internet permission plus Android's own broadcast
+self-permission, allows no cleartext, installs on Android 8.0+, and carries the
+bumped version 1.7.0 / versionCode 9. scripts/release.sh itself is unchanged by
+this leaf — the proofs are the same ones #100 put in place.
+
+Gradle task output is elided; everything below the build is the script's own
+verification, verbatim. The certificate digest is the public pinned value already
+recorded in docs/release.md. Nothing here carries a token, a backend value, an
+account code, an email address or a request secret.
+
+
+== Toolchain
+JDK          openjdk version "21.0.12.1" 2026-08-18
+build-tools  /Users/chonko/Library/Android/sdk/build-tools/37.0.0
+
+== Version
+versionCode  9
+versionName  1.7.0
+tag          v1.7.0
+
+== Build signed release APK
+(elided: 121 Gradle tasks; BUILD SUCCESSFUL, :app:assembleRelease)
+
+== Verify signature
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+V3.0 Signer: certificate SHA-256 digest: d476be8e7efbee3fe81dca8dd89f13c3434f26689a9a6979c01da54629e6485d
+V3.0 Signer: key size (bits): 4096
+
+== Verify release manifest
+package: name='com.cedagova.fastreader' versionCode='9' versionName='1.7.0' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'
+minSdkVersion:'26'
+targetSdkVersion:'37'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+permissions are exactly INTERNET + the platform self-permission, no cleartext, minSdk 26, version matches version.properties
+
+verified artifact: app/build/outputs/apk/release/fastReader-1.7.0.apk (2550143 bytes, sha256 f12b93b3a5dc71224a840f6c05d29fb2d9860798e2f044a6d82506005fd172e6)
+
+Build and verification complete. Re-run with --publish to create v1.7.0.
