@@ -3,6 +3,7 @@ package com.cedagova.fastreader.account.library
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -105,6 +106,76 @@ class AccountShelfTest {
         assertEquals(listOf("remove:acc-1", "remove:acc-2", "undo:acc-2"), actions.calls)
     }
 
+    /**
+     * A window of zero is the degenerate confirmation: the offer opens and
+     * closes in the same tick. `delay(0)` returns without suspending, so this
+     * is the one shape in which the expiry can run *inside* the removal's own
+     * turn, and the shelf must not still be holding its lock when it does.
+     * The expiry is its own coroutine, so a held lock would park it rather
+     * than hang the test; what this pins is that the shelf never depends on
+     * that ordering, and that nothing is left on offer once the tick is over.
+     */
+    @Test
+    fun `a zero window closes the offer in the same tick without deadlocking`() = runTest {
+        val actions = RecordingActions()
+        val shelf = shelf(actions, undoWindowMs = 0)
+
+        shelf.removeFromAccount("acc-1", "Ficciones")
+        runCurrent()
+
+        assertEquals("the delete still went at once", listOf("remove:acc-1"), actions.calls)
+        assertNull("and the offer is already spent", shelf.undo.value)
+
+        shelf.undoRemove()
+        runCurrent()
+        assertEquals("so there is nothing left to take back", listOf("remove:acc-1"), actions.calls)
+    }
+
+    /**
+     * The same degenerate window on a dispatcher that runs a launched coroutine
+     * at once, the way `Dispatchers.Main.immediate` does on the main thread.
+     * Here the timer body genuinely runs *during* the removal's own turn, which
+     * is the only shape in which it could meet a lock the removal still holds.
+     */
+    @Test
+    fun `a zero window closes the offer even when the timer runs eagerly`() = runTest(UnconfinedTestDispatcher()) {
+        val actions = RecordingActions()
+        val shelf = shelf(actions, undoWindowMs = 0)
+
+        shelf.removeFromAccount("acc-1", "Ficciones")
+        runCurrent()
+
+        assertEquals(listOf("remove:acc-1"), actions.calls)
+        assertNull(shelf.undo.value)
+
+        shelf.undoRemove()
+        runCurrent()
+        assertEquals("nothing left to take back", listOf("remove:acc-1"), actions.calls)
+    }
+
+    @Test
+    fun `a second removal supersedes the first even with a zero window`() = runTest {
+        val actions = RecordingActions()
+        val shelf = shelf(actions, undoWindowMs = 0)
+
+        shelf.removeFromAccount("acc-1", "Ficciones")
+        shelf.removeFromAccount("acc-2", "Rayuela")
+        runCurrent()
+
+        assertEquals(listOf("remove:acc-1", "remove:acc-2"), actions.calls)
+        assertNull("the second offer closed on its own window, the first on supersession", shelf.undo.value)
+
+        shelf.undoRemove()
+        runCurrent()
+        advanceTimeBy(AccountShelf.DEFAULT_UNDO_WINDOW_MS)
+        runCurrent()
+        assertEquals(
+            "neither spent timer resurrects an offer, and no restore is sent",
+            listOf("remove:acc-1", "remove:acc-2"),
+            actions.calls,
+        )
+    }
+
     @Test
     fun `signing out ends the offer`() = runTest {
         val actions = RecordingActions()
@@ -170,10 +241,14 @@ class AccountShelfTest {
         )
     }
 
-    private fun kotlinx.coroutines.test.TestScope.shelf(actions: AccountLibraryActions) = AccountShelf(
+    private fun kotlinx.coroutines.test.TestScope.shelf(
+        actions: AccountLibraryActions,
+        undoWindowMs: Long = AccountShelf.DEFAULT_UNDO_WINDOW_MS,
+    ) = AccountShelf(
         actions = actions,
         state = MutableStateFlow(AccountLibraryState(phase = AccountSyncPhase.IDLE, userId = "user-1")),
         scope = backgroundScope,
+        undoWindowMs = undoWindowMs,
     )
 
     /** Every library operation the shelf can reach, in the order it asked for them. */

@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.account.library
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +47,12 @@ class AccountShelf(
     private val undoWindowMs: Long = DEFAULT_UNDO_WINDOW_MS,
 ) {
 
+    /**
+     * Guards [timer] and [_undo] together, so an expiry, an Undo, a later removal
+     * and a sign-out never interleave half-way through one another's transition.
+     * It is not reentrant: nothing that runs *under* it may take it again, which
+     * is why [removeFromAccount] starts the timer only once it has let go.
+     */
     private val mutex = Mutex()
     private var timer: Job? = null
     private val _undo = MutableStateFlow<AccountRemoval?>(null)
@@ -77,14 +84,23 @@ class AccountShelf(
     fun removeFromAccount(bookId: String, title: String) {
         actions.removeFromAccount(bookId)
         scope.launch {
-            mutex.withLock {
+            // The offer is opened under the lock but its timer is only *started*
+            // after the lock is released. The timer's expiry takes the same lock,
+            // and `delay(0)` returns without suspending, so a zero window on an
+            // eager dispatcher would otherwise run that expiry inside this very
+            // block, while it still holds the mutex. Creating the job lazily
+            // keeps the "cancel the old, install the new" step atomic; a cancel
+            // that lands before `start()` (an Undo, a sign-out, a later removal)
+            // simply makes the start a no-op.
+            val window = mutex.withLock {
                 timer?.cancel()
                 _undo.value = AccountRemoval(bookId, title)
-                timer = scope.launch {
+                scope.launch(start = CoroutineStart.LAZY) {
                     delay(undoWindowMs)
                     clearOffer(bookId)
-                }
+                }.also { timer = it }
             }
+            window.start()
         }
     }
 
@@ -108,7 +124,13 @@ class AccountShelf(
     /** The account book was read to its last word. */
     fun recordFinished(bookId: String) = actions.recordFinished(bookId)
 
-    /** Ends the offer, or ends [expected]'s offer only when one is named. */
+    /**
+     * Ends the offer, or ends [expected]'s offer only when one is named.
+     *
+     * Takes the lock itself, so it must only ever be called from a coroutine
+     * that does not already hold it: the expiry timer (started outside the lock
+     * by [removeFromAccount]) and the sign-out collector.
+     */
     private suspend fun clearOffer(expected: String?) {
         mutex.withLock {
             if (expected != null && _undo.value?.bookId != expected) return@withLock
