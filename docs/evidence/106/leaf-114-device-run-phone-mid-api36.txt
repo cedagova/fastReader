@@ -1,21 +1,107 @@
 LEAF703 (#114) — device run, Phone_Mid_API36 (1080p reference phone, Android 16)
+Captured 2026-09-17. Everything below is provable with NO signed-in account.
 
-Phase A: everything provable with no signed-in session.
+BUILD IDENTITY — the installed build IS this PR's head
+-----------------------------------------------------
+  branch          leaf/114-account-books-on-shelf
+  head            5660f90763c74b4f909513500a4d26e00a0e854b
+  worktree        clean (`git status --porcelain` empty at capture time)
+  command         ./gradlew installDebug           (JDK 21)
+  built APK       app/build/outputs/apk/debug/app-debug.apk
+                  SHA-256 2e296ddbc545f47bc2d1998c4e16cee13ffe21cddcb2b0fced4f910afb1576cd
+  installed APK   sha256sum of the device's base.apk
+                  SHA-256 2e296ddbc545f47bc2d1998c4e16cee13ffe21cddcb2b0fced4f910afb1576cd
+  => byte-identical: what ran on the emulator is what this head builds.
+  reported        versionName 1.6.0, versionCode 8 (LEAF704 #115 bumps to 1.7.0 / 9)
 
-  build          app/debug, installDebug at the PR head
-  account state  Settings -> Reader account: "Signed out"
-  shelf          one device book (Pride and Prejudice, Jane Austen), added
-                 through the real SAF picker from /sdcard/Download/fastreader
-  observed       no account notice, no account-only row, no "Remove from
-                 account" control: exactly the v1.6.0 shelf (D4, REQ-516)
+  The earlier version of this file said "installDebug at the PR head" while the
+  install had actually happened at f9c59a7. This run fixes that: the two SHA-256
+  values above are the proof, not a claim.
 
-  adb logcat -d -s AndroidRuntime:E
-  <no output>
+WHAT WAS DRIVEN
+---------------
+  1. Launched com.cedagova.fastreader/.MainActivity after `adb logcat -c`.
+  2. Read the shelf.
+  3. Settings -> scrolled to `Reader account`.
+  4. Back to the shelf, tapped the toolbar manual refresh.
+  5. Dumped the window's full accessibility text with `uiautomator dump`.
+  6. `adb logcat -d -s AndroidRuntime:E`.
 
-Phase B (signed in against stage, with reader-web as the other device) is
-the OWNER's run: REQ-501, REQ-508, REQ-509 and REQ-516's sign-in half are
-marked pending in the PR until it is done. The device book above is the one
-half of the merge that is already in place; its content SHA-256 is
-c25cf3d9ad4d41147ecc6947debcf981a961fd6b69a4219d9892af50b934c8bb, so
-uploading that same EPUB on reader-web is what the shelf must show as one
-row and not two (AD-23).
+WHAT WAS OBSERVED
+-----------------
+  account state   Settings -> Reader account reads "Signed out"
+                  (leaf-114-02-settings-reader-account-signed-out-phone-mid-api36.png)
+
+  shelf           one device book, Pride and Prejudice / Jane Austen / 0% read,
+                  with its cover — added earlier through the real SAF picker
+                  from /sdcard/Download/fastreader/pride-and-prejudice.epub
+                  (leaf-114-01-signed-out-shelf-phone-mid-api36.png)
+
+  manual refresh  syncing both libraries while signed out changes nothing on the
+                  shelf and raises no account notice. The screenshot above is the
+                  shelf AFTER the refresh.
+
+  no account UI   The full set of on-screen text and content descriptions, from
+                  `uiautomator dump` of the shelf after the refresh, is exactly:
+
+                    Search books
+                    Add books
+                    Add folder
+                    Sort books. Currently Recently read.
+                    Sort: Recently read
+                    Pride and Prejudice
+                    Jane Austen
+                    0% read
+                    Remove Pride and Prejudice from the library. The file stays on your device.
+                    Library
+                    Refresh library
+                    Settings
+
+                  Not one of this leaf's 19 new account strings is present: no
+                  `library_account_notice_title` banner, no `library_account_remove`
+                  ("Remove from account"), no `library_account_not_on_device`
+                  account-only row. The one removal control on screen is v1.6.0's
+                  own device removal. That is D4 / REQ-516's signed-out half,
+                  checked as text rather than only by eye.
+
+  crashes         adb logcat -d -s AndroidRuntime:E   -> no output (exit 0)
+                  `FATAL EXCEPTION` / `ANR in com.cedagova` across the whole
+                  buffer -> 0 matches
+
+BUILD WITH NO BACKEND VALUES (hosted-CI parity)
+-----------------------------------------------
+  With `local.properties` reduced to `sdk.dir` alone — no `reader.*` values at
+  all — and with every task forced to re-execute:
+
+    ./gradlew --rerun-tasks testDebugUnitTest verifyRoborazziDebug lint assembleDebug
+    BUILD SUCCESSFUL
+
+  882 unit tests, 0 failures and 0 errors, across :app, :reader-auth and
+  :reader-library (that count includes the :reader-library OpenAPI contract test
+  and PrivacyStatementTest). `git status --porcelain app/screenshots/` empty:
+  zero modified tracked goldens beyond the 11 new `library_account_*` files this
+  leaf adds. The same three checks are green on GitHub Actions at this head,
+  where there is no `local.properties` at all.
+
+  `local.properties` was restored to its machine-local contents afterwards; the
+  APK whose SHA-256 is recorded above is the one built WITH the stage values, so
+  the signed-out proof is a build that could have reached the backend and did
+  not, not a build that has no account surface to begin with.
+
+WHAT THIS RUN CANNOT PROVE
+--------------------------
+  Everything that needs a signed-in stage session or reader-web as the second
+  device. Those are recorded in PR #126 as
+  `PENDING OWNER TEST — step N of the owner list`, against the effort's canonical
+  14-step owner test list, and are claimed nowhere as done. No debug backdoor,
+  fake-gateway flavour or test hook was added to the shipping app to simulate an
+  account on-device: that would be scope creep and would weaken the release
+  proofs. The rendered proof of every account state is instead the 11
+  `library_account_*` Roborazzi goldens plus LibraryAccountUiStateTest,
+  AccountShelfTest and AccountShelfAccessibilityTest.
+
+  The device half of the merge is already in place for the owner's run: the
+  emulator holds pride-and-prejudice.epub, content SHA-256
+  c25cf3d9ad4d41147ecc6947debcf981a961fd6b69a4219d9892af50b934c8bb. Uploading
+  that same file on reader-web (owner step 1, observed at step 4) is what the
+  shelf must then show as one row and not two (AD-23).
