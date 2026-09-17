@@ -9,6 +9,7 @@ import com.cedagova.fastreader.account.ReaderApiLibraryGateway
 import com.cedagova.fastreader.account.ReaderLibraryGateway
 import com.cedagova.fastreader.account.ReaderAccountConfiguration
 import com.cedagova.fastreader.account.ReaderAccountController
+import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.AccountSyncEngine
 import com.cedagova.fastreader.account.library.AccountSyncTrigger
 import com.cedagova.fastreader.account.library.FileAccountLibraryStores
@@ -107,6 +108,14 @@ class FastReaderApplication : Application() {
     lateinit var accountLibrary: AccountSyncEngine
         private set
 
+    /**
+     * The account library as the shelf uses it (#114): [accountLibrary]'s state
+     * and operations, plus the window in which a removal can still be taken
+     * back. Process-scoped, because the window outlives a rotation.
+     */
+    lateinit var accountShelf: AccountShelf
+        private set
+
     override fun onCreate() {
         super.onCreate()
         // First, so that a failure in any of the wiring below is itself reported.
@@ -121,6 +130,11 @@ class FastReaderApplication : Application() {
             gateway = readerLibrary,
             stores = FileAccountLibraryStores(File(filesDir, FileAccountLibraryStores.DIRECTORY_NAME)),
             accountState = readerAccount.state,
+            scope = applicationScope,
+        )
+        accountShelf = AccountShelf(
+            actions = accountLibrary,
+            state = accountLibrary.state,
             scope = applicationScope,
         )
         ProcessLifecycleOwner.get().lifecycle.addObserver(

@@ -27,6 +27,8 @@ import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
+import com.cedagova.fastreader.account.library.AccountShelf
+import com.cedagova.fastreader.library.ui.accountBookIdForDevice
 import com.cedagova.fastreader.library.ui.LibraryRoute
 import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ui.ReaderRoute
@@ -70,7 +72,7 @@ class MainActivity : ComponentActivity() {
             // without either screen knowing the settings exist.
             val settings by library.repository.settings.collectAsState()
             FastReaderTheme(darkTheme = settings.theme.isDark(), fontSize = settings.fontSize) {
-                FastReaderApp(library, app.crashReports, app.readerAccount)
+                FastReaderApp(library, app.crashReports, app.readerAccount, app.accountShelf)
             }
         }
     }
@@ -128,7 +130,12 @@ private fun LibraryGraph.acceptIfExternal(intent: Intent?) {
  *
  */
 @Composable
-private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore, readerAccount: ReaderAccountController) {
+private fun FastReaderApp(
+    library: LibraryGraph,
+    crashReports: CrashReportStore,
+    readerAccount: ReaderAccountController,
+    accountShelf: AccountShelf,
+) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
     // A book handed over by another app (REQ-103). Not saved state: it belongs to
@@ -187,6 +194,18 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore,
         }
         routed = true
     }
+
+    // Opening an account book records last-opened and `reading` for the account
+    // (the definition's "Library status and last opened"). Hooked to the book
+    // the app actually has open rather than to the row that was tapped, so a
+    // launch that goes straight back into the last-read book counts as opening
+    // it too. The key is the *account's* book id, which is null for a device
+    // book the account does not have — such a book sends nothing at all — and
+    // which appears the moment a bootstrap finds the book, so signing in while
+    // reading records it once and then settles.
+    val accountLibrary by accountShelf.state.collectAsState()
+    val openAccountBookId = openBookId?.let { accountBookIdForDevice(it, accountLibrary) }
+    LaunchedEffect(openAccountBookId) { openAccountBookId?.let(accountShelf::recordOpened) }
 
     when {
         // Blank rather than a spinner: the decision costs a small file read, and a
@@ -254,6 +273,7 @@ private fun FastReaderApp(library: LibraryGraph, crashReports: CrashReportStore,
             }
             LibraryRoute(
                 graph = library,
+                account = accountShelf,
                 onOpenBook = { openBookId = it },
                 resumeBlocked = resumeBlocked(blockedBookId, blockedReason),
                 onDismissResumeNotice = {

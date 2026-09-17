@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderCoverStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.model.ReaderSyncRejectionCode
@@ -123,3 +124,7 @@ internal fun ReaderCoverStatus.wireName(): String =
 
 internal fun ReaderSyncRejectionCode.wireName(): String =
     ReaderSyncRejectionCode.serializer().descriptor.getElementName(ordinal)
+
+/** The reason a capability document states, as the shelf quotes it. */
+internal fun ReaderCapabilityReason.wireName(): String =
+    ReaderCapabilityReason.serializer().descriptor.getElementName(ordinal)

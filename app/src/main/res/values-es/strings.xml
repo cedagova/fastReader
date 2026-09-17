@@ -347,4 +347,30 @@
     <string name="account_detail_http">HTTP %1$d</string>
     <string name="account_detail_retry_after">reintentar tras %1$d s</string>
     <string name="account_detail_request_id">id de petición %1$s</string>
+    <!-- The account library on the shelf (#114, REQ-501 / REQ-508 / REQ-516) -->
+    <string name="library_account_not_on_device">En tu cuenta de Reader. No está en este dispositivo.</string>
+    <string name="library_account_remove">Quitar de la cuenta</string>
+    <string name="library_account_remove_label">Quitar %1$s de tu cuenta de Reader</string>
+    <string name="library_account_remove_title">¿Quitar “%1$s” de tu cuenta?</string>
+    <string name="library_account_remove_body">Esto quita el libro de tu cuenta de Reader, en todos los dispositivos donde hayas iniciado sesión. El archivo de este dispositivo y tu punto de lectura no se tocan.</string>
+    <string name="library_account_remove_body_account_only">Esto quita el libro de tu cuenta de Reader, en todos los dispositivos donde hayas iniciado sesión. No se toca nada de este dispositivo.</string>
+    <string name="library_account_remove_confirm">Quitar de la cuenta</string>
+    <string name="library_account_undo_removed">Se quitó “%1$s” de tu cuenta de Reader.</string>
+    <string name="library_account_undo_label">Deshacer quitar %1$s de tu cuenta de Reader</string>
+
+    <!-- The account library’s states (#114) -->
+    <string name="library_account_notice_title">Biblioteca de la cuenta de Reader</string>
+    <string name="library_account_bootstrapping">Cargando los libros de tu cuenta de Reader…</string>
+    <string name="library_account_offline">Estás sin conexión. Los libros de tu cuenta son los últimos conocidos, y los cambios que hagas se envían cuando vuelvas a tener conexión.</string>
+    <plurals name="library_account_queued">
+        <item quantity="one">1 cambio pendiente de enviar</item>
+        <item quantity="many">%1$d de cambios pendientes de enviar</item>
+        <item quantity="other">%1$d cambios pendientes de enviar</item>
+    </plurals>
+    <string name="library_account_unavailable">El servidor de Reader no está sincronizando la biblioteca de tu cuenta ahora mismo. Los libros de tu cuenta son los últimos conocidos, y tus cambios se guardan hasta que vuelva.</string>
+    <string name="library_account_session_gone">Se cerró tu sesión: el servidor de Reader ya no la acepta. Los libros de este dispositivo no se tocan. Inicia sesión otra vez para ver los libros de tu cuenta.</string>
+    <string name="library_account_rejected">El servidor de Reader rechazó uno de los cambios de tu cuenta.</string>
+    <string name="library_account_problem">No se pudo actualizar la biblioteca de tu cuenta.</string>
+    <string name="library_account_code">Código %1$s</string>
+    <string name="library_account_request">Solicitud %1$s</string>
 </resources>

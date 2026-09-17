@@ -125,6 +125,32 @@
     <string name="library_undo">Undo</string>
     <string name="library_undo_label">Undo removing %1$s</string>
 
+    <!-- The account library on the shelf (#114, REQ-501 / REQ-508 / REQ-516) -->
+    <string name="library_account_not_on_device">In your Reader account. Not on this device.</string>
+    <string name="library_account_remove">Remove from account</string>
+    <string name="library_account_remove_label">Remove %1$s from your Reader account</string>
+    <string name="library_account_remove_title">Remove “%1$s” from your account?</string>
+    <string name="library_account_remove_body">This removes the book from your Reader account, on every device signed in to it. The file on this device and your place in it are not touched.</string>
+    <string name="library_account_remove_body_account_only">This removes the book from your Reader account, on every device signed in to it. Nothing on this device is touched.</string>
+    <string name="library_account_remove_confirm">Remove from account</string>
+    <string name="library_account_undo_removed">Removed “%1$s” from your Reader account.</string>
+    <string name="library_account_undo_label">Undo removing %1$s from your Reader account</string>
+
+    <!-- The account library's states (#114, the definition’s states table) -->
+    <string name="library_account_notice_title">Reader account library</string>
+    <string name="library_account_bootstrapping">Loading the books in your Reader account…</string>
+    <string name="library_account_offline">You are offline. Your account books are as last known, and changes you make are queued and sent when you are back online.</string>
+    <plurals name="library_account_queued">
+        <item quantity="one">1 change waiting to be sent</item>
+        <item quantity="other">%1$d changes waiting to be sent</item>
+    </plurals>
+    <string name="library_account_unavailable">The Reader backend is not syncing your account library right now. Your account books are as last known, and changes you make are kept until it is.</string>
+    <string name="library_account_session_gone">You were signed out: the Reader backend no longer accepts this session. Your books on this device are untouched. Sign in again to see your account books.</string>
+    <string name="library_account_rejected">The Reader backend refused one of your account changes.</string>
+    <string name="library_account_problem">Your account library could not be updated.</string>
+    <string name="library_account_code">Code %1$s</string>
+    <string name="library_account_request">Request %1$s</string>
+
     <!-- Added folders (REQ-104) -->
     <string name="library_folders_open">Added folders</string>
     <plurals name="library_folders_open_count">
