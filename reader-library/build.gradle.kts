@@ -46,6 +46,11 @@ dependencies {
     // depends on :reader-library must see :reader-auth's types.
     api(project(":reader-auth"))
     implementation(libs.kotlinx.serialization.json)
+    // The publication-import transfer (#116) speaks TUS straight to the storage
+    // provider under the grant's signed headers. It is a SECOND, plain client on
+    // purpose — it holds no session and cannot reach a token — so it brings its
+    // own engine rather than borrowing :reader-auth's authenticated one.
+    implementation(libs.ktor.client.okhttp)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

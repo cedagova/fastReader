@@ -1,5 +1,10 @@
 package com.cedagova.reader.library
 
+import com.cedagova.reader.library.model.CancelPublicationImportRequest
+import com.cedagova.reader.library.model.CreatePublicationImportRequest
+import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
+import com.cedagova.reader.library.model.PublicationImportPolicyResponse
+import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderSyncCapability
@@ -13,8 +18,14 @@ import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
  * It is an interface so a host can substitute a scripted double in its own
  * tests without a mock engine; [ReaderLibraryClient] is the one production
  * implementation. There is deliberately no generic `call(path, body)` here:
- * every request FastReader can send is one of the five below, and each is
+ * every request FastReader can send is one of the ten below, and each is
  * declared by the pinned OpenAPI document in `contracts/`.
+ *
+ * The last five are the publication-import lifecycle (#116). They carry the
+ * session like every other route here; the *bytes* do not go through them at
+ * all — they go straight to Storage under the grant an admission returns, over
+ * `com.cedagova.reader.library.imports.PublicationTransferClient`, which has no
+ * session to carry.
  *
  * Failures are never new types. Each operation throws exactly the
  * `com.cedagova.reader.auth.ReaderAuthException` branch `:reader-auth`'s call
@@ -64,4 +75,49 @@ interface ReaderLibraryOperations {
      * [ReaderSyncCapability.UNDECLARED] — unavailable, reason unknown.
      */
     suspend fun syncCapability(): ReaderSyncCapability
+
+    // ---- Publication imports (#116) ---------------------------------------------------------
+
+    /**
+     * `GET /reader/v1/imports/policy`: what this deployment will admit.
+     *
+     * Every bound a host enforces — enabled at all, which formats, the size cap
+     * per format, the active-import limits — is read from here on each attempt
+     * and never remembered as a constant (REQ-506).
+     */
+    suspend fun importPolicy(): PublicationImportPolicyResponse
+
+    /**
+     * `POST /reader/v1/imports`: admit one device-only publication into the
+     * account, idempotently on `client_import_id`.
+     *
+     * The answer carries the durable record and, while it awaits bytes, a
+     * bounded TUS grant. Replaying the same `client_import_id` returns the same
+     * record with `created = false`, which is how a retry after app death or a
+     * grant expiry addresses the same admission instead of making a second one.
+     *
+     * @throws IllegalArgumentException when the request does not carry explicit
+     *   `upload_consent`, the device-only promotion source or the
+     *   account-library ownership intent. That is not a server round trip this
+     *   module is willing to make: bytes leave the device only on the owner's
+     *   word (REQ-505).
+     */
+    suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse
+
+    /** `GET /reader/v1/imports/{id}`: the durable lifecycle state of one import. */
+    suspend fun importRecord(importId: String): PublicationImportResponse
+
+    /**
+     * `POST /reader/v1/imports/{id}/complete`: the bytes are all at Storage.
+     *
+     * The backend observes the stored object itself and enters verification; it
+     * never takes a digest from the uploader, so there is nothing to send.
+     */
+    suspend fun completeImport(importId: String): PublicationImportResponse
+
+    /** `POST /reader/v1/imports/{id}/cancel`: stop an import; idempotent. */
+    suspend fun cancelImport(
+        importId: String,
+        reason: String = CancelPublicationImportRequest.DEFAULT_REASON,
+    ): PublicationImportResponse
 }
