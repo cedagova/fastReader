@@ -4,7 +4,8 @@ LEAF704 (#115) — ./scripts/release.sh verify on a signed release build
 Effort      https://github.com/cedagova/fastReader/issues/106 (increment 001 of #104)
 Issue       https://github.com/cedagova/fastReader/issues/115
 Worktree    leaf-115, base collector/106-account-library @ 6045a84c53bdb6e42deb7161294f79d11f3d3b09
-Run         2026-09-17, macOS, verify only — no --publish, no tag, no release created.
+Run         2026-09-17, re-run at the corrected head after review round 1
+            (the statement string changed, so the APK did), macOS, verify only — no --publish, no tag, no release created.
 Signing     machine-local material at ~/.config/fastreader/signing/ (never printed).
 
 What this proves (#115 acceptance): the signed release APK of the account-library
@@ -15,7 +16,8 @@ this leaf — the proofs are the same ones #100 put in place.
 
 Gradle task output is elided; everything below the build is the script's own
 verification, verbatim. The certificate digest is the public pinned value already
-recorded in docs/release.md. Nothing here carries a token, a backend value, an
+recorded in docs/release.md (there in colon-separated form) and pinned as
+EXPECTED_CERT_SHA256 in scripts/release.sh itself. Nothing here carries a token, a backend value, an
 account code, an email address or a request secret.
 
 
@@ -45,6 +47,6 @@ uses-permission: name='android.permission.INTERNET'
 uses-permission: name='com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
 permissions are exactly INTERNET + the platform self-permission, no cleartext, minSdk 26, version matches version.properties
 
-verified artifact: app/build/outputs/apk/release/fastReader-1.7.0.apk (2550143 bytes, sha256 f12b93b3a5dc71224a840f6c05d29fb2d9860798e2f044a6d82506005fd172e6)
+verified artifact: app/build/outputs/apk/release/fastReader-1.7.0.apk (2550615 bytes, sha256 20d7a982bdf6eb4e0bbe308960d478d67291e6a9a1a5fdf058fc101b04942431)
 
 Build and verification complete. Re-run with --publish to create v1.7.0.

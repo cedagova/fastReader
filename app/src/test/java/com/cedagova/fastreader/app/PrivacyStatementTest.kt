@@ -66,12 +66,22 @@ class PrivacyStatementTest {
      * never leave. The import, download and position sentences belong to later
      * increments and are deliberately not here yet.
      *
+     * A third phrase is asserted absent although it never shipped: "while you
+     * are signed in, a copy of your account's own book list". The first draft
+     * of #115 said that, and it was false — `AccountSyncEngine.signOut` keeps
+     * the account document (D4: "stop reading the store, keep the file, delete
+     * nothing"), and signing in as a different user clears only that account's
+     * outbox. Sitting two sentences after "the session … is removed when you
+     * sign out", a temporal clause there reads as a retention limit the code
+     * does not honour. The shipped sentence states the retention instead, and
+     * this assertion keeps the over-claim from coming back.
+     *
      * Nothing holds the Spanish copy of the statement to this one — lint fails
      * a *missing* translation, not a stale one — so a change here is a hand
      * edit of `values-es/strings.xml` too.
      */
     @Test
-    fun `the statement still makes the fourteen claims the build backs up`() {
+    fun `the statement still makes the sixteen claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
@@ -85,7 +95,9 @@ class PrivacyStatementTest {
             "kept encrypted on this device, outside its backup, and is removed when you sign out",
             "hands a web address to your browser",
             "your books stay in the folders you chose",
-            "a copy of your account's own book list, in its private storage",
+            "once you sign in, a copy of your account's own book list, in its private storage",
+            "that copy of the account's list is not deleted when you sign out",
+            "only uninstalling FastReader or clearing its data removes it",
             "is included in this device's backup or in a transfer to a new phone",
             "it goes nowhere unless you share it and pick an app to send it to",
             "not added to your list and no permission to it is kept",
@@ -99,7 +111,12 @@ class PrivacyStatementTest {
             // Retired with #113 and #114: the books half is no longer true.
             "your books, your reading positions, your settings and any crash report " +
                 "stay on this device and are never sent",
-            // The narrower half of the same retired sentence, in case only its
+            // Never shipped, and must never ship: the account book list is NOT
+            // removed on sign-out (AccountSyncEngine.signOut keeps the file, D4),
+            // so a temporal clause here would over-claim privacy — the exact
+            // failure AD-27 forbids.
+            "while you are signed in, a copy of your account's own book list",
+            // The narrower half of the retired v1.6.0 sentence, in case only its
             // opening is trimmed rather than the whole clause rewritten.
             "and nothing else does",
         ).forEach { retired ->

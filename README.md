@@ -100,11 +100,14 @@ its backup, and is removed when you sign out. Check for updates only hands
 a web address to your browser, and your browser makes that request. Your
 books stay in the folders you chose; on this device FastReader keeps only
 its own list of them, your reading positions, your settings, small cover
-thumbnails and, while you are signed in, a copy of your account's own book
-list, in its private storage. If the app stops unexpectedly it also keeps
-one short report about what went wrong in that private storage: the app
-version, this device's model, its Android version and where in the code it
-stopped, with no part of any book in it — the next launch offers that
+thumbnails and, once you sign in, a copy of your account's own book list,
+in its private storage. That copy of the account's list is not deleted when
+you sign out: it stays in that private storage, so signing in to the same
+account again picks up where it left off, and only uninstalling FastReader
+or clearing its data removes it. If the app stops unexpectedly it also
+keeps one short report about what went wrong in that private storage: the
+app version, this device's model, its Android version and where in the code
+it stopped, with no part of any book in it — the next launch offers that
 report to you once, and it goes nowhere unless you share it and pick an app
 to send it to. None of that is included in this device's backup or in a
 transfer to a new phone, so a reinstall or a new phone starts with an empty
