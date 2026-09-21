@@ -5,6 +5,7 @@ import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.PublicationImportResponse
+import com.cedagova.reader.library.model.ReaderAssetGrantResponse
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderSyncCapability
@@ -18,14 +19,17 @@ import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
  * It is an interface so a host can substitute a scripted double in its own
  * tests without a mock engine; [ReaderLibraryClient] is the one production
  * implementation. There is deliberately no generic `call(path, body)` here:
- * every request FastReader can send is one of the ten below, and each is
+ * every request FastReader can send is one of the eleven below, and each is
  * declared by the pinned OpenAPI document in `contracts/`.
  *
- * The last five are the publication-import lifecycle (#116). They carry the
+ * Five of them are the publication-import lifecycle (#116) and the last is the
+ * asset download grant (#118). All six carry the
  * session like every other route here; the *bytes* do not go through them at
- * all — they go straight to Storage under the grant an admission returns, over
- * `com.cedagova.reader.library.imports.PublicationTransferClient`, which has no
- * session to carry.
+ * all — they go to Storage under the grant an admission returns, over
+ * `com.cedagova.reader.library.imports.PublicationTransferClient`, and come
+ * back under the grant `assetDownloadGrant` returns, over
+ * `com.cedagova.reader.library.downloads.AssetDownloadClient`. Neither of
+ * those two clients has a session to carry.
  *
  * Failures are never new types. Each operation throws exactly the
  * `com.cedagova.reader.auth.ReaderAuthException` branch `:reader-auth`'s call
@@ -120,4 +124,24 @@ interface ReaderLibraryOperations {
         importId: String,
         reason: String = CancelPublicationImportRequest.DEFAULT_REASON,
     ): PublicationImportResponse
+
+    // ---- Asset downloads (#118) -------------------------------------------------------------
+
+    /**
+     * `POST /v1/reader/assets/{asset_id}/download-grant`: a short-lived signed
+     * download for one asset the account may read.
+     *
+     * This is the only way book bytes come *onto* the device (REQ-510, D2). The
+     * grant carries the provider's URL, its signature headers, the object's
+     * length, its content SHA-256 and a TTL; FastReader composes none of them.
+     * The bytes themselves do not come back through this route — they are
+     * fetched by
+     * `com.cedagova.reader.library.downloads.AssetDownloadClient`, which has no
+     * session to carry.
+     *
+     * @throws IllegalArgumentException when [assetId] is not a UUID — a caller
+     *   bug refused before a request exists, rather than a path segment built
+     *   from something else.
+     */
+    suspend fun assetDownloadGrant(assetId: String): ReaderAssetGrantResponse
 }

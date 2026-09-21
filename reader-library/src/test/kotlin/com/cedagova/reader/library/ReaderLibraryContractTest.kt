@@ -12,6 +12,10 @@ import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.PublicationOwnershipPolicy
 import com.cedagova.reader.library.model.PublicationPromotion
 import com.cedagova.reader.library.model.PublicationTransferGrant
+import com.cedagova.reader.library.model.ReaderAssetDirection
+import com.cedagova.reader.library.model.ReaderAssetGrant
+import com.cedagova.reader.library.model.ReaderAssetGrantResponse
+import com.cedagova.reader.library.model.ReaderAssetMethod
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderBookAsset
 import com.cedagova.reader.library.model.ReaderBookAssetKind
@@ -50,6 +54,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -133,6 +138,9 @@ class ReaderLibraryContractTest {
         PublicationImportFailure.serializer() to "PublicationImportFailure",
         PublicationImportAdmissionResponse.serializer() to "PublicationImportAdmissionResponse",
         PublicationImportResponse.serializer() to "PublicationImportResponse",
+        // The asset download grant (#118).
+        ReaderAssetGrant.serializer() to "ReaderAssetGrant",
+        ReaderAssetGrantResponse.serializer() to "ReaderAssetGrantResponse",
     )
 
     /** Kotlin descriptor serial name → the schema it must agree with, for `$ref` checks. */
@@ -180,6 +188,8 @@ class ReaderLibraryContractTest {
             "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}" to "get",
             "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.COMPLETE_SUFFIX}" to "post",
             "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.CANCEL_SUFFIX}" to "post",
+            // The asset download grant (#118): the one route book bytes arrive by.
+            "${ReaderLibraryClient.ASSETS_PATH}/${ReaderLibraryClient.ASSET_ID_TEMPLATE}${ReaderLibraryClient.DOWNLOAD_GRANT_SUFFIX}" to "post",
         ).forEach { (path, method) ->
             val declared = paths[path]?.jsonObject
             assertTrue("the document declares no $path", declared != null)
@@ -266,6 +276,68 @@ class ReaderLibraryContractTest {
         // leaves a broken account entry behind.
         assertEquals("false", failure["broken_account_entry_created"]!!.jsonObject["const"].toString())
     }
+
+    /**
+     * The download grant's own shape, against the document (#118).
+     *
+     * The shape checker above already compares every field and enum member.
+     * What this adds is the two facts the copy store *acts* on and would
+     * otherwise be trusting from memory: that a grant's checksum and size come
+     * from the document as required fields (nothing in FastReader may supply
+     * either), and that the direction and method values the client gates on —
+     * `download` and `GET` — are values the schema actually declares.
+     */
+    @Test
+    fun `the download grant the module reads is the document's own`() {
+        val grant = schemas["ReaderAssetGrant"]!!.jsonObject
+        val required = (grant["required"] as JsonArray).mapNotNull { it.primitive() }.toSet()
+        listOf("url", "checksum", "size_bytes", "expires_at", "direction", "method").forEach { field ->
+            assertTrue(
+                "$field must be required: the copy store reads it rather than assuming one",
+                field in required,
+            )
+        }
+
+        val properties = grant["properties"]!!.jsonObject
+        val directions = (properties["direction"]!!.jsonObject["enum"] as JsonArray).mapNotNull { it.primitive() }
+        val methods = (properties["method"]!!.jsonObject["enum"] as JsonArray).mapNotNull { it.primitive() }
+        assertTrue(
+            "the schema must still declare the download direction the client gates on",
+            "download" in directions,
+        )
+        assertTrue("the schema must still declare the GET method the client gates on", "GET" in methods)
+
+        // And those two wire values really do reach the members the client
+        // gates on, through the module's own JSON rather than by inspection.
+        val decoded = ReaderLibraryJson.decodeFromJsonElement(ReaderAssetGrant.serializer(), grantDocument())
+        assertEquals(ReaderAssetDirection.DOWNLOAD, decoded.direction)
+        assertEquals(ReaderAssetMethod.GET, decoded.method)
+        assertTrue("a download GET grant is what the client spends", decoded.isDownload)
+        assertEquals("0".repeat(64), decoded.checksumHex)
+
+        // The grant has no chunk size of its own: a download is one GET the
+        // provider streams. If the document ever grows one, the client must
+        // read it rather than keep streaming whole.
+        assertFalse(
+            "the download grant gained a chunk size the client ignores",
+            properties.containsKey("chunk_size_bytes"),
+        )
+    }
+
+    /** A minimal grant document, as the provider's answer carries one. */
+    private fun grantDocument(): JsonObject = JsonObject(
+        mapOf(
+            "asset_id" to JsonPrimitive("11111111-1111-1111-1111-111111111111"),
+            "book_id" to JsonPrimitive("22222222-2222-2222-2222-222222222222"),
+            "direction" to JsonPrimitive("download"),
+            "method" to JsonPrimitive("GET"),
+            "url" to JsonPrimitive("https://storage.test/object"),
+            "expires_at" to JsonPrimitive("2026-09-21T12:00:00Z"),
+            "checksum" to JsonPrimitive("sha256:" + "0".repeat(64)),
+            "size_bytes" to JsonPrimitive(1),
+            "upload_status" to JsonPrimitive("ready"),
+        ),
+    )
 
     /** A `const` property's single accepted value, through an `anyOf … null` wrapper if there is one. */
     private fun kotlinx.serialization.json.JsonElement.constValue(): String? {
