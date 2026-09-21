@@ -1,5 +1,17 @@
 package com.cedagova.reader.library
 
+import com.cedagova.reader.library.model.CancelPublicationImportRequest
+import com.cedagova.reader.library.model.CreatePublicationImportRequest
+import com.cedagova.reader.library.model.PublicationArchivePolicy
+import com.cedagova.reader.library.model.PublicationFormatPolicy
+import com.cedagova.reader.library.model.PublicationImport
+import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
+import com.cedagova.reader.library.model.PublicationImportFailure
+import com.cedagova.reader.library.model.PublicationImportPolicyResponse
+import com.cedagova.reader.library.model.PublicationImportResponse
+import com.cedagova.reader.library.model.PublicationOwnershipPolicy
+import com.cedagova.reader.library.model.PublicationPromotion
+import com.cedagova.reader.library.model.PublicationTransferGrant
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderBookAsset
 import com.cedagova.reader.library.model.ReaderBookAssetKind
@@ -108,6 +120,19 @@ class ReaderLibraryContractTest {
         ReaderSyncChange.serializer() to "ReaderSyncChange",
         ReaderCapabilityEntry.serializer() to "ReaderCapabilityEntry",
         ReaderCapabilityQuota.serializer() to "ReaderCapabilityQuota",
+        // The publication-import lifecycle (#116).
+        CreatePublicationImportRequest.serializer() to "CreatePublicationImportRequest",
+        CancelPublicationImportRequest.serializer() to "CancelPublicationImportRequest",
+        PublicationImportPolicyResponse.serializer() to "PublicationImportPolicyResponse",
+        PublicationFormatPolicy.serializer() to "PublicationFormatPolicy",
+        PublicationOwnershipPolicy.serializer() to "PublicationOwnershipPolicy",
+        PublicationArchivePolicy.serializer() to "PublicationArchivePolicy",
+        PublicationTransferGrant.serializer() to "PublicationTransferGrant",
+        PublicationImport.serializer() to "PublicationImport",
+        PublicationPromotion.serializer() to "PublicationPromotion",
+        PublicationImportFailure.serializer() to "PublicationImportFailure",
+        PublicationImportAdmissionResponse.serializer() to "PublicationImportAdmissionResponse",
+        PublicationImportResponse.serializer() to "PublicationImportResponse",
     )
 
     /** Kotlin descriptor serial name → the schema it must agree with, for `$ref` checks. */
@@ -149,6 +174,12 @@ class ReaderLibraryContractTest {
             ReaderLibraryClient.MUTATIONS_PATH to "post",
             ReaderLibraryClient.DELTAS_PATH to "get",
             "/v1/reader/capabilities" to "get",
+            // The import lifecycle. Note the other prefix: `/reader/v1/...`.
+            ReaderLibraryClient.IMPORT_POLICY_PATH to "get",
+            ReaderLibraryClient.IMPORTS_PATH to "post",
+            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}" to "get",
+            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.COMPLETE_SUFFIX}" to "post",
+            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.CANCEL_SUFFIX}" to "post",
         ).forEach { (path, method) ->
             val declared = paths[path]?.jsonObject
             assertTrue("the document declares no $path", declared != null)
@@ -173,6 +204,75 @@ class ReaderLibraryContractTest {
                 .mapNotNull { it.primitive() }
                 .contains(ReaderLibraryClient.SYNC_CAPABILITY_KEY),
         )
+    }
+
+    /**
+     * The import constants this module puts on the wire, against the document's
+     * own `const` declarations, plus the two client-side bounds.
+     *
+     * The shape checker above compares fields and types; these are *values* —
+     * `promotion_source`, `ownership_intent`, the cancel reason's default and
+     * the `client_import_id` length — and a wrong value is a 422 against stage
+     * that no type check would have caught.
+     */
+    @Test
+    fun `the import constants the module sends are the document's own`() {
+        val request = schemas["CreatePublicationImportRequest"]!!.jsonObject["properties"]!!.jsonObject
+        assertEquals(
+            CreatePublicationImportRequest.PROMOTION_SOURCE_DEVICE_ONLY,
+            request["promotion_source"]!!.constValue(),
+        )
+        assertEquals(
+            CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY,
+            request["ownership_intent"]!!.constValue(),
+        )
+        assertEquals(
+            CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH.toString(),
+            request["client_import_id"]!!.jsonObject["maxLength"].toString(),
+        )
+        assertEquals(
+            "the module's sha256 guard must be the schema's own pattern",
+            "^(?:sha256:)?[0-9A-Fa-f]{64}$",
+            request["sha256"]!!.jsonObject["pattern"]!!.primitive(),
+        )
+
+        val cancel = schemas["CancelPublicationImportRequest"]!!.jsonObject["properties"]!!.jsonObject["reason"]!!.jsonObject
+        assertEquals(CancelPublicationImportRequest.DEFAULT_REASON, cancel["default"]!!.primitive())
+        assertEquals(CancelPublicationImportRequest.MAX_REASON_LENGTH.toString(), cancel["maxLength"].toString())
+
+        val grant = schemas["PublicationTransferGrant"]!!.jsonObject["properties"]!!.jsonObject
+        assertEquals(PublicationTransferGrant.PROTOCOL_TUS, grant["protocol"]!!.constValue())
+        assertEquals(PublicationTransferGrant.METHOD_POST, grant["method"]!!.constValue())
+        assertTrue(
+            "the document must still promise a signed creation endpoint",
+            grant["endpoint"]!!.jsonObject["description"]!!.primitive()!!
+                .contains(PublicationTransferGrant.SIGNED_ENDPOINT_SUFFIX),
+        )
+
+        val promotion = schemas["PublicationPromotion"]!!.jsonObject["properties"]!!.jsonObject
+        assertEquals(PublicationPromotion.SOURCE_DEVICE_ONLY, promotion["source"]!!.constValue())
+        assertEquals(PublicationPromotion.DESTINATION_ACCOUNT_LIBRARY, promotion["destination"]!!.constValue())
+
+        val failure = schemas["PublicationImportFailure"]!!.jsonObject["properties"]!!.jsonObject
+        assertEquals(
+            PublicationImportFailure.LOCAL_STATE_RETAINED,
+            failure["local_state_disposition"]!!.constValue(),
+        )
+        assertEquals(
+            PublicationImportFailure.EXTERNAL_SOURCE_UNTOUCHED,
+            failure["external_source_disposition"]!!.constValue(),
+        )
+        // REQ-507's promise, in the contract itself: a failed import never
+        // leaves a broken account entry behind.
+        assertEquals("false", failure["broken_account_entry_created"]!!.jsonObject["const"].toString())
+    }
+
+    /** A `const` property's single accepted value, through an `anyOf … null` wrapper if there is one. */
+    private fun kotlinx.serialization.json.JsonElement.constValue(): String? {
+        val property = jsonObject
+        property["const"]?.primitive()?.let { return it }
+        val anyOf = property["anyOf"] as? JsonArray ?: return null
+        return anyOf.mapNotNull { it.jsonObject["const"]?.primitive() }.firstOrNull()
     }
 
     /**
