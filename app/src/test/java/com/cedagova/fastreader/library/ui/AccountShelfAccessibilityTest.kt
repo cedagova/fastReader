@@ -6,9 +6,11 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import org.junit.Assert.assertEquals
@@ -128,13 +130,110 @@ class AccountShelfAccessibilityTest {
         assertTrue("the reason has to be readable, got \"$spoken\"", spoken.contains("session_revoked"))
     }
 
+    // ---- adding a device book to the account (#117) --------------------------------
+
+    /**
+     * "Add to account library" on three rows in a row announces the same four
+     * words three times unless each one names its book — the same trap the
+     * removal sweep above exists for, on the control that sends a file.
+     */
+    @Test
+    fun `each add-to-account action names the book it would upload`() {
+        showShelf()
+
+        val labels = accountControls().map { it.label() }
+
+        assertTrue(
+            "no control announces adding \"Rayuela\" to the account, only $labels",
+            labels.contains("Add Rayuela to your Reader account library"),
+        )
+        assertEveryControlIsTallEnough()
+    }
+
+    /**
+     * REQ-505 through the accessibility tree: the question is reachable and
+     * labelled, and the tap that opens it sends nothing.
+     */
+    @Test
+    fun `the consent question is labelled, reachable, and nothing is sent before the yes`() {
+        var asked = 0
+        var confirmed = 0
+        showShelf(onAddToAccount = { asked += 1 }, onConfirmAddToAccount = { confirmed += 1 })
+
+        composeRule.onNodeWithTag(
+            "library_account_add_${LibraryAccountFixtures.RAYUELA_ID}",
+        ).performClick()
+
+        assertEquals("tapping the action only asks", 1, asked)
+        assertEquals("nothing may be sent before the yes", 0, confirmed)
+    }
+
+    /** The question's own two controls, once the flow has put it on screen. */
+    @Test
+    fun `the consent question offers exactly Add and Cancel, both large enough`() {
+        var confirmed = 0
+        showShelf(
+            imports = AccountImportsState(
+                byDeviceBookId = mapOf(
+                    LibraryAccountFixtures.RAYUELA_ID to
+                        BookImportState.Consent(sizeBytes = 1_048_576, maxSourceBytes = 52_428_800),
+                ),
+            ),
+            onConfirmAddToAccount = { confirmed += 1 },
+        )
+
+        val controls = accountControls().filter { it.testTag().startsWith("library_account_add_dialog") }
+        assertEquals(listOf("Add", "Cancel"), controls.map { it.label() }.sorted())
+        assertEveryControlIsTallEnough()
+
+        composeRule.onNodeWithTag("library_account_add_dialog_confirm").performClick()
+
+        assertEquals(1, confirmed)
+    }
+
+    /**
+     * The transfer belongs to the book, so TalkBack reads it with the book.
+     *
+     * The row merges its own descendants into one stop, which is what makes
+     * "Rayuela … sending … 42%" a single sentence a reader hears rather than a
+     * stray line below the row. The Cancel button is the exception, because a
+     * clickable is its own merge boundary — and it therefore has to name the
+     * book itself, which is what the last assertion is for.
+     */
+    @Test
+    fun `an add in progress is read out with the book, and called off by name`() {
+        showShelf(
+            imports = AccountImportsState(
+                byDeviceBookId = mapOf(
+                    LibraryAccountFixtures.RAYUELA_ID to BookImportState.Sending(fraction = 0.42f),
+                ),
+            ),
+        )
+
+        val row = composeRule.allNodes()
+            .single { it.testTag() == "library_book_${LibraryAccountFixtures.RAYUELA_ID}" }
+        val spoken = row.spokenText()
+
+        assertTrue("the progress has to be readable, got \"$spoken\"", spoken.contains("42"))
+        assertTrue("the book has to be named with it, got \"$spoken\"", spoken.contains("Rayuela"))
+        assertTrue(
+            "the cancel control must name its book, only ${accountControls().map { it.label() }}",
+            accountControls().map { it.label() }
+                .contains("Cancel adding Rayuela to your Reader account"),
+        )
+        assertEveryControlIsTallEnough()
+    }
+
     private fun showShelf(
         account: AccountLibraryState = LibraryAccountFixtures.signedIn(
             LibraryAccountFixtures.ficcionesInAccount(),
             LibraryAccountFixtures.dublinersInAccountOnly(),
         ),
         accountUndo: AccountUndoNotice? = null,
+        imports: AccountImportsState = AccountImportsState.NONE,
         onRemoveFromAccount: (LibraryBookItem) -> Unit = {},
+        onAddToAccount: (LibraryBookItem) -> Unit = {},
+        onConfirmAddToAccount: (LibraryBookItem) -> Unit = {},
     ) {
         composeRule.setContent {
             FastReaderTheme {
@@ -145,6 +244,7 @@ class AccountShelfAccessibilityTest {
                         query = "",
                         account = account,
                         accountUndo = accountUndo,
+                        imports = imports,
                     ),
                     onQueryChange = {},
                     onAddBooks = {},
@@ -154,6 +254,8 @@ class AccountShelfAccessibilityTest {
                     onGrantAccess = {},
                     onOpen = {},
                     onRemoveFromAccount = onRemoveFromAccount,
+                    onAddToAccount = onAddToAccount,
+                    onConfirmAddToAccount = onConfirmAddToAccount,
                 )
             }
         }

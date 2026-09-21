@@ -1,5 +1,8 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.library.imports.PublicationImportRecord
+import com.cedagova.reader.library.model.PublicationFormat
+import com.cedagova.reader.library.model.PublicationImportStatus
 import com.cedagova.reader.library.model.ReaderCoverStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.model.ReaderMutationKind
@@ -142,5 +145,60 @@ class AccountLibraryStoreTest {
         assertEquals(1, others.size)
         val document = (others.single().load() as AccountLibraryLoad.Loaded).document
         assertEquals("user-2", document.userId)
+    }
+
+    /**
+     * Schema 2 (LEAF802): the import records survive a write and a read, because
+     * REQ-507's "app death mid-transfer resumes without a duplicate" is entirely
+     * a claim about this file.
+     */
+    @Test
+    fun `an import record survives the round trip with everything a resume needs`() {
+        val store = FileAccountLibraryStores(directory).forUser("user-1")
+        val record = PublicationImportRecord(
+            clientImportId = "reader-import-v1-${"c".repeat(64)}",
+            accountId = "user-1",
+            contentSha256 = "b".repeat(64),
+            sizeBytes = 8_388_608,
+            sourceFormat = PublicationFormat.EPUB,
+            sourceMimeType = "application/epub+zip",
+            originalFileName = "dune.epub",
+            importId = "9a3b1c2d-4e5f-4061-8172-839405a6b7c8",
+            status = PublicationImportStatus.PENDING_UPLOAD,
+            transferLocation = "https://storage.example/upload/resumable/abc",
+            grantExpiresAt = "2026-09-21T10:00:00Z",
+        )
+        store.save(sample().withImport(record))
+
+        val loaded = (store.load() as AccountLibraryLoad.Loaded).document
+
+        assertEquals(listOf(record), loaded.imports)
+        assertEquals(record, loaded.import(record.clientImportId))
+        assertNull(loaded.withoutImport(record.clientImportId).import(record.clientImportId))
+    }
+
+    /**
+     * A version 1 document — every device that ran increment 001 — reads back as
+     * a version 2 one with no imports, which is the truth about it: it never
+     * added a book. Nothing else in the document moves.
+     */
+    @Test
+    fun `a version one document migrates forward with its rows and queue intact`() {
+        val codec = AccountLibraryCodec()
+        val version1 = codec.encode(sample())
+            .replace("\"schemaVersion\":2", "\"schemaVersion\":1")
+            // A real version 1 document has no `imports` key at all; leaving the
+            // encoder's empty one in would test a document no device ever wrote.
+            .replace(",\"imports\":[]", "")
+        assertTrue("the fixture must really be a version 1 document", version1.contains("\"schemaVersion\":1"))
+        assertTrue("a version 1 document has no imports key", !version1.contains("imports"))
+
+        val decoded = codec.decode(version1) as AccountLibraryDecoding.Decoded
+
+        assertEquals(1, decoded.migratedFrom)
+        assertEquals(AccountLibrarySchema.CURRENT_VERSION, decoded.document.schemaVersion)
+        assertEquals(sample().books, decoded.document.books)
+        assertEquals(sample().outbox, decoded.document.outbox)
+        assertEquals(emptyList<PublicationImportRecord>(), decoded.document.imports)
     }
 }

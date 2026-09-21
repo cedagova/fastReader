@@ -27,6 +27,7 @@ import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
+import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.library.ui.accountBookIdForDevice
 import com.cedagova.fastreader.library.ui.LibraryRoute
@@ -72,7 +73,13 @@ class MainActivity : ComponentActivity() {
             // without either screen knowing the settings exist.
             val settings by library.repository.settings.collectAsState()
             FastReaderTheme(darkTheme = settings.theme.isDark(), fontSize = settings.fontSize) {
-                FastReaderApp(library, app.crashReports, app.readerAccount, app.accountShelf)
+                FastReaderApp(
+                    library = library,
+                    crashReports = app.crashReports,
+                    readerAccount = app.readerAccount,
+                    accountShelf = app.accountShelf,
+                    accountImports = app.accountImports,
+                )
             }
         }
     }
@@ -135,6 +142,7 @@ private fun FastReaderApp(
     crashReports: CrashReportStore,
     readerAccount: ReaderAccountController,
     accountShelf: AccountShelf,
+    accountImports: AccountImports,
 ) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -274,6 +282,7 @@ private fun FastReaderApp(
             LibraryRoute(
                 graph = library,
                 account = accountShelf,
+                imports = accountImports,
                 onOpenBook = { openBookId = it },
                 resumeBlocked = resumeBlocked(blockedBookId, blockedReason),
                 onDismissResumeNotice = {
