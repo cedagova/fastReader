@@ -275,6 +275,10 @@ class AccountShelfTest {
             calls += "finished:$bookId"
         }
 
+        override fun recordPosition(bookId: String, position: LocalReadingPosition) {
+            calls += "position:$bookId:${position.href}:${position.percent}"
+        }
+
         override fun recordStatus(bookId: String, status: ReaderLibraryStatus) {
             calls += "status:$bookId:$status"
         }

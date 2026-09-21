@@ -245,12 +245,20 @@ private fun FastReaderApp(
             // its position, so leaving it is leaving it entirely (REQ-103).
             onBack = { library.external.close() },
             onOpenSettings = { settingsOpen = true },
+            // Handed over, so it has no account row and `accountBookIdForDevice`
+            // answers null for it — the gate is the account's own, rather than a
+            // wire left unconnected here.
+            account = accountShelf,
         )
 
         openBookId != null -> ReaderRoute(
             graph = library,
             target = ReaderTarget.Library(requireNotNull(openBookId)),
             onBack = { openBookId = null; routedIntoReader = false },
+            // Where a portable position is published from for an account book
+            // (#120). A device-only book resolves to no account id and sends
+            // nothing.
+            account = accountShelf,
             // A book the reader chose from the library keeps the reader's own
             // explanation on screen: they picked it, and its row already said
             // what it is. A book the *launch* chose is different — nobody asked

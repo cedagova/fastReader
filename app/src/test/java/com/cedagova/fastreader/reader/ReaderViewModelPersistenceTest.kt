@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.reader
 
+import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.TokenPosition
@@ -225,6 +226,17 @@ class ReaderViewModelPersistenceTest {
 
         override fun flush() {
             flushes++
+        }
+
+        /**
+         * Every portable position the ViewModel offered, with the token index it
+         * offered it at — so a test can assert not just how many there were but
+         * which words they were taken at.
+         */
+        val published = mutableListOf<Pair<String, Int>>()
+
+        override fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int) {
+            published += bookId to tokenIndex
         }
     }
 }

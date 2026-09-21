@@ -126,6 +126,22 @@ interface ReaderPositions {
     /** Makes the last recorded position durable — pause, jump, background, close. */
     fun flush()
 
+    /**
+     * Offers the portable position of a non-word event to whatever publishes it
+     * (REQ-511, AD-25).
+     *
+     * Called from exactly the moments [flush] is, and never from [record]: the
+     * per-word throttle is the one path that must stay free of anything but an
+     * in-memory store, and a position published sixteen times a second would be
+     * a mutation stream rather than a reading position.
+     *
+     * Whether anything is actually sent is not the reader's question. A device
+     * book, a signed-out app and a position that says nothing new all end here
+     * and go no further; the reader's part is to say where it is, at the moments
+     * it is worth saying.
+     */
+    fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int)
+
     /** Non-null while storage is refusing writes, so a lost position is visible. */
     val failure: StateFlow<String?>
 }
