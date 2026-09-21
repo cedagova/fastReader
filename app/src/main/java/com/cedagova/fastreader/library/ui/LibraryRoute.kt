@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
+import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
@@ -28,6 +29,8 @@ fun LibraryRoute(
     graph: LibraryGraph,
     /** The signed-in account's library and its operations (#114). */
     account: AccountShelf,
+    /** Adding a device book to that account, with its consent gate (#117). */
+    imports: AccountImports,
     onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
     resumeBlocked: ResumeBlocked? = null,
@@ -40,6 +43,7 @@ fun LibraryRoute(
     val undoableRemoval by repository.undoableRemoval.collectAsState()
     val accountLibrary by account.state.collectAsState()
     val accountRemoval by account.undo.collectAsState()
+    val accountImports by imports.state.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     var foldersOpen by rememberSaveable { mutableStateOf(false) }
     // Which account notice the reader has put away, by the notice's own key, so
@@ -48,8 +52,26 @@ fun LibraryRoute(
     // as it survives rotation.
     var dismissedAccountNotice by rememberSaveable { mutableStateOf<String?>(null) }
     val accountUndo = accountRemoval?.let { AccountUndoNotice(it.bookId, it.title) }
-    val built = remember(catalog, ingestion, query, resumeBlocked, undoableRemoval, accountLibrary, accountUndo) {
-        buildLibraryUiState(catalog, ingestion, query, resumeBlocked, undoableRemoval, accountLibrary, accountUndo)
+    val built = remember(
+        catalog,
+        ingestion,
+        query,
+        resumeBlocked,
+        undoableRemoval,
+        accountLibrary,
+        accountUndo,
+        accountImports,
+    ) {
+        buildLibraryUiState(
+            catalog = catalog,
+            ingestion = ingestion,
+            query = query,
+            resumeBlocked = resumeBlocked,
+            undoableRemoval = undoableRemoval,
+            account = accountLibrary,
+            accountUndo = accountUndo,
+            imports = accountImports,
+        )
     }
     val state = if (built.accountNotice?.key == dismissedAccountNotice) built.copy(accountNotice = null) else built
 
@@ -104,6 +126,14 @@ fun LibraryRoute(
             book.account?.let { account.removeFromAccount(it.bookId, book.title) }
         },
         onUndoAccountRemove = { account.undoRemove() },
+        // Four callbacks for one flow, because the step that can send bytes has
+        // to be its own: `requestAdd` asks the backend what it accepts, and only
+        // `confirmAdd` — the owner's answer to the question `requestAdd` leads
+        // to — can put this book on the wire (REQ-505).
+        onAddToAccount = { imports.requestAdd(it.id) },
+        onConfirmAddToAccount = { imports.confirmAdd(it.id) },
+        onCancelAddToAccount = { imports.cancelAdd(it.id) },
+        onDismissAddToAccount = { imports.dismiss(it.id) },
         onDismissAccountNotice = { dismissedAccountNotice = state.accountNotice?.key },
         onOpenFolders = { foldersOpen = true },
         onOpen = { onOpenBook(it.id) },

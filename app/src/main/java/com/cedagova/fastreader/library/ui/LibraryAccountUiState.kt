@@ -1,9 +1,12 @@
 package com.cedagova.fastreader.library.ui
 
 import com.cedagova.fastreader.account.library.AccountBook
+import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.account.library.wireName
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
@@ -35,6 +38,56 @@ data class AccountRow(
 
 /** The account removal the reader can still take back (REQ-508). */
 data class AccountUndoNotice(val bookId: String, val title: String)
+
+/**
+ * The **Add to account library** half of one device row (REQ-505, REQ-506,
+ * REQ-507).
+ *
+ * Present only on a row that could actually be added: a readable book this
+ * device has and the signed-in account does not. Null everywhere else, which is
+ * why every signed-out golden is byte-identical to v1.6.0's and why an account
+ * book — whose bytes the account already holds — offers nothing to upload.
+ *
+ * The three shapes it can take:
+ *
+ * - both fields null — the action, plain and on offer;
+ * - [off] set — the deployment admits no imports, so the reason is shown *in
+ *   place of* the action rather than offering a control that cannot work;
+ * - [state] set — an add is somewhere between the tap and its verdict.
+ */
+data class AddToAccount(
+    val state: BookImportState? = null,
+    val off: ImportsOff? = null,
+) {
+    /** True when the row simply offers the action and nothing has happened yet. */
+    val offered: Boolean get() = state == null && off == null
+}
+
+/**
+ * The add-to-account half of [item], or null when the row cannot offer one.
+ *
+ * Four rows get nothing, each for its own reason and none of them cosmetic:
+ *
+ * 1. a row the account already has — there is nothing to upload, and an
+ *    account-only row has no bytes here to upload in the first place;
+ * 2. a book this device cannot read — missing, corrupt, DRM-protected or with
+ *    its permission gone; there is no file to send;
+ * 3. signed out — D4's shelf is exactly v1.6.0's;
+ * 4. `reader.sync.v1` unavailable — the backend has said it is not serving this
+ *    client's library, and offering an upload against it would be a control
+ *    that fails on purpose.
+ */
+internal fun addToAccountFor(
+    item: LibraryBookItem,
+    account: AccountLibraryState,
+    imports: AccountImportsState,
+): AddToAccount? {
+    if (item.account != null || !item.isReadable) return null
+    if (account.phase == AccountSyncPhase.SIGNED_OUT) return null
+    if (account.phase == AccountSyncPhase.DEFERRED && account.capabilityReason != null) return null
+    imports.disabled?.let { return AddToAccount(off = it) }
+    return AddToAccount(state = imports.byDeviceBookId[item.id])
+}
 
 /** Which sentence the shelf says about the account library. */
 enum class AccountNoticeKind {

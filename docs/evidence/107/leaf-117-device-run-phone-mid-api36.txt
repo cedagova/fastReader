@@ -1,0 +1,67 @@
+LEAF802 (#117) — device run on Phone_Mid_API36
+==============================================
+
+Effort      https://github.com/cedagova/fastReader/issues/107 (increment 002 of #104)
+Issue       https://github.com/cedagova/fastReader/issues/117
+Worktree    leaf-117, base collector/107-add-to-account @ 3c8e7c84300f6e956222d990df9b3f89779db5bf
+Device      Phone_Mid_API36 (1080p reference phone, Android 16), -no-window
+Run         2026-09-21, signed OUT — no Reader account on this device.
+
+What this run is for, and what it is not
+----------------------------------------
+
+The acceptance this leaf really wants on a device — a sub-cap EPUB added from
+FastReader appearing and reading on reader-web, an over-cap EPUB refused with
+the policy's cap, a duplicate add making no second row, `am force-stop`
+mid-transfer resuming without a duplicate, and the stage import records showing
+zero imports before the consent tap — all need the owner's signed-in stage
+Reader account. Nobody on this run has it. Those five are recorded as
+`PENDING OWNER TEST` on the PR and in the effort's owner-test list; none of them
+is claimed here.
+
+What this run does prove is the thing nothing else could:
+
+1. The new process-scoped wiring does not take the app down. `AccountImports`
+   is constructed in `FastReaderApplication.onCreate` beside the sync engine,
+   and the foreground observer gained an `onStop` for the first time. A unit
+   test cannot see either.
+2. Signed out, the shelf is still exactly the 1.6.0 shelf. No device book
+   offers **Add to account library**, because `addToAccountFor` returns null
+   for every row while `AccountSyncPhase.SIGNED_OUT` — which is REQ-505's
+   "signing in or opening never adds a book" at its strongest: there is no
+   control to press at all.
+
+Steps
+-----
+
+  emulator -avd Phone_Mid_API36 -no-window -no-snapshot-save &
+  adb shell getprop sys.boot_completed            -> 1
+  ./gradlew installDebug                          -> Installed on 1 device.
+  adb shell am start -n com.cedagova.fastreader/.MainActivity
+  # home, relaunch, home, relaunch: two full background/foreground cycles,
+  # so the new onStop/onForeground pair runs twice
+  adb logcat -d -s AndroidRuntime:E
+  adb emu kill
+
+The installed artifact is the build from this head
+--------------------------------------------------
+
+  local   app/build/outputs/apk/debug/app-debug.apk
+          md5 afe7f4a4a7a01d2b2cb9812982ff24b0
+  device  /data/app/~~U-AYdsEu4W5QVn1ewNCmeg==/com.cedagova.fastreader-4_dvhoo36LH4h8K_OxMx7g==/base.apk
+          md5 afe7f4a4a7a01d2b2cb9812982ff24b0
+
+Results
+-------
+
+  adb logcat -d -s AndroidRuntime:E            0 lines, after launch and after
+                                               two background/foreground cycles
+  adb shell pidof com.cedagova.fastreader      4860 (the same process throughout)
+  topResumedActivity                           com.cedagova.fastreader/.MainActivity
+
+Screenshot: leaf-117-01-signed-out-shelf-phone-mid-api36.png — the shelf with one
+device book (Pride and Prejudice, 0% read). Title, author, progress and the
+remove control, and nothing else: no add-to-account action, no account banner.
+
+Nothing in this file carries a token, a backend value, an account code, an email
+address or a request secret; the device holds no Reader session at all.

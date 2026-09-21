@@ -55,7 +55,7 @@ class PrivacyStatementTest {
      * thing that account sends — which books it holds, and the reading status
      * and last-opened time of those books.
      *
-     * So two promises are retired here, not one. "No internet permission" went
+     * So four promises are retired across v1.7.0, not one. "No internet permission" went
      * with #100. "Your books, your reading positions, your settings and any
      * crash report stay on this device and are never sent" goes with #113 and
      * #114, because the account half of it stopped being true the moment a
@@ -63,8 +63,15 @@ class PrivacyStatementTest {
      * the claim to what the merged code actually does and no further: no book
      * *file* is sent, a device-only book is never named to the Reader API, and
      * positions, reading speed, the other settings and crash reports still
-     * never leave. The import, download and position sentences belong to later
+     * never leave. The download and position sentences belong to later
      * increments and are deliberately not here yet.
+     *
+     * The import half of that replacement lasted exactly one increment. #117
+     * retires "no book file is ever sent" and the unconditional "a book that is
+     * only on this device is never named to the Reader API", because a book the
+     * owner adds is both sent and named. Neither was softened into an
+     * intention: each is replaced by the same claim made conditional on the
+     * consent the code actually requires.
      *
      * A third phrase is asserted absent although it never shipped: "while you
      * are signed in, a copy of your account's own book list". The first draft
@@ -81,7 +88,7 @@ class PrivacyStatementTest {
      * edit of `values-es/strings.xml` too.
      */
     @Test
-    fun `the statement still makes the sixteen claims the build backs up`() {
+    fun `the statement still makes the nineteen claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
@@ -89,13 +96,17 @@ class PrivacyStatementTest {
             "your email address, the code or password you type and the account's session go to the Reader identity provider and the Reader API",
             "asks the Reader API which books your account already holds",
             "for those books only it tells the Reader API that you opened one, when you last opened it, whether you have finished it, and when you take one out of your account or put it back",
-            "no book file is ever sent",
-            "a book that is only on this device is never named to the Reader API",
+            "when you choose Add to account library for a book on this device and confirm",
+            "asks the Reader API what kinds and sizes of file your account accepts",
+            "sends that book's file, its name, its size, its format and its checksum to the Reader API and its storage, where your account keeps them",
+            "nothing about that book is sent before you confirm",
+            "a book file is sent only for a book you add that way",
+            "a book that is only on this device is never named to the Reader API until you add it",
             "your reading positions, your reading speed, your other settings and any crash report stay on this device and are never sent",
             "kept encrypted on this device, outside its backup, and is removed when you sign out",
             "hands a web address to your browser",
             "your books stay in the folders you chose",
-            "once you sign in, a copy of your account's own book list, in its private storage",
+            "once you sign in, a copy of your account's own book list and a note of any book you are part-way through adding to it, in its private storage",
             "that copy of the account's list is not deleted when you sign out",
             "only uninstalling FastReader or clearing its data removes it",
             "is included in this device's backup or in a transfer to a new phone",
@@ -119,6 +130,14 @@ class PrivacyStatementTest {
             // The narrower half of the retired v1.6.0 sentence, in case only its
             // opening is trimmed rather than the whole clause rewritten.
             "and nothing else does",
+            // Retired with #117: adding a book uploads its file, so this one
+            // stopped being true the moment the consent dialog got a yes.
+            "no book file is ever sent",
+            // The unconditional half of the same sentence. Quoted with the comma
+            // that followed it, because the replacement contains the old words
+            // followed by "until you add it" — matching the bare clause would
+            // fail against the *new*, truthful sentence.
+            "never named to the Reader API, and your reading positions",
         ).forEach { retired ->
             assertFalse(
                 "the retired promise \"$retired\" must not survive in the statement: $statement",

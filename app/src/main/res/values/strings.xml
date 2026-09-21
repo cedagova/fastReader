@@ -151,6 +151,37 @@
     <string name="library_account_code">Code %1$s</string>
     <string name="library_account_request">Request %1$s</string>
 
+    <!-- Adding a device book to the account (#117, REQ-505 / REQ-506 / REQ-507) -->
+    <string name="library_account_add">Add to account library</string>
+    <string name="library_account_add_label">Add %1$s to your Reader account library</string>
+    <string name="library_account_add_checking">Checking what your Reader account accepts…</string>
+    <string name="library_account_add_title">Add “%1$s” to your Reader account?</string>
+    <string name="library_account_add_body">This uploads the book\'s file — all %1$s of it — to your Reader account and keeps it there, so you can read it on your other devices. The file on this device and your place in it are not touched. Nothing has been sent yet.</string>
+    <string name="library_account_add_limit">Your account accepts files up to %1$s.</string>
+    <string name="library_account_add_confirm">Add</string>
+    <string name="library_account_add_sending">Sending to your Reader account… %1$d%%</string>
+    <string name="library_account_add_finishing">Sent. Your Reader account is preparing the book…</string>
+    <string name="library_account_add_cancel">Cancel adding</string>
+    <string name="library_account_add_cancel_label">Cancel adding %1$s to your Reader account</string>
+    <string name="library_account_add_off">Your Reader account is not taking new books right now.</string>
+    <string name="library_account_add_retry">Try again</string>
+    <string name="library_account_add_retry_label">Try adding %1$s to your Reader account again</string>
+
+    <!-- Refusals: the backend’s own category, in plain words (REQ-507) -->
+    <string name="library_account_add_kept">Your book here is unchanged.</string>
+    <string name="library_account_refused_too_large">Not added: this file is %1$s and your Reader account accepts up to %2$s.</string>
+    <string name="library_account_refused_unsupported">Not added: your Reader account does not take this kind of file.</string>
+    <string name="library_account_refused_protected">Not added: this file is copy-protected, so your Reader account cannot take it.</string>
+    <string name="library_account_refused_unsafe">Not added: your Reader account would not accept this file.</string>
+    <string name="library_account_refused_malformed">Not added: your Reader account could not read this file.</string>
+    <string name="library_account_refused_upload">Not added: the upload did not finish.</string>
+    <string name="library_account_refused_conversion">Not added: your Reader account could not prepare this book.</string>
+    <string name="library_account_refused_cancelled">Not added: you cancelled it.</string>
+    <string name="library_account_refused_other">Not added: your Reader account did not take this book.</string>
+    <string name="library_account_refused_offline">Not added: you need a connection to add a book to your account.</string>
+    <string name="library_account_refused_unreachable">Not added: this book\'s file could not be read from where it is.</string>
+    <string name="library_account_refused_size_unknown">Not added: the folder this book is in does not say how large the file is.</string>
+
     <!-- Added folders (REQ-104) -->
     <string name="library_folders_open">Added folders</string>
     <plurals name="library_folders_open_count">
@@ -254,7 +285,7 @@
     <string name="settings_reader_account_signed_in">Signed in as %1$s</string>
     <string name="settings_reader_account_summary">Optional. Reading needs no account; this signs in to the Reader stage backend to test it from this app.</string>
     <string name="settings_privacy_label">What stays on this device</string>
-    <string name="settings_privacy">FastReader has the internet permission and uses it for one thing only: the optional Reader account under Settings. Nothing is sent unless you use that account. When you do, your email address, the code or password you type and the account\'s session go to the Reader identity provider and the Reader API. FastReader also asks the Reader API which books your account already holds, and for those books only it tells the Reader API that you opened one, when you last opened it, whether you have finished it, and when you take one out of your account or put it back. That is all that leaves this device: no book file is ever sent, a book that is only on this device is never named to the Reader API, and your reading positions, your reading speed, your other settings and any crash report stay on this device and are never sent. The account session is kept encrypted on this device, outside its backup, and is removed when you sign out. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings, small cover thumbnails and, once you sign in, a copy of your account\'s own book list, in its private storage. That copy of the account\'s list is not deleted when you sign out: it stays in that private storage, so signing in to the same account again picks up where it left off, and only uninstalling FastReader or clearing its data removes it. If the app stops unexpectedly it also keeps one short report about what went wrong in that private storage: the app version, this device\'s model, its Android version and where in the code it stopped, with no part of any book in it — the next launch offers that report to you once, and it goes nowhere unless you share it and pick an app to send it to. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
+    <string name="settings_privacy">FastReader has the internet permission and uses it for one thing only: the optional Reader account under Settings. Nothing is sent unless you use that account. When you do, your email address, the code or password you type and the account\'s session go to the Reader identity provider and the Reader API. FastReader also asks the Reader API which books your account already holds, and for those books only it tells the Reader API that you opened one, when you last opened it, whether you have finished it, and when you take one out of your account or put it back. When you choose Add to account library for a book on this device and confirm, FastReader asks the Reader API what kinds and sizes of file your account accepts and then sends that book\'s file, its name, its size, its format and its checksum to the Reader API and its storage, where your account keeps them; nothing about that book is sent before you confirm. That is all that leaves this device: a book file is sent only for a book you add that way, a book that is only on this device is never named to the Reader API until you add it, and your reading positions, your reading speed, your other settings and any crash report stay on this device and are never sent. The account session is kept encrypted on this device, outside its backup, and is removed when you sign out. Check for updates only hands a web address to your browser, and your browser makes that request. Your books stay in the folders you chose; on this device FastReader keeps only its own list of them, your reading positions, your settings, small cover thumbnails and, once you sign in, a copy of your account\'s own book list and a note of any book you are part-way through adding to it, in its private storage. That copy of the account\'s list is not deleted when you sign out: it stays in that private storage, so signing in to the same account again picks up where it left off, and only uninstalling FastReader or clearing its data removes it. If the app stops unexpectedly it also keeps one short report about what went wrong in that private storage: the app version, this device\'s model, its Android version and where in the code it stopped, with no part of any book in it — the next launch offers that report to you once, and it goes nowhere unless you share it and pick an app to send it to. None of that is included in this device\'s backup or in a transfer to a new phone, so a reinstall or a new phone starts with an empty library. When another app opens a book in FastReader and does not give lasting permission to read it, that book is not added to your list and no permission to it is kept; only your place in it is remembered.</string>
     <string name="settings_visual_only">The word stream is visual only. FastReader shows one word at a time on the screen; it never reads a book aloud, and there is no audio or text-to-speech anywhere in the app. Everything around the stream — the library, the reader controls, and this screen — is labelled for TalkBack, but the stream itself has to be seen.</string>
 
     <!-- The crash report offered on the next launch (REQ-207, AD-14). The
