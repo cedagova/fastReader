@@ -1737,7 +1737,13 @@ private fun LibraryBookItem.statusLine(): String = when {
 
 @Composable
 private fun LibraryBookItem.deviceStatusLine(): String = when (status) {
-    BookStatus.READABLE -> stringResource(R.string.library_progress, progressPercent)
+    // One line, two numbers, and only when the second one says something: the
+    // account's place is shown beside this device's while it is ahead of it
+    // (REQ-511). Which number is *the* position is not in question — the
+    // device's is, until the reader answers the offer in the reader.
+    BookStatus.READABLE -> accountPercentAhead
+        ?.let { stringResource(R.string.library_progress_account_ahead, progressPercent, it) }
+        ?: stringResource(R.string.library_progress, progressPercent)
     BookStatus.CORRUPT -> stringResource(R.string.library_state_corrupt)
     BookStatus.DRM_PROTECTED -> stringResource(R.string.library_state_drm)
     BookStatus.MISSING -> stringResource(R.string.library_state_missing)

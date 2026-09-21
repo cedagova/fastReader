@@ -68,6 +68,20 @@ interface AccountLibraryActions {
      * backend's admission order decides who wins.
      */
     fun recordPosition(bookId: String, position: LocalReadingPosition)
+
+    /**
+     * Records that the resume offer for one remote change has been answered
+     * (REQ-511), whichever way it was answered.
+     *
+     * The one operation on this interface that **queues nothing and sends
+     * nothing**. Whether this reader was asked about a position another client
+     * left is a note this device makes about itself, not a change to the
+     * account — so it is written straight into the account document and no
+     * envelope is built. It is here rather than on a separate interface only
+     * because the account document has exactly one writer, and a second one
+     * racing it would be the first way to lose a queued mutation.
+     */
+    fun settleResumeOffer(bookId: String, changeKey: String)
 }
 
 /**
@@ -303,6 +317,32 @@ class AccountSyncEngine(
             payload = PortableReadingPosition.payloadFor(position),
             resourceType = ReaderResourceType.READING_PROGRESS,
         ) { it }
+    }
+
+    /**
+     * Stores the answered remote change on the book's row, and does nothing else.
+     *
+     * No `enqueue`, so no envelope and no sync: this is the only write in this
+     * class that reaches the document without going near the outbox. It goes
+     * through [persistQuietly] for the reason an import record does — the row the
+     * shelf draws has not changed, so re-publishing the state would re-trigger
+     * the shelf's effects for a fact the shelf does not show.
+     *
+     * A book the account has no row for is skipped rather than invented: there is
+     * nothing to have been offered for.
+     */
+    override fun settleResumeOffer(bookId: String, changeKey: String) {
+        scope.launch {
+            mutex.withLock {
+                val account = active ?: return@withLock
+                val existing = account.document.book(bookId) ?: return@withLock
+                if (existing.resumeOfferSettledFor == changeKey) return@withLock
+                persistQuietly(
+                    account,
+                    account.document.withBook(existing.copy(resumeOfferSettledFor = changeKey)),
+                )
+            }
+        }
     }
 
     // ---------------------------------------------------------- import records

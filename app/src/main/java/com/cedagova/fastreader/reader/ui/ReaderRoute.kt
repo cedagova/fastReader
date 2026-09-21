@@ -25,8 +25,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.PortableReadingPosition
+import com.cedagova.fastreader.account.library.RemoteReadingPosition
 import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.external.ExternalOpen
@@ -44,9 +46,12 @@ import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ReaderViewModel
+import com.cedagova.fastreader.reader.ResumeOffer
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlin.math.roundToInt
 
 /**
  * The reader wired to a real book: catalog bytes in, playback out.
@@ -159,6 +164,34 @@ fun ReaderRoute(
         offer?.positionKey?.let { repository.requestMarkFrontMatterOffered(it) }
         Unit
     }
+    // REQ-511. The reader knows the account holds a place ahead of this one and
+    // which token it maps to; only the account document knows whether *this*
+    // remote change has already been answered on this device, so the two are
+    // joined here — the same split the front-matter offer makes two blocks up.
+    //
+    // A build with no account surface collects a constant signed-out state, so
+    // this is one unconditional collection either way rather than a composable
+    // call that appears and disappears with `account`.
+    val accountLibrary by remember(account) {
+        account?.state ?: MutableStateFlow(AccountLibraryState.SIGNED_OUT)
+    }.collectAsState()
+    val offered by reader.resumeOffer.collectAsState()
+    val resumeSettledBefore = offered?.let { offer ->
+        accountLibrary.books.firstOrNull { it.bookId == offer.accountBookId }
+            ?.resumeOfferSettledFor == offer.changeKey
+    } == true
+    val resumeOffer = offered?.takeIf { !resumeSettledBefore }
+    // REQ-502's position clause: a position changed on another device arrives on
+    // an ordinary foreground sync, and the book can already be open when it does.
+    // Keyed on the rows rather than the phase, so a sync that changed nothing
+    // about this account's books does not re-ask.
+    LaunchedEffect(reader, accountLibrary.books) { reader.considerResumeOffer() }
+    // Answering settles this remote change for good, whichever way it was
+    // answered: the requirement is that it is *offered* once per change.
+    val settleResumeOffer = {
+        offered?.let { account?.settleResumeOffer(it.accountBookId, it.changeKey) }
+        Unit
+    }
     val addToLibrary = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
         if (uris.isNotEmpty()) repository.requestAddPickedBooks(uris.map(Uri::toString))
     }
@@ -255,6 +288,15 @@ fun ReaderRoute(
         onDismissFrontMatterOffer = {
             settleFrontMatterOffer()
             reader.dismissFrontMatterOffer()
+        },
+        resumeOffer = resumeOffer,
+        onAcceptResumeOffer = {
+            settleResumeOffer()
+            reader.acceptResumeOffer()
+        },
+        onDismissResumeOffer = {
+            settleResumeOffer()
+            reader.dismissResumeOffer()
         },
     )
 }
@@ -398,6 +440,75 @@ internal class CatalogPositions(
         val accountBookId = accountBookIdForDevice(bookId, shelf.state.value) ?: return
         val portable = PortableReadingPosition.of(content, tokenIndex) ?: return
         shelf.recordPosition(accountBookId, portable)
+    }
+
+    /**
+     * The resume offer for this book, or null when there is nothing to ask
+     * (REQ-511).
+     *
+     * The same two gates [publishPortable] has, in the same order and for the
+     * same reasons — a device book resolves to no account id, and signed out
+     * there are no rows to resolve against — and then three of its own:
+     *
+     * 1. **The account holds no position for this book.** Nothing has been said
+     *    about it by anybody, so there is nothing to offer.
+     * 2. **The position maps to where the reader already is, or behind it.**
+     * 3. **The book has no tokens.** There is no word to land on.
+     *
+     * ## Gate 2 is a question about whether to ask, not about who wins
+     *
+     * This is the one comparison in the app that puts a remote position next to
+     * a local one, and the distinction matters enough to state twice. It decides
+     * whether a *question* is worth putting on the screen; it never selects a
+     * position. Nothing downstream of it reads the comparison: accepting always
+     * moves to [ResumeOffer.targetTokenIndex] exactly as the mapping produced
+     * it, declining always keeps the local position untouched, and the position
+     * this device publishes is unaffected either way — a backward move still
+     * goes out like any other, and `reader.activity-convergence.v1` still
+     * decides which position the account ends up holding.
+     *
+     * What it rules out is the case that made the gate necessary: this device's
+     * *own* published position comes back through the change stream, so without
+     * it every pause would be followed by an offer to resume at the percent the
+     * reader is already reading. The strict `>` is what makes "the same place"
+     * silent, and #121's "a remote position older than local produces no offer"
+     * is the same `>` seen from the other side.
+     */
+    override fun remoteOffer(bookId: String, content: BookContent, tokenIndex: Int): ResumeOffer? {
+        if (content.isEmpty) return null
+        val shelf = account ?: return null
+        val state = shelf.state.value
+        val accountBookId = accountBookIdForDevice(bookId, state) ?: return null
+        val remote = state.books.firstOrNull { it.bookId == accountBookId }?.remotePosition ?: return null
+        val position = RemoteReadingPosition(
+            href = remote.href,
+            chapterTitle = remote.chapterTitle,
+            progression = remote.progression,
+            percent = remote.percent,
+            updatedAt = remote.updatedAt,
+        )
+        val target = PortableReadingPosition.tokenIndexFor(content, position)
+        if (target <= tokenIndex) return null
+        return ResumeOffer(
+            accountBookId = accountBookId,
+            changeKey = remote.changeKey,
+            targetTokenIndex = target,
+            // This parse's own title for the section the record named, and null
+            // for a section it does not have — the record's own chapter title is
+            // not a substitute, because it describes an edition this device
+            // cannot land in.
+            chapterTitle = remote.href
+                ?.let { href -> content.chapters.firstOrNull { it.spinePath == href } }
+                ?.title
+                ?.takeIf { it.isNotBlank() },
+            // The other client's own number when it stated one, so the reader
+            // sees what was published rather than a re-derivation of it; the
+            // mapped token's percent otherwise, which is the same fallback the
+            // mapping made to get there.
+            percent = remote.percent?.roundToInt()?.coerceIn(0, 100)
+                ?: PortableReadingPosition.of(content, target)?.percent
+                ?: return null,
+        )
     }
 }
 

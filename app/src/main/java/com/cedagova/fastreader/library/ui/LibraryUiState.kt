@@ -177,6 +177,27 @@ data class LibraryBookItem(
      */
     val canDownload: Boolean get() = isAccountOnly && download == null
 
+    /**
+     * The account's percent when it is ahead of this device's, and null
+     * otherwise (REQ-511).
+     *
+     * **A display choice, not an adoption.** It answers "is there a second number
+     * worth putting on this row?", and the answer is no whenever the account is
+     * level with or behind this device — there is nothing to tell the reader they
+     * do not already know. It selects no position and moves nothing: the row's own
+     * `progressPercent` is still the device's, the reader's place is still the
+     * device's, and the only thing that can change where they are is answering the
+     * resume offer in the reader. The backend still decides which position the
+     * account holds (`reader.activity-convergence.v1`).
+     *
+     * Null on an account-only row: there is no local place for the account's to be
+     * ahead *of*, and that row's status line says it is not on this device at all.
+     */
+    val accountPercentAhead: Int? get() = account
+        ?.takeIf { it.onThisDevice }
+        ?.remotePercent
+        ?.takeIf { it > progressPercent }
+
     /** The name to show when one is needed; a book is normally reachable from one place. */
     val fileName: String? get() = fileNames.firstOrNull()
 

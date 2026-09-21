@@ -101,6 +101,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderMode
+import com.cedagova.fastreader.reader.ResumeOffer
 import com.cedagova.fastreader.settings.CueSettings
 import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WidthAware
@@ -238,6 +239,19 @@ fun ReaderScreen(
     frontMatterOffer: String? = null,
     onSkipFrontMatter: () -> Unit = {},
     onDismissFrontMatterOffer: () -> Unit = {},
+    /**
+     * REQ-511: the account holds a place another device left in this book, ahead
+     * of where this reader is, and it has not been answered. Null means no offer.
+     *
+     * The whole value rather than its text, because the offer has two sentences
+     * and which one it is depends on whether the section could be honoured —
+     * choosing between them is presentation, so it belongs here rather than in
+     * the route. The screen reads [ResumeOffer.chapterTitle] and
+     * [ResumeOffer.percent] and nothing else.
+     */
+    resumeOffer: ResumeOffer? = null,
+    onAcceptResumeOffer: () -> Unit = {},
+    onDismissResumeOffer: () -> Unit = {},
     word: @Composable (ReaderWord, Modifier) -> Unit = { token, wordModifier ->
         CueWord(token, cues, wordModifier)
     },
@@ -315,6 +329,13 @@ fun ReaderScreen(
                                 chapterTitle = chapterTitle,
                                 onSkip = onSkipFrontMatter,
                                 onDismiss = onDismissFrontMatterOffer,
+                            )
+                        }
+                        resumeOffer?.let { offer ->
+                            ResumeOfferNotice(
+                                offer = offer,
+                                onAccept = onAcceptResumeOffer,
+                                onDismiss = onDismissResumeOffer,
                             )
                         }
                     }
@@ -571,6 +592,74 @@ private fun FrontMatterOfferNotice(chapterTitle: String, onSkip: () -> Unit, onD
                         .testTag("reader_front_matter_stay"),
                 ) {
                     Text(text = stringResource(R.string.reader_front_matter_stay))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * REQ-511: the offer to pick up where another device left off.
+ *
+ * The third banner in this slot, drawn in the same shape as
+ * [FrontMatterOfferNotice] and [ExternalOpenNotice] for the same three reasons:
+ * it must not stop anyone reading, it must not sit inside the reading surface
+ * where it would change the stream's fixed size or static background (REQ-062,
+ * REQ-302, AD-6), and it goes with the chrome in focused mode. The stream keeps
+ * running underneath it — this is a question, not a modal.
+ *
+ * ## Two sentences, one condition
+ *
+ * When the other client named a section this parse has, the offer names that
+ * chapter and the percent. When it did not — a different edition, a renamed
+ * spine — the offer names the percent alone, because the tap lands by fraction
+ * and naming a chapter it will not land in would be worse than naming none.
+ * That is the whole of `chapterTitle == null`.
+ *
+ * ## Accessibility (REQ-301)
+ *
+ * The accepting button names the destination rather than only the verb, for the
+ * reason the front-matter offer's does: "Resume" alone leaves a reader using
+ * TalkBack no way to know where the tap goes. That makes its label as long as a
+ * chapter title, so the buttons sit in a [FlowRow] — on a 360 dp screen at a
+ * large font scale a plain `Row` gives the second button no width at all and
+ * pushes the way to decline off the screen. Both clear [TouchTarget].
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ResumeOfferNotice(offer: ResumeOffer, onAccept: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth().testTag("reader_resume_offer"),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                text = offer.chapterTitle
+                    ?.let { stringResource(R.string.reader_resume_offer, it, offer.percent) }
+                    ?: stringResource(R.string.reader_resume_offer_percent_only, offer.percent),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = onAccept,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_resume_accept"),
+                ) {
+                    Text(
+                        text = offer.chapterTitle
+                            ?.let { stringResource(R.string.reader_resume_accept, it) }
+                            ?: stringResource(R.string.reader_resume_accept_percent, offer.percent),
+                    )
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("reader_resume_stay"),
+                ) {
+                    Text(text = stringResource(R.string.reader_resume_stay))
                 }
             }
         }
