@@ -172,7 +172,21 @@ class PublicationImportEngine(
         val prepared = try {
             prepare(record, grant, locationGrantExpiresAt)
         } catch (e: PublicationTransferException) {
-            return interrupted(record.withoutTransfer(), e)
+            // Same rule as the transfer catch below: a stored location is thrown
+            // away only when the failure *proves* it is gone. `prepare` already
+            // swallows the two answers that prove it — GrantRejected and
+            // Protocol — and falls through to a fresh creation, so what reaches
+            // here from its HEAD is a dropped connection, a socket timeout or a
+            // provider 5xx. None of those says anything about the object: the
+            // provider is still holding those bytes, and discarding the location
+            // would re-send the whole book on every blip.
+            //
+            // The expiry has to be restored with it. `record` has been through
+            // `withAdmission`, so its grantExpiresAt is the FRESH grant's;
+            // pairing that open window with the OLD location would reintroduce
+            // exactly the "judged by a window that is open by construction" bug
+            // — the location must keep the expiry it was issued under.
+            return interrupted(keepingLocation(record, locationGrantExpiresAt, e), e)
         }
         record = prepared
         onProgress(record)
@@ -234,6 +248,37 @@ class PublicationImportEngine(
     private fun expired(expiresAt: String?): Boolean {
         val instant = expiresAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return false
         return instant <= clock.now()
+    }
+
+    /**
+     * [record] with its stored transfer location kept or dropped, by the one
+     * rule this engine applies everywhere: drop it only when [cause] proves the
+     * resumable upload is gone.
+     *
+     * Only [PublicationTransferException.GrantRejected] proves that (401/403/404
+     * /410 — the signature is spent or the object was discarded). Everything
+     * else leaves the provider holding whatever it already had, so the location
+     * is worth more than the round trip it costs to find out.
+     *
+     * The asymmetry matters: keeping a dead location costs one futile `HEAD` on
+     * the next attempt, which then falls through to a fresh creation. Dropping a
+     * live one costs the owner the entire upload again — up to the hosted cap,
+     * over mobile data, on exactly the flaky link that caused the failure.
+     *
+     * [locationGrantExpiresAt] is the window the kept location was issued under.
+     * It must travel with it: [record] has already adopted the fresh grant's
+     * expiry, and a stored location wearing a fresh window is never judged
+     * spent.
+     */
+    private fun keepingLocation(
+        record: PublicationImportRecord,
+        locationGrantExpiresAt: String?,
+        cause: PublicationTransferException,
+    ): PublicationImportRecord = when (cause) {
+        is PublicationTransferException.GrantRejected -> record.withoutTransfer()
+        // A first attempt has no location, so this preserves nothing and the
+        // next attempt creates one, exactly as it would have.
+        else -> record.copy(grantExpiresAt = locationGrantExpiresAt)
     }
 
     private fun interrupted(

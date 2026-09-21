@@ -304,6 +304,64 @@ class PublicationImportEngineTest {
         assertEquals("the same admission, replayed", ids[0], ids[1])
     }
 
+    /**
+     * A transient failure on the resume's `HEAD` must not cost the owner the
+     * upload.
+     *
+     * A dropped connection, a socket timeout or a provider 5xx says nothing
+     * about the object: the provider is still holding the bytes it had. Only a
+     * rejected grant proves the location is gone. Throwing the location away on
+     * a blip would re-send the whole book — up to the hosted cap, over mobile
+     * data, on exactly the bad link that caused the blip.
+     *
+     * The expiry is asserted too, and deliberately: the record has been through
+     * `withAdmission` by then, so its own `grantExpiresAt` is the *fresh*
+     * grant's. A kept location wearing a fresh window would never be judged
+     * spent again.
+     */
+    @Test
+    fun `a transient failure on the resume's HEAD keeps the location and re-sends nothing`() = runTest {
+        api.on(POLICY) { json(policyBody()) }
+        api.queue(
+            ADMIT,
+            { json(admissionBody(created = true)) },
+            { json(admissionBody(created = false, expiresAt = LATER_EXPIRY)) },
+        )
+        api.on(COMPLETE) { json(importBody(status = "verifying_upload")) }
+
+        storage.interruptNextPatchAfter = KEPT
+        val interrupted = engine().start(ACCOUNT, source, UploadConsent.GRANTED) as PublicationImportStep.Interrupted
+
+        // The provider is unwell exactly when the resume asks where it is.
+        storage.rejectHeadWith = 503
+        val blipped = engine().resume(interrupted.record, InMemoryPublication(bytes), UploadConsent.GRANTED)
+
+        val stalled = blipped as PublicationImportStep.Interrupted
+        assertEquals(
+            "a provider 5xx does not prove the upload is gone: the location is kept",
+            TUS_LOCATION,
+            stalled.record.transferLocation,
+        )
+        assertEquals(
+            "and it keeps the window it was issued under, never the fresh grant's",
+            GRANT_EXPIRY,
+            stalled.record.grantExpiresAt,
+        )
+        assertEquals("nothing new was created while the provider was unwell", 1, storage.countOf("POST"))
+
+        // The provider recovers; the owner tries again.
+        storage.rejectHeadWith = null
+        val resumed = engine().resume(stalled.record, InMemoryPublication(bytes), UploadConsent.GRANTED)
+
+        assertTrue(resumed is PublicationImportStep.Transferred)
+        assertEquals("the upload survived the blip: no second creation", 1, storage.countOf("POST"))
+        assertArrayEquals("and not one byte was re-sent", bytes, storage.received)
+        assertTrue(
+            "the recovery PATCHed from the provider's durable offset, got ${storage.patchOffsets}",
+            storage.patchOffsets.contains(KEPT.toLong()),
+        )
+    }
+
     /** The other way a grant can be spent: the provider discards the upload. */
     @Test
     fun `a location the provider no longer knows starts a fresh transfer`() = runTest {
