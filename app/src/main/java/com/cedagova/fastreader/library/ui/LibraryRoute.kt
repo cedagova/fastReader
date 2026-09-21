@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
+import com.cedagova.fastreader.account.library.AccountDownloads
 import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.library.LibraryGraph
@@ -31,6 +32,8 @@ fun LibraryRoute(
     account: AccountShelf,
     /** Adding a device book to that account, with its consent gate (#117). */
     imports: AccountImports,
+    /** Bringing an account book's bytes here, and freeing them again (#119). */
+    downloads: AccountDownloads,
     onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
     resumeBlocked: ResumeBlocked? = null,
@@ -44,6 +47,7 @@ fun LibraryRoute(
     val accountLibrary by account.state.collectAsState()
     val accountRemoval by account.undo.collectAsState()
     val accountImports by imports.state.collectAsState()
+    val accountDownloads by downloads.state.collectAsState()
     var query by rememberSaveable { mutableStateOf("") }
     var foldersOpen by rememberSaveable { mutableStateOf(false) }
     // Which account notice the reader has put away, by the notice's own key, so
@@ -61,6 +65,7 @@ fun LibraryRoute(
         accountLibrary,
         accountUndo,
         accountImports,
+        accountDownloads,
     ) {
         buildLibraryUiState(
             catalog = catalog,
@@ -71,6 +76,7 @@ fun LibraryRoute(
             account = accountLibrary,
             accountUndo = accountUndo,
             imports = accountImports,
+            downloads = accountDownloads,
         )
     }
     val state = if (built.accountNotice?.key == dismissedAccountNotice) built.copy(accountNotice = null) else built
@@ -83,6 +89,19 @@ fun LibraryRoute(
     // `finished`.
     val finished = remember(built.books) { finishedAccountBooks(built.books) }
     LaunchedEffect(finished) { finished.forEach(account::recordFinished) }
+
+    // A download that has produced a verified, placed copy opens the book the
+    // reader asked for (REQ-510's "downloads on open ... and then reads").
+    // This is the only path from a download into the reader, and the value it
+    // waits on exists only inside `AccountBookCopies`' `Ready` branch — so
+    // "Open never starts reading before verification succeeds" is a property
+    // of what this effect can observe, not of the order of two lines.
+    val downloaded by downloads.opened.collectAsState()
+    LaunchedEffect(downloaded) {
+        val bookId = downloaded ?: return@LaunchedEffect
+        downloads.opened(bookId)
+        onOpenBook(bookId)
+    }
     val coverLoader = remember(graph) { CoverStoreLoader(graph.covers) }
 
     val pickBooks = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
@@ -134,6 +153,14 @@ fun LibraryRoute(
         onConfirmAddToAccount = { imports.confirmAdd(it.id) },
         onCancelAddToAccount = { imports.cancelAdd(it.id) },
         onDismissAddToAccount = { imports.dismiss(it.id) },
+        // The other direction (REQ-510). `onDownloadAccountBook` is the whole
+        // of it: the bytes are fetched under the backend's grant, verified,
+        // placed, and only then does the copy open — none of which this screen
+        // can start halfway through.
+        onDownloadAccountBook = { book -> book.account?.let { downloads.open(it.bookId) } },
+        onCancelDownload = { book -> book.account?.let { downloads.cancel(it.bookId) } },
+        onDismissDownload = { book -> book.account?.let { downloads.dismiss(it.bookId) } },
+        onRemoveAccountCopy = { book -> book.accountCopy?.let { downloads.removeCopy(it.contentSha256) } },
         onDismissAccountNotice = { dismissedAccountNotice = state.accountNotice?.key },
         onOpenFolders = { foldersOpen = true },
         onOpen = { onOpenBook(it.id) },

@@ -27,6 +27,7 @@ import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
+import com.cedagova.fastreader.account.library.AccountDownloads
 import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.library.ui.accountBookIdForDevice
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
                     readerAccount = app.readerAccount,
                     accountShelf = app.accountShelf,
                     accountImports = app.accountImports,
+                    accountDownloads = app.accountDownloads,
                 )
             }
         }
@@ -143,6 +145,7 @@ private fun FastReaderApp(
     readerAccount: ReaderAccountController,
     accountShelf: AccountShelf,
     accountImports: AccountImports,
+    accountDownloads: AccountDownloads,
 ) {
     var routed by rememberSaveable { mutableStateOf(false) }
     var openBookId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -283,6 +286,7 @@ private fun FastReaderApp(
                 graph = library,
                 account = accountShelf,
                 imports = accountImports,
+                downloads = accountDownloads,
                 onOpenBook = { openBookId = it },
                 resumeBlocked = resumeBlocked(blockedBookId, blockedReason),
                 onDismissResumeNotice = {
