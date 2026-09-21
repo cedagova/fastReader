@@ -9,12 +9,17 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.ImportProblem
+import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -161,6 +166,91 @@ class LibraryAccountScreenshotTest {
         capture("library_account_spanish", wholeShelf())
     }
 
+    // ---- adding a device book to the account (#117) -------------------------------------
+
+    /**
+     * REQ-505: the question. It says the file's bytes go to the Reader account
+     * and are kept there, quotes how much that is and the deployment's own cap,
+     * and offers Add or Cancel. Nothing has been sent when this is on screen.
+     */
+    @Test
+    fun theConsentQuestionSaysTheBytesLeaveAndAreKept() {
+        captureDialog(
+            "library_account_add_consent",
+            shelf(
+                LibraryAccountFixtures.ficcionesInAccount(),
+                imports = importing(
+                    BookImportState.Consent(sizeBytes = 8_388_608, maxSourceBytes = 52_428_800),
+                ),
+            ),
+        )
+    }
+
+    /** REQ-506: the transfer on the row, with its own Cancel. */
+    @Test
+    fun anAddInProgressShowsOnTheRowAndCanBeCalledOff() {
+        capture(
+            "library_account_add_sending",
+            shelf(
+                LibraryAccountFixtures.ficcionesInAccount(),
+                imports = importing(BookImportState.Sending(fraction = 0.42f)),
+            ),
+        )
+    }
+
+    /**
+     * REQ-507: the backend's category in plain words, with the cap it quoted,
+     * and the sentence that answers the reader's real question — the book here
+     * is exactly as it was.
+     */
+    @Test
+    fun aRefusedAddShowsTheBackendsCategoryAndLeavesTheBookAlone() {
+        capture(
+            "library_account_add_refused",
+            shelf(
+                LibraryAccountFixtures.ficcionesInAccount(),
+                imports = importing(
+                    BookImportState.Refused(
+                        problem = ImportProblem.Category(PublicationFailureCategory.TOO_LARGE),
+                        requestId = "01JB7Q4KQZ8X",
+                        sizeBytes = 73_400_320,
+                        maxSourceBytes = 52_428_800,
+                        retryable = false,
+                    ),
+                ),
+            ),
+        )
+    }
+
+    /** The deployment admits no imports: the action is not offered, and the reason is. */
+    @Test
+    fun aDeploymentThatAdmitsNothingShowsTheReasonInsteadOfTheAction() {
+        capture(
+            "library_account_add_off",
+            shelf(
+                LibraryAccountFixtures.ficcionesInAccount(),
+                imports = AccountImportsState(disabled = ImportsOff("01JB7Q4KQZ8X")),
+            ),
+        )
+    }
+
+    /** REQ-206: the add-to-account words come from `values-es` too. */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theAddToAccountFlowIsSpanishOnASpanishDevice() {
+        capture(
+            "library_account_add_spanish",
+            shelf(
+                LibraryAccountFixtures.ficcionesInAccount(),
+                imports = importing(BookImportState.Sending(fraction = 0.42f)),
+            ),
+        )
+    }
+
+    /** The in-flight state on Rayuela, the one device-only book in the fixtures. */
+    private fun importing(state: BookImportState): AccountImportsState =
+        AccountImportsState(byDeviceBookId = mapOf(LibraryAccountFixtures.RAYUELA_ID to state))
+
     /** Both kinds of account row and both device rows, with the offline note over them. */
     private fun wholeShelf(): LibraryUiState = shelf(
         LibraryAccountFixtures.ficcionesInAccount(),
@@ -180,13 +270,30 @@ class LibraryAccountScreenshotTest {
         vararg books: com.cedagova.fastreader.account.library.AccountBook,
         account: AccountLibraryState = LibraryAccountFixtures.signedIn(*books),
         accountUndo: AccountUndoNotice? = null,
+        imports: AccountImportsState = AccountImportsState.NONE,
     ): LibraryUiState = buildLibraryUiState(
         catalog = LibraryAccountFixtures.deviceCatalog(),
         ingestion = IngestionState.Idle,
         query = "",
         account = account,
         accountUndo = accountUndo,
+        imports = imports,
     )
+
+    /**
+     * A state whose dialog is already open, captured as a screen.
+     *
+     * The consent question is driven by the state rather than by a tap the
+     * screen remembers, so there is nothing to click first — but a dialog is
+     * still its own window, and the compose root alone would not contain it.
+     */
+    private fun captureDialog(name: String, state: LibraryUiState) {
+        composeRule.setContent {
+            FastReaderTheme { LibraryScreen(state = state, onQueryChange = {}, onAddBooks = {}, onAddFolder = {}, onRefresh = {}, onRemove = {}, onGrantAccess = {}, onOpen = {}) }
+        }
+        composeRule.waitForIdle()
+        captureScreenRoboImage("screenshots/$name.png")
+    }
 
     private fun capture(
         name: String,

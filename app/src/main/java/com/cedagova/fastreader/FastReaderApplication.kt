@@ -5,13 +5,17 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.cedagova.fastreader.account.LibraryReaderAccountGateway
+import com.cedagova.fastreader.account.PublicationImportGateway
 import com.cedagova.fastreader.account.ReaderApiLibraryGateway
+import com.cedagova.fastreader.account.ReaderApiPublicationImportGateway
 import com.cedagova.fastreader.account.ReaderLibraryGateway
 import com.cedagova.fastreader.account.ReaderAccountConfiguration
 import com.cedagova.fastreader.account.ReaderAccountController
+import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.AccountSyncEngine
 import com.cedagova.fastreader.account.library.AccountSyncTrigger
+import com.cedagova.fastreader.account.library.DeviceBookSources
 import com.cedagova.fastreader.account.library.FileAccountLibraryStores
 import com.cedagova.fastreader.crash.CrashReportStore
 import com.cedagova.fastreader.crash.installCrashReporting
@@ -19,6 +23,8 @@ import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.reader.auth.ReaderAuthClient
 import com.cedagova.reader.library.ReaderLibraryClient
+import com.cedagova.reader.library.imports.PublicationImportEngine
+import com.cedagova.reader.library.imports.PublicationTransferClient
 import com.cedagova.reader.auth.ReaderAuthConfig
 import com.cedagova.reader.auth.ReaderAuthException
 import java.io.File
@@ -93,6 +99,25 @@ class FastReaderApplication : Application() {
         readerAuth?.let { ReaderApiLibraryGateway(ReaderLibraryClient(it.api)) }
     }
 
+    /**
+     * The publication-import seam (#117), or `null` on an unconfigured build.
+     *
+     * The transfer client beside it is a second, deliberately session-less
+     * transport: publication bytes go straight to the storage provider under
+     * the signed grant an admission hands out, never through reader-api and
+     * never with the bearer (see `PublicationTransferClient`). That is why it
+     * is built here rather than taken from [readerAuth].
+     */
+    val readerImports: PublicationImportGateway? by lazy {
+        readerAuth?.let { auth ->
+            val operations = ReaderLibraryClient(auth.api)
+            ReaderApiPublicationImportGateway(
+                operations = operations,
+                engine = PublicationImportEngine(operations, PublicationTransferClient()),
+            )
+        }
+    }
+
     /** The account surface's state model, process-scoped like the library graph. */
     lateinit var readerAccount: ReaderAccountController
         private set
@@ -116,6 +141,19 @@ class FastReaderApplication : Application() {
     lateinit var accountShelf: AccountShelf
         private set
 
+    /**
+     * Adding a device book to the account (#117): the consent gate and the
+     * transfers that survive a relaunch.
+     *
+     * Process-scoped because a transfer is: it must not be tied to the screen
+     * that started it, and the record it leaves behind is what a relaunch
+     * resumes. Driven by the same foreground observer as everything else —
+     * status reads happen while the app is in front of the reader and stop
+     * when it is not (AD-21).
+     */
+    lateinit var accountImports: AccountImports
+        private set
+
     override fun onCreate() {
         super.onCreate()
         // First, so that a failure in any of the wiring below is itself reported.
@@ -137,12 +175,31 @@ class FastReaderApplication : Application() {
             state = accountLibrary.state,
             scope = applicationScope,
         )
+        accountImports = AccountImports(
+            gateway = readerImports,
+            records = accountLibrary,
+            sources = DeviceBookSources(library.gateway),
+            bookForId = { id -> library.repository.catalog.value.book(id) },
+            // The account row for a finished import is the backend's to create;
+            // this only asks for the pass that carries it here (AD-22, AD-23).
+            onImportReady = { accountLibrary.requestSync(AccountSyncTrigger.OWN_WRITE) },
+            accountState = accountLibrary.state,
+            scope = applicationScope,
+        )
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
                     library.repository.requestRescan(ScanTrigger.APP_OPEN)
                     refreshReaderSessionOnForeground()
                     accountLibrary.requestSync(AccountSyncTrigger.FOREGROUND)
+                    accountImports.onForeground()
+                }
+
+                override fun onStop(owner: LifecycleOwner) {
+                    // Status reads stop with the app. Nothing is cancelled: the
+                    // import records are on disk and the next foreground pass
+                    // picks them up where this one left them.
+                    accountImports.onBackground()
                 }
             },
         )

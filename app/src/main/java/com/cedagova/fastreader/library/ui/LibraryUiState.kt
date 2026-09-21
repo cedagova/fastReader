@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.library.ui
 
+import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus
@@ -124,6 +125,14 @@ data class LibraryBookItem(
      * every row signed out.
      */
     val account: AccountRow? = null,
+    /**
+     * The **Add to account library** half of this row (REQ-505), or null when
+     * the row cannot offer one — see [addToAccountFor] for the four reasons.
+     *
+     * Null on every signed-out row, which is what keeps D4's "the signed-out
+     * shelf is v1.6.0's" a property of the data rather than of the layout.
+     */
+    val addToAccount: AddToAccount? = null,
 ) {
     val isReadable: Boolean get() = status == BookStatus.READABLE
 
@@ -186,11 +195,16 @@ fun buildLibraryUiState(
     account: AccountLibraryState = AccountLibraryState.SIGNED_OUT,
     /** Set while an account removal can still be taken back (REQ-508). */
     accountUndo: AccountUndoNotice? = null,
+    /** Every add-to-account in flight, and the deployment's verdict (REQ-505). */
+    imports: AccountImportsState = AccountImportsState.NONE,
 ): LibraryUiState {
     val order = catalog.settings.libraryOrder
     val all = catalog.books
         .map { book -> book.toItem(catalog.readingStates[book.id]?.progressFraction ?: 0f) }
         .withAccountBooks(account)
+        // After the merge, never before: whether a row can be added depends on
+        // whether the account already has it, which is what the merge decides.
+        .map { item -> item.copy(addToAccount = addToAccountFor(item, account, imports)) }
         .sortedWith(catalog.comparatorFor(order))
     val matches = all.filter { it.matches(query) }
     val content = when {

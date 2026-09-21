@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.library.ui
 
+import android.text.format.Formatter
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -81,6 +83,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.ImportProblem
+import com.cedagova.fastreader.account.library.PublicationSourceProblem
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
@@ -88,6 +93,8 @@ import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WideLayoutMinWidth
 import com.cedagova.fastreader.ui.WidthAware
+import com.cedagova.reader.library.model.PublicationFailureCategory
+import kotlin.math.roundToInt
 
 /** Smallest comfortable touch target; Android's accessibility minimum is 48dp (REQ-060). */
 private val TouchTarget = 48.dp
@@ -148,6 +155,20 @@ fun LibraryScreen(
     onRemoveFromAccount: (LibraryBookItem) -> Unit = {},
     /** Takes back the account removal, as the contract's one immediate Undo (REQ-508). */
     onUndoAccountRemove: () -> Unit = {},
+    /**
+     * Asks what it would take to add this device book to the account (REQ-505).
+     *
+     * It does **not** add it. It reads the deployment's policy and leads to the
+     * consent question or to the refusal that policy already implies; nothing
+     * about the book leaves the device on this callback.
+     */
+    onAddToAccount: (LibraryBookItem) -> Unit = {},
+    /** The owner answered yes: the one callback here that can send a book's bytes. */
+    onConfirmAddToAccount: (LibraryBookItem) -> Unit = {},
+    /** Stops an add that is already under way; the device book is untouched. */
+    onCancelAddToAccount: (LibraryBookItem) -> Unit = {},
+    /** Declines the question, or puts away a refusal that has been read. Sends nothing. */
+    onDismissAddToAccount: (LibraryBookItem) -> Unit = {},
     /** Puts away an account notice that is a verdict about the past, not a live state. */
     onDismissAccountNotice: () -> Unit = {},
     /** Stores a new library order (REQ-203). The list re-sorts from the stored value. */
@@ -176,6 +197,21 @@ fun LibraryScreen(
             book = bookToRemoveFromAccount,
             onConfirm = { confirmingAccountRemoval = null; onRemoveFromAccount(bookToRemoveFromAccount) },
             onDismiss = { confirmingAccountRemoval = null },
+        )
+    }
+    // The consent question is driven by the flow's own state rather than by a
+    // tap this screen remembers, and deliberately so: it is the *only* gate in
+    // front of a book's bytes, so it must be the same value the code that sends
+    // them is looking at. A remembered id could say yes to a question the flow
+    // had already moved past.
+    val bookAwaitingConsent = state.books.firstOrNull { it.addToAccount?.state is BookImportState.Consent }
+    val consent = bookAwaitingConsent?.addToAccount?.state as? BookImportState.Consent
+    if (bookAwaitingConsent != null && consent != null) {
+        AddToAccountDialog(
+            book = bookAwaitingConsent,
+            consent = consent,
+            onConfirm = { onConfirmAddToAccount(bookAwaitingConsent) },
+            onDismiss = { onDismissAddToAccount(bookAwaitingConsent) },
         )
     }
     WidthAware(modifier.fillMaxSize()) { layout ->
@@ -258,6 +294,9 @@ fun LibraryScreen(
                             books = state.books,
                             onRemove = { confirmingRemoval = it.id },
                             onRemoveFromAccount = { confirmingAccountRemoval = it.id },
+                            onAddToAccount = onAddToAccount,
+                            onCancelAddToAccount = onCancelAddToAccount,
+                            onDismissAddToAccount = onDismissAddToAccount,
                             onGrantAccess = onGrantAccess,
                             onOpen = onOpen,
                             coverLoader = coverLoader,
@@ -846,6 +885,9 @@ private fun BookList(
     books: List<LibraryBookItem>,
     onRemove: (LibraryBookItem) -> Unit,
     onRemoveFromAccount: (LibraryBookItem) -> Unit,
+    onAddToAccount: (LibraryBookItem) -> Unit,
+    onCancelAddToAccount: (LibraryBookItem) -> Unit,
+    onDismissAddToAccount: (LibraryBookItem) -> Unit,
     onGrantAccess: (LibraryBookItem) -> Unit,
     onOpen: (LibraryBookItem) -> Unit,
     coverLoader: CoverLoader,
@@ -861,6 +903,9 @@ private fun BookList(
                     book = book,
                     onRemove = { onRemove(book) },
                     onRemoveFromAccount = { onRemoveFromAccount(book) },
+                    onAddToAccount = { onAddToAccount(book) },
+                    onCancelAddToAccount = { onCancelAddToAccount(book) },
+                    onDismissAddToAccount = { onDismissAddToAccount(book) },
                     onGrantAccess = { onGrantAccess(book) },
                     onOpen = { onOpen(book) },
                     coverLoader = coverLoader,
@@ -895,6 +940,9 @@ private fun BookList(
                     book = book,
                     onRemove = { onRemove(book) },
                     onRemoveFromAccount = { onRemoveFromAccount(book) },
+                    onAddToAccount = { onAddToAccount(book) },
+                    onCancelAddToAccount = { onCancelAddToAccount(book) },
+                    onDismissAddToAccount = { onDismissAddToAccount(book) },
                     onGrantAccess = { onGrantAccess(book) },
                     onOpen = { onOpen(book) },
                     coverLoader = coverLoader,
@@ -991,6 +1039,9 @@ private fun BookRow(
     book: LibraryBookItem,
     onRemove: () -> Unit,
     onRemoveFromAccount: () -> Unit,
+    onAddToAccount: () -> Unit,
+    onCancelAddToAccount: () -> Unit,
+    onDismissAddToAccount: () -> Unit,
     onGrantAccess: () -> Unit,
     onOpen: () -> Unit,
     coverLoader: CoverLoader,
@@ -1064,6 +1115,19 @@ private fun BookRow(
                     Text(stringResource(R.string.library_account_remove))
                 }
             }
+            // The other half of the account pair, and the one that puts bytes on
+            // the wire: adding this device's book to the account (REQ-505). It
+            // is present only on a row that could actually be added, so every
+            // signed-out row and every account row look exactly as they did.
+            book.addToAccount?.let { add ->
+                AddToAccountSlot(
+                    book = book,
+                    add = add,
+                    onAdd = onAddToAccount,
+                    onCancel = onCancelAddToAccount,
+                    onDismiss = onDismissAddToAccount,
+                )
+            }
             if (book.status == BookStatus.PERMISSION_LOST) {
                 TextButton(
                     onClick = onGrantAccess,
@@ -1094,6 +1158,329 @@ private fun BookRow(
         }
     }
 }
+
+/**
+ * Everything the add-to-account flow puts under a device book's status line
+ * (REQ-505, REQ-506, REQ-507).
+ *
+ * One slot rather than several, because the states are exclusive: the action,
+ * the reason the action is not there, the wait while the policy is read, the
+ * transfer with its Cancel, and the verdict with the backend's own words. The
+ * consent question itself is not here — it is a dialog over the whole screen,
+ * for the same reason the two removals are.
+ *
+ * The sentences sit inside the row's own merged semantics, so TalkBack reads
+ * them as part of the book — "Rayuela, …, Sending to your Reader account, 42%"
+ * — rather than as a stray line a reader would have to hunt for. The buttons
+ * stay separately focusable, because a clickable is its own merge boundary, and
+ * each of them names the book it belongs to (REQ-060).
+ */
+@Composable
+private fun AddToAccountSlot(
+    book: LibraryBookItem,
+    add: AddToAccount,
+    onAdd: () -> Unit,
+    onCancel: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val off = add.off
+    if (off != null) {
+        ImportNote(
+            text = stringResource(R.string.library_account_add_off),
+            requestId = off.requestId,
+            tag = "library_account_add_off_${book.id}",
+        )
+        return
+    }
+    when (val state = add.state) {
+        null -> {
+            val label = stringResource(R.string.library_account_add_label, book.title)
+            TextButton(
+                onClick = onAdd,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = TouchTarget)
+                    .testTag("library_account_add_${book.id}")
+                    .semantics { contentDescription = label },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(stringResource(R.string.library_account_add))
+            }
+        }
+
+        // Reading the policy. Said rather than left blank, because the tap has
+        // to look like it did something — and because what it did is exactly
+        // this and nothing about the book has been sent.
+        BookImportState.Checking -> ImportNote(
+            text = stringResource(R.string.library_account_add_checking),
+            tag = "library_account_add_checking_${book.id}",
+            progress = INDETERMINATE,
+        )
+
+        // The dialog has the question; the row stays quiet behind it.
+        is BookImportState.Consent -> Unit
+
+        is BookImportState.Sending -> ImportNote(
+            text = stringResource(
+                R.string.library_account_add_sending,
+                (state.fraction * PERCENT).roundToInt().coerceIn(0, PERCENT),
+            ),
+            tag = "library_account_add_sending_${book.id}",
+            progress = state.fraction,
+            action = ImportAction(
+                label = stringResource(R.string.library_account_add_cancel),
+                description = stringResource(R.string.library_account_add_cancel_label, book.title),
+                tag = "library_account_add_cancel_${book.id}",
+                onClick = onCancel,
+            ),
+        )
+
+        BookImportState.Finishing -> ImportNote(
+            text = stringResource(R.string.library_account_add_finishing),
+            tag = "library_account_add_finishing_${book.id}",
+            progress = INDETERMINATE,
+            action = ImportAction(
+                label = stringResource(R.string.library_account_add_cancel),
+                description = stringResource(R.string.library_account_add_cancel_label, book.title),
+                tag = "library_account_add_cancel_${book.id}",
+                onClick = onCancel,
+            ),
+        )
+
+        is BookImportState.Refused -> ImportNote(
+            // Two sentences, always: what the backend said, and the thing the
+            // reader actually wants to know — that the book on this phone is
+            // exactly as it was (REQ-507).
+            text = state.message() + " " + stringResource(R.string.library_account_add_kept),
+            code = state.code,
+            requestId = state.requestId,
+            tag = "library_account_add_refused_${book.id}",
+            error = true,
+            action = if (state.retryable) {
+                ImportAction(
+                    label = stringResource(R.string.library_account_add_retry),
+                    description = stringResource(R.string.library_account_add_retry_label, book.title),
+                    tag = "library_account_add_retry_${book.id}",
+                    onClick = onAdd,
+                )
+            } else {
+                ImportAction(
+                    label = stringResource(R.string.library_resume_blocked_dismiss),
+                    description = null,
+                    tag = "library_account_add_dismiss_${book.id}",
+                    onClick = onDismiss,
+                )
+            },
+        )
+    }
+}
+
+/** One button beside an import note. */
+private data class ImportAction(
+    val label: String,
+    val description: String?,
+    val tag: String,
+    val onClick: () -> Unit,
+)
+
+/**
+ * A sentence under a book's status line, with the backend's own code and
+ * request id when there are any, an optional progress bar, and at most one
+ * action.
+ *
+ * [progress] is [INDETERMINATE] for a wait with no measure and a fraction for
+ * one with — the same two shapes `ScanBanner` already uses for the folder scan,
+ * so the shelf has one visual language for "something is happening".
+ */
+@Composable
+private fun ImportNote(
+    text: String,
+    tag: String,
+    code: String? = null,
+    requestId: String? = null,
+    progress: Float? = null,
+    error: Boolean = false,
+    action: ImportAction? = null,
+) {
+    val detail = listOfNotNull(
+        code?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.library_account_code, it) },
+        requestId?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.library_account_request, it) },
+    ).joinToString(" · ")
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag(tag)) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (detail.isNotEmpty()) {
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        if (progress != null) {
+            Spacer(Modifier.height(4.dp))
+            if (progress == INDETERMINATE) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else {
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        if (action != null) {
+            val described = action.description
+            TextButton(
+                onClick = action.onClick,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = TouchTarget)
+                    .testTag(action.tag)
+                    .then(
+                        if (described != null) {
+                            Modifier.semantics { contentDescription = described }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(action.label)
+            }
+        }
+    }
+}
+
+/**
+ * The question before a book's bytes leave this device (REQ-505).
+ *
+ * It says the three things a reader cannot find out afterwards: that the
+ * **file itself** goes to the Reader account, how much of it that is, and that
+ * it is **kept** there. It also says what the removal question says in the
+ * other direction — the copy here and the reader's place in it are untouched —
+ * and, last, that nothing has gone yet, because until this dialog is confirmed
+ * nothing has.
+ *
+ * The cap under it is the policy's own number for this file's format, read on
+ * this attempt (REQ-506). No constant in this app knows what it is.
+ */
+@Composable
+private fun AddToAccountDialog(
+    book: LibraryBookItem,
+    consent: BookImportState.Consent,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("library_account_add_dialog"),
+        title = {
+            Text(
+                text = stringResource(R.string.library_account_add_title, book.title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(
+                        R.string.library_account_add_body,
+                        humanSize(consent.sizeBytes),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.library_account_add_limit,
+                        humanSize(consent.maxSourceBytes),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_account_add_dialog_confirm"),
+            ) {
+                Text(stringResource(R.string.library_account_add_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_account_add_dialog_cancel"),
+            ) {
+                Text(stringResource(R.string.library_remove_cancel))
+            }
+        },
+    )
+}
+
+/**
+ * The refusal, in the reader's language, from the backend's own category.
+ *
+ * Every branch is one member of `PublicationFailureCategory` or one local
+ * reason there was nothing to send. This app classifies nothing: it translates
+ * a category into a sentence, and where the category is about size it quotes
+ * the policy's cap rather than a number of its own (REQ-507).
+ */
+@Composable
+private fun BookImportState.Refused.message(): String = when (val reason = problem) {
+    ImportProblem.NeedsConnection -> stringResource(R.string.library_account_refused_offline)
+
+    is ImportProblem.SourceUnavailable -> stringResource(
+        when (reason.problem) {
+            PublicationSourceProblem.UNREACHABLE -> R.string.library_account_refused_unreachable
+            PublicationSourceProblem.SIZE_UNKNOWN -> R.string.library_account_refused_size_unknown
+        },
+    )
+
+    is ImportProblem.Api -> stringResource(R.string.library_account_refused_other)
+
+    is ImportProblem.Category -> when (reason.category) {
+        PublicationFailureCategory.TOO_LARGE ->
+            if (sizeBytes != null && maxSourceBytes != null) {
+                stringResource(
+                    R.string.library_account_refused_too_large,
+                    humanSize(sizeBytes),
+                    humanSize(maxSourceBytes),
+                )
+            } else {
+                stringResource(R.string.library_account_refused_other)
+            }
+
+        PublicationFailureCategory.UNSUPPORTED -> stringResource(R.string.library_account_refused_unsupported)
+        PublicationFailureCategory.PROTECTED -> stringResource(R.string.library_account_refused_protected)
+        PublicationFailureCategory.UNSAFE -> stringResource(R.string.library_account_refused_unsafe)
+        PublicationFailureCategory.MALFORMED -> stringResource(R.string.library_account_refused_malformed)
+        PublicationFailureCategory.UPLOAD -> stringResource(R.string.library_account_refused_upload)
+        PublicationFailureCategory.CONVERSION -> stringResource(R.string.library_account_refused_conversion)
+        PublicationFailureCategory.CANCELLED -> stringResource(R.string.library_account_refused_cancelled)
+        PublicationFailureCategory.UNKNOWN -> stringResource(R.string.library_account_refused_other)
+    }
+}
+
+/**
+ * A byte count as the platform writes it in the reader's own language.
+ *
+ * The platform's formatter rather than a hand-rolled one: it is the same "12
+ * MB" a Spanish device writes as "12 MB" and a locale with another decimal
+ * separator writes its own way, and getting that wrong in the one sentence
+ * that says how much of the reader's data is about to move would be a poor
+ * place to save a dependency.
+ */
+@Composable
+private fun humanSize(bytes: Long): String =
+    Formatter.formatShortFileSize(LocalContext.current, bytes)
+
+/** The progress value that means "working, with no measure of how far". */
+private const val INDETERMINATE = -1f
+
+private const val PERCENT = 100
 
 @Composable
 private fun LibraryBookItem.statusLine(): String = when {

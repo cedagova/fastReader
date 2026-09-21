@@ -84,36 +84,44 @@ This is the same statement the app shows under **Settings → What stays on this
 device**, word for word — a unit test compares the two so they cannot drift.
 
 <!-- privacy-statement:begin -->
-FastReader has the internet permission and uses it for one thing only: the
-optional Reader account under Settings. Nothing is sent unless you use that
-account. When you do, your email address, the code or password you type and
-the account's session go to the Reader identity provider and the Reader
-API. FastReader also asks the Reader API which books your account already
-holds, and for those books only it tells the Reader API that you opened
-one, when you last opened it, whether you have finished it, and when you
-take one out of your account or put it back. That is all that leaves this
-device: no book file is ever sent, a book that is only on this device is
-never named to the Reader API, and your reading positions, your reading
-speed, your other settings and any crash report stay on this device and are
-never sent. The account session is kept encrypted on this device, outside
-its backup, and is removed when you sign out. Check for updates only hands
-a web address to your browser, and your browser makes that request. Your
-books stay in the folders you chose; on this device FastReader keeps only
-its own list of them, your reading positions, your settings, small cover
-thumbnails and, once you sign in, a copy of your account's own book list,
-in its private storage. That copy of the account's list is not deleted when
-you sign out: it stays in that private storage, so signing in to the same
-account again picks up where it left off, and only uninstalling FastReader
-or clearing its data removes it. If the app stops unexpectedly it also
-keeps one short report about what went wrong in that private storage: the
-app version, this device's model, its Android version and where in the code
-it stopped, with no part of any book in it — the next launch offers that
-report to you once, and it goes nowhere unless you share it and pick an app
-to send it to. None of that is included in this device's backup or in a
-transfer to a new phone, so a reinstall or a new phone starts with an empty
-library. When another app opens a book in FastReader and does not give
-lasting permission to read it, that book is not added to your list and no
-permission to it is kept; only your place in it is remembered.
+FastReader has the internet permission and uses it for one thing only:
+the optional Reader account under Settings. Nothing is sent unless you
+use that account. When you do, your email address, the code or password
+you type and the account's session go to the Reader identity provider
+and the Reader API. FastReader also asks the Reader API which books your
+account already holds, and for those books only it tells the Reader API
+that you opened one, when you last opened it, whether you have finished
+it, and when you take one out of your account or put it back. When you
+choose Add to account library for a book on this device and confirm,
+FastReader asks the Reader API what kinds and sizes of file your account
+accepts and then sends that book's file, its name, its size, its format
+and its checksum to the Reader API and its storage, where your account
+keeps them; nothing about that book is sent before you confirm. That is
+all that leaves this device: a book file is sent only for a book you add
+that way, a book that is only on this device is never named to the
+Reader API until you add it, and your reading positions, your reading
+speed, your other settings and any crash report stay on this device and
+are never sent. The account session is kept encrypted on this device,
+outside its backup, and is removed when you sign out. Check for updates
+only hands a web address to your browser, and your browser makes that
+request. Your books stay in the folders you chose; on this device
+FastReader keeps only its own list of them, your reading positions, your
+settings, small cover thumbnails and, once you sign in, a copy of your
+account's own book list and a note of any book you are part-way through
+adding to it, in its private storage. That copy of the account's list is
+not deleted when you sign out: it stays in that private storage, so
+signing in to the same account again picks up where it left off, and
+only uninstalling FastReader or clearing its data removes it. If the app
+stops unexpectedly it also keeps one short report about what went wrong
+in that private storage: the app version, this device's model, its
+Android version and where in the code it stopped, with no part of any
+book in it — the next launch offers that report to you once, and it goes
+nowhere unless you share it and pick an app to send it to. None of that
+is included in this device's backup or in a transfer to a new phone, so
+a reinstall or a new phone starts with an empty library. When another
+app opens a book in FastReader and does not give lasting permission to
+read it, that book is not added to your list and no permission to it is
+kept; only your place in it is remembered.
 <!-- privacy-statement:end -->
 
 What each sentence rests on, and how it was checked, is in
@@ -135,6 +143,15 @@ holds onto the shelf beside the ones on this phone.
   this phone and your place in it are untouched either way.
 - **Opening and finishing** a book the account already holds is recorded for the
   account. A book only on this phone records nothing.
+- **Add to account library** puts a book on this phone into the account. It asks
+  first, and the question is the whole point: it says the file's bytes will be
+  uploaded to your Reader account and kept there, how large that is, and what
+  size your account accepts — all of it read from the backend, none of it
+  built in. Until you say **Add**, nothing about that book has left the phone.
+  The upload shows on the row and can be called off; killing the app in the
+  middle resumes it rather than starting a second one. A refusal shows the
+  backend's own category — too large, unsupported, copy-protected — and leaves
+  the book here exactly as it was.
 - The shelf's refresh rescans your folders **and** asks the account for its
   current list.
 

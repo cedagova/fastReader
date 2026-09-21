@@ -4,6 +4,7 @@ import com.cedagova.fastreader.account.ReaderAccountState
 import com.cedagova.fastreader.account.ReaderLibraryGateway
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.ReaderLibraryClient
+import com.cedagova.reader.library.imports.PublicationImportRecord
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderDeltaStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
@@ -55,6 +56,33 @@ interface AccountLibraryActions {
 }
 
 /**
+ * The account document's import records, as the add-to-account flow uses them
+ * (LEAF802, AD-26).
+ *
+ * A separate interface rather than more methods on [AccountLibraryActions]
+ * because the two answer different questions: those are *mutations of the
+ * account's library* that queue and are admitted; these are this device's own
+ * memory of an upload in flight, which the backend never sees. It is served by
+ * [AccountSyncEngine] all the same, and for one reason — the account document
+ * has exactly one writer, and a second one racing it would be the first way to
+ * lose a queued mutation.
+ */
+interface AccountImportRecords {
+
+    /** The signed-in account's user id, or null when nobody is signed in. */
+    fun accountId(): String?
+
+    /** Every import this device has started for the signed-in account and not finished. */
+    suspend fun importRecords(): List<PublicationImportRecord>
+
+    /** Stores [record], replacing any earlier state of the same import. */
+    suspend fun putImportRecord(record: PublicationImportRecord)
+
+    /** Forgets the import [clientImportId] names. */
+    suspend fun dropImportRecord(clientImportId: String)
+}
+
+/**
  * The account library: one store per account, and the foreground-driven engine
  * that keeps it in step with the backend (AD-20, AD-21, AD-22).
  *
@@ -99,7 +127,7 @@ class AccountSyncEngine(
     /** Minted once per queued mutation and then persisted; never re-minted for a retry. */
     private val newIdempotencyKey: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> String = { kotlin.time.Clock.System.now().toString() },
-) : AccountLibraryActions {
+) : AccountLibraryActions, AccountImportRecords {
 
     private val mutex = Mutex()
     private val _state = MutableStateFlow(AccountLibraryState.SIGNED_OUT)
@@ -165,6 +193,59 @@ class AccountSyncEngine(
     override fun recordStatus(bookId: String, status: ReaderLibraryStatus) {
         val payload = buildJsonObject { put("status", JsonPrimitive(status.wireName())) }
         enqueue(bookId, ReaderMutationKind.UPSERT, payload) { it.copy(status = status) }
+    }
+
+    // ---------------------------------------------------------- import records
+
+    override fun accountId(): String? = active?.userId
+
+    override suspend fun importRecords(): List<PublicationImportRecord> =
+        mutex.withLock { active?.document?.imports.orEmpty() }
+
+    /**
+     * Stores [record] under the one writer of the account document.
+     *
+     * Silently does nothing when nobody is signed in, which is the right answer
+     * rather than a failure: a transfer whose session went away has nowhere to
+     * be remembered, and the shelf has already lost the account rows it would
+     * have bound to.
+     */
+    override suspend fun putImportRecord(record: PublicationImportRecord) {
+        mutex.withLock {
+            val account = active ?: return@withLock
+            if (record.accountId != account.userId) return@withLock
+            persistQuietly(account, account.document.withImport(record))
+        }
+    }
+
+    override suspend fun dropImportRecord(clientImportId: String) {
+        mutex.withLock {
+            val account = active ?: return@withLock
+            if (account.document.import(clientImportId) == null) return@withLock
+            persistQuietly(account, account.document.withoutImport(clientImportId))
+        }
+    }
+
+    /**
+     * Writes the document and publishes nothing.
+     *
+     * An import record changes no row the shelf draws — the account row arrives
+     * from the change stream when the backend has made one (AD-23) — so a write
+     * here must not re-publish a state and re-trigger the shelf's own effects.
+     * A storage failure is surfaced as the deferred state every other write
+     * failure is, because a record that could not be stored is exactly the case
+     * where a relaunch would start a second transfer.
+     */
+    private suspend fun persistQuietly(account: ActiveAccount, document: AccountLibraryDocument) {
+        try {
+            persist(account, document)
+        } catch (e: IOException) {
+            publish(
+                AccountSyncPhase.DEFERRED,
+                AccountSyncTrigger.OWN_WRITE,
+                error = AccountSyncError.StoreBlocked(e.message ?: "the account library could not be written"),
+            )
+        }
     }
 
     // ---------------------------------------------------------------- sessions

@@ -2,6 +2,11 @@ package com.cedagova.reader.library
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.auth.api.ReaderApiClient
+import com.cedagova.reader.library.model.CancelPublicationImportRequest
+import com.cedagova.reader.library.model.CreatePublicationImportRequest
+import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
+import com.cedagova.reader.library.model.PublicationImportPolicyResponse
+import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.ReaderCapabilityEntry
 import com.cedagova.reader.library.model.ReaderCapabilityKey
 import com.cedagova.reader.library.model.ReaderLibraryResponse
@@ -34,6 +39,13 @@ import kotlinx.serialization.json.jsonObject
  * document disagree.
  */
 class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOperations {
+
+    /**
+     * The one JSON body builder: a request model in, the object
+     * [ReaderApiClient.post] puts on the wire out.
+     */
+    private fun <T> body(serializer: KSerializer<T>, value: T): JsonObject =
+        ReaderLibraryJson.encodeToJsonElement(serializer, value).jsonObject
 
     override suspend fun library(): ReaderLibraryResponse =
         decode(api.get(LIBRARY_PATH), ReaderLibraryResponse.serializer(), LIBRARY_PATH)
@@ -80,6 +92,70 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         )
     }
 
+    // ---- Publication imports (#116) ---------------------------------------------------------
+
+    override suspend fun importPolicy(): PublicationImportPolicyResponse =
+        decode(api.get(IMPORT_POLICY_PATH), PublicationImportPolicyResponse.serializer(), IMPORT_POLICY_PATH)
+
+    /**
+     * The one place a publication-import admission is put on the wire, and so
+     * the one place that can refuse to.
+     *
+     * The three requires below are not defensive noise. `upload_consent` is the
+     * owner's explicit decision that this file's bytes may leave the device
+     * (REQ-505); `promotion_source` and `ownership_intent` are what make this a
+     * device-to-account promotion rather than some other admission. A request
+     * missing any of them is a caller bug that must never reach stage, so it
+     * fails here, before the request exists.
+     */
+    override suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse {
+        require(request.uploadConsent == true) {
+            "a publication import is admitted only with explicit upload_consent: the owner's bytes leave the device"
+        }
+        require(request.promotionSource == CreatePublicationImportRequest.PROMOTION_SOURCE_DEVICE_ONLY) {
+            "promotion_source must be '${CreatePublicationImportRequest.PROMOTION_SOURCE_DEVICE_ONLY}', not '${request.promotionSource}'"
+        }
+        require(request.ownershipIntent == CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY) {
+            "ownership_intent must be '${CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY}', not '${request.ownershipIntent}'"
+        }
+        require(request.clientImportId.isNotBlank() &&
+            request.clientImportId.length <= CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH) {
+            "a client_import_id is 1..${CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH} characters"
+        }
+        require(request.sizeBytes > 0) { "a source size is positive, not ${request.sizeBytes}" }
+        require(SHA256.matches(request.sha256)) { "sha256 must be 64 hex characters, optionally 'sha256:'-prefixed" }
+        val document = api.post(IMPORTS_PATH, body(CreatePublicationImportRequest.serializer(), request))
+        return decode(document, PublicationImportAdmissionResponse.serializer(), IMPORTS_PATH)
+    }
+
+    override suspend fun importRecord(importId: String): PublicationImportResponse {
+        val path = importPath(importId)
+        return decode(api.get(path), PublicationImportResponse.serializer(), path)
+    }
+
+    override suspend fun completeImport(importId: String): PublicationImportResponse {
+        // The route takes no body: reader-api observes the stored object itself
+        // and never accepts an uploader-supplied digest. An empty object is
+        // what a POST with nothing to say sends.
+        val path = importPath(importId) + COMPLETE_SUFFIX
+        return decode(api.post(path, EMPTY_BODY), PublicationImportResponse.serializer(), path)
+    }
+
+    override suspend fun cancelImport(importId: String, reason: String): PublicationImportResponse {
+        require(reason.isNotBlank() && reason.length <= CancelPublicationImportRequest.MAX_REASON_LENGTH) {
+            "a cancel reason is 1..${CancelPublicationImportRequest.MAX_REASON_LENGTH} characters"
+        }
+        val path = importPath(importId) + CANCEL_SUFFIX
+        val document = api.post(path, body(CancelPublicationImportRequest.serializer(), CancelPublicationImportRequest(reason)))
+        return decode(document, PublicationImportResponse.serializer(), path)
+    }
+
+    /** `/reader/v1/imports/{id}`, with the id checked to be a path segment and nothing more. */
+    private fun importPath(importId: String): String {
+        require(IMPORT_ID.matches(importId)) { "an import id is a UUID, not '$importId'" }
+        return "$IMPORTS_PATH/$importId"
+    }
+
     /**
      * The one place a contract mismatch becomes an error. A body that parsed as
      * JSON but does not match the pinned document is surfaced as the existing
@@ -104,6 +180,19 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         const val MUTATIONS_PATH: String = "/v1/reader/sync/mutations"
         const val DELTAS_PATH: String = "/v1/reader/sync/deltas"
 
+        // The publication-import routes (#116). Note the prefix: these are
+        // `/reader/v1/...`, not `/v1/reader/...` like the four above. That is
+        // the pinned document's own spelling, and
+        // `every route the module calls is declared by the pinned document`
+        // is what keeps this honest rather than plausible.
+        const val IMPORTS_PATH: String = "/reader/v1/imports"
+        const val IMPORT_POLICY_PATH: String = "/reader/v1/imports/policy"
+        const val COMPLETE_SUFFIX: String = "/complete"
+        const val CANCEL_SUFFIX: String = "/cancel"
+
+        /** The document's own path-parameter name, for the contract test's route check. */
+        const val IMPORT_ID_TEMPLATE: String = "{ingestion_id}"
+
         /** The capability this module gates every sync request on. */
         const val SYNC_CAPABILITY_KEY: String = "reader.sync.v1"
 
@@ -126,5 +215,8 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         private const val CAPABILITIES_FIELD = "capabilities"
         private const val CAPABILITY_KEY_FIELD = "key"
         private val CURSOR = Regex("^[0-9]+$")
+        private val SHA256 = Regex("^(?:sha256:)?[0-9A-Fa-f]{64}$")
+        private val IMPORT_ID = Regex("^[0-9a-fA-F-]{36}$")
+        private val EMPTY_BODY = JsonObject(emptyMap())
     }
 }

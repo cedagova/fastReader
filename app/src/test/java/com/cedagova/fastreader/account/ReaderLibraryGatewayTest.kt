@@ -2,6 +2,10 @@ package com.cedagova.fastreader.account
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.ReaderLibraryOperations
+import com.cedagova.reader.library.model.CreatePublicationImportRequest
+import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
+import com.cedagova.reader.library.model.PublicationImportPolicyResponse
+import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.ReaderDeltaStatus
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderMutationKind
@@ -149,5 +153,28 @@ class ReaderLibraryGatewayTest {
             failure?.let { throw it }
             return capabilityResponse
         }
+
+        // The publication-import half of the interface (#116). The gateway is the
+        // sync surface and calls none of it — LEAF802 (#117) owns the import flow
+        // and will drive `PublicationImportEngine` directly. These are therefore
+        // not stubs that answer: reaching one from the gateway would mean the
+        // sync path had started admitting imports, and failing loudly is how that
+        // shows up as the bug it would be rather than as a silent empty answer.
+        override suspend fun importPolicy(): PublicationImportPolicyResponse =
+            error("the sync gateway does not read the import policy")
+
+        override suspend fun admitImport(
+            request: CreatePublicationImportRequest,
+        ): PublicationImportAdmissionResponse =
+            error("the sync gateway does not admit imports")
+
+        override suspend fun importRecord(importId: String): PublicationImportResponse =
+            error("the sync gateway does not read import records")
+
+        override suspend fun completeImport(importId: String): PublicationImportResponse =
+            error("the sync gateway does not complete imports")
+
+        override suspend fun cancelImport(importId: String, reason: String): PublicationImportResponse =
+            error("the sync gateway does not cancel imports")
     }
 }

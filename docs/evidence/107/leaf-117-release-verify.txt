@@ -1,0 +1,57 @@
+LEAF802 (#117) — ./scripts/release.sh verify on a signed release build
+=======================================================================
+
+Effort      https://github.com/cedagova/fastReader/issues/107 (increment 002 of #104)
+Issue       https://github.com/cedagova/fastReader/issues/117
+Worktree    leaf-117, base collector/107-add-to-account @ 3c8e7c84300f6e956222d990df9b3f89779db5bf
+Run         2026-09-21, macOS, verify only — no --publish, no tag, no release created.
+Signing     machine-local material at ~/.config/fastreader/signing/ (never printed).
+
+What this proves (#117 acceptance, AD-27): the increment that makes FastReader
+upload a book for the first time changes NONE of the release gate's proofs. The
+signed release APK still asks for exactly the internet permission plus Android's
+own broadcast self-permission, still allows no cleartext, still installs on
+Android 8.0+, and still carries 1.7.0 / versionCode 9 — this leaf bumps nothing
+(AD-28: 1.7.0 is unreleased and its notes are edited in place).
+
+That the permission set is unchanged is the load-bearing line. The transfer this
+leaf adds goes over a second HTTP client inside `:reader-library`
+(PublicationTransferClient), and a second client is exactly the kind of change
+that would otherwise drag in a permission or a cleartext exemption. It does not:
+the module's manifest is still empty, and the bytes go to an https signed URL.
+
+scripts/release.sh itself is untouched by this leaf. Gradle's build output is
+elided; everything below is the script's own verification, verbatim. The
+certificate digest is the public pinned value already recorded in
+docs/release.md and in scripts/release.sh. Nothing here carries a token, a
+backend value, an account code, an email address or a request secret.
+
+== Toolchain
+JDK          openjdk version "21.0.12.1" 2026-08-18
+build-tools  /Users/chonko/Library/Android/sdk/build-tools/37.0.0
+
+== Version
+versionCode  9
+versionName  1.7.0
+tag          v1.7.0
+
+== Build signed release APK
+(Gradle output elided.)
+== Verify signature
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+V3.0 Signer: certificate SHA-256 digest: d476be8e7efbee3fe81dca8dd89f13c3434f26689a9a6979c01da54629e6485d
+V3.0 Signer: key size (bits): 4096
+
+== Verify release manifest
+package: name='com.cedagova.fastreader' versionCode='9' versionName='1.7.0' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'
+minSdkVersion:'26'
+targetSdkVersion:'37'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+permissions are exactly INTERNET + the platform self-permission, no cleartext, minSdk 26, version matches version.properties
+
+verified artifact: app/build/outputs/apk/release/fastReader-1.7.0.apk (2615299 bytes, sha256 72499935ce01d8890aced65e454d388e47627a3a265cf9a23ad8ee6f6798eb0b)
+
+Build and verification complete. Re-run with --publish to create v1.7.0.
+

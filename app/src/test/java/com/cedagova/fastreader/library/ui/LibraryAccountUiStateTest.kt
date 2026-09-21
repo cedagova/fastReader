@@ -1,12 +1,16 @@
 package com.cedagova.fastreader.library.ui
 
 import com.cedagova.fastreader.account.library.AccountBook
+import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import org.junit.Assert.assertEquals
@@ -285,11 +289,13 @@ class LibraryAccountUiStateTest {
         catalog: Catalog,
         account: AccountLibraryState,
         query: String = "",
+        imports: AccountImportsState = AccountImportsState.NONE,
     ): LibraryUiState = buildLibraryUiState(
         catalog = catalog,
         ingestion = IngestionState.Idle,
         query = query,
         account = account,
+        imports = imports,
     )
 
     private fun catalogOf(vararg books: Pair<String, String>) = Catalog(
@@ -320,5 +326,101 @@ class LibraryAccountUiStateTest {
         const val FICCIONES_HEX = "11111111111111111111111111111111111111111111111111111111aaaaaaaa"
         const val RAYUELA_HEX = "22222222222222222222222222222222222222222222222222222222bbbbbbbb"
         const val FICCIONES = "sha256:$FICCIONES_HEX"
+    }
+
+    // ---- adding a device book to the account (#117, REQ-505) ---------------------------
+
+    @Test
+    fun `a device book the account does not have offers the add`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones"),
+            accountOf(accountBook("acc-1", "Dubliners", contentSha256 = RAYUELA_HEX)),
+        )
+
+        val add = state.books.single { it.id == FICCIONES }.addToAccount
+
+        assertEquals(true, add?.offered)
+    }
+
+    @Test
+    fun `a book the account already has offers nothing to upload`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones"),
+            accountOf(accountBook("acc-1", "Ficciones", contentSha256 = FICCIONES_HEX)),
+        )
+
+        assertNull(state.books.single { it.id == FICCIONES }.addToAccount)
+    }
+
+    @Test
+    fun `an account-only row has no bytes here to add`() {
+        val state = shelf(
+            catalogOf(),
+            accountOf(accountBook("acc-1", "Dubliners", contentSha256 = RAYUELA_HEX)),
+        )
+
+        assertNull(state.books.single().addToAccount)
+    }
+
+    @Test
+    fun `signed out, no row offers the add at all`() {
+        val state = shelf(catalogOf(FICCIONES to "Ficciones"), AccountLibraryState.SIGNED_OUT)
+
+        assertEquals(emptyList<AddToAccount>(), state.books.mapNotNull { it.addToAccount })
+    }
+
+    @Test
+    fun `a book this device cannot read has no file to send`() {
+        val catalog = Catalog(
+            books = listOf(
+                LibraryFixtures.unavailable(FICCIONES, "Ficciones", SourceAvailability.MISSING),
+            ),
+        )
+
+        val state = shelf(catalog, accountOf())
+
+        assertNull(state.books.single().addToAccount)
+    }
+
+    @Test
+    fun `a backend that is not serving the library does not offer an upload against it`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones"),
+            AccountLibraryState(
+                phase = AccountSyncPhase.DEFERRED,
+                userId = "user-1",
+                capabilityReason = ReaderCapabilityReason.SERVICE_NOT_ENABLED,
+            ),
+        )
+
+        assertNull(state.books.single().addToAccount)
+    }
+
+    @Test
+    fun `a deployment that admits nothing shows the reason on every addable row`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones"),
+            accountOf(),
+            imports = AccountImportsState(disabled = ImportsOff("req-1")),
+        )
+
+        assertEquals(ImportsOff("req-1"), state.books.single().addToAccount?.off)
+    }
+
+    @Test
+    fun `an add in flight belongs to the row whose bytes it is`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones", "sha256:$RAYUELA_HEX" to "Rayuela"),
+            accountOf(),
+            imports = AccountImportsState(
+                byDeviceBookId = mapOf(FICCIONES to BookImportState.Sending(0.5f)),
+            ),
+        )
+
+        assertEquals(
+            BookImportState.Sending(0.5f),
+            state.books.single { it.id == FICCIONES }.addToAccount?.state,
+        )
+        assertEquals(true, state.books.single { it.title == "Rayuela" }.addToAccount?.offered)
     }
 }
