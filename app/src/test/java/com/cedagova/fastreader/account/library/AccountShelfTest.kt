@@ -200,9 +200,15 @@ class AccountShelfTest {
      * There is no `settings`, `note` or `bookmark` operation in it for the shelf
      * to call, and no catalog, file or grant operation either. Adding one would
      * fail here, which is what LEAF704's privacy statement inherits (AD-27).
+     *
+     * `recordPosition` is the seventh since #120, and it is the one addition this
+     * increment makes: the portable position of an account book. Its payload is
+     * built from the contract's own body type and carries no token index or
+     * reading speed — `PortableReadingPositionTest` asserts that key set — so the
+     * surface grew by a position and not by a new category of data.
      */
     @Test
-    fun `the shelf's whole library surface is these six operations`() {
+    fun `the shelf's whole library surface is these seven operations`() {
         val declared = AccountLibraryActions::class.java.declaredMethods
             .map { it.name }
             .toSortedSet()
@@ -213,6 +219,7 @@ class AccountShelfTest {
             sortedSetOf(
                 "recordFinished",
                 "recordOpened",
+                "recordPosition",
                 "recordStatus",
                 "refresh",
                 "removeFromAccount",
