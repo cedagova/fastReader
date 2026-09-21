@@ -17,6 +17,7 @@ import com.cedagova.reader.library.model.PublicationFormatPolicy
 import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.PublicationImportResponse
+import com.cedagova.reader.library.model.ReaderAssetGrantResponse
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderSyncCapability
@@ -165,4 +166,5 @@ private object UnusedOperations : ReaderLibraryOperations {
     override suspend fun importRecord(importId: String): PublicationImportResponse = nope()
     override suspend fun completeImport(importId: String): PublicationImportResponse = nope()
     override suspend fun cancelImport(importId: String, reason: String): PublicationImportResponse = nope()
+    override suspend fun assetDownloadGrant(assetId: String): ReaderAssetGrantResponse = nope()
 }

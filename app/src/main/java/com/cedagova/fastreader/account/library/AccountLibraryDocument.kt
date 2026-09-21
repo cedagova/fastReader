@@ -32,26 +32,32 @@ object AccountLibrarySchema {
      * - **2** — increment 002 (LEAF802): `imports`, the durable publication
      *   import records of AD-26, so an add interrupted by app death addresses
      *   the same admission instead of making a second one.
+     * - **3** — increment 003 (LEAF811): `copies`, this account's references to
+     *   the verified private copies on this device (REQ-510, D2). A reference
+     *   is content identity plus when it was placed; the bytes themselves are
+     *   `AccountCopyStore`'s, and the device catalog's `ACCOUNT_COPY` source is
+     *   what keeps them readable after sign-out (D4, AD-24).
      *
-     * Later increments each take one forward step of their own: LEAF811 adds
-     * copy references, LEAF821 remote positions and the resume record. Each
-     * adds a [MIGRATIONS] entry keyed by the version it upgrades *from*,
-     * exactly as `CatalogSchema` does.
+     * LEAF821 takes the next step of its own, for remote positions and the
+     * resume record. Each adds a [MIGRATIONS] entry keyed by the version it
+     * upgrades *from*, exactly as `CatalogSchema` does.
      */
-    const val CURRENT_VERSION: Int = 2
+    const val CURRENT_VERSION: Int = 3
 
     /**
      * Forward migrations keyed by the version they upgrade *from*.
      *
-     * 1 → 2 is a no-op on the document's own keys: `imports` is a new list with
-     * an empty default, so a version 1 document decodes into a version 2 one
-     * with no imports, which is exactly the truth about a device that has never
-     * added a book. The step exists all the same, because the decoder demands
-     * one per version and a missing entry is how a forgotten migration is
-     * caught rather than a document quietly read as damaged.
+     * Both steps so far are no-ops on the document's own keys, for the same
+     * reason: each adds a new list with an empty default, so an older document
+     * decodes with that list empty — which is exactly the truth about a device
+     * that has never added a book (1 → 2) or never downloaded one (2 → 3). The
+     * steps exist all the same, because the decoder demands one per version and
+     * a missing entry is how a forgotten migration is caught rather than a
+     * document quietly read as damaged.
      */
     val MIGRATIONS: Map<Int, AccountLibraryMigration> = mapOf(
         1 to AccountLibraryMigration { document -> document },
+        2 to AccountLibraryMigration { document -> document },
     )
 }
 
@@ -93,6 +99,23 @@ data class AccountLibraryDocument(
      * a resume gets fresh ones by replaying the idempotent admission.
      */
     @SerialName("imports") val imports: List<PublicationImportRecord> = emptyList(),
+    /**
+     * The verified private copies this account has on this device (schema 3,
+     * REQ-510, D2).
+     *
+     * It is a *reference*, not the bytes and not their location: the bytes are
+     * `AccountCopyStore`'s, keyed by the same content identity, and the file
+     * they live in is named by the device catalog's `ACCOUNT_COPY` source. This
+     * list is how the shelf answers "is this account book on this device?"
+     * without reading the filesystem for every row it draws.
+     *
+     * It is deliberately account-scoped and deliberately not authoritative. A
+     * copy the store no longer holds is reconciled away on the next start, and
+     * two accounts that hold the same book each carry their own reference to
+     * the one shared file — which is why signing out drops the reference and
+     * never the copy (D4).
+     */
+    @SerialName("copies") val copies: List<AccountCopy> = emptyList(),
 ) {
 
     /** True once the account's library has been read at least once on this device. */
@@ -117,6 +140,27 @@ data class AccountLibraryDocument(
     /** Drops the import [clientImportId] names; nothing happens when there is none. */
     fun withoutImport(clientImportId: String): AccountLibraryDocument =
         copy(imports = imports.filterNot { it.clientImportId == clientImportId })
+
+    /** True when this account has a copy reference for that content identity. */
+    fun hasCopy(contentSha256: String): Boolean = copies.any { it.contentSha256 == contentSha256 }
+
+    /** Records [copy], replacing any earlier reference to the same content. */
+    fun withCopy(copy: AccountCopy): AccountLibraryDocument {
+        val index = copies.indexOfFirst { it.contentSha256 == copy.contentSha256 }
+        return if (index < 0) {
+            copy(copies = copies + copy)
+        } else {
+            copy(copies = copies.toMutableList().apply { this[index] = copy })
+        }
+    }
+
+    /** Drops the copy reference for [contentSha256]; the bytes are not this document's to delete. */
+    fun withoutCopy(contentSha256: String): AccountLibraryDocument =
+        copy(copies = copies.filterNot { it.contentSha256 == contentSha256 })
+
+    /** Keeps only the copy references [present] still names — the start-up reconciliation. */
+    fun retainingCopies(present: Set<String>): AccountLibraryDocument =
+        copy(copies = copies.filter { it.contentSha256 in present })
 
     /** Replaces [book]'s row, or appends it when the account has no row for that book yet. */
     fun withBook(book: AccountBook): AccountLibraryDocument {
@@ -188,6 +232,26 @@ data class AccountBook(
         }
     }
 }
+
+/**
+ * One account book whose bytes are on this device (REQ-510, D2).
+ *
+ * [contentSha256] is the whole of the identity — the same digest the shelf
+ * merges rows on (AD-23) and the same one `AccountCopyStore` names its file
+ * after. There is deliberately no path here: a reference that recorded where
+ * the bytes were would be a second answer to a question the catalog's
+ * `ACCOUNT_COPY` source already answers, and two answers drift.
+ *
+ * [sizeBytes] and [placedAtEpochMs] are what a host shows about a copy — how
+ * much freeing it would recover, and when it arrived. Neither is load-bearing:
+ * a reference with both at zero still means "this account's copy is here".
+ */
+@Serializable
+data class AccountCopy(
+    @SerialName("contentSha256") val contentSha256: String,
+    @SerialName("sizeBytes") val sizeBytes: Long = 0,
+    @SerialName("placedAtEpochMs") val placedAtEpochMs: Long = 0,
+)
 
 /**
  * One mutation waiting to be admitted.

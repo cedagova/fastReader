@@ -186,12 +186,14 @@ class AccountLibraryStoreTest {
     fun `a version one document migrates forward with its rows and queue intact`() {
         val codec = AccountLibraryCodec()
         val version1 = codec.encode(sample())
-            .replace("\"schemaVersion\":2", "\"schemaVersion\":1")
-            // A real version 1 document has no `imports` key at all; leaving the
-            // encoder's empty one in would test a document no device ever wrote.
+            .replace("\"schemaVersion\":${AccountLibrarySchema.CURRENT_VERSION}", "\"schemaVersion\":1")
+            // A real version 1 document has neither key at all; leaving the
+            // encoder's empty ones in would test a document no device ever wrote.
             .replace(",\"imports\":[]", "")
+            .replace(",\"copies\":[]", "")
         assertTrue("the fixture must really be a version 1 document", version1.contains("\"schemaVersion\":1"))
         assertTrue("a version 1 document has no imports key", !version1.contains("imports"))
+        assertTrue("a version 1 document has no copies key", !version1.contains("copies"))
 
         val decoded = codec.decode(version1) as AccountLibraryDecoding.Decoded
 
@@ -200,5 +202,55 @@ class AccountLibraryStoreTest {
         assertEquals(sample().books, decoded.document.books)
         assertEquals(sample().outbox, decoded.document.outbox)
         assertEquals(emptyList<PublicationImportRecord>(), decoded.document.imports)
+        assertEquals(emptyList<AccountCopy>(), decoded.document.copies)
+    }
+
+    /**
+     * Schema 3's own step (#118): a device that has added a book but never
+     * downloaded one.
+     *
+     * The 2 → 3 migration writes nothing, and this is what "nothing" has to
+     * mean: every row, every queued mutation and every import record read back
+     * exactly as version 2 held them, plus an empty copy list — which is the
+     * truth about a device with no copies rather than an absent answer.
+     */
+    @Test
+    fun `a version two document migrates forward with no copies and nothing else changed`() {
+        val codec = AccountLibraryCodec()
+        val version2 = codec.encode(sample())
+            .replace("\"schemaVersion\":${AccountLibrarySchema.CURRENT_VERSION}", "\"schemaVersion\":2")
+            .replace(",\"copies\":[]", "")
+        assertTrue("the fixture must really be a version 2 document", version2.contains("\"schemaVersion\":2"))
+        assertTrue("a version 2 document has no copies key", !version2.contains("copies"))
+
+        val decoded = codec.decode(version2) as AccountLibraryDecoding.Decoded
+
+        assertEquals(2, decoded.migratedFrom)
+        assertEquals(AccountLibrarySchema.CURRENT_VERSION, decoded.document.schemaVersion)
+        assertEquals(sample().books, decoded.document.books)
+        assertEquals(sample().outbox, decoded.document.outbox)
+        assertEquals(sample().imports, decoded.document.imports)
+        assertEquals(emptyList<AccountCopy>(), decoded.document.copies)
+    }
+
+    /** A copy reference survives a write and a read, and replaces rather than duplicates. */
+    @Test
+    fun `copy references round trip and are keyed by content`() {
+        val codec = AccountLibraryCodec()
+        val copy = AccountCopy(contentSha256 = "b".repeat(64), sizeBytes = 4_096, placedAtEpochMs = 1_700_000_000_000)
+        val document = sample().withCopy(copy)
+
+        val decoded = codec.decode(codec.encode(document)) as AccountLibraryDecoding.Decoded
+
+        assertEquals(listOf(copy), decoded.document.copies)
+        assertTrue(decoded.document.hasCopy("b".repeat(64)))
+
+        val replaced = decoded.document.withCopy(copy.copy(sizeBytes = 8_192))
+        assertEquals("the same content is one reference, not two", 1, replaced.copies.size)
+        assertEquals(8_192L, replaced.copies.single().sizeBytes)
+
+        assertEquals(emptyList<AccountCopy>(), replaced.withoutCopy("b".repeat(64)).copies)
+        assertEquals(emptyList<AccountCopy>(), replaced.retainingCopies(emptySet()).copies)
+        assertEquals(replaced.copies, replaced.retainingCopies(setOf("b".repeat(64))).copies)
     }
 }

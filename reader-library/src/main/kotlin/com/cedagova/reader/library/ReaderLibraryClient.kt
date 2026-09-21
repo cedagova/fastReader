@@ -7,6 +7,7 @@ import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.PublicationImportResponse
+import com.cedagova.reader.library.model.ReaderAssetGrantResponse
 import com.cedagova.reader.library.model.ReaderCapabilityEntry
 import com.cedagova.reader.library.model.ReaderCapabilityKey
 import com.cedagova.reader.library.model.ReaderLibraryResponse
@@ -24,8 +25,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 
 /**
- * The account-library client: five typed operations over the one authenticated
- * client `:reader-auth` owns.
+ * The account-library client: every typed operation of
+ * [ReaderLibraryOperations], over the one authenticated client `:reader-auth`
+ * owns.
  *
  * It holds no session, no token, no refresh and no retry of its own. Every call
  * goes through [ReaderApiClient], so the bearer, `X-Reader-Client`,
@@ -156,6 +158,22 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         return "$IMPORTS_PATH/$importId"
     }
 
+    // ---- Asset downloads (#118) -------------------------------------------------------------
+
+    /**
+     * The one place a download grant is asked for, and so the one place the
+     * address of a book's bytes is decided: by reader-api, from an asset id.
+     *
+     * The route takes no body — the asset is the whole request — so an empty
+     * object is what a POST with nothing to say sends, exactly as
+     * [completeImport] does.
+     */
+    override suspend fun assetDownloadGrant(assetId: String): ReaderAssetGrantResponse {
+        require(ASSET_ID.matches(assetId)) { "an asset id is a UUID, not '$assetId'" }
+        val path = "$ASSETS_PATH/$assetId$DOWNLOAD_GRANT_SUFFIX"
+        return decode(api.post(path, EMPTY_BODY), ReaderAssetGrantResponse.serializer(), path)
+    }
+
     /**
      * The one place a contract mismatch becomes an error. A body that parsed as
      * JSON but does not match the pinned document is surfaced as the existing
@@ -193,6 +211,14 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         /** The document's own path-parameter name, for the contract test's route check. */
         const val IMPORT_ID_TEMPLATE: String = "{ingestion_id}"
 
+        // The asset download grant (#118). Back to the `/v1/reader/...` prefix,
+        // again because that is the pinned document's own spelling.
+        const val ASSETS_PATH: String = "/v1/reader/assets"
+        const val DOWNLOAD_GRANT_SUFFIX: String = "/download-grant"
+
+        /** The document's own path-parameter name, for the contract test's route check. */
+        const val ASSET_ID_TEMPLATE: String = "{asset_id}"
+
         /** The capability this module gates every sync request on. */
         const val SYNC_CAPABILITY_KEY: String = "reader.sync.v1"
 
@@ -217,6 +243,7 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         private val CURSOR = Regex("^[0-9]+$")
         private val SHA256 = Regex("^(?:sha256:)?[0-9A-Fa-f]{64}$")
         private val IMPORT_ID = Regex("^[0-9a-fA-F-]{36}$")
+        private val ASSET_ID = Regex("^[0-9a-fA-F-]{36}$")
         private val EMPTY_BODY = JsonObject(emptyMap())
     }
 }

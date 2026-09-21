@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.account.library.AccountCopyStore
 import com.cedagova.fastreader.settings.AppVersion
+import java.io.File
 import java.util.Properties
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -127,5 +129,61 @@ class AppVersionTest {
                 legacyRules.contains("""<exclude domain="$domain" path="." />"""),
             )
         }
+    }
+
+    /**
+     * REQ-510's backup clause, for the first bytes of somebody else's book this
+     * app has ever put on a device (#118, D2).
+     *
+     * A downloaded copy is an EPUB in FastReader's private storage, and "copies
+     * are excluded from backup" is not a new rule here — it is the existing
+     * whole-domain exclusion, which the test above already guards. What was
+     * missing is the link between the two: that the directory the copies
+     * actually go in is inside a domain that exclusion names. This asserts it
+     * from the store's own constant, so moving the copies somewhere the rules
+     * do not reach fails here rather than on somebody's new phone.
+     *
+     * `filesDir` is the `file` domain (and `device_file` in device-protected
+     * storage); both are excluded whole, in both extraction sections and in the
+     * API 26-30 rules, with no `path` narrowing them.
+     */
+    @Test
+    fun `downloaded copies live in a domain the backup rules exclude`() {
+        val copies = File(context.filesDir, AccountCopyStore.DIRECTORY_NAME)
+
+        assertEquals(
+            "the copy directory must be directly under filesDir — the `file` backup domain",
+            context.filesDir,
+            copies.parentFile,
+        )
+        assertTrue(
+            "the copy directory must sit inside the app's own data directory",
+            copies.canonicalPath.startsWith(context.filesDir.canonicalPath + File.separator),
+        )
+
+        val rules = repositoryFile("app/src/main/res/xml/data_extraction_rules.xml").readText()
+        val legacyRules = repositoryFile("app/src/main/res/xml/backup_rules.xml").readText()
+        listOf("file", "device_file").forEach { domain ->
+            assertEquals(
+                "the $domain domain holding the copies must be excluded from both extraction sections",
+                2,
+                Regex("""<exclude domain="$domain"\s*/>""").findAll(rules).count(),
+            )
+            assertTrue(
+                "the $domain domain holding the copies must be excluded from the API 26-30 rules",
+                legacyRules.contains("""<exclude domain="$domain" path="." />"""),
+            )
+        }
+        // A `path` on one of those exclusions would narrow it to a subtree, and
+        // the copies could fall outside it. The 26-30 schema requires a path and
+        // uses "." for the whole domain; the 31+ schema takes none at all.
+        assertFalse(
+            "the file domain's 31+ exclusion must cover the whole domain, not a path inside it",
+            Regex("""<exclude domain="file"\s+path=""").containsMatchIn(rules),
+        )
+        assertTrue(
+            "the file domain's 26-30 exclusion must be the whole domain",
+            legacyRules.contains("""<exclude domain="file" path="." />"""),
+        )
     }
 }
