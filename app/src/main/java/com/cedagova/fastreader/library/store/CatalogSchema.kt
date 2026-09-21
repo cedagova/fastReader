@@ -52,8 +52,13 @@ object CatalogSchema {
      *   the paused-only paragraph they had).
      * - **10** — the progress readouts become a choice (`progressShown`, written
      *   as `true` so an updating reader keeps the percent and time they had).
+     * - **11** — issue #118: a source may be a private copy of an account book
+     *   (`SourceOrigin.ACCOUNT_COPY` and `BookSource.filePath`), downloaded
+     *   through the backend's grant and verified against its content SHA-256
+     *   (D2, AD-24). Both are new values rather than new meanings, so nothing
+     *   in an existing document changes and the step writes nothing.
      */
-    const val CURRENT_VERSION: Int = 10
+    const val CURRENT_VERSION: Int = 11
 
     /**
      * Forward migrations keyed by the version they upgrade *from*; each step must
@@ -70,6 +75,7 @@ object CatalogSchema {
         7 to WordSizeV8Migration,
         8 to ParagraphAlwaysShownV9Migration,
         9 to ProgressShownV10Migration,
+        10 to AccountCopyV11Migration,
     )
 }
 

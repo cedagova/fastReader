@@ -26,7 +26,6 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.content.TokenPosition
-import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.external.ExternalOpen
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.LibraryRepository
@@ -310,11 +309,10 @@ private class CatalogBooks(private val repository: LibraryRepository) : ReaderBo
     override fun libraryBook(bookId: String) = BookOpenRequest.library(
         bookId = bookId,
         title = repository.catalog.value.book(bookId)?.title.orEmpty(),
-        bytes = object : EpubByteSource {
-            override fun open() = repository.openBook(bookId)
-
-            override fun openChannel() = repository.openBookChannel(bookId)
-        },
+        // Whether those bytes are a picked file, a folder's file or a verified
+        // private copy of an account book is the repository's business alone
+        // (#118): this asks for the book and gets the book.
+        bytes = repository.byteSource(bookId),
     )
 }
 

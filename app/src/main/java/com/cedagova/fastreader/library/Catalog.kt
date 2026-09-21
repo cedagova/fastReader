@@ -147,9 +147,27 @@ enum class BookContentStatus { READABLE, DRM_PROTECTED, CORRUPT }
 /** The state the library presents for a book. */
 enum class BookStatus { READABLE, DRM_PROTECTED, CORRUPT, MISSING, PERMISSION_LOST }
 
-/** One place a book is reachable from. Files are read here in place and never copied (AD-1). */
+/**
+ * One place a book is reachable from.
+ *
+ * A picked or folder-discovered file is read in place and never copied (AD-1).
+ * The one exception is [SourceOrigin.ACCOUNT_COPY], which owner decision D2
+ * introduced for account books only: those bytes are downloaded into
+ * FastReader's own private storage, and [filePath] is where they landed.
+ */
 @Serializable
 data class BookSource(
+    /**
+     * The stable key this source is deduplicated and looked up by.
+     *
+     * For [SourceOrigin.DIRECT_PICK] and [SourceOrigin.FOLDER] it is the
+     * platform document URI, which is also the address
+     * [com.cedagova.fastreader.library.DocumentGateway] opens. For
+     * [SourceOrigin.ACCOUNT_COPY] it is deliberately *not* an address at all —
+     * see [accountCopyUri] — because a private copy is addressed by [filePath]
+     * and handing a copy to the Storage Access Framework must fail loudly
+     * rather than plausibly.
+     */
     val uri: String,
     val origin: SourceOrigin,
     val displayName: String,
@@ -157,7 +175,17 @@ data class BookSource(
     val sizeBytes: Long = -1,
     val lastModifiedEpochMs: Long = 0,
     val availability: SourceAvailability = SourceAvailability.AVAILABLE,
+    /**
+     * Where this source's bytes are, when they are a file this app owns
+     * (schema 11). Null for every source read through the document provider,
+     * which is every source a document written before schema 11 can hold — so
+     * the migration into 11 has nothing to write.
+     */
+    val filePath: String? = null,
 ) {
+
+    /** True when this source is a private copy of an account book (D2, AD-24). */
+    val isAccountCopy: Boolean get() = origin == SourceOrigin.ACCOUNT_COPY
     /**
      * True when the file looks untouched since it was last inspected, which is
      * what lets a rescan skip re-parsing it. A provider that reports neither a
@@ -168,9 +196,39 @@ data class BookSource(
         val hasSignal = sizeBytes > 0 || lastModifiedEpochMs > 0
         return hasSignal && this.sizeBytes == sizeBytes && this.lastModifiedEpochMs == lastModifiedEpochMs
     }
+
+    companion object {
+
+        /**
+         * The [uri] of a private copy of the account book whose content SHA-256
+         * is [contentSha256].
+         *
+         * Content, never a path: the copy's location is an implementation
+         * detail of this app's private storage, and its *identity* is the same
+         * digest the shelf merges rows on (AD-23). Two sign-ins, a reinstall or
+         * a moved data directory all produce the same key for the same book.
+         *
+         * The scheme is FastReader's own and is not a URI any provider would
+         * answer: a copy handed to the document gateway by mistake fails at
+         * once instead of resolving to something plausible.
+         */
+        fun accountCopyUri(contentSha256: String): String =
+            ACCOUNT_COPY_SCHEME + contentSha256.removePrefix(SHA256_PREFIX).lowercase()
+
+        private const val ACCOUNT_COPY_SCHEME = "fastreader-account-copy:"
+        private const val SHA256_PREFIX = "sha256:"
+    }
 }
 
-enum class SourceOrigin { DIRECT_PICK, FOLDER }
+/**
+ * Where a source came from.
+ *
+ * [ACCOUNT_COPY] arrived with catalog schema 11 (AD-24): the bytes of an
+ * account book, downloaded through the backend's grant, SHA-256-verified and
+ * placed in this app's private storage. It is a device-catalog source like the
+ * other two precisely so that signing out changes nothing about it (D4).
+ */
+enum class SourceOrigin { DIRECT_PICK, FOLDER, ACCOUNT_COPY }
 
 enum class SourceAvailability { AVAILABLE, MISSING, PERMISSION_LOST }
 
