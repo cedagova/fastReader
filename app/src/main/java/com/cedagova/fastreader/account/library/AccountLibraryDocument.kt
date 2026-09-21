@@ -37,27 +37,34 @@ object AccountLibrarySchema {
      *   is content identity plus when it was placed; the bytes themselves are
      *   `AccountCopyStore`'s, and the device catalog's `ACCOUNT_COPY` source is
      *   what keeps them readable after sign-out (D4, AD-24).
+     * - **4** — increment 004 (LEAF821): `remotePosition` on a book row, the
+     *   portable position another client left for it (REQ-511, AD-25). It is
+     *   the account's position and deliberately *not* the device's: the local
+     *   `ReadingState` keeps its own shape and semantics, and the two are never
+     *   merged here.
      *
-     * LEAF821 takes the next step of its own, for remote positions and the
-     * resume record. Each adds a [MIGRATIONS] entry keyed by the version it
+     * LEAF822 takes the next step of its own, for the settled record of the
+     * resume offer. Each adds a [MIGRATIONS] entry keyed by the version it
      * upgrades *from*, exactly as `CatalogSchema` does.
      */
-    const val CURRENT_VERSION: Int = 3
+    const val CURRENT_VERSION: Int = 4
 
     /**
      * Forward migrations keyed by the version they upgrade *from*.
      *
-     * Both steps so far are no-ops on the document's own keys, for the same
-     * reason: each adds a new list with an empty default, so an older document
-     * decodes with that list empty — which is exactly the truth about a device
-     * that has never added a book (1 → 2) or never downloaded one (2 → 3). The
-     * steps exist all the same, because the decoder demands one per version and
-     * a missing entry is how a forgotten migration is caught rather than a
-     * document quietly read as damaged.
+     * Every step so far is a no-op on the document's own keys, for the same
+     * reason: each adds something with an empty or absent default, so an older
+     * document decodes with it empty — which is exactly the truth about a device
+     * that has never added a book (1 → 2), never downloaded one (2 → 3), or
+     * never heard a position from another client (3 → 4). The steps exist all the
+     * same, because the decoder demands one per version and a missing entry is
+     * how a forgotten migration is caught rather than a document quietly read as
+     * damaged.
      */
     val MIGRATIONS: Map<Int, AccountLibraryMigration> = mapOf(
         1 to AccountLibraryMigration { document -> document },
         2 to AccountLibraryMigration { document -> document },
+        3 to AccountLibraryMigration { document -> document },
     )
 }
 
@@ -212,6 +219,18 @@ data class AccountBook(
      */
     @SerialName("progressPercent") val progressPercent: Double? = null,
     @SerialName("progressUpdatedAt") val progressUpdatedAt: String? = null,
+    /**
+     * The portable position the account holds for this book (schema 4, REQ-511,
+     * AD-25): the section another client named and how far through the book it
+     * was, with the server's own revision and admission time.
+     *
+     * This is **not** the device's position. `ReadingState` is unchanged in shape
+     * and semantics and stays in the catalog; this row never merges with it, and
+     * nothing here compares the two to decide which is further along — the
+     * backend's admission order decides that (`reader.activity-convergence.v1`).
+     * LEAF822 is what offers it to a reader.
+     */
+    @SerialName("remotePosition") val remotePosition: AccountRemotePosition? = null,
 ) {
     companion object {
 
@@ -232,6 +251,37 @@ data class AccountBook(
         }
     }
 }
+
+/**
+ * The account's portable position for one book (schema 4, REQ-511).
+ *
+ * Every field is the backend's own, adopted from a `reading_progress` payload
+ * (AD-22). Nothing here is computed, and nothing here is FastReader's: there is
+ * no token index, no pipeline version, no structural fingerprint and no reading
+ * speed, because the account never held any of them.
+ *
+ * [revision] and [serverAdmittedAt] are the server's ordering, kept so a host
+ * can tell one remote change from the next — which is what LEAF822's "offered
+ * once per remote change" needs — without inventing an ordering of its own.
+ * [href] may be absent: a locator states only its format as a minimum, and a
+ * record from a client that named no section is still a usable percentage.
+ */
+@Serializable
+data class AccountRemotePosition(
+    /** The section the other client named — a spine path, when it named one. */
+    @SerialName("href") val href: String? = null,
+    @SerialName("chapterTitle") val chapterTitle: String? = null,
+    /** `0.0..1.0`, the book-level fraction the record carried. */
+    @SerialName("progression") val progression: Double? = null,
+    /** `0..100` as the record stated it. */
+    @SerialName("percent") val percent: Double? = null,
+    /** The server's own time for the record; never compared with a device clock. */
+    @SerialName("updatedAt") val updatedAt: String? = null,
+    /** The server's revision of the progress resource this position came from. */
+    @SerialName("revision") val revision: Long = 0,
+    /** The server's admission time for the change that delivered it, when one came with it. */
+    @SerialName("serverAdmittedAt") val serverAdmittedAt: String? = null,
+)
 
 /**
  * One account book whose bytes are on this device (REQ-510, D2).

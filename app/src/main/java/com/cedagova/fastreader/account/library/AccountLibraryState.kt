@@ -102,6 +102,30 @@ sealed interface AccountSyncError {
     /** The stored account document cannot be used, and must not be overwritten. */
     data class StoreBlocked(val message: String) : AccountSyncError
 
+    /**
+     * A `reading_progress` record arrived that this app cannot place on a book
+     * (REQ-511).
+     *
+     * This branch exists to falsify an assumption rather than to report a
+     * failure. The pinned document types a change's `resource_id` as a bare
+     * string and fixes no meaning for it per resource type; that a progress
+     * record's identity is the book is *derived* (see
+     * [PortableReadingPosition.recordFor]) and has never been observed against
+     * stage. If the derivation is wrong, the record cannot be filed — and the
+     * one thing that must not happen then is nothing. So it becomes this: the
+     * resource id verbatim, the `book_id` the payload carried if it carried one,
+     * and the reason, all of them the values needed to correct the mapping in
+     * one file.
+     *
+     * It is not a sign-out, not a rejection and not retryable. The position is
+     * simply not adopted, and the rest of the stream is read as normal.
+     */
+    data class UnrecognizedProgressRecord(
+        val resourceId: String,
+        val payloadBookId: String?,
+        val reason: String,
+    ) : AccountSyncError
+
     /** The build carries no stage values, so there is nothing to call. */
     data object NotConfigured : AccountSyncError
 }

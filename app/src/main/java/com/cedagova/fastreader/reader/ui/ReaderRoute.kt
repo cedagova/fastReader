@@ -25,6 +25,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.account.library.AccountShelf
+import com.cedagova.fastreader.account.library.PortableReadingPosition
+import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.external.ExternalOpen
 import com.cedagova.fastreader.library.LibraryGraph
@@ -32,6 +35,7 @@ import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.ui.PickPersistableDocuments
+import com.cedagova.fastreader.library.ui.accountBookIdForDevice
 import com.cedagova.fastreader.reader.PlaybackScheduler
 import com.cedagova.fastreader.reader.BookOpenRequest
 import com.cedagova.fastreader.reader.ReaderBooks
@@ -65,6 +69,12 @@ fun ReaderRoute(
     onCannotOpen: (String) -> Unit = {},
     /** Opens the settings screen (LEAF302), so cues can be changed while reading. */
     onOpenSettings: () -> Unit = {},
+    /**
+     * The account library, when this build has one: where the portable position
+     * of an account book is published from (#120). Null leaves the reader
+     * exactly as it was — every position stays on the device.
+     */
+    account: AccountShelf? = null,
 ) {
     val repository = graph.repository
     // The stored settings drive the cue layer LEAF301 built and the timing engine
@@ -74,7 +84,7 @@ fun ReaderRoute(
     val settings by repository.settings.collectAsState()
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
-            initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository)) }
+            initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository, account)) }
         },
     )
     // Keyed on which book, not on the target value: an external target changes
@@ -322,7 +332,21 @@ private class CatalogBooks(private val repository: LibraryRepository) : ReaderBo
  * The only place the reader's [ReaderPosition] and the catalog's [ReadingState]
  * meet, so neither package has to know the other's shape.
  */
-internal class CatalogPositions(private val repository: LibraryRepository) : ReaderPositions {
+internal class CatalogPositions(
+    private val repository: LibraryRepository,
+    /**
+     * Where a portable position goes, or null when this build has no account
+     * surface at all (#120).
+     *
+     * Deliberately the whole shelf rather than a book id: whether the open book
+     * is an account book is a question about the account's *current* rows, and
+     * the answer changes while the reader is reading — a book added to the
+     * account from the shelf, a sign-out mid-chapter. Resolving it at each flush
+     * asks the live state; resolving it once at open would answer from a shelf
+     * that has since changed.
+     */
+    private val account: AccountShelf? = null,
+) : ReaderPositions {
 
     override val failure: StateFlow<String?> get() = repository.persistenceFailure
 
@@ -354,6 +378,26 @@ internal class CatalogPositions(private val repository: LibraryRepository) : Rea
 
     override fun flush() {
         repository.flushReadingState()
+    }
+
+    /**
+     * Publishes the portable position, for an account book only.
+     *
+     * Two gates, and a device book fails the second exactly as REQ-512 requires.
+     * `accountBookIdForDevice` is the same content-identity bridge the shelf uses
+     * to tell the reader's open apart from the account's row (AD-23), and it
+     * returns null for every book the account does not hold — so a device-only
+     * book never names itself to the Reader API from here, any more than it does
+     * from the open that `MainActivity` reports.
+     *
+     * Signed out there is no shelf state to resolve against and `books` is empty,
+     * so the same null comes back and nothing is sent (D4).
+     */
+    override fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int) {
+        val shelf = account ?: return
+        val accountBookId = accountBookIdForDevice(bookId, shelf.state.value) ?: return
+        val portable = PortableReadingPosition.of(content, tokenIndex) ?: return
+        shelf.recordPosition(accountBookId, portable)
     }
 }
 

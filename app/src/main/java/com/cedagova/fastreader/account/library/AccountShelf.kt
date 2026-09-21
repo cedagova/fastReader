@@ -125,6 +125,16 @@ class AccountShelf(
     fun recordFinished(bookId: String) = actions.recordFinished(bookId)
 
     /**
+     * The reader reached a place worth stating portably in this account book
+     * (REQ-511, AD-25).
+     *
+     * Straight through, like the two above it: the engine owns whether this says
+     * anything new, and this class owns only the Undo window.
+     */
+    fun recordPosition(bookId: String, position: LocalReadingPosition) =
+        actions.recordPosition(bookId, position)
+
+    /**
      * Ends the offer, or ends [expected]'s offer only when one is named.
      *
      * Takes the lock itself, so it must only ever be called from a coroutine

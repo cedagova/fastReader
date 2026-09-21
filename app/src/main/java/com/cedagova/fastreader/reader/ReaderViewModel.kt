@@ -485,7 +485,13 @@ class ReaderViewModel(
         val positionKey = openRequest?.positionKey ?: return
         val current = session ?: return
         positions.record(positionKey, current.toPosition())
-        if (flush) positions.flush()
+        if (flush) {
+            positions.flush()
+            // The same moments, and only those: pause, jump, speed, background,
+            // close, and a stream that stopped itself. AD-25's "never on the
+            // per-word throttle" is this `if` and nothing else.
+            positions.publishPortable(positionKey, current.content, current.index)
+        }
     }
 
     /** Leaving the reader for good; the last word read must not depend on timing. */

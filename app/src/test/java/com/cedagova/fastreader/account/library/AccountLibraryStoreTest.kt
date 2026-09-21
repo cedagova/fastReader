@@ -233,6 +233,54 @@ class AccountLibraryStoreTest {
         assertEquals(emptyList<AccountCopy>(), decoded.document.copies)
     }
 
+    /**
+     * 3 → 4: a document written before this increment decodes with no remote
+     * position, which is the truth about a device that never heard one.
+     */
+    @Test
+    fun `a version three document migrates forward with no remote position and nothing else changed`() {
+        val codec = AccountLibraryCodec()
+        val version3 = codec.encode(sample())
+            .replace("\"schemaVersion\":${AccountLibrarySchema.CURRENT_VERSION}", "\"schemaVersion\":3")
+            .replace(",\"remotePosition\":null", "")
+        assertTrue("the fixture must really be a version 3 document", version3.contains("\"schemaVersion\":3"))
+        assertTrue("a version 3 document names no remote position", !version3.contains("remotePosition"))
+
+        val decoded = codec.decode(version3) as AccountLibraryDecoding.Decoded
+
+        assertEquals(3, decoded.migratedFrom)
+        assertEquals(AccountLibrarySchema.CURRENT_VERSION, decoded.document.schemaVersion)
+        assertEquals(sample().books, decoded.document.books)
+        assertEquals(sample().outbox, decoded.document.outbox)
+        assertEquals(sample().imports, decoded.document.imports)
+        assertEquals(sample().copies, decoded.document.copies)
+        assertTrue(
+            "every row comes back without a remote position",
+            decoded.document.books.all { it.remotePosition == null },
+        )
+    }
+
+    /** A remote position survives a write and a read, with the server's ordering intact. */
+    @Test
+    fun `a remote position round trips with the server's revision and admission time`() {
+        val codec = AccountLibraryCodec()
+        val remote = AccountRemotePosition(
+            href = "OEBPS/ch8.xhtml",
+            chapterTitle = "Chapter Eight",
+            progression = 0.625,
+            percent = 62.5,
+            updatedAt = "2026-09-20T09:00:00Z",
+            revision = 11,
+            serverAdmittedAt = "2026-09-20T09:00:01Z",
+        )
+        val book = sample().books.first().copy(remotePosition = remote)
+        val document = sample().withBook(book)
+
+        val decoded = codec.decode(codec.encode(document)) as AccountLibraryDecoding.Decoded
+
+        assertEquals(remote, decoded.document.book(book.bookId)!!.remotePosition)
+    }
+
     /** A copy reference survives a write and a read, and replaces rather than duplicates. */
     @Test
     fun `copy references round trip and are keyed by content`() {

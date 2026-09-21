@@ -191,12 +191,23 @@ fun accountNoticeFor(account: AccountLibraryState): AccountNotice? = when (accou
 /**
  * The notice one error is, or null for an error the shelf says nothing about.
  *
- * `NotConfigured` is that one: a build with no stage values has no account
+ * Two are those. `NotConfigured`: a build with no stage values has no account
  * surface at all, and the account screen of #100 already says so in the one
  * place a reader would go looking.
+ *
+ * `UnrecognizedProgressRecord` is the other, and deliberately so. It reports
+ * that *this app's* derivation about a progress record's identity did not hold
+ * against a real record (#120) — a thing to be read in state, not a sentence
+ * about somebody's library. A reader can do nothing with it, their books are all
+ * still there, and the only consequence is one position that was not adopted.
+ * It stays a typed value on the state so a test and a device run can both see
+ * it; making it a notice would put a developer's diagnostic on the shelf.
  */
 private fun AccountSyncError?.toNotice(): AccountNotice? = when (this) {
-    null, AccountSyncError.NotConfigured -> null
+    null,
+    AccountSyncError.NotConfigured,
+    is AccountSyncError.UnrecognizedProgressRecord,
+    -> null
 
     AccountSyncError.NetworkUnavailable -> AccountNotice(AccountNoticeKind.OFFLINE)
 
