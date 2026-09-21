@@ -83,7 +83,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
+import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.ImportProblem
 import com.cedagova.fastreader.account.library.PublicationSourceProblem
 import com.cedagova.fastreader.library.BookStatus
@@ -171,6 +173,19 @@ fun LibraryScreen(
     onDismissAddToAccount: (LibraryBookItem) -> Unit = {},
     /** Puts away an account notice that is a verdict about the past, not a live state. */
     onDismissAccountNotice: () -> Unit = {},
+    /**
+     * Fetches an account book's bytes and opens it (REQ-510).
+     *
+     * It is a *download*, not an open: nothing opens until the bytes have been
+     * placed and their SHA-256 has matched the account's identity for the book.
+     */
+    onDownloadAccountBook: (LibraryBookItem) -> Unit = {},
+    /** Stops a download under way. Nothing was placed, so the row is untouched. */
+    onCancelDownload: (LibraryBookItem) -> Unit = {},
+    /** Puts away a download refusal that has been read. Downloads nothing. */
+    onDismissDownload: (LibraryBookItem) -> Unit = {},
+    /** Frees this device's downloaded copy; the account keeps the book (D2). */
+    onRemoveAccountCopy: (LibraryBookItem) -> Unit = {},
     /** Stores a new library order (REQ-203). The list re-sorts from the stored value. */
     onOrderChange: (LibraryOrder) -> Unit = {},
     coverLoader: CoverLoader = CoverLoader.None,
@@ -197,6 +212,20 @@ fun LibraryScreen(
             book = bookToRemoveFromAccount,
             onConfirm = { confirmingAccountRemoval = null; onRemoveFromAccount(bookToRemoveFromAccount) },
             onDismiss = { confirmingAccountRemoval = null },
+        )
+    }
+    // And a third, for the third removal this shelf can offer. Freeing a
+    // downloaded copy is neither of the other two — the book stays in the
+    // account and the row stays on the shelf — so a yes to it must never be
+    // mistaken for a yes to either.
+    var confirmingCopyRemoval by rememberSaveable { mutableStateOf<String?>(null) }
+    val bookToFree = confirmingCopyRemoval?.let { id -> state.books.firstOrNull { it.id == id } }
+    if (bookToFree?.accountCopy != null) {
+        RemoveAccountCopyDialog(
+            book = bookToFree,
+            copy = bookToFree.accountCopy,
+            onConfirm = { confirmingCopyRemoval = null; onRemoveAccountCopy(bookToFree) },
+            onDismiss = { confirmingCopyRemoval = null },
         )
     }
     // The consent question is driven by the flow's own state rather than by a
@@ -294,9 +323,13 @@ fun LibraryScreen(
                             books = state.books,
                             onRemove = { confirmingRemoval = it.id },
                             onRemoveFromAccount = { confirmingAccountRemoval = it.id },
+                            onRemoveAccountCopy = { confirmingCopyRemoval = it.id },
                             onAddToAccount = onAddToAccount,
                             onCancelAddToAccount = onCancelAddToAccount,
                             onDismissAddToAccount = onDismissAddToAccount,
+                            onDownloadAccountBook = onDownloadAccountBook,
+                            onCancelDownload = onCancelDownload,
+                            onDismissDownload = onDismissDownload,
                             onGrantAccess = onGrantAccess,
                             onOpen = onOpen,
                             coverLoader = coverLoader,
@@ -885,9 +918,13 @@ private fun BookList(
     books: List<LibraryBookItem>,
     onRemove: (LibraryBookItem) -> Unit,
     onRemoveFromAccount: (LibraryBookItem) -> Unit,
+    onRemoveAccountCopy: (LibraryBookItem) -> Unit,
     onAddToAccount: (LibraryBookItem) -> Unit,
     onCancelAddToAccount: (LibraryBookItem) -> Unit,
     onDismissAddToAccount: (LibraryBookItem) -> Unit,
+    onDownloadAccountBook: (LibraryBookItem) -> Unit,
+    onCancelDownload: (LibraryBookItem) -> Unit,
+    onDismissDownload: (LibraryBookItem) -> Unit,
     onGrantAccess: (LibraryBookItem) -> Unit,
     onOpen: (LibraryBookItem) -> Unit,
     coverLoader: CoverLoader,
@@ -903,9 +940,13 @@ private fun BookList(
                     book = book,
                     onRemove = { onRemove(book) },
                     onRemoveFromAccount = { onRemoveFromAccount(book) },
+                    onRemoveAccountCopy = { onRemoveAccountCopy(book) },
                     onAddToAccount = { onAddToAccount(book) },
                     onCancelAddToAccount = { onCancelAddToAccount(book) },
                     onDismissAddToAccount = { onDismissAddToAccount(book) },
+                    onDownloadAccountBook = { onDownloadAccountBook(book) },
+                    onCancelDownload = { onCancelDownload(book) },
+                    onDismissDownload = { onDismissDownload(book) },
                     onGrantAccess = { onGrantAccess(book) },
                     onOpen = { onOpen(book) },
                     coverLoader = coverLoader,
@@ -940,9 +981,13 @@ private fun BookList(
                     book = book,
                     onRemove = { onRemove(book) },
                     onRemoveFromAccount = { onRemoveFromAccount(book) },
+                    onRemoveAccountCopy = { onRemoveAccountCopy(book) },
                     onAddToAccount = { onAddToAccount(book) },
                     onCancelAddToAccount = { onCancelAddToAccount(book) },
                     onDismissAddToAccount = { onDismissAddToAccount(book) },
+                    onDownloadAccountBook = { onDownloadAccountBook(book) },
+                    onCancelDownload = { onCancelDownload(book) },
+                    onDismissDownload = { onDismissDownload(book) },
                     onGrantAccess = { onGrantAccess(book) },
                     onOpen = { onOpen(book) },
                     coverLoader = coverLoader,
@@ -1039,9 +1084,13 @@ private fun BookRow(
     book: LibraryBookItem,
     onRemove: () -> Unit,
     onRemoveFromAccount: () -> Unit,
+    onRemoveAccountCopy: () -> Unit,
     onAddToAccount: () -> Unit,
     onCancelAddToAccount: () -> Unit,
     onDismissAddToAccount: () -> Unit,
+    onDownloadAccountBook: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDismissDownload: () -> Unit,
     onGrantAccess: () -> Unit,
     onOpen: () -> Unit,
     coverLoader: CoverLoader,
@@ -1128,6 +1177,33 @@ private fun BookRow(
                     onDismiss = onDismissAddToAccount,
                 )
             }
+            // The other direction (REQ-510): bringing an account book's bytes
+            // here. Present on an account-only row and nowhere else.
+            if (book.isAccountOnly) {
+                AccountDownloadSlot(
+                    book = book,
+                    onDownload = onDownloadAccountBook,
+                    onCancel = onCancelDownload,
+                    onDismiss = onDismissDownload,
+                )
+            }
+            // And freeing those bytes again (D2). Read off the catalog's own
+            // `ACCOUNT_COPY` source, so it is still here after sign-out — which
+            // is exactly what "a downloaded copy is an ordinary device book,
+            // openable and removable" has to mean on screen (D4).
+            if (book.accountCopy != null) {
+                val freeLabel = stringResource(R.string.library_account_copy_remove_label, book.title)
+                TextButton(
+                    onClick = onRemoveAccountCopy,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = TouchTarget)
+                        .testTag("library_account_copy_remove_${book.id}")
+                        .semantics { contentDescription = freeLabel },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(stringResource(R.string.library_account_copy_remove))
+                }
+            }
             if (book.status == BookStatus.PERMISSION_LOST) {
                 TextButton(
                     onClick = onGrantAccess,
@@ -1143,9 +1219,12 @@ private fun BookRow(
         Spacer(Modifier.width(8.dp))
         // Removing the *row* is removing this device's copy from this device's
         // library, and an account-only row has no copy here to remove: its only
-        // removal is the account one above. Every device row keeps this button
-        // exactly as it was.
-        if (!book.isAccountOnly) {
+        // removal is the account one above. A downloaded copy has one too, and
+        // it is the one above that frees the bytes — offering this as well
+        // would let a reader drop the row and leave the file behind, which is
+        // the one way "removable" could be untrue. Every other device row keeps
+        // this button exactly as it was.
+        if (!book.isAccountOnly && book.accountCopy == null) {
             IconButton(
                 onClick = onRemove,
                 modifier = Modifier.size(TouchTarget).testTag("library_remove_${book.id}"),
@@ -1272,6 +1351,172 @@ private fun AddToAccountSlot(
             },
         )
     }
+}
+
+/**
+ * Everything the download flow puts under an account-only book's status line
+ * (REQ-510, the definition's "Open account book not on device" and "Download
+ * grant unavailable / storage full").
+ *
+ * Three exclusive states and no fourth: the offer, the transfer with its
+ * Cancel, and the refusal with its reason. There is deliberately nothing for
+ * "done" — a copy that has landed has become a device row with a cover, a
+ * position and a **Remove downloaded copy** action, so this slot is gone by
+ * then rather than showing a stale success.
+ *
+ * Every refusal ends with the same second sentence: the book is still in the
+ * Reader account. That is the definition's "the book stays listed" said to the
+ * reader rather than only held by the data, and it is what makes each of these
+ * a statement about one attempt instead of about their library.
+ */
+@Composable
+private fun AccountDownloadSlot(
+    book: LibraryBookItem,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    when (val state = book.download) {
+        null -> {
+            val label = stringResource(R.string.library_account_download_label, book.title)
+            TextButton(
+                onClick = onDownload,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = TouchTarget)
+                    .testTag("library_account_download_${book.id}")
+                    .semantics { contentDescription = label },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(stringResource(R.string.library_account_download))
+            }
+        }
+
+        is BookDownloadState.Downloading -> {
+            val fraction = state.fraction
+            ImportNote(
+                text = if (fraction == null) {
+                    stringResource(R.string.library_account_downloading_unmeasured)
+                } else {
+                    stringResource(
+                        R.string.library_account_downloading,
+                        (fraction * PERCENT).roundToInt().coerceIn(0, PERCENT),
+                    )
+                },
+                tag = "library_account_downloading_${book.id}",
+                progress = fraction ?: INDETERMINATE,
+                action = ImportAction(
+                    label = stringResource(R.string.library_account_download_cancel),
+                    description = stringResource(R.string.library_account_download_cancel_label, book.title),
+                    tag = "library_account_download_cancel_${book.id}",
+                    onClick = onCancel,
+                ),
+            )
+        }
+
+        is BookDownloadState.Refused -> ImportNote(
+            text = state.message() + " " + stringResource(R.string.library_account_download_kept),
+            code = state.code,
+            requestId = state.requestId,
+            tag = "library_account_download_refused_${book.id}",
+            error = true,
+            action = if (state.retryable) {
+                ImportAction(
+                    label = stringResource(R.string.library_account_download_retry),
+                    description = stringResource(R.string.library_account_download_retry_label, book.title),
+                    tag = "library_account_download_retry_${book.id}",
+                    onClick = onDownload,
+                )
+            } else {
+                ImportAction(
+                    label = stringResource(R.string.library_resume_blocked_dismiss),
+                    description = null,
+                    tag = "library_account_download_dismiss_${book.id}",
+                    onClick = onDismiss,
+                )
+            },
+        )
+    }
+}
+
+/**
+ * The refusal, in the reader's language, from the one closed set of reasons a
+ * download can fail for.
+ *
+ * Each sentence names the thing that actually went wrong — the asset, this
+ * device, the network, the backend, or the book — because a reader's next move
+ * is different for each, and "something went wrong" would leave them without
+ * one.
+ */
+@Composable
+private fun BookDownloadState.Refused.message(): String = stringResource(
+    when (problem) {
+        DownloadProblem.TAMPERED -> R.string.library_account_download_tampered
+        DownloadProblem.NO_STORAGE -> R.string.library_account_download_no_storage
+        DownloadProblem.OFFLINE -> R.string.library_account_download_offline
+        DownloadProblem.REFUSED -> R.string.library_account_download_refused
+        DownloadProblem.FAILED -> R.string.library_account_download_failed
+        DownloadProblem.UNREADABLE -> R.string.library_account_download_unreadable
+        DownloadProblem.UNAVAILABLE -> R.string.library_account_download_unavailable
+    },
+)
+
+/**
+ * The question before a downloaded copy's bytes are freed (D2).
+ *
+ * It is the third removal this shelf offers and the only one that costs bytes,
+ * so it says the three things that distinguish it from the other two: how much
+ * is freed, that the **account** keeps the book and it can be fetched again,
+ * and that the reader's place in it survives. The size is the file's own —
+ * taken from the catalog source the copy wrote — not a number the account
+ * reported.
+ */
+@Composable
+private fun RemoveAccountCopyDialog(
+    book: LibraryBookItem,
+    copy: AccountCopyRow,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("library_account_copy_remove_dialog"),
+        title = {
+            Text(
+                text = stringResource(R.string.library_account_copy_remove_title, book.title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
+        text = {
+            Text(
+                text = if (copy.sizeBytes > 0) {
+                    stringResource(R.string.library_account_copy_remove_body, humanSize(copy.sizeBytes))
+                } else {
+                    stringResource(R.string.library_account_copy_remove_body_unmeasured)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_account_copy_remove_dialog_confirm"),
+            ) {
+                Text(stringResource(R.string.library_account_copy_remove_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                    .testTag("library_account_copy_remove_dialog_cancel"),
+            ) {
+                Text(stringResource(R.string.library_remove_cancel))
+            }
+        },
+    )
 }
 
 /** One button beside an import note. */
@@ -1484,8 +1729,8 @@ private const val PERCENT = 100
 
 @Composable
 private fun LibraryBookItem.statusLine(): String = when {
-    // The account has this book and this device does not. Said plainly, and
-    // without a way to open it: the download is increment 003's.
+    // The account has this book and this device does not. Said plainly; what
+    // to do about it is the control under this line (REQ-510).
     isAccountOnly -> stringResource(R.string.library_account_not_on_device)
     else -> deviceStatusLine()
 }

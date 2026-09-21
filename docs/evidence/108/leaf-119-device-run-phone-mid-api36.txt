@@ -1,0 +1,90 @@
+LEAF812 (#119) — device run on Phone_Mid_API36
+==============================================
+
+Effort      https://github.com/cedagova/fastReader/issues/108 (increment 003 of #104)
+Issue       https://github.com/cedagova/fastReader/issues/119
+Worktree    leaf-119, base collector/108-read-account-book @ a41c8fa8fb73f6191f8d51cffe75663f85028e85
+Head        5951b481ba8ef3438a2749f7fc938720fdf28230
+Device      Phone_Mid_API36 (sdk_gphone64_arm64, Android 16 / API 36, 1080x2400 @ 420 dpi)
+Run         2026-09-21. Build signed out: this machine has no stage credentials, so
+            every account-dependent flow is a PENDING OWNER TEST, not a claim.
+
+APK identity
+------------
+  built from this head            md5 5353b86432faf7251d78eabd2f287aad
+  `adb pull` of the installed apk md5 5353b86432faf7251d78eabd2f287aad
+  package path /data/app/~~U-AYdsEu4W5QVn1ewNCmeg==/com.cedagova.fastreader-.../base.apk
+
+What was exercised, and what each step proves
+---------------------------------------------
+
+1. Cold launch, signed out.
+   `adb shell am start -n com.cedagova.fastreader/.MainActivity`
+   The shelf is v1.6.0's: one device book (Pride and Prejudice, its cover, 0%
+   read) with its row-removal X, and NOTHING this leaf adds — no download
+   control, no copy removal, no account line. That is D4's "the signed-out shelf
+   is v1.6.0's" on a real device, after a leaf that adds three new controls to
+   that screen.
+   -> leaf-119-01-signed-out-shelf-phone-mid-api36.png
+
+2. Settings -> What stays on this device.
+   The shipped statement renders with increment 003's two new sentences in it.
+   The first screenshot catches the download sentence beginning ("When you
+   choose Download and open for a book your account already holds, FastReader
+   asks the Reader API for a one-off ..."), and above it "Version 1.7.0 (build
+   9)" — AD-28, no bump — and "Reader account: Signed out".
+   -> leaf-119-02-privacy-statement-phone-mid-api36.png
+
+3. The same screen at es-ES (`cmd locale set-app-locales ... --locales es-ES`).
+   The Spanish twin carries both new sentences, including
+   «Una copia descargada es un archivo de ese almacenamiento privado como los
+   demás: queda fuera de la copia de seguridad de este dispositivo y de una
+   transferencia a un teléfono nuevo, y «Quitar la copia descargada» en la fila
+   del libro la borra de este dispositivo sin sacar el libro de tu cuenta de
+   Reader.»
+   Nothing holds the Spanish copy to the English one but a hand edit, so seeing
+   it rendered is the check.
+   -> leaf-119-03-privacy-statement-spanish-phone-mid-api36.png
+
+4. Cold start with a copy already in private storage.
+   With files/account-copies/copy-<sha256>.epub present (512 KiB), the app was
+   force-stopped and launched again, so FastReaderApplication's once-per-process
+   account-copy sweep ran against it. The file is still there afterwards, byte
+   for byte:
+
+     total 516
+     -rw-rw-rw- 1 u0_a220 u0_a220 524288 copy-f095cf39...0624.epub
+
+   That is the sweep doing what it says: a placed `.epub` is a copy, only a
+   `.part` is a partial, and start-up deletes only the second kind.
+
+5. The docs/evidence/46/ backup procedure, with that copy present.
+   Recorded separately and in full in
+   leaf-119-backup-with-copy-phone-mid-api36.txt. Zero bytes on both transports.
+
+Crashes
+-------
+  adb logcat -d -s AndroidRuntime:E   ->   0 lines
+
+No FastReader-authored log line appeared at any point; every line mentioning the
+package is the platform's own (AssetManager locale, CoreBackPreview,
+GraphicsEnvironment, ImeTracker). The app logs nothing about the account, the
+library or a download, which is what a build that prints no backend value looks
+like.
+
+What this run does NOT prove
+----------------------------
+Every REQ-510 and REQ-516 clause that needs a signed-in stage account: the
+download itself, the airplane-mode reopen, the tampered refusal against the real
+provider, freeing a real copy, and sign-out/sign-in re-binding. Those are the
+numbered PENDING OWNER TEST items on the PR, unchanged in wording from the six
+LEAF811's reviewer endorsed where they are the same test.
+
+Housekeeping
+------------
+The copy file and the helper script were deleted from the device at the end of
+the run; the emulator was shut down with `adb emu kill` and the shared emulator
+lock released.
+
+No token, signed URL, backend value, local.properties value, email address or
+request secret appears anywhere in this file or in the screenshots beside it.

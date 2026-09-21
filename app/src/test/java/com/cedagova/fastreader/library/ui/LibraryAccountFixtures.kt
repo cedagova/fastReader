@@ -27,6 +27,10 @@ internal object LibraryAccountFixtures {
     /** Dubliners: in the account only — its bytes are not here. */
     const val DUBLINERS_ACCOUNT_ID: String = "3f0b2c41-9d6e-4a77-9a1c-7c2f5b8e40aa"
 
+    /** Dubliners' bytes, once they are here. */
+    const val DUBLINERS_HEX: String = "d0b112e522222222222222222222222222222222222222222222222222222222"
+
+    const val DUBLINERS_COPY_ID: String = "sha256:$DUBLINERS_HEX"
     const val FICCIONES_ID: String = "sha256:$FICCIONES_HEX"
     const val RAYUELA_ID: String = "sha256:$RAYUELA_HEX"
 
@@ -63,9 +67,30 @@ internal object LibraryAccountFixtures {
         bookId = DUBLINERS_ACCOUNT_ID,
         title = "Dubliners",
         author = "James Joyce",
-        contentSha256 = "d0b112e522222222222222222222222222222222222222222222222222222222",
+        contentSha256 = DUBLINERS_HEX,
         status = ReaderLibraryStatus.QUEUED,
     )
+
+    /**
+     * The same three books, with Dubliners downloaded (#119).
+     *
+     * The copy is a device row keyed by the *same* digest the account book
+     * carries, so the merge puts them on one row — which is the whole of what
+     * "a downloaded copy shows as a device book" means to the shelf.
+     */
+    fun catalogWithDownloadedCopy(): Catalog {
+        val base = deviceCatalog()
+        return base.copy(
+            books = base.books + LibraryFixtures.accountCopy(
+                contentHex = DUBLINERS_HEX,
+                title = "Dubliners",
+                author = "James Joyce",
+                hasCover = false,
+            ),
+            readingStates = base.readingStates +
+                (DUBLINERS_COPY_ID to ReadingState(progressFraction = 0.08f, updatedAtEpochMs = 3_000)),
+        )
+    }
 
     private fun device(id: String, title: String, author: String, fileName: String): Book =
         LibraryFixtures.readable(id = id, title = title, author = author, fileName = fileName)

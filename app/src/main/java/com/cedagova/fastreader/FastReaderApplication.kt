@@ -15,6 +15,7 @@ import com.cedagova.fastreader.account.ReaderAccountConfiguration
 import com.cedagova.fastreader.account.ReaderAccountController
 import com.cedagova.fastreader.account.library.AccountBookCopies
 import com.cedagova.fastreader.account.library.AccountCopyStore
+import com.cedagova.fastreader.account.library.AccountDownloads
 import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.AccountSyncEngine
@@ -186,6 +187,16 @@ class FastReaderApplication : Application() {
     lateinit var accountCopies: AccountBookCopies
         private set
 
+    /**
+     * Downloading an account book onto this device and freeing it again (#119).
+     *
+     * Process-scoped for the same reason [accountImports] is: a download must
+     * outlive the screen that started it, and a reader who leaves the shelf
+     * mid-transfer should come back to a finished book rather than to nothing.
+     */
+    lateinit var accountDownloads: AccountDownloads
+        private set
+
     private var accountCopiesSwept = false
 
     override fun onCreate() {
@@ -225,6 +236,11 @@ class FastReaderApplication : Application() {
             store = AccountCopyStore(File(filesDir, AccountCopyStore.DIRECTORY_NAME)),
             references = accountLibrary,
             library = library.repository,
+        )
+        accountDownloads = AccountDownloads(
+            copies = accountCopies,
+            accountState = accountLibrary.state,
+            scope = applicationScope,
         )
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {

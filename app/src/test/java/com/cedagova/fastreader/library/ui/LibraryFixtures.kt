@@ -82,6 +82,39 @@ internal object LibraryFixtures {
         ),
     )
 
+    /**
+     * A book whose bytes are a downloaded private copy of an account book
+     * (#119, AD-24).
+     *
+     * The id is the content digest, exactly as a real ingestion derives it, and
+     * the source's uri is the copy-store key — which is what the shelf reads
+     * the identity to free back off. Nothing about this row says "account": D4
+     * is precisely that a copy keeps working when the account rows leave.
+     */
+    fun accountCopy(
+        contentHex: String,
+        title: String,
+        author: String? = null,
+        sizeBytes: Long = 6_291_456,
+        hasCover: Boolean = true,
+    ) = Book(
+        id = "sha256:$contentHex",
+        title = title,
+        author = author,
+        hasCover = hasCover,
+        contentStatus = BookContentStatus.READABLE,
+        sources = listOf(
+            BookSource(
+                uri = BookSource.accountCopyUri(contentHex),
+                origin = SourceOrigin.ACCOUNT_COPY,
+                displayName = "$title.epub",
+                sizeBytes = sizeBytes,
+                lastModifiedEpochMs = 1_700_000_000_000,
+                filePath = "/data/user/0/com.cedagova.fastreader/files/account-copies/copy-$contentHex.epub",
+            ),
+        ),
+    )
+
     private fun source(
         uri: String,
         displayName: String,

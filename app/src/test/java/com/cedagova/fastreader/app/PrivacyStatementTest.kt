@@ -73,6 +73,18 @@ class PrivacyStatementTest {
      * intention: each is replaced by the same claim made conditional on the
      * consent the code actually requires.
      *
+     * #119 retires nothing at all, and that is the point of asserting its four
+     * download claims here rather than trusting the block. Downloading an
+     * account book is the first thing this app does that moves a whole file in
+     * the *inbound* direction, so "that is all that leaves this device" is
+     * still true word for word — but the statement now has to say three things
+     * it did not: which request fetches the book, that the account's bearer is
+     * never handed to the storage it comes from (`AssetDownloadClient` holds no
+     * session and could not send one), and that the copy which lands is a
+     * private file the owner can free. The last three claims below are AD-27's
+     * "downloaded copies live in private storage, are excluded from backup, and
+     * are removable" held to the shipped words.
+     *
      * A third phrase is asserted absent although it never shipped: "while you
      * are signed in, a copy of your account's own book list". The first draft
      * of #115 said that, and it was false — `AccountSyncEngine.signOut` keeps
@@ -88,7 +100,7 @@ class PrivacyStatementTest {
      * edit of `values-es/strings.xml` too.
      */
     @Test
-    fun `the statement still makes the nineteen claims the build backs up`() {
+    fun `the statement still makes the twenty-six claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
@@ -100,13 +112,20 @@ class PrivacyStatementTest {
             "asks the Reader API what kinds and sizes of file your account accepts",
             "sends that book's file, its name, its size, its format and its checksum to the Reader API and its storage, where your account keeps them",
             "nothing about that book is sent before you confirm",
+            "when you choose Download and open for a book your account already holds",
+            "asks the Reader API for a one-off address for that book's file and fetches the file from that address",
+            "the request names only a book your account already has",
+            "the account's sign-in is never given to the storage the file comes from",
             "a book file is sent only for a book you add that way",
             "a book that is only on this device is never named to the Reader API until you add it",
             "your reading positions, your reading speed, your other settings and any crash report stay on this device and are never sent",
             "kept encrypted on this device, outside its backup, and is removed when you sign out",
             "hands a web address to your browser",
             "your books stay in the folders you chose",
-            "once you sign in, a copy of your account's own book list and a note of any book you are part-way through adding to it, in its private storage",
+            "once you sign in, a copy of your account's own book list, a note of any book you are part-way through adding to it and the file of any account book you have downloaded, in its private storage",
+            "a downloaded copy is a file in that private storage like the rest",
+            "it is left out of this device's backup and of a transfer to a new phone",
+            "Remove downloaded copy on the book's row deletes it from this device without taking the book out of your Reader account",
             "that copy of the account's list is not deleted when you sign out",
             "only uninstalling FastReader or clearing its data removes it",
             "is included in this device's backup or in a transfer to a new phone",

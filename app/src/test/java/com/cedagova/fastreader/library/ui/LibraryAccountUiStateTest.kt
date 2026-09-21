@@ -1,11 +1,14 @@
 package com.cedagova.fastreader.library.ui
 
 import com.cedagova.fastreader.account.library.AccountBook
+import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
@@ -93,7 +96,8 @@ class LibraryAccountUiStateTest {
         assertEquals("Dubliners", row.title)
         assertEquals("James Joyce", row.author)
         assertTrue("it is the account's and not this device's", row.isAccountOnly)
-        assertFalse("there is nothing here to open until increment 003", row.canOpen)
+        assertFalse("there are no bytes here to open: it has to be downloaded first", row.canOpen)
+        assertTrue("and that is what it offers", row.canDownload)
         assertFalse("a cover is bytes, and the bytes are not here", row.hasCover)
         assertEquals(LibraryContent.BOOKS, state.content)
     }
@@ -290,12 +294,14 @@ class LibraryAccountUiStateTest {
         account: AccountLibraryState,
         query: String = "",
         imports: AccountImportsState = AccountImportsState.NONE,
+        downloads: AccountDownloadsState = AccountDownloadsState.NONE,
     ): LibraryUiState = buildLibraryUiState(
         catalog = catalog,
         ingestion = IngestionState.Idle,
         query = query,
         account = account,
         imports = imports,
+        downloads = downloads,
     )
 
     private fun catalogOf(vararg books: Pair<String, String>) = Catalog(
@@ -325,6 +331,7 @@ class LibraryAccountUiStateTest {
     private companion object {
         const val FICCIONES_HEX = "11111111111111111111111111111111111111111111111111111111aaaaaaaa"
         const val RAYUELA_HEX = "22222222222222222222222222222222222222222222222222222222bbbbbbbb"
+        const val ULYSSES_HEX = "33333333333333333333333333333333333333333333333333333333cccccccc"
         const val FICCIONES = "sha256:$FICCIONES_HEX"
     }
 
@@ -422,5 +429,99 @@ class LibraryAccountUiStateTest {
             state.books.single { it.id == FICCIONES }.addToAccount?.state,
         )
         assertEquals(true, state.books.single { it.title == "Rayuela" }.addToAccount?.offered)
+    }
+
+    // ---- downloading an account book, and freeing the copy (#119, REQ-510) -------------
+
+    @Test
+    fun `an account-only row offers the download and a device row never does`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones"),
+            accountOf(
+                accountBook("acc-1", "Ficciones", FICCIONES_HEX),
+                accountBook("acc-2", "Dubliners", RAYUELA_HEX),
+            ),
+        )
+
+        assertEquals(
+            listOf("Dubliners"),
+            state.books.filter { it.canDownload }.map { it.title },
+        )
+        assertNull("a row that is here has nothing to fetch", state.books.single { it.id == FICCIONES }.download)
+    }
+
+    @Test
+    fun `a download belongs to the account book it was started for`() {
+        val state = shelf(
+            catalogOf(),
+            accountOf(
+                accountBook("acc-1", "Dubliners", RAYUELA_HEX),
+                accountBook("acc-2", "Ulysses", ULYSSES_HEX),
+            ),
+            downloads = AccountDownloadsState(
+                byAccountBookId = mapOf("acc-1" to BookDownloadState.Downloading(received = 3, total = 4)),
+            ),
+        )
+
+        val downloading = state.books.single { it.title == "Dubliners" }
+        assertEquals(0.75f, (downloading.download as BookDownloadState.Downloading).fraction!!, 0.001f)
+        assertFalse("a row already downloading does not offer to start again", downloading.canDownload)
+        assertNull("and its neighbour is untouched", state.books.single { it.title == "Ulysses" }.download)
+    }
+
+    @Test
+    fun `a refused download keeps the book listed and offers no open`() {
+        val state = shelf(
+            catalogOf(),
+            accountOf(accountBook("acc-1", "Dubliners", RAYUELA_HEX)),
+            downloads = AccountDownloadsState(
+                byAccountBookId = mapOf(
+                    "acc-1" to BookDownloadState.Refused(DownloadProblem.TAMPERED),
+                ),
+            ),
+        )
+
+        val row = state.books.single()
+        assertEquals("the book stays on the shelf", "Dubliners", row.title)
+        assertFalse("and it still does not open", row.canOpen)
+        assertEquals(DownloadProblem.TAMPERED, (row.download as BookDownloadState.Refused).problem)
+    }
+
+    /**
+     * D4's copy rule, and the whole of it: a downloaded copy is a device book.
+     * Signed out there is no account half at all, and the row still opens and
+     * still offers the one removal that frees its bytes.
+     */
+    @Test
+    fun `a downloaded copy is a device book after sign-out, openable and removable`() {
+        val catalog = Catalog(books = listOf(LibraryFixtures.accountCopy(RAYUELA_HEX, "Dubliners")))
+
+        val state = shelf(catalog, AccountLibraryState.SIGNED_OUT)
+
+        val row = state.books.single()
+        assertNull("no account half: the rows left with the session", row.account)
+        assertTrue("it opens like any other book on this phone", row.canOpen)
+        assertEquals(RAYUELA_HEX, row.accountCopy?.contentSha256)
+        assertEquals(6_291_456L, row.accountCopy?.sizeBytes)
+    }
+
+    @Test
+    fun `signing in again shows the copy as an account book, still one row`() {
+        val catalog = Catalog(books = listOf(LibraryFixtures.accountCopy(RAYUELA_HEX, "Dubliners")))
+
+        val state = shelf(catalog, accountOf(accountBook("acc-1", "Dubliners", RAYUELA_HEX)))
+
+        val row = state.books.single()
+        assertEquals("re-bound by content identity, never by a path", "acc-1", row.account?.bookId)
+        assertTrue(row.account?.onThisDevice == true)
+        assertEquals("and it is still the same copy", RAYUELA_HEX, row.accountCopy?.contentSha256)
+        assertNull("a book the account already holds offers nothing to upload", row.addToAccount)
+    }
+
+    @Test
+    fun `a book from a folder has no copy to free`() {
+        val state = shelf(catalogOf(FICCIONES to "Ficciones"), accountOf())
+
+        assertNull(state.books.single().accountCopy)
     }
 }

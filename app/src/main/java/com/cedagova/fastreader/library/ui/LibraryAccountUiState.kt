@@ -1,7 +1,9 @@
 package com.cedagova.fastreader.library.ui
 
 import com.cedagova.fastreader.account.library.AccountBook
+import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
+import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
@@ -27,8 +29,9 @@ import com.cedagova.reader.library.model.ReaderLibraryStatus
  * [bookId] is the backend's canonical UUID — what every `library_item`
  * mutation for this row quotes, and never the device's content digest.
  * [onThisDevice] is false for a row the account has and this device does not;
- * such a row shows its title and author, says it is not here, and offers no
- * way to open it until increment 003 brings the download.
+ * such a row shows its title and author, says it is not here, and since #119
+ * offers **Download and open** — which fetches and verifies the bytes before
+ * anything opens (REQ-510).
  */
 data class AccountRow(
     val bookId: String,
@@ -38,6 +41,29 @@ data class AccountRow(
 
 /** The account removal the reader can still take back (REQ-508). */
 data class AccountUndoNotice(val bookId: String, val title: String)
+
+/**
+ * The downloaded private copy behind a row (REQ-510, D2, AD-24).
+ *
+ * [contentSha256] is what freeing the copy is addressed by — the copy store
+ * names its file after it — and [sizeBytes] is what freeing it would recover,
+ * taken from the catalog source so the confirmation quotes the file that is
+ * actually there rather than a number the account reported.
+ */
+data class AccountCopyRow(val contentSha256: String, val sizeBytes: Long)
+
+/**
+ * The download half of [item], or null when the row has none.
+ *
+ * Keyed by the *account's* book id, so it only ever attaches to an
+ * account-only row: a device row has no account bytes to fetch, and a copy
+ * that has landed is a device row by then (see [BookDownloadState]).
+ */
+internal fun downloadFor(item: LibraryBookItem, downloads: AccountDownloadsState): BookDownloadState? {
+    if (!item.isAccountOnly) return null
+    val bookId = item.account?.bookId ?: return null
+    return downloads.byAccountBookId[bookId]
+}
 
 /**
  * The **Add to account library** half of one device row (REQ-505, REQ-506,
@@ -264,7 +290,8 @@ private fun AccountBook.toAccountOnlyItem(): LibraryBookItem = LibraryBookItem(
     progressPercent = 0,
     status = BookStatus.READABLE,
     // A cover is bytes, and the bytes are not here: the row is title and author
-    // until increment 003 downloads the book (out of scope by the leaf contract).
+    // until the download lands, at which point it is a device row with the
+    // cover the ingestion took from the copy.
     hasCover = false,
     account = AccountRow(bookId = bookId, status = status, onThisDevice = false),
 )

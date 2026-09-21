@@ -86,42 +86,53 @@ device**, word for word — a unit test compares the two so they cannot drift.
 <!-- privacy-statement:begin -->
 FastReader has the internet permission and uses it for one thing only:
 the optional Reader account under Settings. Nothing is sent unless you
-use that account. When you do, your email address, the code or password
-you type and the account's session go to the Reader identity provider
-and the Reader API. FastReader also asks the Reader API which books your
-account already holds, and for those books only it tells the Reader API
-that you opened one, when you last opened it, whether you have finished
-it, and when you take one out of your account or put it back. When you
-choose Add to account library for a book on this device and confirm,
-FastReader asks the Reader API what kinds and sizes of file your account
-accepts and then sends that book's file, its name, its size, its format
-and its checksum to the Reader API and its storage, where your account
-keeps them; nothing about that book is sent before you confirm. That is
-all that leaves this device: a book file is sent only for a book you add
-that way, a book that is only on this device is never named to the
-Reader API until you add it, and your reading positions, your reading
-speed, your other settings and any crash report stay on this device and
-are never sent. The account session is kept encrypted on this device,
-outside its backup, and is removed when you sign out. Check for updates
-only hands a web address to your browser, and your browser makes that
-request. Your books stay in the folders you chose; on this device
-FastReader keeps only its own list of them, your reading positions, your
-settings, small cover thumbnails and, once you sign in, a copy of your
-account's own book list and a note of any book you are part-way through
-adding to it, in its private storage. That copy of the account's list is
-not deleted when you sign out: it stays in that private storage, so
-signing in to the same account again picks up where it left off, and
-only uninstalling FastReader or clearing its data removes it. If the app
-stops unexpectedly it also keeps one short report about what went wrong
-in that private storage: the app version, this device's model, its
-Android version and where in the code it stopped, with no part of any
-book in it — the next launch offers that report to you once, and it goes
-nowhere unless you share it and pick an app to send it to. None of that
-is included in this device's backup or in a transfer to a new phone, so
-a reinstall or a new phone starts with an empty library. When another
-app opens a book in FastReader and does not give lasting permission to
-read it, that book is not added to your list and no permission to it is
-kept; only your place in it is remembered.
+use that account. When you do, your email address, the code or
+password you type and the account's session go to the Reader identity
+provider and the Reader API. FastReader also asks the Reader API which
+books your account already holds, and for those books only it tells
+the Reader API that you opened one, when you last opened it, whether
+you have finished it, and when you take one out of your account or put
+it back. When you choose Add to account library for a book on this
+device and confirm, FastReader asks the Reader API what kinds and
+sizes of file your account accepts and then sends that book's file,
+its name, its size, its format and its checksum to the Reader API and
+its storage, where your account keeps them; nothing about that book is
+sent before you confirm. When you choose Download and open for a book
+your account already holds, FastReader asks the Reader API for a
+one-off address for that book's file and fetches the file from that
+address; the request names only a book your account already has, and
+the account's sign-in is never given to the storage the file comes
+from. That is all that leaves this device: a book file is sent only
+for a book you add that way, a book that is only on this device is
+never named to the Reader API until you add it, and your reading
+positions, your reading speed, your other settings and any crash
+report stay on this device and are never sent. The account session is
+kept encrypted on this device, outside its backup, and is removed when
+you sign out. Check for updates only hands a web address to your
+browser, and your browser makes that request. Your books stay in the
+folders you chose; on this device FastReader keeps only its own list
+of them, your reading positions, your settings, small cover thumbnails
+and, once you sign in, a copy of your account's own book list, a note
+of any book you are part-way through adding to it and the file of any
+account book you have downloaded, in its private storage. A downloaded
+copy is a file in that private storage like the rest: it is left out
+of this device's backup and of a transfer to a new phone, and Remove
+downloaded copy on the book's row deletes it from this device without
+taking the book out of your Reader account. That copy of the account's
+list is not deleted when you sign out: it stays in that private
+storage, so signing in to the same account again picks up where it
+left off, and only uninstalling FastReader or clearing its data
+removes it. If the app stops unexpectedly it also keeps one short
+report about what went wrong in that private storage: the app version,
+this device's model, its Android version and where in the code it
+stopped, with no part of any book in it — the next launch offers that
+report to you once, and it goes nowhere unless you share it and pick
+an app to send it to. None of that is included in this device's backup
+or in a transfer to a new phone, so a reinstall or a new phone starts
+with an empty library. When another app opens a book in FastReader and
+does not give lasting permission to read it, that book is not added to
+your list and no permission to it is kept; only your place in it is
+remembered.
 <!-- privacy-statement:end -->
 
 What each sentence rests on, and how it was checked, is in
@@ -136,8 +147,20 @@ holds onto the shelf beside the ones on this phone.
   the same EPUB uploaded to the account and sitting in your folder shows once,
   with this device's cover, author and your place in it — not twice.
 - **A book only the account has is an account-only row.** Title, author and "In
-  your Reader account. Not on this device." No cover, and it does not open:
-  FastReader does not download books yet.
+  your Reader account. Not on this device." No cover — the bytes are not here —
+  and one action: **Download and open**.
+- **Download and open** fetches that book through a one-off address the Reader
+  API issues, checks the file's SHA-256 against the one your account holds for
+  it, and only then opens it. Nothing opens before that check passes, and a
+  file that arrives wrong is refused with the reason while the book stays in
+  your account. Once the copy is here it is an ordinary book on the shelf: it
+  opens in airplane mode, keeps your place, and stays after you sign out.
+- **Remove downloaded copy** frees those bytes again. It is the only removal in
+  the app that deletes a file, and it deletes only FastReader's own private
+  copy: the book stays in your Reader account, on every device, and your place
+  in it is kept for the next time you fetch it. Downloaded copies live in
+  FastReader's private storage and are left out of this device's backup and of
+  a transfer to a new phone, like everything else FastReader keeps.
 - **Remove from account** takes a book out of the Reader account on *every*
   device signed in to it, with an Undo bar for about eight seconds. The file on
   this phone and your place in it are untouched either way.
