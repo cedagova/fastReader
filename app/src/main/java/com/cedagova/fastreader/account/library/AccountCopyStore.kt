@@ -6,6 +6,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.security.DigestOutputStream
 import java.security.MessageDigest
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * The private copies of account books on this device (REQ-510, D2, AD-24).
@@ -128,6 +129,13 @@ class AccountCopyStore(private val directory: File) {
                 write(sink)
                 sink.flush()
             }
+        } catch (cancelled: CancellationException) {
+            // A cancelled download is not an outcome to report: the caller went
+            // away. The temporary file goes with it, and cancellation keeps
+            // propagating, because swallowing it here would leave the coroutine
+            // that owns this download alive after its scope had been torn down.
+            partial.delete()
+            throw cancelled
         } catch (error: Throwable) {
             partial.delete()
             return failure(error)

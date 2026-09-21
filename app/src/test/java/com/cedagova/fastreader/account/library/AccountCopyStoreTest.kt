@@ -11,6 +11,7 @@ import com.cedagova.fastreader.epub.FileEpubByteSource
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -156,6 +157,30 @@ class AccountCopyStoreTest {
 
         val failed = placement as CopyPlacement.Failed
         assertEquals("connection reset", failed.error.message)
+        assertFalse(store.has(digest))
+        assertEquals(0, partials().size)
+    }
+
+    /**
+     * A cancelled download is not an outcome: it is the caller going away.
+     *
+     * Cancellation keeps propagating rather than being reported as a failure —
+     * swallowing it would leave the coroutine that owns the download alive
+     * after its scope had been torn down — and the temporary file goes with it.
+     */
+    @Test
+    fun `a cancelled download propagates and leaves nothing behind`() = runTest {
+        var thrown: CancellationException? = null
+        try {
+            store.place(digest, bytes.size.toLong()) { sink ->
+                sink.write(bytes, 0, 64)
+                throw CancellationException("the reader left the screen")
+            }
+        } catch (e: CancellationException) {
+            thrown = e
+        }
+
+        assertNotNull("cancellation must not be turned into a CopyPlacement", thrown)
         assertFalse(store.has(digest))
         assertEquals(0, partials().size)
     }

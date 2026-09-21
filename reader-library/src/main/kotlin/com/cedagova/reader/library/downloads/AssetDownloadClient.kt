@@ -156,6 +156,13 @@ class AssetDownloadClient internal constructor(
          */
         internal fun httpClient(engine: HttpClientEngine): HttpClient = HttpClient(engine) {
             expectSuccess = false
+            // Unlike the upload side, which POSTs to one signed creation
+            // endpoint and resolves the provider's Location itself, a download
+            // is a plain GET of a signed object URL — and object storage in
+            // front of a CDN answers one with a redirect. Following it is
+            // ordinary; the only credential that can travel with it is the
+            // grant's provider-scoped signature, because that is the only
+            // credential this client holds at all.
             followRedirects = true
             install(HttpTimeout) {
                 requestTimeoutMillis = INFINITE_TIMEOUT_MILLIS
