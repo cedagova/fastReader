@@ -1,0 +1,99 @@
+LEAF812 (#119) — the docs/evidence/46/ backup procedure, re-run with a
+downloaded copy present
+=========================================================================
+
+Effort      https://github.com/cedagova/fastReader/issues/108 (increment 003 of #104)
+Issue       https://github.com/cedagova/fastReader/issues/119
+Worktree    leaf-119, base collector/108-read-account-book @ a41c8fa8fb73f6191f8d51cffe75663f85028e85
+Head        5951b481ba8ef3438a2749f7fc938720fdf28230
+Device      Phone_Mid_API36 (sdk_gphone64_arm64, Android 16 / API 36, 1080x2400 @ 420dpi), adb root
+Run         2026-09-21. APK installed from this head: md5 5353b86432faf7251d78eabd2f287aad,
+            confirmed equal to the base.apk pulled back off the device.
+
+Why this run exists
+-------------------
+REQ-510 names it as a clause of its own: "the docs/evidence/46/ backup procedure
+while a copy exists transfers zero bytes". docs/evidence/46/ proved the exclusion
+on a device holding a catalog, covers and a theme mirror. Increment 003 puts a
+new *kind* of file in private storage for the first time since then — a whole
+book — so the question is no longer the one #46 answered. This is the same
+procedure, the same two transports, on a device that is holding one.
+
+The static half is proven without a device by AppVersionTest ("downloaded copies
+live in a domain the backup rules exclude"), which derives the directory from
+AccountCopyStore.DIRECTORY_NAME and asserts it sits directly under filesDir, in
+the `file` domain that data_extraction_rules.xml excludes in both sections. This
+run is the behavioural half.
+
+How the copy got there
+----------------------
+Written directly into the app's own private storage with `run-as`, under exactly
+the name and in exactly the directory AccountCopyStore places a verified copy
+under:
+
+    files/account-copies/copy-<sha256 of the file's bytes>.epub   (524,288 bytes)
+
+and the script named it after the digest it had just computed of those bytes, so
+the file is the shape the production writer produces. It was NOT downloaded
+through the real grant, because that needs the signed-in stage account and the
+owner is not available for this run (see the PENDING OWNER TEST list). That
+makes no difference to what is being measured: Android's backup agent reads the
+filesystem, and the rules exclude a *domain*, not a provenance. What is proven
+here is that a file of this kind, in this directory, moves zero bytes on both
+transports — which is the claim the privacy statement makes.
+
+The two transports, and what each one proves
+--------------------------------------------
+  com.android.localtransport/.LocalTransport                    cloud backup
+  com.google.android.gms/.backup.migrate.service.D2dTransport   device transfer
+
+The cloud path is refused outright ("Backup is not allowed"), which is
+android:allowBackup="false". The device-transfer path ignores that attribute, so
+there it is the rules file that empties the payload — the same split
+docs/evidence/46/ isolated with its build B control.
+
+Result: ZERO bytes on both transports, and no FastReader path in the stored blob
+on either. Identical to build C of docs/evidence/46/, on a device that is also
+holding a 512 KiB account copy.
+
+The copy was deleted again at the end of the run.
+
+Transcript follows, verbatim.
+
+========================================================================
+adb root: 0
+
+-- what FastReader holds before the run --
+files/account-copies:
+total 516
+-rw-rw-rw- 1 u0_a220 u0_a220 524288 2026-09-21 15:01 copy-f095cf39d6aab7265e24ffc7a6394265fb0dc3159391c4950c0bdb9dd9cc0624.epub
+
+files/catalog:
+total 8
+-rw------- 1 u0_a220 u0_a220 1099 2026-09-21 15:00 catalog.json
+
+files/covers:
+total 228
+-rw------- 1 u0_a220 u0_a220 225286 2026-09-14 17:33 sha256_c25cf3d9ad4d41147ecc6947debcf981a961fd6b69a4219d9892af50b934c8bb.img
+Backup Manager now enabled
+
+---- transport: com.android.localtransport/.LocalTransport ----
+Selected transport com.android.localtransport/.LocalTransport (formerly com.google.android.gms/.backup.BackupTransportService)
+Wiped backup data for com.cedagova.fastreader on com.android.localtransport/.LocalTransport
+Running incremental backup for 1 requested packages.
+Package com.cedagova.fastreader with result: Backup is not allowed
+Backup finished with result: Success
+-- what the transport stored --
+total 0
+   FastReader paths found in the stored blob: 0
+
+---- transport: com.google.android.gms/.backup.migrate.service.D2dTransport ----
+Selected transport com.google.android.gms/.backup.migrate.service.D2dTransport (formerly com.android.localtransport/.LocalTransport)
+Wiped backup data for com.cedagova.fastreader on com.google.android.gms/.backup.migrate.service.D2dTransport
+Running incremental backup for 1 requested packages.
+Package @pm@ with result: Success
+Package com.cedagova.fastreader with result: Transport rejected package because it wasn't able to process it at the time
+Backup finished with result: Success
+-- what the transport stored --
+total 0
+   FastReader paths found in the stored blob: 0

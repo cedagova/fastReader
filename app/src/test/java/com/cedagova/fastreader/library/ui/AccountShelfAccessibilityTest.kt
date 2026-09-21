@@ -6,11 +6,14 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import org.junit.Assert.assertEquals
@@ -224,6 +227,87 @@ class AccountShelfAccessibilityTest {
         assertEveryControlIsTallEnough()
     }
 
+    // ---- downloading an account book, and freeing the copy (#119) ------------------
+
+    /**
+     * Three account-only rows in a row would each announce the same three
+     * words, and this one starts a network transfer — the same trap the
+     * removal and the upload sweeps exist for, on the control that fetches a
+     * file.
+     */
+    @Test
+    fun `each download action names the book it would fetch`() {
+        showShelf()
+
+        val labels = accountControls().map { it.label() }
+
+        assertTrue(
+            "no control announces downloading \"Dubliners\", only $labels",
+            labels.contains("Download Dubliners from your Reader account and open it"),
+        )
+        assertEveryControlIsTallEnough()
+    }
+
+    /**
+     * The transfer belongs to the book, so TalkBack reads it with the book —
+     * and the Cancel, being its own merge boundary, names the book itself.
+     */
+    @Test
+    fun `a download in progress is read out with the book, and called off by name`() {
+        showShelf(
+            downloads = AccountDownloadsState(
+                byAccountBookId = mapOf(
+                    LibraryAccountFixtures.DUBLINERS_ACCOUNT_ID to
+                        BookDownloadState.Downloading(received = 37, total = 100),
+                ),
+            ),
+        )
+
+        val row = composeRule.allNodes()
+            .single { it.testTag() == "library_book_account:${LibraryAccountFixtures.DUBLINERS_ACCOUNT_ID}" }
+        val spoken = row.spokenText()
+
+        assertTrue("the progress has to be readable, got \"$spoken\"", spoken.contains("37"))
+        assertTrue("the book has to be named with it, got \"$spoken\"", spoken.contains("Dubliners"))
+        assertTrue(
+            "the cancel control must name its book, only ${accountControls().map { it.label() }}",
+            accountControls().map { it.label() }
+                .contains("Cancel downloading Dubliners from your Reader account"),
+        )
+        assertEveryControlIsTallEnough()
+    }
+
+    /**
+     * The one removal in this app that deletes a file. It names its book, it
+     * asks first, and nothing is freed before the yes.
+     */
+    @Test
+    fun `freeing a downloaded copy is labelled, asks first, and frees nothing before the yes`() {
+        var freed = 0
+        showShelf(
+            catalog = LibraryAccountFixtures.catalogWithDownloadedCopy(),
+            onRemoveAccountCopy = { freed += 1 },
+        )
+
+        assertTrue(
+            "the control must name its book, only ${accountControls().map { it.label() }}",
+            accountControls().map { it.label() }
+                .contains("Remove the downloaded copy of Dubliners from this device"),
+        )
+        composeRule.onNodeWithTag(
+            "library_account_copy_remove_${LibraryAccountFixtures.DUBLINERS_COPY_ID}",
+        ).performClick()
+
+        assertEquals("no byte is freed before the yes", 0, freed)
+        val controls = accountControls().filter { it.testTag().startsWith("library_account_copy_remove_dialog") }
+        assertEquals(listOf("Cancel", "Remove copy"), controls.map { it.label() }.sorted())
+        assertEveryControlIsTallEnough()
+
+        composeRule.onNodeWithTag("library_account_copy_remove_dialog_confirm").performClick()
+
+        assertEquals(1, freed)
+    }
+
     private fun showShelf(
         account: AccountLibraryState = LibraryAccountFixtures.signedIn(
             LibraryAccountFixtures.ficcionesInAccount(),
@@ -231,20 +315,25 @@ class AccountShelfAccessibilityTest {
         ),
         accountUndo: AccountUndoNotice? = null,
         imports: AccountImportsState = AccountImportsState.NONE,
+        downloads: AccountDownloadsState = AccountDownloadsState.NONE,
+        catalog: Catalog = LibraryAccountFixtures.deviceCatalog(),
         onRemoveFromAccount: (LibraryBookItem) -> Unit = {},
         onAddToAccount: (LibraryBookItem) -> Unit = {},
         onConfirmAddToAccount: (LibraryBookItem) -> Unit = {},
+        onDownloadAccountBook: (LibraryBookItem) -> Unit = {},
+        onRemoveAccountCopy: (LibraryBookItem) -> Unit = {},
     ) {
         composeRule.setContent {
             FastReaderTheme {
                 LibraryScreen(
                     state = buildLibraryUiState(
-                        catalog = LibraryAccountFixtures.deviceCatalog(),
+                        catalog = catalog,
                         ingestion = IngestionState.Idle,
                         query = "",
                         account = account,
                         accountUndo = accountUndo,
                         imports = imports,
+                        downloads = downloads,
                     ),
                     onQueryChange = {},
                     onAddBooks = {},
@@ -256,6 +345,8 @@ class AccountShelfAccessibilityTest {
                     onRemoveFromAccount = onRemoveFromAccount,
                     onAddToAccount = onAddToAccount,
                     onConfirmAddToAccount = onConfirmAddToAccount,
+                    onDownloadAccountBook = onDownloadAccountBook,
+                    onRemoveAccountCopy = onRemoveAccountCopy,
                 )
             }
         }

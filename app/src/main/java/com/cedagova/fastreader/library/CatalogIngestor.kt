@@ -4,7 +4,9 @@ import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.epub.EpubInspection
 import com.cedagova.fastreader.epub.EpubInspector
 import com.cedagova.fastreader.epub.EpubRejectReason
+import com.cedagova.fastreader.epub.FileEpubByteSource
 import com.cedagova.fastreader.library.store.CoverStore
+import java.io.File
 
 /** What one ingestion pass changed. */
 data class IngestOutcome(
@@ -168,6 +170,103 @@ class CatalogIngestor(
     }
 
     /**
+     * Adds the verified private copy of an account book (#118, REQ-510, D2).
+     *
+     * The copy is a device book with an `ACCOUNT_COPY` source (AD-24), which is
+     * the whole of why it survives sign-out: nothing about this row knows an
+     * account exists. It is ingested through exactly the same path a picked file
+     * takes — inspected, keyed by its own whole-file digest, merged into an
+     * existing row when this device already holds the same content — so a copy
+     * of a book that is *also* on the device becomes a second source of one row
+     * rather than a duplicate (AD-23).
+     *
+     * The one difference is where the bytes are read from: [file], through
+     * [FileEpubByteSource], rather than the document provider.
+     * [contentSha256] is the account's identity for the book and is used only
+     * as the source's dedup key; the row's own id is re-derived from the bytes
+     * by the inspection, exactly as it is for every other book, because a row
+     * keyed by something the caller passed in would be a second source of
+     * truth. The two agree by construction — `AccountCopyStore` places nothing
+     * whose digest disagrees — and this method does not need them to.
+     *
+     * Adding a copy undoes an earlier removal of the same book, exactly as
+     * picking its file again does: downloading it is an explicit request for it.
+     */
+    fun addAccountCopy(
+        catalog: Catalog,
+        contentSha256: String,
+        file: File,
+        displayName: String,
+    ): IngestOutcome {
+        val working = Working(catalog, clock())
+        working.ingest(
+            ref = DocumentRef(
+                uri = BookSource.accountCopyUri(contentSha256),
+                displayName = displayName,
+                sizeBytes = file.length(),
+                lastModifiedEpochMs = file.lastModified(),
+            ),
+            origin = SourceOrigin.ACCOUNT_COPY,
+            folderId = null,
+            honorRemovals = false,
+            bytes = FileEpubByteSource(file),
+            filePath = file.absolutePath,
+        )
+        return working.finish()
+    }
+
+    /**
+     * Drops the private copy's source from [bookId], and the row with it when no
+     * other source remains (#118's **Remove downloaded copy**).
+     *
+     * The bytes are `AccountCopyStore`'s to delete; this is only the catalog
+     * half. A book that is also on the device through a picked file or a folder
+     * keeps that source and stays in the library — freeing the copy frees the
+     * copy, never the book.
+     *
+     * Unlike [removeBook] this does not record a removal: the reader did not
+     * remove the *book*, and a recorded removal would keep it out of the library
+     * the next time its folder was scanned.
+     */
+    fun removeAccountCopy(catalog: Catalog, bookId: String): Catalog {
+        val book = catalog.book(bookId) ?: return catalog
+        val kept = book.sources.filterNot { it.isAccountCopy }
+        if (kept.size == book.sources.size) return catalog
+        return if (kept.isEmpty()) {
+            catalog.copy(books = catalog.books.filterNot { it.id == bookId })
+        } else {
+            catalog.copy(books = catalog.books.map { if (it.id == bookId) it.copy(sources = kept) else it })
+        }
+    }
+
+    /**
+     * Marks every `ACCOUNT_COPY` source by whether its file is actually there.
+     *
+     * Run on start: a copy can leave without the catalog hearing about it — the
+     * system reclaiming private storage, a `Clear data`, or a build that removed
+     * one. [exists] is asked once per source, so this costs one `stat` per copy
+     * and nothing at all on a device with none.
+     */
+    fun reconcileAccountCopies(catalog: Catalog, exists: (String) -> Boolean): Catalog {
+        if (catalog.books.none { book -> book.sources.any { it.isAccountCopy } }) return catalog
+        return catalog.copy(
+            books = catalog.books.map { book ->
+                book.copy(
+                    sources = book.sources.map { source ->
+                        if (!source.isAccountCopy) return@map source
+                        val availability = if (source.filePath?.let(exists) == true) {
+                            SourceAvailability.AVAILABLE
+                        } else {
+                            SourceAvailability.MISSING
+                        }
+                        if (source.availability == availability) source else source.copy(availability = availability)
+                    },
+                )
+            },
+        )
+    }
+
+    /**
      * Removes a catalog entry. The file is never touched and the position is kept
      * (REQ-004). The removal is recorded so that a book living inside an added
      * folder does not reappear on the next rescan; picking the file again, or
@@ -292,7 +391,20 @@ class CatalogIngestor(
          * removed must stay out; false when the reader explicitly asked for this
          * file or its folder, which undoes the removal.
          */
-        fun ingest(ref: DocumentRef, origin: SourceOrigin, folderId: String?, honorRemovals: Boolean) {
+        fun ingest(
+            ref: DocumentRef,
+            origin: SourceOrigin,
+            folderId: String?,
+            honorRemovals: Boolean,
+            /**
+             * Where the bytes are, for a source this app owns the file of
+             * (#118). Null — the usual case — means the document provider, and
+             * [ref]'s uri is the address it is opened by.
+             */
+            bytes: EpubByteSource? = null,
+            /** [BookSource.filePath] for that same case; null for a provider document. */
+            filePath: String? = null,
+        ) {
             val holderId = bookIdByUri[ref.uri]
             val holder = holderId?.let { id -> books[id]?.let { id to it } }
             val knownSource = holder?.second?.sources?.firstOrNull { it.uri == ref.uri }
@@ -320,12 +432,15 @@ class CatalogIngestor(
                 return
             }
 
-            val inspection = inspect(EpubByteSource { gateway.open(ref.uri) })
+            val inspection = inspect(bytes ?: EpubByteSource { gateway.open(ref.uri) })
             val digest = inspection.contentDigest
             if (digest == null) {
                 // The bytes could not be read at all: an access problem, not a bad book.
-                val availability = when (gateway.lookup(ref.uri)) {
-                    DocumentLookup.PermissionLost -> SourceAvailability.PERMISSION_LOST
+                // A file this app owns has no permission to lose, so its only
+                // access failure is that the file is gone.
+                val availability = when {
+                    bytes != null -> SourceAvailability.MISSING
+                    gateway.lookup(ref.uri) == DocumentLookup.PermissionLost -> SourceAvailability.PERMISSION_LOST
                     else -> SourceAvailability.MISSING
                 }
                 markSources(availability) { it.uri == ref.uri }
@@ -354,6 +469,7 @@ class CatalogIngestor(
                 sizeBytes = ref.sizeBytes,
                 lastModifiedEpochMs = ref.lastModifiedEpochMs,
                 availability = SourceAvailability.AVAILABLE,
+                filePath = filePath,
             )
             val existing = books[digest]
             val fallbackTitle = ref.displayName.substringBeforeLast('.', ref.displayName).ifBlank { ref.displayName }

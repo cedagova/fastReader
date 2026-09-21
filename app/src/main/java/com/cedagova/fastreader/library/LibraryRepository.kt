@@ -1,14 +1,19 @@
 package com.cedagova.fastreader.library
 
+import com.cedagova.fastreader.epub.EpubByteSource
+import com.cedagova.fastreader.epub.FileEpubByteSource
 import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeMirror
 import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.channels.SeekableByteChannel
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -134,7 +139,20 @@ class LibraryRepository(
         val book = catalog.book(bookId) ?: return@withLock
         if (book.sources.isEmpty()) return@withLock
         val refreshed = withContext(ioDispatcher) {
-            book.sources.map { source -> source.copy(availability = gateway.lookup(source.uri).availability()) }
+            book.sources.map { source ->
+                // A private copy has no provider to ask and no permission to
+                // lose: the file either is there or is not (#118).
+                val availability = if (source.isAccountCopy) {
+                    if (source.filePath?.let { File(it).isFile } == true) {
+                        SourceAvailability.AVAILABLE
+                    } else {
+                        SourceAvailability.MISSING
+                    }
+                } else {
+                    gateway.lookup(source.uri).availability()
+                }
+                source.copy(availability = availability)
+            }
         }
         if (refreshed == book.sources) return@withLock
         val next = catalog.copy(
@@ -343,26 +361,129 @@ class LibraryRepository(
     fun coverFile(bookId: String): File? = covers.read(bookId)
 
     /**
+     * The book's bytes, as everything that reads a book wants them (#118).
+     *
+     * One seam, two kinds of source behind it. A picked or folder-discovered
+     * book is read in place through the document provider (AD-1); a private copy
+     * of an account book is a file this app owns, read through
+     * [FileEpubByteSource] (AD-24). Which one it is, is decided here and
+     * nowhere else — the reader, the pipeline and the archive reader see an
+     * [EpubByteSource] and do not know the difference, which is exactly what
+     * "a copy opens like a device book" (REQ-510) has to mean in code.
+     *
+     * It resolves the source lazily, on each `open`, so a reference held across
+     * a rescan still opens whatever is readable now.
+     */
+    fun byteSource(bookId: String): EpubByteSource = object : EpubByteSource {
+        override fun open(): InputStream = openBook(bookId)
+
+        override fun openChannel(): SeekableByteChannel? = openBookChannel(bookId)
+    }
+
+    /**
      * Opens the book's bytes for reading, in place. The reading pipeline
      * (increment 002) consumes this instead of holding URIs of its own.
      */
     @Throws(IOException::class)
-    fun openBook(bookId: String): InputStream = gateway.open(readableUri(bookId))
+    fun openBook(bookId: String): InputStream = when (val source = readableSource(bookId)) {
+        is ReadableSource.PrivateFile -> FileInputStream(source.file)
+        is ReadableSource.Document -> gateway.open(source.uri)
+    }
 
     /**
      * A seekable view of the book's bytes, or null when the provider has none.
      *
      * What lets the reader open a book by seeking to its text instead of reading
-     * past its pictures (REQ-110).
+     * past its pictures (REQ-110). A private copy always has one, which is why a
+     * downloaded book opens through the directory strategy rather than the
+     * streaming fallback.
      */
     @Throws(IOException::class)
-    fun openBookChannel(bookId: String): SeekableByteChannel? = gateway.openSeekable(readableUri(bookId))
+    fun openBookChannel(bookId: String): SeekableByteChannel? = when (val source = readableSource(bookId)) {
+        is ReadableSource.PrivateFile -> Files.newByteChannel(source.file.toPath(), StandardOpenOption.READ)
+        is ReadableSource.Document -> gateway.openSeekable(source.uri)
+    }
+
+    /**
+     * Adds the verified private copy of an account book to the catalog (#118).
+     *
+     * [file] must already have been verified by
+     * `com.cedagova.fastreader.account.library.AccountCopyStore`: this writes a
+     * catalog row, and a row is a promise that the bytes are the book. Returns
+     * the id of the row the copy belongs to — the same id a device book of the
+     * same content already has, when there is one — or null when the file could
+     * not be read as an EPUB at all.
+     */
+    suspend fun addAccountCopy(contentSha256: String, file: File, displayName: String): String? {
+        mutateCatalog { catalog ->
+            withContext(ioDispatcher) { ingestor.addAccountCopy(catalog, contentSha256, file, displayName).catalog }
+        }
+        val uri = BookSource.accountCopyUri(contentSha256)
+        return _catalog.value.books.firstOrNull { book -> book.sources.any { it.uri == uri } }?.id
+    }
+
+    /**
+     * Drops a private copy's source, and the row with it when no other source
+     * remains (D2's **Remove downloaded copy**).
+     *
+     * The file is the copy store's to delete; the position is kept, as it is for
+     * every other removal (REQ-004), so downloading the book again resumes where
+     * the reader left off.
+     */
+    suspend fun removeAccountCopy(bookId: String) =
+        mutateCatalog { catalog -> ingestor.removeAccountCopy(catalog, bookId) }
+
+    /**
+     * Re-checks whether each private copy's file is still there (#118).
+     *
+     * Called on start. A copy can leave without the catalog hearing about it,
+     * and a row that claims to be readable when its bytes are gone is the one
+     * state the library has no way to explain.
+     */
+    suspend fun reconcileAccountCopies(exists: (String) -> Boolean = { File(it).isFile }) = mutex.withLock {
+        if (!ensureLoaded()) return@withLock
+        val catalog = _catalog.value
+        val next = withContext(ioDispatcher) { ingestor.reconcileAccountCopies(catalog, exists) }
+        // Deliberately not [mutateCatalog]: this runs on every process that has
+        // ever downloaded a book, and the answer is almost always "everything is
+        // where it was". A write that changes nothing is still a write — one
+        // that would re-save the catalog and re-push the theme mirror on every
+        // start — so the unchanged case does nothing at all.
+        if (next == catalog) return@withLock
+        try {
+            withContext(ioDispatcher) { store.save(next) }
+            publish(next)
+        } catch (error: Exception) {
+            // A row that claims to be readable when its bytes are gone is worse
+            // than a stale document, so the in-memory answer is published either
+            // way and the failure is reported the way every other write failure is.
+            publish(next)
+            val message = error.message ?: "the library could not be updated"
+            _ingestion.value = IngestionState.Failed(message)
+            _persistenceFailure.value = message
+        }
+    }
+
+    /** Where a book's bytes are right now: a file this app owns, or a provider document. */
+    private sealed interface ReadableSource {
+        data class PrivateFile(val file: File) : ReadableSource
+        data class Document(val uri: String) : ReadableSource
+    }
 
     @Throws(IOException::class)
-    private fun readableUri(bookId: String): String {
+    private fun readableSource(bookId: String): ReadableSource {
         val book = _catalog.value.book(bookId) ?: throw IOException("unknown book $bookId")
         val source = book.readableSource ?: throw IOException("no reachable source for ${book.title}")
-        return source.uri
+        val path = source.filePath
+        if (source.isAccountCopy) {
+            // A copy with no path is a row this build could not have written.
+            // Failing here keeps "a copy is verified before it is readable" true
+            // rather than handing an account-copy uri to the document provider,
+            // which would fail later and less clearly.
+            if (path == null) throw IOException("the private copy of ${book.title} has no file")
+            return ReadableSource.PrivateFile(File(path))
+        }
+        return ReadableSource.Document(source.uri)
     }
 
     /** Fire-and-forget wrappers for callers without a coroutine scope of their own. */
@@ -507,7 +628,13 @@ class LibraryRepository(
         }
     }
 
-    private suspend fun mutateCatalog(block: (Catalog) -> Catalog) = mutex.withLock {
+    /**
+     * One catalog write under the one lock. [block] is a suspending lambda so a
+     * write whose work is more than a field change — inspecting a downloaded
+     * copy, for instance — can put that work on the IO dispatcher itself rather
+     * than leaving it on whatever thread happened to call.
+     */
+    private suspend fun mutateCatalog(block: suspend (Catalog) -> Catalog) = mutex.withLock {
         if (!ensureLoaded()) return@withLock
         try {
             val next = block(_catalog.value)

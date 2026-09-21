@@ -6,6 +6,7 @@ import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.PublicationImportResponse
+import com.cedagova.reader.library.model.ReaderAssetGrantResponse
 import com.cedagova.reader.library.model.ReaderDeltaStatus
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderMutationKind
@@ -176,5 +177,10 @@ class ReaderLibraryGatewayTest {
 
         override suspend fun cancelImport(importId: String, reason: String): PublicationImportResponse =
             error("the sync gateway does not cancel imports")
+
+        // And the asset download grant (#118), for the same reason: the sync
+        // gateway never fetches a book's bytes. AssetDownloadGateway does.
+        override suspend fun assetDownloadGrant(assetId: String): ReaderAssetGrantResponse =
+            error("the sync gateway does not issue download grants")
     }
 }

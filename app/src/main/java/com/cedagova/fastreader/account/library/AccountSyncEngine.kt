@@ -83,6 +83,40 @@ interface AccountImportRecords {
 }
 
 /**
+ * The account document's copy references, as the download flow uses them
+ * (LEAF811, REQ-510, D2).
+ *
+ * Beside [AccountImportRecords] and for the same reason: the account document
+ * has exactly one writer, and a second one racing it would be the first way to
+ * lose a queued mutation. These say which account books this device holds
+ * bytes for; the bytes are [AccountCopyStore]'s and the readable source is the
+ * device catalog's.
+ */
+interface AccountCopyReferences {
+
+    /** The signed-in account's user id, or null when nobody is signed in. */
+    fun accountId(): String?
+
+    /** The content identities the signed-in account has copies of on this device. */
+    suspend fun copyReferences(): List<AccountCopy>
+
+    /** Records [copy], replacing any earlier reference to the same content. */
+    suspend fun putCopyReference(copy: AccountCopy)
+
+    /** Forgets the reference to [contentSha256]. The bytes are not dropped here. */
+    suspend fun dropCopyReference(contentSha256: String)
+
+    /**
+     * Keeps only the references [present] names.
+     *
+     * The start-up reconciliation: the store is the authority on what is
+     * actually on disk, and a reference to a copy a dead process never finished
+     * placing must not outlive it.
+     */
+    suspend fun retainCopyReferences(present: Set<String>)
+}
+
+/**
  * The account library: one store per account, and the foreground-driven engine
  * that keeps it in step with the backend (AD-20, AD-21, AD-22).
  *
@@ -127,7 +161,7 @@ class AccountSyncEngine(
     /** Minted once per queued mutation and then persisted; never re-minted for a retry. */
     private val newIdempotencyKey: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> String = { kotlin.time.Clock.System.now().toString() },
-) : AccountLibraryActions, AccountImportRecords {
+) : AccountLibraryActions, AccountImportRecords, AccountCopyReferences {
 
     private val mutex = Mutex()
     private val _state = MutableStateFlow(AccountLibraryState.SIGNED_OUT)
@@ -223,6 +257,44 @@ class AccountSyncEngine(
             val account = active ?: return@withLock
             if (account.document.import(clientImportId) == null) return@withLock
             persistQuietly(account, account.document.withoutImport(clientImportId))
+        }
+    }
+
+    // ---------------------------------------------------------- copy references
+
+    override suspend fun copyReferences(): List<AccountCopy> =
+        mutex.withLock { active?.document?.copies.orEmpty() }
+
+    /**
+     * Records a copy under the one writer of the account document.
+     *
+     * Silently does nothing when nobody is signed in, and that is the right
+     * answer rather than a failure: the bytes are already placed and the
+     * catalog's `ACCOUNT_COPY` source already makes them readable, so a
+     * reference that has no account to belong to costs nothing (D4 — a copy
+     * outlives the session that fetched it). Signing back in re-binds it.
+     */
+    override suspend fun putCopyReference(copy: AccountCopy) {
+        mutex.withLock {
+            val account = active ?: return@withLock
+            persistQuietly(account, account.document.withCopy(copy))
+        }
+    }
+
+    override suspend fun dropCopyReference(contentSha256: String) {
+        mutex.withLock {
+            val account = active ?: return@withLock
+            if (!account.document.hasCopy(contentSha256)) return@withLock
+            persistQuietly(account, account.document.withoutCopy(contentSha256))
+        }
+    }
+
+    override suspend fun retainCopyReferences(present: Set<String>) {
+        mutex.withLock {
+            val account = active ?: return@withLock
+            val retained = account.document.retainingCopies(present)
+            if (retained.copies.size == account.document.copies.size) return@withLock
+            persistQuietly(account, retained)
         }
     }
 

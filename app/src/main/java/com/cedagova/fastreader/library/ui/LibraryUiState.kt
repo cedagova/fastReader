@@ -1,7 +1,9 @@
 package com.cedagova.fastreader.library.ui
 
+import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
+import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
@@ -133,6 +135,21 @@ data class LibraryBookItem(
      * shelf is v1.6.0's" a property of the data rather than of the layout.
      */
     val addToAccount: AddToAccount? = null,
+    /**
+     * The downloaded private copy behind this row, or null when its bytes came
+     * from somewhere else (REQ-510, AD-24).
+     *
+     * Read from the catalog's own `ACCOUNT_COPY` source rather than from the
+     * account, which is exactly why it survives sign-out: D4's "a downloaded
+     * copy is an ordinary device book" is this field being non-null while
+     * [account] is null.
+     */
+    val accountCopy: AccountCopyRow? = null,
+    /**
+     * Where this account book's download has got to (REQ-510), or null when
+     * none is running and none has been refused.
+     */
+    val download: BookDownloadState? = null,
 ) {
     val isReadable: Boolean get() = status == BookStatus.READABLE
 
@@ -142,11 +159,23 @@ data class LibraryBookItem(
     /**
      * Whether tapping this row opens it.
      *
-     * An account-only row has no bytes here: downloading and opening one is
-     * increment 003's, so until then the row says where the book is and offers
-     * nothing to tap. Everything else opens exactly as it did.
+     * An account-only row has no bytes here, so it is not a row that opens: its
+     * **Download and open** control is what puts the bytes on the device first,
+     * and until that control has produced a verified copy there is nothing for
+     * a tap to open. Everything else opens exactly as it did — including a
+     * downloaded copy, which by then is an ordinary device row.
      */
     val canOpen: Boolean get() = isReadable && !isAccountOnly
+
+    /**
+     * Whether this row offers to fetch the book (the states table's "Open
+     * account book not on device").
+     *
+     * Only a row whose bytes are genuinely elsewhere, and only while nothing is
+     * already happening to it: a download in flight shows its progress and a
+     * refusal shows its reason, each with its own control.
+     */
+    val canDownload: Boolean get() = isAccountOnly && download == null
 
     /** The name to show when one is needed; a book is normally reachable from one place. */
     val fileName: String? get() = fileNames.firstOrNull()
@@ -197,14 +226,22 @@ fun buildLibraryUiState(
     accountUndo: AccountUndoNotice? = null,
     /** Every add-to-account in flight, and the deployment's verdict (REQ-505). */
     imports: AccountImportsState = AccountImportsState.NONE,
+    /** Every download in flight or refused (REQ-510). */
+    downloads: AccountDownloadsState = AccountDownloadsState.NONE,
 ): LibraryUiState {
     val order = catalog.settings.libraryOrder
     val all = catalog.books
         .map { book -> book.toItem(catalog.readingStates[book.id]?.progressFraction ?: 0f) }
         .withAccountBooks(account)
         // After the merge, never before: whether a row can be added depends on
-        // whether the account already has it, which is what the merge decides.
-        .map { item -> item.copy(addToAccount = addToAccountFor(item, account, imports)) }
+        // whether the account already has it, which is what the merge decides —
+        // and so does which download belongs to it.
+        .map { item ->
+            item.copy(
+                addToAccount = addToAccountFor(item, account, imports),
+                download = downloadFor(item, downloads),
+            )
+        }
         .sortedWith(catalog.comparatorFor(order))
     val matches = all.filter { it.matches(query) }
     val content = when {
@@ -318,6 +355,16 @@ private fun Book.toItem(progressFraction: Float): LibraryBookItem = LibraryBookI
     regrantTreeUri = sources
         .firstOrNull { it.availability == SourceAvailability.PERMISSION_LOST && it.origin == SourceOrigin.FOLDER }
         ?.folderId,
+    accountCopy = sources.firstOrNull { it.isAccountCopy }?.let { source ->
+        AccountCopyRow(
+            // The source's key is the content identity itself, which is what
+            // the copy store names its file after: taking it from there rather
+            // than from the row's id keeps the two in step by construction
+            // even for a row that also has a picked or folder source.
+            contentSha256 = source.uri.substringAfter(':'),
+            sizeBytes = source.sizeBytes.coerceAtLeast(0),
+        )
+    },
 )
 
 /**

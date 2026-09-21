@@ -9,10 +9,12 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.ImportProblem
 import com.cedagova.fastreader.account.library.ImportsOff
@@ -247,6 +249,83 @@ class LibraryAccountScreenshotTest {
         )
     }
 
+
+    // ---- downloading an account book, and freeing the copy (#119, REQ-510) --------------
+
+    /**
+     * The states table's "Open account book not on device": the row says where
+     * the book is, and offers the one thing that changes that. Nothing here
+     * opens — the control is **Download and open**, in that order.
+     */
+    @Test
+    fun anAccountBookNotOnThisDeviceOffersToFetchIt() {
+        capture(
+            "library_account_not_on_device",
+            shelf(LibraryAccountFixtures.dublinersInAccountOnly()),
+        )
+    }
+
+    /** REQ-510: the transfer on the row, with its own Cancel and nothing open behind it. */
+    @Test
+    fun aDownloadInProgressShowsOnTheRowAndCanBeCalledOff() {
+        capture(
+            "library_account_downloading",
+            shelf(
+                LibraryAccountFixtures.dublinersInAccountOnly(),
+                downloads = downloading(BookDownloadState.Downloading(received = 2_306_867, total = 6_291_456)),
+            ),
+        )
+    }
+
+    /**
+     * REQ-510 after the copy has landed: one row, the account's and the
+     * device's, with the cover-less placeholder, the reader's place in it, and
+     * the two removals that mean different things — **Remove from account**
+     * and **Remove downloaded copy**. There is no row-removal X, because
+     * freeing the copy *is* this row's removal.
+     */
+    @Test
+    fun aDownloadedBookReadsAsBothAndOffersToFreeItsCopy() {
+        capture(
+            "library_account_downloaded",
+            shelf(
+                LibraryAccountFixtures.dublinersInAccountOnly(),
+                catalog = LibraryAccountFixtures.catalogWithDownloadedCopy(),
+            ),
+        )
+    }
+
+    /** D2: the question before the bytes go, saying what it frees and what it keeps. */
+    @Test
+    fun freeingTheCopyAsksFirstAndSaysTheAccountKeepsTheBook() {
+        capture(
+            "library_account_copy_remove_confirm",
+            shelf(
+                LibraryAccountFixtures.dublinersInAccountOnly(),
+                catalog = LibraryAccountFixtures.catalogWithDownloadedCopy(),
+            ),
+            click = "library_account_copy_remove_${LibraryAccountFixtures.DUBLINERS_COPY_ID}",
+        )
+    }
+
+    /** REQ-206: every word #119 adds comes from `values-es` on a Spanish device. */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theDownloadFlowIsSpanishOnASpanishDevice() {
+        capture(
+            "library_account_download_spanish",
+            shelf(
+                LibraryAccountFixtures.dublinersInAccountOnly(),
+                downloads = downloading(BookDownloadState.Downloading(received = 2_306_867, total = 6_291_456)),
+            ),
+        )
+    }
+
+    /** The in-flight state on Dubliners, the one account-only book in the fixtures. */
+    private fun downloading(state: BookDownloadState): AccountDownloadsState = AccountDownloadsState(
+        byAccountBookId = mapOf(LibraryAccountFixtures.DUBLINERS_ACCOUNT_ID to state),
+    )
+
     /** The in-flight state on Rayuela, the one device-only book in the fixtures. */
     private fun importing(state: BookImportState): AccountImportsState =
         AccountImportsState(byDeviceBookId = mapOf(LibraryAccountFixtures.RAYUELA_ID to state))
@@ -271,13 +350,16 @@ class LibraryAccountScreenshotTest {
         account: AccountLibraryState = LibraryAccountFixtures.signedIn(*books),
         accountUndo: AccountUndoNotice? = null,
         imports: AccountImportsState = AccountImportsState.NONE,
+        downloads: AccountDownloadsState = AccountDownloadsState.NONE,
+        catalog: com.cedagova.fastreader.library.Catalog = LibraryAccountFixtures.deviceCatalog(),
     ): LibraryUiState = buildLibraryUiState(
-        catalog = LibraryAccountFixtures.deviceCatalog(),
+        catalog = catalog,
         ingestion = IngestionState.Idle,
         query = "",
         account = account,
         accountUndo = accountUndo,
         imports = imports,
+        downloads = downloads,
     )
 
     /**

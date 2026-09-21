@@ -182,6 +182,28 @@ enum class ReaderCapabilityKey {
     @SerialName(UNKNOWN_VALUE) UNKNOWN,
 }
 
+/**
+ * `ReaderAssetGrant.direction`: which way a signed transfer goes.
+ *
+ * FastReader asks for a download grant and reads this back rather than
+ * assuming it: a grant that came back for the other direction is a grant this
+ * client must not spend, and `AssetDownloadClient` refuses one.
+ */
+@Serializable
+enum class ReaderAssetDirection {
+    @SerialName("upload") UPLOAD,
+    @SerialName("download") DOWNLOAD,
+    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+}
+
+/** `ReaderAssetGrant.method`: the HTTP method the provider signed the URL for. */
+@Serializable
+enum class ReaderAssetMethod {
+    @SerialName("GET") GET,
+    @SerialName("PUT") PUT,
+    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+}
+
 /** `ReaderCapabilityEntry.availability`. */
 @Serializable
 enum class ReaderCapabilityAvailability {

@@ -5,12 +5,17 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.cedagova.fastreader.account.LibraryReaderAccountGateway
+import com.cedagova.fastreader.account.AssetDownloadGateway
 import com.cedagova.fastreader.account.PublicationImportGateway
+import com.cedagova.fastreader.account.ReaderApiAssetDownloadGateway
 import com.cedagova.fastreader.account.ReaderApiLibraryGateway
 import com.cedagova.fastreader.account.ReaderApiPublicationImportGateway
 import com.cedagova.fastreader.account.ReaderLibraryGateway
 import com.cedagova.fastreader.account.ReaderAccountConfiguration
 import com.cedagova.fastreader.account.ReaderAccountController
+import com.cedagova.fastreader.account.library.AccountBookCopies
+import com.cedagova.fastreader.account.library.AccountCopyStore
+import com.cedagova.fastreader.account.library.AccountDownloads
 import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.AccountSyncEngine
@@ -23,6 +28,7 @@ import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.reader.auth.ReaderAuthClient
 import com.cedagova.reader.library.ReaderLibraryClient
+import com.cedagova.reader.library.downloads.AssetDownloadClient
 import com.cedagova.reader.library.imports.PublicationImportEngine
 import com.cedagova.reader.library.imports.PublicationTransferClient
 import com.cedagova.reader.auth.ReaderAuthConfig
@@ -118,6 +124,22 @@ class FastReaderApplication : Application() {
         }
     }
 
+    /**
+     * The asset-download seam (#118), or `null` on an unconfigured build.
+     *
+     * The transport beside it is the third, deliberately session-less client
+     * in this app and the exact counterpart of the publication transfer's:
+     * book bytes come from the storage provider under the signed grant
+     * reader-api issues, never through reader-api and never with the bearer
+     * (see `AssetDownloadClient`). That is why it is built here rather than
+     * taken from [readerAuth].
+     */
+    val readerDownloads: AssetDownloadGateway? by lazy {
+        readerAuth?.let { auth ->
+            ReaderApiAssetDownloadGateway(ReaderLibraryClient(auth.api), AssetDownloadClient())
+        }
+    }
+
     /** The account surface's state model, process-scoped like the library graph. */
     lateinit var readerAccount: ReaderAccountController
         private set
@@ -154,6 +176,29 @@ class FastReaderApplication : Application() {
     lateinit var accountImports: AccountImports
         private set
 
+    /**
+     * The verified private copies of account books on this device (#118).
+     *
+     * Process-scoped like everything else here, and for the same reason a
+     * transfer is: a download must not be tied to the screen that started it.
+     * LEAF812 is what offers one; this is what performs, verifies, places and
+     * frees it.
+     */
+    lateinit var accountCopies: AccountBookCopies
+        private set
+
+    /**
+     * Downloading an account book onto this device and freeing it again (#119).
+     *
+     * Process-scoped for the same reason [accountImports] is: a download must
+     * outlive the screen that started it, and a reader who leaves the shelf
+     * mid-transfer should come back to a finished book rather than to nothing.
+     */
+    lateinit var accountDownloads: AccountDownloads
+        private set
+
+    private var accountCopiesSwept = false
+
     override fun onCreate() {
         super.onCreate()
         // First, so that a failure in any of the wiring below is itself reported.
@@ -186,9 +231,21 @@ class FastReaderApplication : Application() {
             accountState = accountLibrary.state,
             scope = applicationScope,
         )
+        accountCopies = AccountBookCopies(
+            gateway = readerDownloads,
+            store = AccountCopyStore(File(filesDir, AccountCopyStore.DIRECTORY_NAME)),
+            references = accountLibrary,
+            library = library.repository,
+        )
+        accountDownloads = AccountDownloads(
+            copies = accountCopies,
+            accountState = accountLibrary.state,
+            scope = applicationScope,
+        )
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStart(owner: LifecycleOwner) {
+                    sweepAccountCopiesOnce()
                     library.repository.requestRescan(ScanTrigger.APP_OPEN)
                     refreshReaderSessionOnForeground()
                     accountLibrary.requestSync(AccountSyncTrigger.FOREGROUND)
@@ -203,6 +260,25 @@ class FastReaderApplication : Application() {
                 }
             },
         )
+    }
+
+    /**
+     * The one account-copy sweep this process runs (#118).
+     *
+     * A download interrupted by app death left a partial file and no catalog
+     * row, and this is where it goes. It happens on the *first* foreground
+     * rather than in `onCreate`, beside the library rescan, for the same reason
+     * every other start-of-session job does: nothing here touches the disk
+     * before the app is actually in front of the reader (AD-21).
+     *
+     * Once, and only once. A download is process-scoped and outlives the screen
+     * that started it, so sweeping on every foreground would delete the
+     * temporary file of a transfer still running behind a locked screen.
+     */
+    private fun sweepAccountCopiesOnce() {
+        if (accountCopiesSwept) return
+        accountCopiesSwept = true
+        applicationScope.launch { accountCopies.reconcile() }
     }
 
     /**

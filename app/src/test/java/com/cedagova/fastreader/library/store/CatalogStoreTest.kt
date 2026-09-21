@@ -681,6 +681,64 @@ class CatalogStoreTest {
         assertTrue(CatalogCodec().decode(wrongShape) !is CatalogDecoding.Newer)
     }
 
+    /**
+     * The real 10 → 11 step (#118, AD-24): a source may be a private copy of an
+     * account book.
+     *
+     * The migration writes nothing, so "nothing" is what this has to prove —
+     * not that it ran. The fixture is a full version 10 document with books,
+     * sources, folders, positions, removals, settings and the front-matter
+     * record, and every one of them must read back *identical* to what the same
+     * catalog encodes at version 11. Anything the step touched would show up as
+     * a difference in that comparison.
+     */
+    @Test
+    fun `a version 10 document reads back identically and gains the copy capability`() {
+        val expected = sampleCatalog()
+        val v10 = CatalogCodec().encode(expected).replace(
+            "\"schemaVersion\":${CatalogSchema.CURRENT_VERSION}",
+            "\"schemaVersion\":10",
+        )
+        assertTrue("the fixture must really be a version 10 document", v10.contains("\"schemaVersion\":10"))
+
+        val decoded = CatalogCodec().decode(v10) as CatalogDecoding.Decoded
+
+        assertEquals(10, decoded.migratedFrom)
+        assertEquals(CatalogSchema.CURRENT_VERSION, decoded.catalog.schemaVersion)
+        assertEquals(
+            "a 10 → 11 migration that changed anything is a bug, not a step",
+            expected.copy(schemaVersion = CatalogSchema.CURRENT_VERSION),
+            decoded.catalog,
+        )
+        assertTrue(
+            "every source of a pre-11 document is a provider document with no file path",
+            decoded.catalog.books.flatMap { it.sources }.none { it.isAccountCopy || it.filePath != null },
+        )
+    }
+
+    /** And the capability itself: an `ACCOUNT_COPY` source survives a write and a read. */
+    @Test
+    fun `an account copy source round trips through the store`() {
+        val digest = "c".repeat(64)
+        val copy = BookSource(
+            uri = BookSource.accountCopyUri(digest),
+            origin = SourceOrigin.ACCOUNT_COPY,
+            displayName = "Dune.epub",
+            sizeBytes = 4_096,
+            filePath = "/data/user/0/com.cedagova.fastreader/files/account-copies/copy-$digest.epub",
+        )
+        val store = FileCatalogStore(file)
+        store.save(
+            Catalog(books = listOf(Book(id = "sha256:$digest", title = "Dune", sources = listOf(copy)))),
+        )
+
+        val loaded = (store.load() as CatalogLoad.Loaded).catalog
+
+        assertEquals(CatalogSchema.CURRENT_VERSION, loaded.schemaVersion)
+        assertEquals(copy, loaded.books.single().sources.single())
+        assertTrue(loaded.books.single().sources.single().isAccountCopy)
+    }
+
     @Test
     fun `hidden progress readouts round trip through the store`() {
         val store = FileCatalogStore(file)
