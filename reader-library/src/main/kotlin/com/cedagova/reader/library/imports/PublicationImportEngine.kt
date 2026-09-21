@@ -153,6 +153,12 @@ class PublicationImportEngine(
         consent: UploadConsent,
         onProgress: (PublicationImportRecord) -> Unit,
     ): PublicationImportStep {
+        // The expiry the *stored* location was issued under, read before the
+        // admission answer below overwrites it with the fresh grant's. It is the
+        // only thing that says whether that location's signature still works, and
+        // a fresh grant's expiry is by definition in the future: judging the old
+        // location by the new expiry would HEAD every spent grant forever.
+        val locationGrantExpiresAt = initial.grantExpiresAt
         val admission = operations.admitImport(initial.admissionRequest(consent))
         var record = initial.withAdmission(admission)
         onProgress(record)
@@ -164,7 +170,7 @@ class PublicationImportEngine(
             ?: return PublicationImportStep.Transferred(record)
 
         val prepared = try {
-            prepare(record, grant)
+            prepare(record, grant, locationGrantExpiresAt)
         } catch (e: PublicationTransferException) {
             return interrupted(record.withoutTransfer(), e)
         }
@@ -194,13 +200,24 @@ class PublicationImportEngine(
      * it does not have. A spent window skips that round trip, and a rejected
      * `HEAD` falls through to a fresh creation — which is the expired-grant path
      * the plan asks for, arrived at from either direction.
+     *
+     * [locationGrantExpiresAt] is the expiry [PublicationImportRecord.transferLocation]
+     * was created under, *not* [grant]'s: [grant] is the fresh one this attempt
+     * just admitted, and its window is always open.
+     *
+     * This `HEAD` is also the only thing that knows how far an interrupted
+     * transfer actually got. A connection that dies mid-`PATCH` may leave the
+     * provider holding part of that chunk, and the client is not told; the
+     * stored record therefore under-counts until this call replaces it with the
+     * provider's own number.
      */
     private suspend fun prepare(
         record: PublicationImportRecord,
         grant: PublicationTransferGrant,
+        locationGrantExpiresAt: String?,
     ): PublicationImportRecord {
         val location = record.transferLocation
-        if (location != null && !expired(record.grantExpiresAt)) {
+        if (location != null && !expired(locationGrantExpiresAt)) {
             try {
                 val offset = transfer.offset(grant, location)
                 return record.copy(grantExpiresAt = grant.expiresAt, uploadedOffset = 0).confirmedOffset(offset)
@@ -267,8 +284,13 @@ sealed interface PublicationImportStep {
     data class Transferred(override val record: PublicationImportRecord) : PublicationImportStep
 
     /**
-     * The transfer stopped part-way. [record] carries the provider's confirmed
-     * offset, so resuming re-sends nothing before it.
+     * The transfer stopped part-way. [record] carries the last offset the
+     * provider *acknowledged*, which is an honest lower bound and never a claim
+     * on bytes that may not be there: a connection lost mid-`PATCH` can leave
+     * the provider holding part of that chunk without the client ever hearing
+     * so. Resuming re-reads the provider's own offset with `HEAD` before it
+     * sends anything, so nothing already stored is re-sent and nothing is
+     * skipped — that guarantee comes from the `HEAD`, not from this number.
      */
     data class Interrupted(
         override val record: PublicationImportRecord,

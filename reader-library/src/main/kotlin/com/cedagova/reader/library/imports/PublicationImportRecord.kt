@@ -32,8 +32,13 @@ import kotlinx.serialization.Serializable
  * - [grantExpiresAt] is the moment that location's signature stops working; a
  *   record past it goes straight to a fresh admission instead of spending a
  *   round trip learning the same thing.
- * - [uploadedOffset] is the last offset the *provider* confirmed, never a local
- *   count of bytes written. It is what "no re-sent bytes" is measured against.
+ * - [uploadedOffset] is the last offset the *provider* acknowledged, never a
+ *   local count of bytes written. It is a lower bound, not the whole truth: a
+ *   connection lost mid-`PATCH` can leave the provider holding part of that
+ *   chunk with the client never told, so a resume always re-reads the
+ *   provider's own offset with `HEAD` rather than trusting this. Keeping it a
+ *   lower bound is the point — over-counting would skip bytes that were never
+ *   stored, and a book missing a chunk fails verification at the backend.
  * - [status], [failureCategory] and [canonicalBookId] are the backend's answer,
  *   carried forward so a host can render a terminal import it has not re-read
  *   yet, and so `ready` can bind the device book to its account row (AD-23).

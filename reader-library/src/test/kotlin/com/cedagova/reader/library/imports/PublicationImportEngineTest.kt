@@ -11,6 +11,7 @@ import com.cedagova.reader.library.model.PublicationFormat
 import com.cedagova.reader.library.model.PublicationImportStatus
 import com.cedagova.reader.library.session
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -43,7 +44,13 @@ class PublicationImportEngineTest {
 
     private val api = FakeServers()
     private val storage = FakeStorage()
-    private val clock = FakeClock()
+
+    // Anchored, never `FakeClock()`'s wall-clock default. Grant expiry is a
+    // comparison between this clock and [GRANT_EXPIRY], so a clock that moved
+    // with the calendar would silently flip every resume onto the expired-grant
+    // path once the fixture date passed — the suite would go from proving the
+    // HEAD resume to proving nothing, without a line changing.
+    private val clock = FakeClock(Instant.parse(NOW))
     private val harness = Harness(api, clock)
     private val transfer = PublicationTransferClient.createForTests(storage.engine)
 
@@ -222,7 +229,15 @@ class PublicationImportEngineTest {
         val first = engine().start(ACCOUNT, source, UploadConsent.GRANTED)
 
         val interrupted = first as PublicationImportStep.Interrupted
-        assertEquals("the record keeps the provider's own offset", KEPT.toLong(), interrupted.record.uploadedOffset)
+        // The provider kept KEPT bytes of the chunk whose connection then died,
+        // and never got to say so. The record claims only what was acknowledged:
+        // a lower bound is recoverable, an over-count would skip bytes that were
+        // never stored. The HEAD on resume below is what supplies the truth.
+        assertEquals(
+            "the record claims only what the provider acknowledged",
+            0L,
+            interrupted.record.uploadedOffset,
+        )
         assertEquals(TUS_LOCATION, interrupted.record.transferLocation)
         assertEquals(IMPORT_ID, interrupted.record.importId)
 
@@ -231,6 +246,16 @@ class PublicationImportEngineTest {
 
         assertTrue(second is PublicationImportStep.Transferred)
         assertArrayEquals("no byte was re-sent and none was skipped", bytes, storage.received)
+        // The resume picks up at the provider's own mid-chunk offset: not at the
+        // record's lower bound (0, which would re-send) and not past it.
+        assertTrue(
+            "the resume PATCHed from the provider's durable offset, got ${storage.patchOffsets}",
+            storage.patchOffsets.contains(KEPT.toLong()),
+        )
+        assertTrue(
+            "and no PATCH ever declared an offset inside what was already stored",
+            storage.patchOffsets.none { it in 1 until KEPT.toLong() },
+        )
 
         val admissions = api.requestsTo(ReaderLibraryClient.IMPORTS_PATH)
         assertEquals("two admissions", 2, admissions.size)
@@ -525,7 +550,13 @@ class PublicationImportEngineTest {
         const val HOSTED_CAP = 52_428_800L
         const val SMALL_CAP = 4_096L
 
+        /** The device's clock for every test here. Fixed, so expiry is arithmetic, not a date. */
+        const val NOW = "2026-09-17T10:00:00Z"
+
+        /** Two hours ahead of [NOW]: a grant whose window is open. */
         const val GRANT_EXPIRY = "2026-09-17T12:00:00Z"
+
+        /** Five hours ahead of [NOW]: the fresh grant a re-admission hands out. */
         const val LATER_EXPIRY = "2026-09-17T15:00:00Z"
 
         val POLICY = "GET ${ReaderLibraryClient.IMPORT_POLICY_PATH}"
