@@ -40,6 +40,15 @@ kotlin {
     }
 }
 
+// ReaderLibraryContractTest reads contracts/ from the filesystem, not from the
+// test classpath, so Gradle does not see the pinned document as an input of
+// the test task on its own. Without this declaration a changed contract file
+// still returns the last green result FROM-CACHE / UP-TO-DATE and the drift
+// gate never runs; the pin only bit under --rerun-tasks --no-build-cache.
+tasks.withType<Test>().configureEach {
+    inputs.dir("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 dependencies {
     // api, not implementation: this module's operations take a ReaderApiClient
     // and every failure they raise is a ReaderAuthException, so a host that
