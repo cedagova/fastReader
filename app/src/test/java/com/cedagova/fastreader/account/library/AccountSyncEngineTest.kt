@@ -14,6 +14,8 @@ import com.cedagova.reader.library.model.ReaderLibraryItem
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.model.ReaderMutationKind
+import com.cedagova.reader.library.model.ReaderPortableLocationV1
+import com.cedagova.reader.library.model.ReaderPortablePublicationV1
 import com.cedagova.reader.library.model.ReaderProgress
 import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderResourceType
@@ -96,7 +98,17 @@ class AccountSyncEngineTest {
         gateway.progressResponses = queueOf(
             ReaderProgressListResponse(
                 requestId = REQUEST_ID,
-                progress = listOf(ReaderProgress("book-1", 41.5, "2026-09-14T10:01:00Z")),
+                progress = listOf(
+                    ReaderProgress(
+                        bookId = "book-1",
+                        progressPercent = 41.5,
+                        updatedAt = "2026-09-14T10:01:00Z",
+                        location = ReaderPortableLocationV1(
+                            publication = ReaderPortablePublicationV1.accountEpub("book-1"),
+                            locator = locator("OEBPS/ch1.xhtml", 0.415),
+                        ),
+                    ),
+                ),
             ),
         )
         gateway.deltaResponses = queueOf(deltas(latestCursor = "512"))
@@ -620,7 +632,8 @@ class AccountSyncEngineTest {
 
     /**
      * A position is published as a `reading_progress` upsert carrying exactly the
-     * portable locator — and the envelope is addressed by the account's book id.
+     * portable location — and both the envelope and the location's publication
+     * are the account's book id.
      */
     @Test
     fun `a published position is a reading_progress upsert with the portable locator`() = runTest(dispatcher) {
@@ -644,12 +657,18 @@ class AccountSyncEngineTest {
         assertEquals(ReaderMutationKind.UPSERT, envelope.mutationKind)
         assertEquals("book-1", envelope.resourceId)
         assertEquals(
-            setOf("chapter_title", "locator", "progress_percent"),
+            setOf("chapter_title", "location", "progress_percent"),
             envelope.payload.keys,
         )
+        val location = envelope.payload["location"] as JsonObject
         assertEquals(
             "OEBPS/ch3.xhtml",
-            (envelope.payload["locator"] as JsonObject)["href"]!!.toString().trim('"'),
+            (location["locator"] as JsonObject)["href"]!!.toString().trim('"'),
+        )
+        assertEquals(
+            "reader-api rejects a publication_id that is not the envelope's resource_id",
+            envelope.resourceId,
+            (location["publication"] as JsonObject)["publication_id"]!!.toString().trim('"'),
         )
     }
 
@@ -669,11 +688,16 @@ class AccountSyncEngineTest {
 
         val payloads = gateway.submitted.flatten().map { it.payload }
         assertEquals(12, payloads.size)
-        val keys = payloads.flatMap { it.keys }.toSet() +
-            payloads.flatMap { (it["locator"] as JsonObject).keys }.toSet()
+        val locations = payloads.map { it["location"] as JsonObject }
+        assertEquals(setOf("chapter_title", "location", "progress_percent"), payloads.flatMap { it.keys }.toSet())
+        assertEquals(setOf("contract_version", "publication", "locator"), locations.flatMap { it.keys }.toSet())
         assertEquals(
-            setOf("chapter_title", "locator", "progress_percent", "contract_version", "format", "href", "progression"),
-            keys,
+            setOf("publication_id", "format", "media_type", "source"),
+            locations.flatMap { (it["publication"] as JsonObject).keys }.toSet(),
+        )
+        assertEquals(
+            setOf("contract_version", "format", "href", "progression"),
+            locations.flatMap { (it["locator"] as JsonObject).keys }.toSet(),
         )
     }
 
@@ -813,7 +837,7 @@ class AccountSyncEngineTest {
         assertNull("a record this app could place is not an error", engine.state.value.lastError)
     }
 
-    /** The bootstrap's progress list carries the locator too, not only the percentage. */
+    /** The bootstrap's progress list carries the location's locator too, not only the percentage. */
     @Test
     fun `the bootstrap stores the portable locator from the progress list`() = runTest(dispatcher) {
         gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
@@ -825,7 +849,10 @@ class AccountSyncEngineTest {
                         bookId = "book-1",
                         progressPercent = 33.0,
                         updatedAt = "2026-09-20T08:00:00Z",
-                        locator = locator("OEBPS/ch3.xhtml", 0.33),
+                        location = ReaderPortableLocationV1(
+                            publication = ReaderPortablePublicationV1.accountEpub("book-1"),
+                            locator = locator("OEBPS/ch3.xhtml", 0.33),
+                        ),
                         chapterTitle = "Chapter Three",
                     ),
                 ),
@@ -898,7 +925,7 @@ class AccountSyncEngineTest {
                         serverAdmittedAt = SERVER_TIME,
                         canonicalPayload = buildJsonObject {
                             put("progress_percent", JsonPrimitive(50.0))
-                            put("locator", locator("OEBPS/ch5.xhtml", 0.5))
+                            put("location", location("book-1", locator("OEBPS/ch5.xhtml", 0.5)))
                         },
                     ),
                 ),
@@ -939,7 +966,7 @@ class AccountSyncEngineTest {
                         canonicalPayload = buildJsonObject {
                             put("book_id", JsonPrimitive("book-1"))
                             put("progress_percent", JsonPrimitive(50.0))
-                            put("locator", locator("OEBPS/ch5.xhtml", 0.5))
+                            put("location", location("book-1", locator("OEBPS/ch5.xhtml", 0.5)))
                         },
                     ),
                 ),
@@ -987,6 +1014,21 @@ class AccountSyncEngineTest {
         percent = percent,
     )
 
+    /** A canonical `location` for an account EPUB, as reader-api returns it (#139). */
+    private fun location(bookId: String, locator: JsonObject) = buildJsonObject {
+        put("contract_version", JsonPrimitive("reader.portable-semantics.v1"))
+        put(
+            "publication",
+            buildJsonObject {
+                put("publication_id", JsonPrimitive(bookId))
+                put("format", JsonPrimitive("epub"))
+                put("media_type", JsonPrimitive("application/epub+zip"))
+                put("source", JsonPrimitive("account"))
+            },
+        )
+        put("locator", locator)
+    }
+
     private fun locator(href: String, progression: Double) = buildJsonObject {
         put("format", JsonPrimitive("epub"))
         put("href", JsonPrimitive(href))
@@ -1011,7 +1053,7 @@ class AccountSyncEngineTest {
             put("book_id", JsonPrimitive(bookId))
             put("progress_percent", JsonPrimitive(percent))
             put("updated_at", JsonPrimitive("2026-09-20T09:00:00Z"))
-            put("locator", locator(href, percent / 100.0))
+            put("location", location(bookId, locator(href, percent / 100.0)))
         },
     )
 

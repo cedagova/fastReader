@@ -9,6 +9,7 @@ import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderDeltaStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.model.ReaderMutationKind
+import com.cedagova.reader.library.model.ReaderPortableLocationV1
 import com.cedagova.reader.library.model.ReaderResourceType
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchRequest
 import com.cedagova.reader.library.model.ReaderSyncMutationResult
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -314,7 +316,7 @@ class AccountSyncEngine(
         enqueue(
             bookId = bookId,
             kind = ReaderMutationKind.UPSERT,
-            payload = PortableReadingPosition.payloadFor(position),
+            payload = PortableReadingPosition.payloadFor(bookId, position),
             resourceType = ReaderResourceType.READING_PROGRESS,
         ) { it }
     }
@@ -683,14 +685,14 @@ class AccountSyncEngine(
                 // The bootstrap's second list is keyed by `book_id`, which the
                 // document marks required on `ReaderProgress` — so unlike the
                 // stream there is nothing to derive here, and the portable
-                // locator is read through the same seam the stream uses (#120).
+                // location is read through the same seam the stream uses (#120, #139).
                 row.copy(
                     progressPercent = progress.progressPercent,
                     progressUpdatedAt = progress.updatedAt,
                     remotePosition = AccountCanonicalPayload.remotePosition(
                         position = PortableReadingPosition.positionOf(
                             buildJsonObject {
-                                put("locator", progress.locator)
+                                put("location", Json.encodeToJsonElement(ReaderPortableLocationV1.serializer(), progress.location))
                                 put("progress_percent", JsonPrimitive(progress.progressPercent))
                                 put("updated_at", JsonPrimitive(progress.updatedAt))
                                 progress.chapterTitle?.let { put("chapter_title", JsonPrimitive(it)) }

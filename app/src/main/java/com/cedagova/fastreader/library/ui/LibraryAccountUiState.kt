@@ -8,6 +8,7 @@ import com.cedagova.fastreader.account.library.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.account.library.wireName
 import com.cedagova.fastreader.library.BookStatus
@@ -89,8 +90,9 @@ internal fun downloadFor(item: LibraryBookItem, downloads: AccountDownloadsState
  * The three shapes it can take:
  *
  * - both fields null — the action, plain and on offer;
- * - [off] set — the deployment admits no imports, so the reason is shown *in
- *   place of* the action rather than offering a control that cannot work;
+ * - [off] set — the deployment admits no imports, or the account's import
+ *   capability is unavailable, so the reason is shown *in place of* the action
+ *   rather than offering a control that cannot work;
  * - [state] set — an add is somewhere between the tap and its verdict.
  */
 data class AddToAccount(
@@ -114,6 +116,13 @@ data class AddToAccount(
  * 4. `reader.sync.v1` unavailable — the backend has said it is not serving this
  *    client's library, and offering an upload against it would be a control
  *    that fails on purpose.
+ *
+ * Past those, an add already under way always shows — its transfer is the
+ * account's active capacity, so the capability reading "exhausted" must not
+ * hide the very add that exhausted it. Otherwise the action is offered only on
+ * exactly one `reader.publication-import.v1` entry that is `available` (#139,
+ * core.md §6): an unavailable, missing or duplicated entry shows its reason in
+ * place of the action, and a capability not read yet shows nothing at all.
  */
 internal fun addToAccountFor(
     item: LibraryBookItem,
@@ -124,7 +133,12 @@ internal fun addToAccountFor(
     if (account.phase == AccountSyncPhase.SIGNED_OUT) return null
     if (account.phase == AccountSyncPhase.DEFERRED && account.capabilityReason != null) return null
     imports.disabled?.let { return AddToAccount(off = it) }
-    return AddToAccount(state = imports.byDeviceBookId[item.id])
+    imports.byDeviceBookId[item.id]?.let { return AddToAccount(state = it) }
+    return when (val offer = imports.offer) {
+        ImportOffer.Available -> AddToAccount()
+        is ImportOffer.Unavailable -> AddToAccount(off = ImportsOff(requestId = null, reason = offer.reason))
+        ImportOffer.Unknown -> null
+    }
 }
 
 /** Which sentence the shelf says about the account library. */

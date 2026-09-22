@@ -12,6 +12,7 @@ import com.cedagova.reader.library.model.ReaderCapabilityEntry
 import com.cedagova.reader.library.model.ReaderCapabilityKey
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgressListResponse
+import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchRequest
@@ -91,6 +92,23 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
             reason = decoded.reason,
             quota = decoded.quota,
             declared = decoded.key == ReaderCapabilityKey.SYNC_V1,
+        )
+    }
+
+    override suspend fun publicationImportCapability(): ReaderPublicationImportCapability {
+        val document = api.capabilities()
+        val entries = (document[CAPABILITIES_FIELD] as? JsonArray).orEmpty().filter { element ->
+            val key = (element as? JsonObject)?.get(CAPABILITY_KEY_FIELD) as? JsonPrimitive
+            key?.contentOrNull == PUBLICATION_IMPORT_CAPABILITY_KEY
+        }
+        // Exactly one, or it is not permission (core.md §6): a duplicate is as
+        // unusable as an absence, and neither is decoded as if it were the answer.
+        val only = entries.singleOrNull() ?: return ReaderPublicationImportCapability.undeclared(entries.size)
+        val decoded = decode(only.jsonObject, ReaderCapabilityEntry.serializer(), ReaderApiClient.CAPABILITIES_PATH)
+        return ReaderPublicationImportCapability(
+            availability = decoded.availability,
+            reason = decoded.reason,
+            entries = 1,
         )
     }
 
@@ -221,6 +239,9 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
 
         /** The capability this module gates every sync request on. */
         const val SYNC_CAPABILITY_KEY: String = "reader.sync.v1"
+
+        /** The capability that decides whether "Add to account library" is offered (#139). */
+        const val PUBLICATION_IMPORT_CAPABILITY_KEY: String = "reader.publication-import.v1"
 
         /** The cursor a client that has never synced starts from. */
         const val FIRST_CURSOR: String = "0"

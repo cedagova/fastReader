@@ -7,7 +7,7 @@ owns. Added by [#112](https://github.com/cedagova/fastReader/issues/112)
 
 ## What it is
 
-Five operations, and nothing else:
+Six library operations, and nothing else:
 
 | Operation | Route |
 | --- | --- |
@@ -16,11 +16,12 @@ Five operations, and nothing else:
 | `applyMutations(…)` | `POST /v1/reader/sync/mutations` (1–50 envelopes) |
 | `deltas(afterCursor, limit)` | `GET /v1/reader/sync/deltas` (limit ≤ 500) |
 | `syncCapability()` | `GET /v1/reader/capabilities?clientVersion=…`, the `reader.sync.v1` entry |
+| `publicationImportCapability()` | the same document's `reader.publication-import.v1` entry, available only when there is exactly one (#139) |
 
 `ReaderLibraryOperations` is the interface; `ReaderLibraryClient` is the one
 implementation, constructed with the `ReaderApiClient` a `ReaderAuthClient`
 exposes. There is no generic `call(path, body)` on it: every request this module
-can send is one of the five above.
+can send is one of the six above or one of the publication-import and download-grant routes `ReaderLibraryOperations` declares.
 
 ## What it is not
 

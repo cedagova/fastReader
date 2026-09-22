@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.account.library
 
 import com.cedagova.reader.library.model.PublicationFailureCategory
+import com.cedagova.reader.library.model.ReaderCapabilityReason
 
 /**
  * How far one device book's **Add to account library** has got, as the shelf
@@ -109,16 +110,44 @@ sealed interface ImportProblem {
 }
 
 /**
- * The deployment admits no imports at all (`enabled: false`).
+ * The action is not on offer, and why — shown as a reason in place of it.
  *
- * Account-wide rather than per book, and shown as a reason in place of the
- * action: offering a control that cannot work would be worse than saying so.
- * [requestId] is reader-api's echo of the policy read that said it.
+ * Two sources, never mixed up:
+ *
+ * - the deployment's policy said `enabled: false` — [requestId] is reader-api's
+ *   echo of that policy read and [reason] is null;
+ * - the account's `reader.publication-import.v1` capability is unavailable,
+ *   missing or duplicated (#139, core.md §6) — [reason] is the entry's own typed
+ *   reason, quoted as the code under the sentence, and [requestId] is null
+ *   because the capabilities document carries none.
+ *
+ * Account-wide rather than per book: offering a control that cannot work would
+ * be worse than saying so.
  */
-data class ImportsOff(val requestId: String?)
+data class ImportsOff(val requestId: String?, val reason: ReaderCapabilityReason? = null)
 
 /**
- * Every add this device is in the middle of, plus the one account-wide verdict.
+ * What the account's `reader.publication-import.v1` entry says, as the shelf
+ * reads it (#139).
+ *
+ * The contract's rule is that import is offered only on exactly one entry with
+ * `availability: available`; [Unknown] — not read yet this session, or the read
+ * failed — is therefore *not* an offer. Discovery reserves nothing: admission
+ * stays authoritative and the policy still supplies every cap.
+ */
+sealed interface ImportOffer {
+    /** Not read yet in this session, or the read did not get an answer. Not an offer. */
+    data object Unknown : ImportOffer
+
+    /** Exactly one entry, `available`. */
+    data object Available : ImportOffer
+
+    /** The entry said no, or there was not exactly one; [reason] is the entry's, or `UNKNOWN`. */
+    data class Unavailable(val reason: ReaderCapabilityReason) : ImportOffer
+}
+
+/**
+ * Every add this device is in the middle of, plus the account-wide verdicts.
  *
  * [byDeviceBookId] is keyed by the catalog's own book id (`sha256:<hex>`),
  * which is the content identity AD-23 merges on — so a row's progress belongs
@@ -126,6 +155,7 @@ data class ImportsOff(val requestId: String?)
  */
 data class AccountImportsState(
     val disabled: ImportsOff? = null,
+    val offer: ImportOffer = ImportOffer.Unknown,
     val byDeviceBookId: Map<String, BookImportState> = emptyMap(),
 ) {
     companion object {

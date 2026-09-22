@@ -179,6 +179,7 @@ enum class ReaderCapabilityKey {
     @SerialName("reader.sync.v1") SYNC_V1,
     @SerialName("reader.ai-quota.v1") AI_QUOTA_V1,
     @SerialName("reader.notifications.registration.v1") NOTIFICATIONS_REGISTRATION_V1,
+    @SerialName("reader.publication-import.v1") PUBLICATION_IMPORT_V1,
     @SerialName(UNKNOWN_VALUE) UNKNOWN,
 }
 

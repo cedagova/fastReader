@@ -5,6 +5,8 @@ import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
 import com.cedagova.reader.library.model.PORTABLE_SEMANTICS_VERSION
 import com.cedagova.reader.library.model.PutReaderProgressRequest
 import com.cedagova.reader.library.model.ReaderEpubLocatorV1
+import com.cedagova.reader.library.model.ReaderPortableLocationV1
+import com.cedagova.reader.library.model.ReaderPortablePublicationV1
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -35,10 +37,12 @@ import kotlin.math.roundToInt
  *    payload's own `book_id` over the resource id precisely so a resource id
  *    that turns out to be something else — a composite key, an opaque row id —
  *    costs a fallback rather than a wrong book.
- * 2. **What a published payload looks like.** The mutations envelope's `payload`
- *    is a free-form object, so the document states no payload shape for a
- *    `reading_progress` upsert. [payloadFor] uses the body the document *does*
- *    declare for stating a position, `PutReaderProgressRequest`.
+ * 2. **What a published payload looks like.** Since the #139 re-pin this is no
+ *    longer a derivation: reader-api validates a `reading_progress` upsert's
+ *    payload against `PutReaderProgressRequest` and rejects anything else as
+ *    `invalid_payload`. [payloadFor] serializes exactly that body — a
+ *    `location` holding the account book's publication identity and the
+ *    portable locator.
  * 3. **How a section maps to a word.** Section plus fraction is honest for an
  *    RSVP stream and a paginated reader alike, and exact word equivalence is
  *    promised by neither (assumption A2).
@@ -51,7 +55,10 @@ import kotlin.math.roundToInt
  * else, so the set of keys that can appear in an outbound position is closed by
  * a type rather than by review. The token index, the words-per-minute setting,
  * the pipeline version and the structural fingerprint are not fields of it
- * (REQ-512).
+ * (REQ-512). What the `location` adds around the locator names nothing new: the
+ * publication is the account book id the envelope's `resource_id` already
+ * carries (reader-api refuses a mismatch), plus the constants `epub`,
+ * `application/epub+zip` and `account`. No content digest is sent.
  *
  * ## What this file never does
  *
@@ -151,15 +158,22 @@ object PortableReadingPosition {
     }
 
     /**
-     * The payload of a `reading_progress` upsert for [position].
+     * The payload of a `reading_progress` upsert for [position] in the account
+     * book [bookId].
      *
      * Built by serializing [PutReaderProgressRequest], so the key set is the
-     * model's and a field cannot be added here by accident.
+     * model's and a field cannot be added here by accident. [bookId] must be the
+     * envelope's `resource_id`: reader-api rejects a location whose
+     * `publication_id` differs from it.
      */
-    fun payloadFor(position: LocalReadingPosition): JsonObject {
+    fun payloadFor(bookId: String, position: LocalReadingPosition): JsonObject {
         val body = PutReaderProgressRequest(
             progressPercent = position.percent.toDouble(),
-            locator = locatorFor(position),
+            location = ReaderPortableLocationV1(
+                contractVersion = PORTABLE_SEMANTICS_VERSION,
+                publication = ReaderPortablePublicationV1.accountEpub(bookId),
+                locator = locatorFor(position),
+            ),
             chapterTitle = position.chapterTitle,
         )
         return wire.encodeToJsonElement(body).jsonObject
@@ -222,15 +236,16 @@ object PortableReadingPosition {
     /**
      * The remote position a canonical payload states.
      *
-     * Every field is read and none is computed. A payload that carries no
-     * locator, or one whose locator is a shape this app does not recognise,
-     * yields a position with a null href — which [tokenIndexFor] answers with
-     * the fraction alone. That is the documented fallback, not an error: a
-     * malformed locator must not cost the reader the percentage that came with
-     * it.
+     * Every field is read and none is computed. The locator is the one inside
+     * the payload's `location` (`ReaderPortableLocationV1`, since the #139
+     * re-pin). A payload that carries no location, or one whose locator is a
+     * shape this app does not recognise, yields a position with a null href —
+     * which [tokenIndexFor] answers with the fraction alone. That is the
+     * documented fallback, not an error: a malformed locator must not cost the
+     * reader the percentage that came with it.
      */
     fun positionOf(payload: JsonObject): RemoteReadingPosition {
-        val locator = payload["locator"] as? JsonObject
+        val locator = (payload["location"] as? JsonObject)?.get("locator") as? JsonObject
         val format = locator?.string("format")
         // A pdf locator, or a format this build does not know, states nothing
         // about an EPUB's spine. Its progression is still a fraction of the
