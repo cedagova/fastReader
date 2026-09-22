@@ -686,22 +686,33 @@ class AccountSyncEngine(
                 // document marks required on `ReaderProgress` — so unlike the
                 // stream there is nothing to derive here, and the portable
                 // location is read through the same seam the stream uses (#120, #139).
+                //
+                // A list read carries no revision. When it returns the very record
+                // this device already held — same server `updated_at` — the stored
+                // revision stands, and so does the mark that the record is this
+                // device's own (#140); a re-bootstrap must not turn this device's
+                // own position into "another device's". A different record keeps
+                // neither.
+                val held = account.document.book(row.bookId)
+                    ?.takeIf { it.remotePosition?.updatedAt == progress.updatedAt }
+                val remote = AccountCanonicalPayload.remotePosition(
+                    position = PortableReadingPosition.positionOf(
+                        buildJsonObject {
+                            put("location", Json.encodeToJsonElement(ReaderPortableLocationV1.serializer(), progress.location))
+                            put("progress_percent", JsonPrimitive(progress.progressPercent))
+                            put("updated_at", JsonPrimitive(progress.updatedAt))
+                            progress.chapterTitle?.let { put("chapter_title", JsonPrimitive(it)) }
+                        },
+                    ),
+                    existing = held?.remotePosition,
+                    revision = null,
+                    serverAdmittedAt = null,
+                )
                 row.copy(
                     progressPercent = progress.progressPercent,
                     progressUpdatedAt = progress.updatedAt,
-                    remotePosition = AccountCanonicalPayload.remotePosition(
-                        position = PortableReadingPosition.positionOf(
-                            buildJsonObject {
-                                put("location", Json.encodeToJsonElement(ReaderPortableLocationV1.serializer(), progress.location))
-                                put("progress_percent", JsonPrimitive(progress.progressPercent))
-                                put("updated_at", JsonPrimitive(progress.updatedAt))
-                                progress.chapterTitle?.let { put("chapter_title", JsonPrimitive(it)) }
-                            },
-                        ),
-                        existing = row.remotePosition,
-                        revision = null,
-                        serverAdmittedAt = null,
-                    ),
+                    remotePosition = remote,
+                    ownPositionChangeKey = held?.ownPositionChangeKey?.takeIf { it == remote.changeKey },
                 )
             } ?: row
         }
@@ -741,6 +752,7 @@ class AccountSyncEngine(
                     payload = change.canonicalPayload,
                     revision = change.revision,
                     serverAdmittedAt = change.serverAdmittedAt,
+                    origin = CanonicalOrigin.STREAM,
                 )
             }
             val next = response.nextCursor ?: response.latestCursor
@@ -823,6 +835,11 @@ class AccountSyncEngine(
      * Adopts one mutation result. A rejection carries an empty canonical
      * payload by contract and changes no row; everything else — `applied`,
      * `replayed`, `superseded` and `conflict` alike — is adopted as it stands.
+     *
+     * `applied` and `replayed` are the backend admitting *this device's own*
+     * mutation, so for a position they are recorded as this device's own
+     * (#140). `superseded` and `conflict` carry the position that beat it —
+     * somebody else's — and are adopted without that mark.
      */
     private fun adopt(
         document: AccountLibraryDocument,
@@ -840,7 +857,23 @@ class AccountSyncEngine(
             payload = payload,
             revision = result.revision ?: result.conflict?.remoteRevision,
             serverAdmittedAt = result.serverAdmittedAt,
+            origin = when (result.status) {
+                ReaderSyncStatus.APPLIED, ReaderSyncStatus.REPLAYED -> CanonicalOrigin.ADMITTED_HERE
+                else -> CanonicalOrigin.RESULT
+            },
         )
+    }
+
+    /** Where a canonical payload came from, which decides the two rules below that differ by source. */
+    private enum class CanonicalOrigin {
+        /** This device's own mutation, `applied` or `replayed`: the canonical result is this device's write. */
+        ADMITTED_HERE,
+
+        /** Any other mutation result — `superseded` or `conflict` — adopted as it stands. */
+        RESULT,
+
+        /** A change read from the account's change stream, which names no originating client. */
+        STREAM,
     }
 
     private fun applyCanonical(
@@ -852,6 +885,7 @@ class AccountSyncEngine(
         revision: Long?,
         /** The server's admission time for this change, when it came from the stream. */
         serverAdmittedAt: String? = null,
+        origin: CanonicalOrigin,
     ): AccountLibraryDocument = when (resourceType) {
         ReaderResourceType.LIBRARY_ITEM, ReaderResourceType.BOOK -> {
             val existing = document.book(resourceId)
@@ -880,16 +914,38 @@ class AccountSyncEngine(
                     knownBook = { document.book(it) != null },
                 )
             ) {
-                is ProgressRecord.Recognized ->
-                    AccountCanonicalPayload.readingProgress(
-                        existing = document.book(record.bookId),
-                        payload = payload,
-                        position = record.position,
-                        revision = revision,
-                        serverAdmittedAt = serverAdmittedAt,
-                    )
-                        ?.let(document::withBook)
-                        ?: document
+                is ProgressRecord.Recognized -> {
+                    val existing = document.book(record.bookId)
+                    val stored = existing?.remotePosition
+                    if (origin == CanonicalOrigin.STREAM && stored != null && revision != null &&
+                        revision <= stored.revision
+                    ) {
+                        // Client contract §7.3: a stream change is applied only when
+                        // its revision is newer than the one this device already
+                        // holds for the resource. The stream names no originating
+                        // client, so this is also what recognises this device's own
+                        // admitted position coming back to it (#140): it carries the
+                        // very revision §7.4 stored when the result was adopted.
+                        document
+                    } else {
+                        AccountCanonicalPayload.readingProgress(
+                            existing = existing,
+                            payload = payload,
+                            position = record.position,
+                            revision = revision,
+                            serverAdmittedAt = serverAdmittedAt,
+                        )
+                            ?.let { row ->
+                                if (origin == CanonicalOrigin.ADMITTED_HERE) {
+                                    row.copy(ownPositionChangeKey = row.remotePosition?.changeKey)
+                                } else {
+                                    row
+                                }
+                            }
+                            ?.let(document::withBook)
+                            ?: document
+                    }
+                }
 
                 is ProgressRecord.Unrecognized -> {
                     progressMismatch = AccountSyncError.UnrecognizedProgressRecord(

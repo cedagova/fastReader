@@ -291,6 +291,48 @@ class CatalogPositionsTest {
         assertNull(positions.remoteOffer(deviceBookId, book, tokenIndex = late.startTokenIndex))
     }
 
+    /**
+     * #140: this device published 40 %, the backend admitted it, and the reader
+     * has since rewound. The account's position is ahead of the reader — gate 2
+     * alone would offer it — but it is this device's own, not another device's.
+     */
+    @Test
+    fun `this device's own admitted position is not offered, though it is ahead of the reader`() = runTest {
+        val book = ReaderFixtures.englishNovel
+        val chapter = book.chapters.last { !it.isEmpty }
+        val remote = AccountRemotePosition(
+            href = chapter.spinePath,
+            progression = book.progressFraction(chapter.startTokenIndex).toDouble(),
+            percent = 40.0,
+            updatedAt = "2026-09-20T10:00:00Z",
+            revision = 5,
+        )
+        val positions = accountPositions(remote = remote, ownPositionChangeKey = remote.changeKey)
+
+        assertNull(positions.remoteOffer(deviceBookId, book, tokenIndex = 0))
+    }
+
+    /** A newer change after this device's own is another device's, and is offered. */
+    @Test
+    fun `a newer position after this device's own is offered`() = runTest {
+        val book = ReaderFixtures.englishNovel
+        val chapter = book.chapters.last { !it.isEmpty }
+        val positions = accountPositions(
+            remote = AccountRemotePosition(
+                href = chapter.spinePath,
+                progression = book.progressFraction(chapter.startTokenIndex).toDouble(),
+                percent = 70.0,
+                updatedAt = "2026-09-20T11:00:00Z",
+                revision = 6,
+            ),
+            ownPositionChangeKey = "5:2026-09-20T10:00:00Z",
+        )
+
+        val offer = requireNotNull(positions.remoteOffer(deviceBookId, book, tokenIndex = 0))
+
+        assertEquals("6:2026-09-20T11:00:00Z", offer.changeKey)
+    }
+
     /** An account row with no position at all: nobody has said anything to offer. */
     @Test
     fun `an account book with no remote position offers nothing`() = runTest {
@@ -349,6 +391,7 @@ class CatalogPositionsTest {
 
     private suspend fun TestScope.accountPositions(
         remote: AccountRemotePosition?,
+        ownPositionChangeKey: String? = null,
         contentSha256: String? = null,
         signedOut: Boolean = false,
     ): CatalogPositions {
@@ -367,6 +410,7 @@ class CatalogPositionsTest {
                         bookId = "acct-1",
                         contentSha256 = contentSha256 ?: deviceBookId,
                         remotePosition = remote,
+                        ownPositionChangeKey = ownPositionChangeKey,
                     ),
                 ),
             )

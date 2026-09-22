@@ -901,6 +901,173 @@ class AccountSyncEngineTest {
         assertEquals(4L, remote.revision)
     }
 
+    // ---- this device's own position (#140)
+
+    /**
+     * #140's acceptance: publish at 40 %, the backend admits it at revision 5,
+     * and the stream later delivers that same change back. The stream names no
+     * originating client, so what recognises the echo is the contract's revision
+     * rule — and the row records that the position the account holds is this
+     * device's own, which is what keeps the resume offer from presenting it as
+     * another device's after a rewind.
+     */
+    @Test
+    fun `this device's own admitted position echoed by the stream stays marked as its own`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(
+            positionResult("key-1", ReaderSyncStatus.APPLIED, revision = 5, percent = 40.0, href = "OEBPS/ch4.xhtml"),
+        )
+        engine.recordPosition("book-1", position(href = "OEBPS/ch4.xhtml", percent = 40))
+        advanceUntilIdle()
+
+        val admitted = engine.state.value.books.single()
+        assertEquals(5L, admitted.remotePosition!!.revision)
+        assertEquals(
+            "the admitted result is this device's own position (§7.4)",
+            admitted.remotePosition!!.changeKey,
+            admitted.ownPositionChangeKey,
+        )
+
+        // The reader rewinds to 30 % without a new publish; the echo arrives.
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "5",
+                changes = listOf(progressChange("5", "book-1", revision = 5, percent = 40.0, href = "OEBPS/ch4.xhtml")),
+            ),
+        )
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals(admitted.remotePosition, row.remotePosition)
+        assertEquals(
+            "the echo is this device's own change, never another device's",
+            row.remotePosition!!.changeKey,
+            row.ownPositionChangeKey,
+        )
+    }
+
+    /**
+     * Client contract §7.3: a stream change is applied only when its revision is
+     * newer than the one held for the resource. Old code applied every change,
+     * so a stale revision moved the held position back.
+     */
+    @Test
+    fun `a stream position no newer than the held revision is not applied`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(
+            deltas(latestCursor = "1"),
+            deltas(
+                latestCursor = "7",
+                changes = listOf(
+                    progressChange("6", "book-1", revision = 6, percent = 62.0, href = "OEBPS/ch6.xhtml"),
+                    progressChange("7", "book-1", revision = 5, percent = 30.0, href = "OEBPS/ch3.xhtml"),
+                    progressChange("8", "book-1", revision = 6, percent = 31.0, href = "OEBPS/ch3.xhtml"),
+                ),
+            ),
+        )
+        val engine = engine()
+        signIn("user-1")
+
+        engine.refresh()
+        advanceUntilIdle()
+
+        val remote = engine.state.value.books.single().remotePosition!!
+        assertEquals("an older and an equal revision both leave the held one", 6L, remote.revision)
+        assertEquals(62.0, remote.percent!!, 1e-9)
+        assertEquals("OEBPS/ch6.xhtml", remote.href)
+    }
+
+    /** A genuinely newer revision from elsewhere is applied, and it is not this device's own. */
+    @Test
+    fun `a newer position after this device's own is applied as another device's`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(
+            positionResult("key-1", ReaderSyncStatus.APPLIED, revision = 5, percent = 40.0, href = "OEBPS/ch4.xhtml"),
+        )
+        engine.recordPosition("book-1", position(href = "OEBPS/ch4.xhtml", percent = 40))
+        advanceUntilIdle()
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "6",
+                changes = listOf(
+                    progressChange("5", "book-1", revision = 5, percent = 40.0, href = "OEBPS/ch4.xhtml"),
+                    progressChange("6", "book-1", revision = 6, percent = 70.0, href = "OEBPS/ch7.xhtml"),
+                ),
+            ),
+        )
+
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals(6L, row.remotePosition!!.revision)
+        assertEquals(70.0, row.remotePosition!!.percent!!, 1e-9)
+        assertTrue(
+            "a newer revision is somebody else's change",
+            row.ownPositionChangeKey != row.remotePosition!!.changeKey,
+        )
+    }
+
+    /** A superseded publish carries the position that beat it — another device's — and is not marked as own. */
+    @Test
+    fun `a superseded publish adopts the winner without marking it as this device's`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(
+            positionResult("key-1", ReaderSyncStatus.SUPERSEDED, revision = 7, percent = 81.0, href = "OEBPS/ch8.xhtml"),
+        )
+
+        engine.recordPosition("book-1", position(href = "OEBPS/ch4.xhtml", percent = 40))
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals(81.0, row.remotePosition!!.percent!!, 1e-9)
+        assertNull(row.ownPositionChangeKey)
+    }
+
+    /**
+     * A re-bootstrap reads the progress list, which carries no revision. The same
+     * record this device admitted keeps its revision and its own mark; without
+     * that, a cursor expiry would turn this device's position into another's.
+     */
+    @Test
+    fun `a re-bootstrap that reads back this device's own position keeps it as its own`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(
+            positionResult("key-1", ReaderSyncStatus.APPLIED, revision = 5, percent = 40.0, href = "OEBPS/ch4.xhtml"),
+        )
+        engine.recordPosition("book-1", position(href = "OEBPS/ch4.xhtml", percent = 40))
+        advanceUntilIdle()
+        val admitted = engine.state.value.books.single()
+        gateway.deltaResponses = queueOf(
+            deltas(status = ReaderDeltaStatus.CURSOR_EXPIRED, latestCursor = "9", rebootstrapRequired = true),
+            deltas(latestCursor = "9"),
+        )
+        gateway.progressResponses = queueOf(
+            ReaderProgressListResponse(
+                requestId = REQUEST_ID,
+                progress = listOf(
+                    ReaderProgress(
+                        bookId = "book-1",
+                        progressPercent = 40.0,
+                        updatedAt = PROGRESS_TIME,
+                        location = ReaderPortableLocationV1(
+                            publication = ReaderPortablePublicationV1.accountEpub("book-1"),
+                            locator = locator("OEBPS/ch4.xhtml", 0.40),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals(admitted.remotePosition!!.changeKey, row.remotePosition!!.changeKey)
+        assertEquals(row.remotePosition!!.changeKey, row.ownPositionChangeKey)
+    }
+
     /**
      * The unverified derivation failing, as a visible outcome.
      *
@@ -1049,12 +1216,35 @@ class AccountSyncEngineTest {
         revision = revision,
         kind = ReaderMutationKind.UPSERT,
         serverAdmittedAt = SERVER_TIME,
-        canonicalPayload = buildJsonObject {
-            put("book_id", JsonPrimitive(bookId))
-            put("progress_percent", JsonPrimitive(percent))
-            put("updated_at", JsonPrimitive("2026-09-20T09:00:00Z"))
-            put("location", location(bookId, locator(href, percent / 100.0)))
-        },
+        canonicalPayload = progressPayload(bookId, percent, href),
+    )
+
+    /** A canonical `reading_progress` record as reader-api returns it. */
+    private fun progressPayload(bookId: String, percent: Double, href: String) = buildJsonObject {
+        put("book_id", JsonPrimitive(bookId))
+        put("progress_percent", JsonPrimitive(percent))
+        put("updated_at", JsonPrimitive(PROGRESS_TIME))
+        put("location", location(bookId, locator(href, percent / 100.0)))
+    }
+
+    /** The backend's answer to this device's own `reading_progress` upsert for book-1. */
+    private fun positionResult(
+        key: String,
+        status: ReaderSyncStatus,
+        revision: Long,
+        percent: Double,
+        href: String,
+    ) = ReaderSyncMutationResult(
+        idempotencyKey = key,
+        resourceType = ReaderResourceType.READING_PROGRESS,
+        resourceId = "book-1",
+        mutationKind = ReaderMutationKind.UPSERT,
+        status = status,
+        canonicalPayload = progressPayload("book-1", percent, href),
+        serverAdmission = if (status == ReaderSyncStatus.APPLIED) ReaderServerAdmission.ACCEPTED else null,
+        revision = revision,
+        cursor = revision.toString(),
+        serverAdmittedAt = SERVER_TIME,
     )
 
     /** Answer the next batch's single envelope as admitted, with an empty canonical payload. */
@@ -1197,5 +1387,6 @@ class AccountSyncEngineTest {
         const val REQUEST_ID: String = FakeReaderLibraryGateway.REQUEST_ID
         const val SERVER_TIME: String = "2026-09-14T09:00:00Z"
         const val CLIENT_TIME: String = "2026-09-14T09:30:00Z"
+        const val PROGRESS_TIME: String = "2026-09-20T09:00:00Z"
     }
 }
