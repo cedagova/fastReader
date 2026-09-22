@@ -223,10 +223,11 @@ sign-out, and what a host must declare — is
 
 Since #112 there is a second one, `reader-library/`: the account-library module
 (`com.cedagova.reader.library`). It depends on `:reader-auth` and on nothing
-under `app/`, declares no permission of its own, and offers exactly five typed
-operations — `GET /v1/reader/library`, `GET /v1/reader/progress`,
+under `app/`, declares no permission of its own, and offers exactly six typed
+library operations — `GET /v1/reader/library`, `GET /v1/reader/progress`,
 `POST /v1/reader/sync/mutations`, `GET /v1/reader/sync/deltas` and the
-`reader.sync.v1` capability read. There is deliberately no generic
+`reader.sync.v1` and `reader.publication-import.v1` capability reads — beside
+the publication-import lifecycle and the asset download grant. There is deliberately no generic
 `call(path, body)`. See [reader-library/README.md](reader-library/README.md).
 
 **The Reader API contract it is built against is pinned, by identity, in this

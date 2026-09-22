@@ -123,7 +123,12 @@ class AccountImports(
      */
     private val foreground = MutableStateFlow(true)
 
-    /** Whose session the current [AccountImportsState.offer] was read in; null while signed out. */
+    /**
+     * Whose session the current [AccountImportsState.offer] was read in; null
+     * while signed out. Written and compared under [mutex], so a capability
+     * answer is applied only to the session that asked for it.
+     */
+    @Volatile
     private var offerUser: String? = null
 
     /** The capability read in flight, so a burst of account states asks once. */
@@ -133,14 +138,22 @@ class AccountImports(
         scope.launch {
             accountState.collect { account ->
                 if (account.phase == AccountSyncPhase.SIGNED_OUT) {
-                    offerUser = null
                     forgetEverything()
-                } else if (account.userId != offerUser || _state.value.offer == ImportOffer.Unknown) {
+                } else {
+                    val newSession = mutex.withLock {
+                        (account.userId != offerUser).also { changed ->
+                            if (changed) {
+                                // The previous session's read, if still in
+                                // flight, answers for an account that is gone.
+                                offerJob?.cancel()
+                                offerUser = account.userId
+                            }
+                        }
+                    }
                     // A new session reads the capability afresh; an unanswered
                     // read is retried on the next account state rather than
                     // leaving the action off for the whole session.
-                    offerUser = account.userId
-                    refreshOffer()
+                    if (newSession || _state.value.offer == ImportOffer.Unknown) refreshOffer()
                 }
             }
         }
@@ -149,7 +162,7 @@ class AccountImports(
     /** The app came to the foreground: poll again, and pick up anything left in flight. */
     fun onForeground() {
         foreground.value = true
-        if (offerUser != null) refreshOffer()
+        refreshOffer()
         resumeStoredImports()
     }
 
@@ -164,18 +177,26 @@ class AccountImports(
      */
     private fun refreshOffer() {
         val gateway = gateway ?: return
+        val user = offerUser ?: return
         if (offerJob?.isActive == true) return
         offerJob = scope.launch {
-            runCatching { readOffer(gateway) }
+            runCatching { readOffer(gateway, user) }
         }
     }
 
-    /** One capability read, published to the state and returned. */
-    private suspend fun readOffer(gateway: PublicationImportGateway): ImportOffer {
+    /**
+     * One capability read for [user]'s session, published to the state and
+     * returned — or null, publishing nothing, when that session ended (sign-out
+     * or another account) while the read was on the wire.
+     */
+    private suspend fun readOffer(gateway: PublicationImportGateway, user: String): ImportOffer? {
         val capability = gateway.importCapability()
         val offer = if (capability.isAvailable) ImportOffer.Available else ImportOffer.Unavailable(capability.reason)
-        _state.update { it.copy(offer = offer) }
-        return offer
+        return mutex.withLock {
+            if (offerUser != user) return@withLock null
+            _state.update { it.copy(offer = offer) }
+            offer
+        }
     }
 
     /** The app went away: status reads stop until it is back. */
@@ -199,8 +220,9 @@ class AccountImports(
             // the action on the last answer, and this tap re-asks before the
             // policy read. A "no" takes the action off every row with its
             // reason and sends nothing more.
+            val user = offerUser ?: return@launchFor clear(deviceBookId)
             val offer = try {
-                readOffer(gateway)
+                readOffer(gateway, user)
             } catch (e: ReaderAuthException) {
                 publish(deviceBookId, refusalFor(e))
                 return@launchFor
@@ -560,6 +582,9 @@ class AccountImports(
      */
     private suspend fun forgetEverything() {
         mutex.withLock {
+            offerUser = null
+            offerJob?.cancel()
+            offerJob = null
             jobs.values.forEach(Job::cancel)
             jobs.clear()
             persisted.clear()

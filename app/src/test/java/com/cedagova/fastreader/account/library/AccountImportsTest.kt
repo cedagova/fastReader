@@ -15,6 +15,7 @@ import com.cedagova.reader.library.model.PublicationImportStatus
 import com.cedagova.reader.library.model.ReaderCapabilityAvailability
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderPublicationImportCapability
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -192,6 +193,53 @@ class AccountImportsTest {
 
             assertEquals(ImportOffer.Available, imports.state.value.offer)
         }
+
+    @Test
+    fun `a capability answer that arrives after sign-out is not applied`() = runTest(dispatcher) {
+        val onTheWire = CompletableDeferred<Unit>()
+        gateway.capabilityGate = onTheWire
+        imports.state
+        advanceUntilIdle()
+        assertEquals("the read is still in flight", 1, gateway.capabilityReads)
+
+        account.value = AccountLibraryState.SIGNED_OUT
+        advanceUntilIdle()
+        onTheWire.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(AccountImportsState.NONE, imports.state.value)
+        assertEquals(ImportOffer.Unknown, imports.state.value.offer)
+    }
+
+    @Test
+    fun `a capability answer read for one account is never applied to the next`() = runTest(dispatcher) {
+        val firstAnswer = CompletableDeferred<Unit>()
+        gateway.capabilityGate = firstAnswer
+        imports.state
+        advanceUntilIdle()
+
+        // user-1's read is still on the wire when user-2's session begins.
+        gateway.capabilityGate = null
+        gateway.capability = ReaderPublicationImportCapability(
+            availability = ReaderCapabilityAvailability.UNAVAILABLE,
+            reason = ReaderCapabilityReason.QUOTA_EXHAUSTED,
+            entries = 1,
+        )
+        account.value = AccountLibraryState(phase = AccountSyncPhase.IDLE, userId = "user-2")
+        advanceUntilIdle()
+        assertEquals("user-2 reads its own answer", 2, gateway.capabilityReads)
+        assertEquals(ImportOffer.Unavailable(ReaderCapabilityReason.QUOTA_EXHAUSTED), imports.state.value.offer)
+
+        gateway.capability = FakePublicationImportGateway.IMPORT_AVAILABLE
+        firstAnswer.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(
+            "user-1's late answer does not overwrite user-2's",
+            ImportOffer.Unavailable(ReaderCapabilityReason.QUOTA_EXHAUSTED),
+            imports.state.value.offer,
+        )
+    }
 
     // ---- the policy decides, never a constant ----------------------------------------------
 

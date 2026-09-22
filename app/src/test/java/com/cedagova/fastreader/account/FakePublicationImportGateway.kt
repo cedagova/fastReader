@@ -27,6 +27,7 @@ import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
+import kotlinx.coroutines.CompletableDeferred
 
 /**
  * A scripted stand-in for the publication-import seam, the same shape as
@@ -74,6 +75,9 @@ class FakePublicationImportGateway : PublicationImportGateway {
      */
     var capabilityReads: Int = 0
 
+    /** When set, a capability read waits for it — a read still on the wire. */
+    var capabilityGate: CompletableDeferred<Unit>? = null
+
     /** Answers for `start`/`resume`, in order; the last one repeats. */
     val steps = ArrayDeque<PublicationImportStep>()
     var stepFailure: ReaderAuthException? = null
@@ -91,6 +95,7 @@ class FakePublicationImportGateway : PublicationImportGateway {
 
     override suspend fun importCapability(): ReaderPublicationImportCapability {
         capabilityReads++
+        capabilityGate?.await()
         capabilityFailure?.let { throw it }
         return capability
     }
