@@ -63,8 +63,20 @@ class PrivacyStatementTest {
      * the claim to what the merged code actually does and no further: no book
      * *file* is sent, a device-only book is never named to the Reader API, and
      * positions, reading speed, the other settings and crash reports still
-     * never leave. The download and position sentences belong to later
-     * increments and are deliberately not here yet.
+     * never leave.
+     *
+     * The positions quarter of *that* replacement lasted three increments.
+     * #120 and #121 retire "your reading positions … are never sent", because
+     * for a book the account already holds FastReader now publishes the
+     * portable position — the chapter's spine path, the book-level fraction and
+     * the whole percent already on screen — as a `reading_progress` upsert.
+     * Again nothing is softened: the replacement states the two conditions the
+     * code enforces (only for a book the account holds, and only as the chapter
+     * and the fraction) and keeps the three quarters that are still true, adding
+     * the exact *word* to them — `PutReaderProgressRequest` has no field a token
+     * index could travel in, so that is a claim about a type rather than about
+     * care. The inbound half sends nothing and is named in the fourth claim
+     * because a request is made for it, not because anything leaves with it.
      *
      * The import half of that replacement lasted exactly one increment. #117
      * retires "no book file is ever sent" and the unconditional "a book that is
@@ -100,14 +112,15 @@ class PrivacyStatementTest {
      * edit of `values-es/strings.xml` too.
      */
     @Test
-    fun `the statement still makes the twenty-six claims the build backs up`() {
+    fun `the statement still makes the twenty-nine claims the build backs up`() {
         val statement = oneLine(shownInApp())
 
         listOf(
             "has the internet permission and uses it for one thing only: the optional Reader account",
             "your email address, the code or password you type and the account's session go to the Reader identity provider and the Reader API",
             "asks the Reader API which books your account already holds",
-            "for those books only it tells the Reader API that you opened one, when you last opened it, whether you have finished it, and when you take one out of your account or put it back",
+            "for those books only it tells the Reader API that you opened one, when you last opened it, how far through it you are and which chapter you are in, whether you have finished it, and when you take one out of your account or put it back",
+            "it also asks for the place another device left in those books, so it can offer to take you there",
             "when you choose Add to account library for a book on this device and confirm",
             "asks the Reader API what kinds and sizes of file your account accepts",
             "sends that book's file, its name, its size, its format and its checksum to the Reader API and its storage, where your account keeps them",
@@ -118,7 +131,8 @@ class PrivacyStatementTest {
             "the account's sign-in is never given to the storage the file comes from",
             "a book file is sent only for a book you add that way",
             "a book that is only on this device is never named to the Reader API until you add it",
-            "your reading positions, your reading speed, your other settings and any crash report stay on this device and are never sent",
+            "your place in a book leaves this device only for a book your account holds and only as the chapter and how far through it you are",
+            "the exact word you are on, your reading speed, your other settings and any crash report stay on this device and are never sent",
             "kept encrypted on this device, outside its backup, and is removed when you sign out",
             "hands a web address to your browser",
             "your books stay in the folders you chose",
@@ -157,6 +171,16 @@ class PrivacyStatementTest {
             // followed by "until you add it" — matching the bare clause would
             // fail against the *new*, truthful sentence.
             "never named to the Reader API, and your reading positions",
+            // Retired with #120 and #121: for a book the account holds, the
+            // portable position — the chapter's spine path, the book-level
+            // fraction and the whole percent already on screen — is published as
+            // a `reading_progress` upsert, so "your reading positions … are
+            // never sent" stopped being true. The three quarters of it that are
+            // still true (speed, other settings, crash report) are kept verbatim
+            // in the replacement, which also adds the exact *word* — no token
+            // index has a field in `PutReaderProgressRequest` to travel in.
+            "your reading positions, your reading speed, your other settings " +
+                "and any crash report stay on this device and are never sent",
         ).forEach { retired ->
             assertFalse(
                 "the retired promise \"$retired\" must not survive in the statement: $statement",

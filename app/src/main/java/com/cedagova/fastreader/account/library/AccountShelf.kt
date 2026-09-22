@@ -135,6 +135,17 @@ class AccountShelf(
         actions.recordPosition(bookId, position)
 
     /**
+     * The reader has answered the resume offer for one remote change (REQ-511).
+     *
+     * Straight through like the three above it, and the only one of the four that
+     * puts nothing on the wire: it records that the question was asked, so the
+     * next open of this book does not ask it again. Called for **both** answers —
+     * the requirement is that the offer is *made* once.
+     */
+    fun settleResumeOffer(bookId: String, changeKey: String) =
+        actions.settleResumeOffer(bookId, changeKey)
+
+    /**
      * Ends the offer, or ends [expected]'s offer only when one is named.
      *
      * Takes the lock itself, so it must only ever be called from a coroutine

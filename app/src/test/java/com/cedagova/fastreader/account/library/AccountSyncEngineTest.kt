@@ -314,8 +314,23 @@ class AccountSyncEngineTest {
         assertEquals(0, engine.state.value.queued)
     }
 
+    /**
+     * The four *library* actions the shelf offers produce `library_item`
+     * envelopes and nothing else.
+     *
+     * Deliberately named for what it drives. It used to be called "nothing but
+     * library_item mutations is ever produced", which read as a global invariant
+     * over the engine — and stopped being one in #120, when a published position
+     * became a second kind of envelope this class builds. The test itself never
+     * covered that: it drives remove, undo, open and finish, none of which is a
+     * position flush, so it kept passing while the claim in its name went false.
+     * A privacy promise was resting on that name (row 7 of
+     * `docs/privacy-statement.md`), which is the whole reason the rename matters.
+     *
+     * The invariant over the *engine* is the test below this one.
+     */
     @Test
-    fun `nothing but library_item mutations is ever produced`() = runTest(dispatcher) {
+    fun `a library mutation is only ever a library_item envelope`() = runTest(dispatcher) {
         gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
         gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
         val engine = engine()
@@ -349,6 +364,83 @@ class AccountSyncEngineTest {
             ),
             envelopes.map { it.mutationKind },
         )
+    }
+
+    /**
+     * The invariant row 7 of `docs/privacy-statement.md` actually rests on: over
+     * every operation this engine offers, the set of resource types it puts on
+     * the wire is exactly `library_item` and `reading_progress`.
+     *
+     * An equality over the whole set, not a per-envelope check against a list of
+     * allowed members: a `profile`, `settings`, `note` or `bookmark` envelope
+     * added later fails this, and so does silently dropping the position
+     * envelope. It drives all five operations in one run — remove, undo, open,
+     * finish *and* a position — so the assertion is about a batch that really
+     * contains both kinds rather than about one kind in isolation.
+     */
+    @Test
+    fun `only library_item and reading_progress envelopes are ever produced`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        admit("key-1", ReaderMutationKind.DELETE)
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+        admit("key-2", ReaderMutationKind.RESTORE)
+        engine.undoRemove("book-1")
+        advanceUntilIdle()
+        admit("key-3", ReaderMutationKind.UPSERT)
+        engine.recordOpened("book-1")
+        advanceUntilIdle()
+        admit("key-4", ReaderMutationKind.UPSERT)
+        engine.recordFinished("book-1")
+        advanceUntilIdle()
+        admit("key-5", ReaderMutationKind.UPSERT)
+        engine.recordPosition("book-1", position(href = "OEBPS/ch3.xhtml", percent = 40))
+        advanceUntilIdle()
+
+        val envelopes = gateway.submitted.flatten()
+        assertEquals(5, envelopes.size)
+        assertEquals(
+            "the engine can put no settings, note, bookmark or profile envelope on the wire",
+            setOf(ReaderResourceType.LIBRARY_ITEM, ReaderResourceType.READING_PROGRESS),
+            envelopes.map { it.resourceType }.toSet(),
+        )
+        assertEquals(
+            "exactly one of the five is a position",
+            1,
+            envelopes.count { it.resourceType == ReaderResourceType.READING_PROGRESS },
+        )
+    }
+
+    /**
+     * Settling the resume offer is a note to this device and never a mutation
+     * (#121).
+     *
+     * The record exists so the offer is made once per remote change; nothing
+     * about it belongs to the account's backend state, so answering it must add
+     * no envelope to the outbox and send nothing at all. Asserted beside the
+     * envelope invariant above because this is the operation most likely to grow
+     * a wire call by accident — it is the only thing on
+     * [AccountLibraryActions] that writes the account document without queueing.
+     */
+    @Test
+    fun `settling a resume offer is stored and sends nothing`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+        gateway.calls.clear()
+
+        engine.settleResumeOffer("book-1", "7:2026-09-20T10:00:00Z")
+        advanceUntilIdle()
+
+        assertTrue("settling must send nothing at all, got ${gateway.calls}", gateway.calls.isEmpty())
+        assertEquals(0, engine.state.value.queued)
+        val stored = stores.forUser("user-1").load() as AccountLibraryLoad.Loaded
+        assertEquals("7:2026-09-20T10:00:00Z", stored.document.book("book-1")?.resumeOfferSettledFor)
     }
 
     // ------------------------------------------------------- cursor expiry

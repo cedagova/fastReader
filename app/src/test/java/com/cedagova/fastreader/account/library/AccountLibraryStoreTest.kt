@@ -243,8 +243,10 @@ class AccountLibraryStoreTest {
         val version3 = codec.encode(sample())
             .replace("\"schemaVersion\":${AccountLibrarySchema.CURRENT_VERSION}", "\"schemaVersion\":3")
             .replace(",\"remotePosition\":null", "")
+            .replace(",\"resumeOfferSettledFor\":null", "")
         assertTrue("the fixture must really be a version 3 document", version3.contains("\"schemaVersion\":3"))
         assertTrue("a version 3 document names no remote position", !version3.contains("remotePosition"))
+        assertTrue("nor a settled resume offer", !version3.contains("resumeOfferSettledFor"))
 
         val decoded = codec.decode(version3) as AccountLibraryDecoding.Decoded
 
@@ -279,6 +281,67 @@ class AccountLibraryStoreTest {
         val decoded = codec.decode(codec.encode(document)) as AccountLibraryDecoding.Decoded
 
         assertEquals(remote, decoded.document.book(book.bookId)!!.remotePosition)
+    }
+
+    /**
+     * Schema 5 (#121): a document written before the resume offer existed reads
+     * back with nothing answered, which is the truth about a device that was never
+     * asked. Everything else comes back untouched.
+     */
+    @Test
+    fun `a version four document migrates forward with no settled resume offer`() {
+        val codec = AccountLibraryCodec()
+        val version4 = codec.encode(sample())
+            .replace("\"schemaVersion\":${AccountLibrarySchema.CURRENT_VERSION}", "\"schemaVersion\":4")
+            .replace(",\"resumeOfferSettledFor\":null", "")
+        assertTrue("the fixture must really be a version 4 document", version4.contains("\"schemaVersion\":4"))
+        assertTrue("a version 4 document names no settled offer", !version4.contains("resumeOfferSettledFor"))
+
+        val decoded = codec.decode(version4) as AccountLibraryDecoding.Decoded
+
+        assertEquals(4, decoded.migratedFrom)
+        assertEquals(AccountLibrarySchema.CURRENT_VERSION, decoded.document.schemaVersion)
+        assertEquals(sample().books, decoded.document.books)
+        assertEquals(sample().outbox, decoded.document.outbox)
+        assertEquals(sample().imports, decoded.document.imports)
+        assertEquals(sample().copies, decoded.document.copies)
+        assertTrue(
+            "every row comes back never having been asked",
+            decoded.document.books.all { it.resumeOfferSettledFor == null },
+        )
+    }
+
+    /** The settled record survives a write and a read, keyed by the remote change. */
+    @Test
+    fun `a settled resume offer round trips as the remote change it answered`() {
+        val codec = AccountLibraryCodec()
+        val book = sample().books.first().copy(resumeOfferSettledFor = "11:2026-09-20T09:00:00Z")
+        val document = sample().withBook(book)
+
+        val decoded = codec.decode(codec.encode(document)) as AccountLibraryDecoding.Decoded
+
+        assertEquals("11:2026-09-20T09:00:00Z", decoded.document.book(book.bookId)!!.resumeOfferSettledFor)
+    }
+
+    /**
+     * The key is the server's own ordering and nothing of this device's, and a
+     * later change carries a different one — which is the whole of "a newer remote
+     * change is offered again".
+     */
+    @Test
+    fun `a remote change key names the revision and the server's own time`() {
+        val at = "2026-09-20T09:00:00Z"
+        assertEquals("11:$at", AccountRemotePosition(updatedAt = at, revision = 11).changeKey)
+        assertEquals(
+            "a later revision is a different question",
+            "12:$at",
+            AccountRemotePosition(updatedAt = at, revision = 12).changeKey,
+        )
+        assertEquals(
+            "and so is the same revision restated at a different time",
+            "11:2026-09-20T10:00:00Z",
+            AccountRemotePosition(updatedAt = "2026-09-20T10:00:00Z", revision = 11).changeKey,
+        )
     }
 
     /** A copy reference survives a write and a read, and replaces rather than duplicates. */

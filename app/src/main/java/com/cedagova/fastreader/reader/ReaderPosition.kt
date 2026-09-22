@@ -142,6 +142,22 @@ interface ReaderPositions {
      */
     fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int)
 
+    /**
+     * The offer to resume from the place another client left in this book, or
+     * null when there is none to make (REQ-511).
+     *
+     * The mirror of [publishPortable] and gated the same way: a device book, a
+     * signed-out app and a book the account holds no position for all end here
+     * and produce nothing. [tokenIndex] is where the reader is *now*, which is
+     * what makes the difference between a question worth asking and one that
+     * would offer to move somebody to where they already are.
+     *
+     * Asked rather than pushed, and asked again whenever the account's rows
+     * change: a position from another device arrives on an ordinary foreground
+     * sync (REQ-502), which can land while the book is already open.
+     */
+    fun remoteOffer(bookId: String, content: BookContent, tokenIndex: Int): ResumeOffer?
+
     /** Non-null while storage is refusing writes, so a lost position is visible. */
     val failure: StateFlow<String?>
 }

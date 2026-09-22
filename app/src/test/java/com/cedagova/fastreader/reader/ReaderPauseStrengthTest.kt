@@ -215,5 +215,8 @@ class ReaderPauseStrengthTest {
         override fun flush() = Unit
 
         override fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int) = Unit
+
+        /** No account, so no other client has ever left a place in this book. */
+        override fun remoteOffer(bookId: String, content: BookContent, tokenIndex: Int): ResumeOffer? = null
     }
 }

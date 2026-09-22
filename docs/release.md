@@ -47,7 +47,10 @@ account. This page is the whole procedure.
    **absent**: "no internet permission" went with v1.6.0, and v1.7.0 retired
    "your books, your reading positions, your settings and any crash report stay
    on this device and are never sent" because the account library now sends
-   `library_item` changes for the books an account already holds. The rule is
+   `library_item` changes for the books an account already holds — and then
+   retired the narrower "your reading positions … are never sent" too, because a
+   `reading_progress` upsert now carries the chapter and the fraction for those
+   same books. The rule is
    AD-27: the statement may claim *less* than the shipped code does, never
    more. The permission and cleartext proofs in the table below did not change
    for that — the account library rides the client `:reader-auth` already

@@ -316,5 +316,11 @@ class ReaderViewModelPersistenceTest {
         override fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int) {
             published += bookId to tokenIndex
         }
+
+        /**
+         * The resume offer has its own test class with its own fake; here the
+         * account holds no place, so nothing is ever offered.
+         */
+        override fun remoteOffer(bookId: String, content: BookContent, tokenIndex: Int): ResumeOffer? = null
     }
 }

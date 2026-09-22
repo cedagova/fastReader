@@ -4,6 +4,7 @@ import com.cedagova.fastreader.account.library.AccountBook
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
+import com.cedagova.fastreader.account.library.AccountRemotePosition
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
@@ -524,4 +525,87 @@ class LibraryAccountUiStateTest {
 
         assertNull(state.books.single().accountCopy)
     }
+
+    // ---- the account's place on the shelf (#121, REQ-511) -----------------------------
+
+    /**
+     * The row carries both numbers, and the device's is untouched: the account's
+     * place is a *second* value the row can show, never a replacement for the one
+     * the catalog holds.
+     */
+    @Test
+    fun `an account place further on is carried beside this device's`() {
+        val state = shelf(readAt(0.37f), accountOf(withPlace(percent = 68.0)))
+
+        val row = state.books.single()
+        assertEquals("the catalog's number is unchanged", 37, row.progressPercent)
+        assertEquals(68, row.account?.remotePercent)
+        assertEquals("and it is worth showing", 68, row.accountPercentAhead)
+    }
+
+    /**
+     * Level, behind, and absent all say nothing extra — #121's "a remote position
+     * older than local shows nothing on the shelf", and the case that makes it
+     * matter: this device's own published position coming back.
+     */
+    @Test
+    fun `an account place level with or behind this device's is not shown`() {
+        assertNull(
+            "the same place, which is what this device's own publish looks like on return",
+            shelf(readAt(0.37f), accountOf(withPlace(percent = 37.0)))
+                .books.single().accountPercentAhead,
+        )
+        assertNull(
+            "and a place further back",
+            shelf(readAt(0.37f), accountOf(withPlace(percent = 4.0)))
+                .books.single().accountPercentAhead,
+        )
+        assertNull(
+            "and an account row that holds no place at all",
+            shelf(readAt(0.37f), accountOf(accountBook("acc-1", "Ficciones", FICCIONES_HEX)))
+                .books.single().accountPercentAhead,
+        )
+    }
+
+    /**
+     * An account-only row has no local place for the account's to be ahead *of*,
+     * and its status line already says the book is not on this device — so it
+     * carries the percent as a value and shows nothing extra.
+     */
+    @Test
+    fun `an account-only row shows nothing extra`() {
+        val state = shelf(catalogOf(), accountOf(withPlace(percent = 68.0, contentSha256 = RAYUELA_HEX)))
+
+        val row = state.books.single()
+        assertTrue(row.isAccountOnly)
+        assertEquals(68, row.account?.remotePercent)
+        assertNull(row.accountPercentAhead)
+    }
+
+    /** Signed out there is no account half, so there is no second number either. */
+    @Test
+    fun `signed out no row shows a second place`() {
+        val state = shelf(readAt(0.37f), AccountLibraryState.SIGNED_OUT)
+
+        assertNull(state.books.single().account)
+        assertNull(state.books.single().accountPercentAhead)
+    }
+
+    /** Ficciones, on this device, read to [fraction]. */
+    private fun readAt(fraction: Float) = Catalog(
+        books = listOf(LibraryFixtures.readable(FICCIONES, "Ficciones", fileName = "Ficciones.epub")),
+        readingStates = mapOf(FICCIONES to ReadingState(progressFraction = fraction)),
+    )
+
+    private fun withPlace(percent: Double, contentSha256: String = FICCIONES_HEX) =
+        accountBook("acc-1", "Ficciones", contentSha256).copy(
+            remotePosition = AccountRemotePosition(
+                href = "OEBPS/ch8.xhtml",
+                chapterTitle = "Chapter Eight",
+                progression = percent / 100.0,
+                percent = percent,
+                updatedAt = "2026-09-20T10:00:00Z",
+                revision = 4,
+            ),
+        )
 }
