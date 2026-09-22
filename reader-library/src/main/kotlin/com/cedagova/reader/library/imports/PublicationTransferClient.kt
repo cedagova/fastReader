@@ -1,5 +1,6 @@
 package com.cedagova.reader.library.imports
 
+import com.cedagova.reader.library.GrantOrigin
 import com.cedagova.reader.library.model.PublicationTransferGrant
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
@@ -63,6 +64,10 @@ class PublicationTransferClient internal constructor(
      * The provider may answer with a relative `Location`; it is resolved
      * against the creation endpoint, which is what the TUS specification says
      * to do and what a signed-route provider actually returns.
+     *
+     * A `Location` on another origin than [PublicationTransferGrant.endpoint]
+     * is refused with [PublicationTransferException.ForeignLocation]: every
+     * later `HEAD` and `PATCH` carries the grant's headers to it (#142).
      */
     suspend fun create(grant: PublicationTransferGrant): String {
         require(grant.protocol == PublicationTransferGrant.PROTOCOL_TUS) {
@@ -82,7 +87,7 @@ class PublicationTransferClient internal constructor(
         }
         val location = response.headers[HttpHeaders.Location]
             ?: throw PublicationTransferException.Protocol("the creation response carried no Location")
-        return resolve(grant.endpoint, location)
+        return resolve(grant.endpoint, location).also { checkOrigin(grant, it) }
     }
 
     /** The `HEAD` that recovers the provider's durable offset for a resumable upload. */
@@ -183,6 +188,10 @@ class PublicationTransferClient internal constructor(
         offset: Long?,
         block: HttpRequestBuilder.() -> Unit = {},
     ): HttpResponse {
+        // A stored location from an earlier attempt reaches here without
+        // passing through `create`, so the origin is checked on every request,
+        // before the grant's headers are put on it.
+        checkOrigin(grant, url)
         val response = try {
             http.request(url) {
                 this.method = method
@@ -206,6 +215,11 @@ class PublicationTransferClient internal constructor(
             status in 500..599 -> throw PublicationTransferException.Unavailable(IOException("provider $status"))
             else -> throw PublicationTransferException.Refused(status)
         }
+    }
+
+    /** The grant's headers go only to the grant endpoint's own origin (#142). */
+    private fun checkOrigin(grant: PublicationTransferGrant, url: String) {
+        if (!GrantOrigin.sameAs(grant.endpoint, url)) throw PublicationTransferException.ForeignLocation()
     }
 
     private fun HttpResponse.uploadOffset(): Long =
@@ -379,4 +393,13 @@ sealed class PublicationTransferException(
 
     /** The provider answered in a way TUS does not allow. Not resumable by retrying blindly. */
     class Protocol(message: String) : PublicationTransferException(message)
+
+    /**
+     * The upload's `Location` is on another origin (host, port or scheme) than
+     * the grant's endpoint, so the grant's headers were not sent to it (#142).
+     * Nothing of the location travels in this error: it can carry a signature.
+     * The location is not one to keep, and the same provider would hand back
+     * the same one, so this is a refusal rather than an interruption.
+     */
+    class ForeignLocation : PublicationTransferException("the upload location is on another origin than the grant")
 }

@@ -135,6 +135,9 @@ class FakeStorage(
     /** Refuse the creation `POST` outright, as a provider over its limit does (413). */
     var refuseCreateWith: Int? = null
 
+    /** The `Location` the creation `POST` answers with. */
+    var location: String = TUS_LOCATION
+
     /** Answer the next `PATCH` with `409`, as a provider that has moved on does. */
     var conflictNextPatch: Boolean = false
 
@@ -170,7 +173,7 @@ class FakeStorage(
                 respond(
                     "",
                     HttpStatusCode.Created,
-                    headersOf(HttpHeaders.Location to listOf(TUS_LOCATION)),
+                    headersOf(HttpHeaders.Location to listOf(location)),
                 )
             }
             "HEAD" -> {

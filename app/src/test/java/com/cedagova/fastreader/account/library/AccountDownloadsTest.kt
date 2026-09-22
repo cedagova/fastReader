@@ -8,6 +8,7 @@ import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetMethod
@@ -182,6 +183,25 @@ class AccountDownloadsTest {
         assertTrue("freeing space and trying again is the reader's move", refused.retryable)
         assertNull(downloads.opened.value)
         assertTrue("the book stays in the account", account.value.books.map { it.bookId }.contains(ACCOUNT_BOOK_ID))
+    }
+
+    /** #142: a redirect off the grant's origin is its own sentence, and not offered again. */
+    @Test
+    fun `a download redirected to another origin is refused as redirected and nothing opens`() = runTest {
+        val transport = ScriptedDownloads(bytes)
+        transport.transportFailure = AssetDownloadException.ForeignRedirect()
+        val library = repository(appScope())
+        val downloads = downloads(transport, library, appScope())
+
+        downloads.open(ACCOUNT_BOOK_ID)
+        advanceUntilIdle()
+
+        val refused = downloads.state.value.byAccountBookId[ACCOUNT_BOOK_ID] as BookDownloadState.Refused
+        assertEquals(DownloadProblem.REDIRECTED, refused.problem)
+        assertFalse("the same grant would meet the same redirect", refused.retryable)
+        assertEquals("a foreign redirect is not a spent grant: no second grant", 1, transport.grants.size)
+        assertNull(downloads.opened.value)
+        assertEquals(emptySet<String>(), store.contents())
     }
 
     @Test

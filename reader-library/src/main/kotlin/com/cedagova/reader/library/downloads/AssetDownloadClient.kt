@@ -1,5 +1,6 @@
 package com.cedagova.reader.library.downloads
 
+import com.cedagova.reader.library.GrantOrigin
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
@@ -9,10 +10,12 @@ import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.HttpHeaders
 import io.ktor.utils.io.readAvailable
 import java.io.Closeable
 import java.io.IOException
 import java.io.OutputStream
+import java.net.URI
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -77,21 +80,35 @@ class AssetDownloadClient internal constructor(
         }
         require(grant.url.isNotBlank()) { "a download grant carries the provider's own URL" }
         var written = 0L
+        var url = grant.url
+        var redirects = 0
         try {
-            http.prepareGet(grant.url) {
-                grant.headers.forEach { (name, value) -> header(name, value) }
-            }.execute { response ->
-                verify(response)
-                val channel = response.bodyAsChannel()
-                val buffer = ByteArray(READ_BUFFER_BYTES)
-                while (true) {
-                    val read = channel.readAvailable(buffer, 0, buffer.size)
-                    if (read < 0) break
-                    if (read == 0) continue
-                    sink.write(buffer, 0, read)
-                    written += read
-                    onProgress(written, grant.sizeBytes)
+            while (true) {
+                val next = http.prepareGet(url) {
+                    grant.headers.forEach { (name, value) -> header(name, value) }
+                }.execute<String?> { response ->
+                    redirectTarget(url, response)?.let { return@execute it }
+                    verify(response)
+                    val channel = response.bodyAsChannel()
+                    val buffer = ByteArray(READ_BUFFER_BYTES)
+                    while (true) {
+                        val read = channel.readAvailable(buffer, 0, buffer.size)
+                        if (read < 0) break
+                        if (read == 0) continue
+                        sink.write(buffer, 0, read)
+                        written += read
+                        onProgress(written, grant.sizeBytes)
+                    }
+                    null
+                } ?: break
+                // The grant's headers are about to be sent again. They go only
+                // to the origin the grant named (#142): a redirect to another
+                // host, port or scheme is refused before any request exists.
+                if (!GrantOrigin.sameAs(grant.url, next)) throw AssetDownloadException.ForeignRedirect()
+                if (++redirects > MAX_REDIRECTS) {
+                    throw AssetDownloadException.Protocol("the provider redirected more than $MAX_REDIRECTS times")
                 }
+                url = next
             }
         } catch (e: CancellationException) {
             throw e
@@ -113,6 +130,23 @@ class AssetDownloadClient internal constructor(
 
     override fun close() {
         http.close()
+    }
+
+    /**
+     * The absolute address a redirect names, or null when [response] is not a
+     * redirect. A relative `Location` is resolved against [current], the URL
+     * that answered. The address is only *read* here; whether the grant's
+     * headers may follow it is decided by the caller, against the grant.
+     */
+    private fun redirectTarget(current: String, response: HttpResponse): String? {
+        if (response.status.value !in REDIRECTS) return null
+        val location = response.headers[HttpHeaders.Location]
+            ?: throw AssetDownloadException.Protocol("the provider redirected without a Location")
+        return try {
+            URI(current).resolve(location).toString()
+        } catch (e: IllegalArgumentException) {
+            throw AssetDownloadException.Protocol("the provider's redirect Location is not a URL")
+        }
     }
 
     /**
@@ -143,6 +177,12 @@ class AssetDownloadClient internal constructor(
 
         private const val READ_BUFFER_BYTES = 64 * 1024
 
+        /** The statuses a GET follows: the provider's object lives at another path. */
+        private val REDIRECTS = setOf(301, 302, 303, 307, 308)
+
+        /** More same-origin hops than this is a loop, not a CDN. */
+        private const val MAX_REDIRECTS = 10
+
         /** The client tests drive: the real client over a mock engine, same code path. */
         fun createForTests(engine: HttpClientEngine): AssetDownloadClient =
             AssetDownloadClient(httpClient(engine))
@@ -156,14 +196,13 @@ class AssetDownloadClient internal constructor(
          */
         internal fun httpClient(engine: HttpClientEngine): HttpClient = HttpClient(engine) {
             expectSuccess = false
-            // Unlike the upload side, which POSTs to one signed creation
-            // endpoint and resolves the provider's Location itself, a download
-            // is a plain GET of a signed object URL — and object storage in
-            // front of a CDN answers one with a redirect. Following it is
-            // ordinary; the only credential that can travel with it is the
-            // grant's provider-scoped signature, because that is the only
-            // credential this client holds at all.
-            followRedirects = true
+            // A download is a plain GET of a signed object URL, and object
+            // storage answers one with a redirect often enough that following
+            // it is ordinary. But Ktor's own follower would re-send the grant's
+            // headers to whatever host the redirect names, so `download`
+            // follows redirects itself and only within the grant URL's origin
+            // (#142) — the same rule the upload side applies to its Location.
+            followRedirects = false
             install(HttpTimeout) {
                 requestTimeoutMillis = INFINITE_TIMEOUT_MILLIS
                 connectTimeoutMillis = CONNECT_TIMEOUT_MILLIS
@@ -207,4 +246,12 @@ sealed class AssetDownloadException(
 
     /** The provider answered in a way the grant does not allow — a short or over-long body. */
     class Protocol(message: String) : AssetDownloadException(message)
+
+    /**
+     * The provider redirected to a different origin (host, port or scheme),
+     * and the grant's headers were not sent there (#142). Nothing of the
+     * target travels in this error: it can carry a signed URL. Retrying the
+     * same grant would meet the same redirect, so this is not a retry case.
+     */
+    class ForeignRedirect : AssetDownloadException("the provider redirected the download to another origin")
 }

@@ -1461,6 +1461,7 @@ private fun BookDownloadState.Refused.message(): String = stringResource(
         DownloadProblem.OFFLINE -> R.string.library_account_download_offline
         DownloadProblem.REFUSED -> R.string.library_account_download_refused
         DownloadProblem.FAILED -> R.string.library_account_download_failed
+        DownloadProblem.REDIRECTED -> R.string.library_account_download_redirected
         DownloadProblem.UNREADABLE -> R.string.library_account_download_unreadable
         DownloadProblem.UNAVAILABLE -> R.string.library_account_download_unavailable
     },

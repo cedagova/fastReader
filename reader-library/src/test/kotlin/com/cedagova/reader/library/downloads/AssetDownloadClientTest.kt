@@ -183,6 +183,54 @@ class AssetDownloadClientTest {
         assertTrue(failure.message!!.contains("${SIZE / 2}"))
     }
 
+    /**
+     * #142: the grant's headers never leave the grant URL's origin. A redirect
+     * to another host is refused before anything is requested there — the old
+     * client let Ktor follow it with the signature attached.
+     */
+    @Test
+    fun `a redirect to another origin is refused and the grant's headers never reach it`() = runTest {
+        storage.redirectTo = "https://cdn.elsewhere.test/reader/0f1e/book.epub?token=signed"
+        val sink = ByteArrayOutputStream()
+
+        val refused = assertRaises<AssetDownloadException.ForeignRedirect> {
+            client.download(downloadGrant(bytes), sink)
+        }
+
+        assertEquals("only the grant's own URL was requested", listOf("storage.test"), storage.requests.map { it.host })
+        assertEquals("no byte was written", 0, sink.size())
+        assertFalse("the target never travels in the error", refused.message!!.contains("elsewhere"))
+    }
+
+    /** The same rule, for a downgrade: same host, but http is another origin. */
+    @Test
+    fun `a redirect from https to http on the same host is refused`() = runTest {
+        storage.redirectTo = "http://storage.test/storage/v1/object/sign/reader/0f1e/book.epub?token=signed"
+
+        assertRaises<AssetDownloadException.ForeignRedirect> {
+            client.download(downloadGrant(bytes), ByteArrayOutputStream())
+        }
+
+        assertEquals(1, storage.requests.size)
+    }
+
+    /** A redirect inside the grant's origin is ordinary storage behaviour and still works. */
+    @Test
+    fun `a same-origin redirect is followed with the grant's headers and the whole book arrives`() = runTest {
+        storage.redirectTo = "/storage/v1/object/public/reader/0f1e/book.epub"
+        val sink = ByteArrayOutputStream()
+
+        val written = client.download(downloadGrant(bytes), sink)
+
+        assertEquals(SIZE.toLong(), written)
+        assertArrayEquals(bytes, sink.toByteArray())
+        assertEquals(2, storage.requests.size)
+        val followed = storage.requests[1]
+        assertEquals("storage.test", followed.host)
+        assertEquals("/storage/v1/object/public/reader/0f1e/book.epub", followed.path)
+        DOWNLOAD_HEADERS.forEach { (name, value) -> assertEquals(value, followed.headers[name]) }
+    }
+
     /** A full disk surfaces from the sink, and the caller is the one that cleans up. */
     @Test
     fun `a sink that cannot take the bytes fails the download`() = runTest {

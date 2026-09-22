@@ -220,6 +220,57 @@ class PublicationTransferClientTest {
         )
     }
 
+    /**
+     * #142: the grant's headers never leave the grant endpoint's origin. The
+     * old client returned a foreign `Location` and PATCHed the book to it with
+     * the signature attached.
+     */
+    @Test
+    fun `a creation Location on another origin is refused and nothing is sent to it`() = runTest {
+        storage.location = "https://elsewhere.test/storage/v1/upload/resumable/sign/reader/0f1e/source.epub"
+
+        val refused = assertRaises<PublicationTransferException.ForeignLocation> {
+            client.create(grant())
+        }
+
+        assertEquals("only the creation POST was sent", listOf("POST"), storage.requests.map { it.method })
+        assertEquals(listOf("storage.test"), storage.requests.map { it.host })
+        assertFalse("the location never travels in the error", refused.message!!.contains("elsewhere"))
+    }
+
+    /** A location stored by an earlier attempt is checked too, before HEAD or PATCH carry the grant. */
+    @Test
+    fun `a stored location on another origin is never HEADed or PATCHed`() = runTest {
+        val foreign = "https://elsewhere.test/upload/abc"
+
+        assertRaises<PublicationTransferException.ForeignLocation> { client.offset(grant(), foreign) }
+        assertRaises<PublicationTransferException.ForeignLocation> {
+            client.patch(grant(), foreign, 0, bytes.copyOf(CHUNK.toInt()))
+        }
+        assertRaises<PublicationTransferException.ForeignLocation> {
+            client.offset(grant(), "http://storage.test/storage/v1/upload/resumable/sign/abc")
+        }
+
+        assertEquals("nothing reached any host", 0, storage.requests.size)
+    }
+
+    /** An absolute `Location` on the grant's own origin (explicit default port included) still works. */
+    @Test
+    fun `a same-origin Location carries the whole transfer with the grant's headers`() = runTest {
+        storage.location = "https://STORAGE.test:443/storage/v1/upload/resumable/sign/reader/0f1e/other.epub"
+        val grant = grant()
+
+        val location = client.create(grant)
+        val end = client.transfer(grant, location, InMemoryPublication(bytes))
+
+        assertEquals(SIZE.toLong(), end)
+        assertArrayEquals(bytes, storage.received)
+        assertTrue(storage.requests.all { it.host.equals("storage.test", ignoreCase = true) })
+        storage.requests.forEach { request ->
+            GRANT_HEADERS.forEach { (name, value) -> assertEquals(value, request.headers[name]) }
+        }
+    }
+
     /** A book is not POSTed to an unsigned endpoint, whatever the grant says. */
     @Test
     fun `an unsigned creation endpoint is refused before anything is sent`() = runTest {

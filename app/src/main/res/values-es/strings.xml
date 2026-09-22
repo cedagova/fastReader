@@ -429,6 +429,7 @@
     <string name="library_account_download_offline">No se descargó: necesitas conexión para descargar un libro de tu cuenta.</string>
     <string name="library_account_download_refused">No se descargó: tu cuenta de Reader no entrega este libro ahora mismo.</string>
     <string name="library_account_download_failed">No se descargó: la descarga no llegó a terminar.</string>
+    <string name="library_account_download_redirected">No se descargó: el servicio de almacenamiento envió la descarga a otra dirección, así que FastReader se detuvo.</string>
     <string name="library_account_download_unreadable">No se descargó: el archivo llegó completo y FastReader no puede abrirlo como EPUB.</string>
     <string name="library_account_download_unavailable">No se descargó: tu cuenta de Reader no tiene archivo para este libro.</string>
 
