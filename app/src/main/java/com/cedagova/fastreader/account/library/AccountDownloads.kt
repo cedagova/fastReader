@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.account.library
 
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.library.downloads.AssetDownloadException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -236,6 +237,13 @@ enum class DownloadProblem {
     /** The bytes did not arrive. A later attempt may work. */
     FAILED,
 
+    /**
+     * The storage provider sent the download to another origin, and FastReader
+     * would not send the book's signed grant there (#142). The same grant
+     * would meet the same redirect, so this is not offered again.
+     */
+    REDIRECTED,
+
     /** The bytes are the account's, exactly, and are not an EPUB this reader opens. */
     UNREADABLE,
 
@@ -254,7 +262,12 @@ private fun CopyOutcome.refusal(): BookDownloadState.Refused = when (this) {
 
     is CopyOutcome.NoStorage -> BookDownloadState.Refused(DownloadProblem.NO_STORAGE, retryable = true)
 
-    is CopyOutcome.DownloadFailed -> BookDownloadState.Refused(DownloadProblem.FAILED, retryable = true)
+    is CopyOutcome.DownloadFailed ->
+        if (generateSequence(error) { it.cause }.any { it is AssetDownloadException.ForeignRedirect }) {
+            BookDownloadState.Refused(DownloadProblem.REDIRECTED)
+        } else {
+            BookDownloadState.Refused(DownloadProblem.FAILED, retryable = true)
+        }
 
     is CopyOutcome.Unreadable -> BookDownloadState.Refused(DownloadProblem.UNREADABLE)
 

@@ -87,11 +87,18 @@ class FakeObjectStorage(private val body: ByteArray) {
     /** Rejections stop after this many requests, so a re-fetched grant can succeed. */
     var rejectFirst: Int = Int.MAX_VALUE
 
+    /** Answer the first request with a 302 to this `Location`, as a CDN in front of storage does. */
+    var redirectTo: String? = null
+
     val engine = MockEngine { data ->
         val recorded = data.record()
         requests += recorded
         val reject = rejectWith
+        val redirect = redirectTo
         when {
+            redirect != null && requests.size == 1 ->
+                respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, redirect))
+
             reject != null && requests.size <= rejectFirst ->
                 respond("provider says no", HttpStatusCode.fromValue(reject))
 

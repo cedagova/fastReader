@@ -206,6 +206,7 @@
     <string name="library_account_download_offline">Not downloaded: you need a connection to download a book from your account.</string>
     <string name="library_account_download_refused">Not downloaded: your Reader account would not hand this book over right now.</string>
     <string name="library_account_download_failed">Not downloaded: the download did not finish.</string>
+    <string name="library_account_download_redirected">Not downloaded: the storage service sent the download to another address, so FastReader stopped.</string>
     <string name="library_account_download_unreadable">Not downloaded: the file arrived complete, and FastReader cannot open it as an EPUB.</string>
     <string name="library_account_download_unavailable">Not downloaded: your Reader account has no file for this book.</string>
 

@@ -198,7 +198,7 @@ class PublicationImportEngine(
             record.confirmedOffset(end)
         } catch (e: PublicationTransferException) {
             val reached = record.confirmedOffset(e.offset)
-            return interrupted(if (e is PublicationTransferException.GrantRejected) reached.withoutTransfer() else reached, e)
+            return interrupted(if (e.provesLocationGone()) reached.withoutTransfer() else reached, e)
         }
 
         val completed = record.withImport(operations.completeImport(record.importId!!).importRecord)
@@ -239,6 +239,9 @@ class PublicationImportEngine(
                 // The resumable upload is gone. Nothing to recover; make a new one.
             } catch (e: PublicationTransferException.Protocol) {
                 // An answer TUS does not allow is not an offset we may trust.
+            } catch (e: PublicationTransferException.ForeignLocation) {
+                // A stored location off the grant's origin is never HEADed
+                // with the grant's headers (#142); make a new one instead.
             }
         }
         return record.transferringAt(transfer.create(grant), grant)
@@ -256,8 +259,9 @@ class PublicationImportEngine(
      * resumable upload is gone.
      *
      * Only [PublicationTransferException.GrantRejected] proves that (401/403/404
-     * /410 — the signature is spent or the object was discarded). Everything
-     * else leaves the provider holding whatever it already had, so the location
+     * /410 — the signature is spent or the object was discarded), plus
+     * [PublicationTransferException.ForeignLocation], a location this client
+     * will never send the grant's headers to (#142). Everything else leaves the provider holding whatever it already had, so the location
      * is worth more than the round trip it costs to find out.
      *
      * The asymmetry matters: keeping a dead location costs one futile `HEAD` on
@@ -274,12 +278,20 @@ class PublicationImportEngine(
         record: PublicationImportRecord,
         locationGrantExpiresAt: String?,
         cause: PublicationTransferException,
-    ): PublicationImportRecord = when (cause) {
-        is PublicationTransferException.GrantRejected -> record.withoutTransfer()
+    ): PublicationImportRecord = when {
+        cause.provesLocationGone() -> record.withoutTransfer()
         // A first attempt has no location, so this preserves nothing and the
         // next attempt creates one, exactly as it would have.
         else -> record.copy(grantExpiresAt = locationGrantExpiresAt)
     }
+
+    /**
+     * True when [this] says the stored location is not worth keeping: the
+     * provider discarded it, or it is on another origin than the grant and
+     * so will never be sent the grant's headers (#142).
+     */
+    private fun PublicationTransferException.provesLocationGone(): Boolean =
+        this is PublicationTransferException.GrantRejected || this is PublicationTransferException.ForeignLocation
 
     private fun interrupted(
         record: PublicationImportRecord,
@@ -288,7 +300,12 @@ class PublicationImportEngine(
         // A provider refusal is not one of the backend's categories, and this
         // module does not invent one: `upload` is the contract's own name for a
         // transfer that did not succeed, which is exactly what happened.
-        is PublicationTransferException.Refused ->
+        // A Location off the grant's origin (#142) is the provider refusing
+        // this client's terms rather than a dropped connection: retrying would
+        // be handed the same Location, so it settles like a refusal.
+        is PublicationTransferException.Refused,
+        is PublicationTransferException.ForeignLocation,
+        ->
             PublicationImportStep.Failed(
                 record.copy(failureCategory = PublicationFailureCategory.UPLOAD, failureRetryable = false),
                 PublicationFailureCategory.UPLOAD,

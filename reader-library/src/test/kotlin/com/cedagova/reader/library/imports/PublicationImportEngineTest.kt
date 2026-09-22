@@ -380,6 +380,28 @@ class PublicationImportEngineTest {
         assertArrayEquals(bytes, storage.received)
     }
 
+    /**
+     * #142 at the engine: a foreign `Location` settles as the contract's
+     * `upload` failure, not retryable, with no location kept and nothing sent
+     * to the other origin.
+     */
+    @Test
+    fun `a creation Location on another origin fails the upload and keeps no location`() = runTest {
+        api.on(POLICY) { json(policyBody()) }
+        api.on(ADMIT) { json(admissionBody(created = true)) }
+        storage.location = "https://elsewhere.test/upload/abc"
+
+        val step = engine().start(ACCOUNT, source, UploadConsent.GRANTED)
+
+        assertTrue("got $step", step is PublicationImportStep.Failed)
+        step as PublicationImportStep.Failed
+        assertEquals(PublicationFailureCategory.UPLOAD, step.category)
+        assertEquals(false, step.record.failureRetryable)
+        assertNull("a foreign location is never stored", step.record.transferLocation)
+        assertEquals(listOf("POST"), storage.requests.map { it.method })
+        assertTrue(storage.requests.none { it.host == "elsewhere.test" })
+    }
+
     // ---- failures ------------------------------------------------------------------------------
 
     /**

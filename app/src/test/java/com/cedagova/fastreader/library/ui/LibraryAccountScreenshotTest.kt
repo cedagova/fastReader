@@ -16,6 +16,7 @@ import com.cedagova.fastreader.account.library.AccountRemotePosition
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
+import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.account.library.ImportProblem
@@ -309,6 +310,21 @@ class LibraryAccountScreenshotTest {
             shelf(
                 LibraryAccountFixtures.dublinersInAccountOnly(),
                 catalog = LibraryAccountFixtures.catalogWithDownloadedCopy(),
+            ),
+        )
+    }
+
+    /**
+     * #142: a download the provider sent to another origin is refused with its
+     * own sentence, the book stays in the account, and no Try again is offered.
+     */
+    @Test
+    fun aDownloadRedirectedToAnotherOriginIsRefusedWithItsOwnReason() {
+        capture(
+            "library_account_download_redirected",
+            shelf(
+                LibraryAccountFixtures.dublinersInAccountOnly(),
+                downloads = downloading(BookDownloadState.Refused(DownloadProblem.REDIRECTED)),
             ),
         )
     }
