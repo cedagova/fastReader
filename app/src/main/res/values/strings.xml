@@ -170,6 +170,9 @@
     <string name="library_account_add_cancel">Cancel adding</string>
     <string name="library_account_add_cancel_label">Cancel adding %1$s to your Reader account</string>
     <string name="library_account_add_off">Your Reader account is not taking new books right now.</string>
+    <string name="library_account_add_off_busy">Your Reader account is still taking in other books. You can add this one when they have finished.</string>
+    <string name="library_account_add_off_version">This version of FastReader cannot add books to your Reader account.</string>
+    <string name="library_account_add_off_later">Your Reader account cannot take new books at the moment. Try again later.</string>
     <string name="library_account_add_retry">Try again</string>
     <string name="library_account_add_retry_label">Try adding %1$s to your Reader account again</string>
 

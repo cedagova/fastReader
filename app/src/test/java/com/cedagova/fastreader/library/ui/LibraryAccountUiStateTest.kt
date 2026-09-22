@@ -10,6 +10,7 @@ import com.cedagova.fastreader.account.library.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.DownloadProblem
+import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
@@ -294,7 +295,7 @@ class LibraryAccountUiStateTest {
         catalog: Catalog,
         account: AccountLibraryState,
         query: String = "",
-        imports: AccountImportsState = AccountImportsState.NONE,
+        imports: AccountImportsState = AccountImportsState(offer = ImportOffer.Available),
         downloads: AccountDownloadsState = AccountDownloadsState.NONE,
     ): LibraryUiState = buildLibraryUiState(
         catalog = catalog,
@@ -409,10 +410,60 @@ class LibraryAccountUiStateTest {
         val state = shelf(
             catalogOf(FICCIONES to "Ficciones"),
             accountOf(),
-            imports = AccountImportsState(disabled = ImportsOff("req-1")),
+            imports = AccountImportsState(offer = ImportOffer.Available, disabled = ImportsOff("req-1")),
         )
 
         assertEquals(ImportsOff("req-1"), state.books.single().addToAccount?.off)
+    }
+
+    /** #139, core.md §6: an import capability not read yet is not an offer. */
+    @Test
+    fun `before the import capability is read, no row offers the add`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones"),
+            accountOf(),
+            imports = AccountImportsState.NONE,
+        )
+
+        assertNull(state.books.single().addToAccount)
+    }
+
+    /** #139: an unavailable capability shows its typed reason in place of the action. */
+    @Test
+    fun `an unavailable import capability shows its reason instead of the action`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones"),
+            accountOf(),
+            imports = AccountImportsState(offer = ImportOffer.Unavailable(ReaderCapabilityReason.QUOTA_EXHAUSTED)),
+        )
+
+        assertEquals(
+            ImportsOff(requestId = null, reason = ReaderCapabilityReason.QUOTA_EXHAUSTED),
+            state.books.single().addToAccount?.off,
+        )
+    }
+
+    /**
+     * The add that exhausted the account's active capacity must stay on screen
+     * with its Cancel: the capability reading `quota_exhausted` withdraws the
+     * offer from the *other* rows, never the transfer already under way.
+     */
+    @Test
+    fun `an add in flight still shows while the capability says capacity is exhausted`() {
+        val state = shelf(
+            catalogOf(FICCIONES to "Ficciones", "sha256:$RAYUELA_HEX" to "Rayuela"),
+            accountOf(),
+            imports = AccountImportsState(
+                offer = ImportOffer.Unavailable(ReaderCapabilityReason.QUOTA_EXHAUSTED),
+                byDeviceBookId = mapOf(FICCIONES to BookImportState.Sending(0.5f)),
+            ),
+        )
+
+        assertEquals(BookImportState.Sending(0.5f), state.books.single { it.id == FICCIONES }.addToAccount?.state)
+        assertEquals(
+            ReaderCapabilityReason.QUOTA_EXHAUSTED,
+            state.books.single { it.title == "Rayuela" }.addToAccount?.off?.reason,
+        )
     }
 
     @Test
@@ -421,6 +472,7 @@ class LibraryAccountUiStateTest {
             catalogOf(FICCIONES to "Ficciones", "sha256:$RAYUELA_HEX" to "Rayuela"),
             accountOf(),
             imports = AccountImportsState(
+                offer = ImportOffer.Available,
                 byDeviceBookId = mapOf(FICCIONES to BookImportState.Sending(0.5f)),
             ),
         )

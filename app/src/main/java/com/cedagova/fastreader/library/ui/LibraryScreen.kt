@@ -87,7 +87,9 @@ import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.ImportProblem
+import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.account.library.PublicationSourceProblem
+import com.cedagova.fastreader.account.library.wireName
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
@@ -96,6 +98,7 @@ import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WideLayoutMinWidth
 import com.cedagova.fastreader.ui.WidthAware
 import com.cedagova.reader.library.model.PublicationFailureCategory
+import com.cedagova.reader.library.model.ReaderCapabilityReason
 import kotlin.math.roundToInt
 
 /** Smallest comfortable touch target; Android's accessibility minimum is 48dp (REQ-060). */
@@ -1265,7 +1268,10 @@ private fun AddToAccountSlot(
     val off = add.off
     if (off != null) {
         ImportNote(
-            text = stringResource(R.string.library_account_add_off),
+            text = stringResource(off.sentence()),
+            // The capability's own typed reason, as the sync notice quotes its
+            // own (#139). A missing or duplicated entry has no reason to quote.
+            code = off.reason?.takeIf { it != ReaderCapabilityReason.UNKNOWN }?.wireName(),
             requestId = off.requestId,
             tag = "library_account_add_off_${book.id}",
         )
@@ -1786,4 +1792,22 @@ private fun Cover(book: LibraryBookItem, coverLoader: CoverLoader) {
             )
         }
     }
+}
+
+/**
+ * The sentence for an add that is not on offer, by the capability's typed
+ * reason (#139). Each says what the reader can expect rather than naming the
+ * mechanism; the reason itself is quoted as the code underneath.
+ */
+private fun ImportsOff.sentence(): Int = when (reason) {
+    ReaderCapabilityReason.QUOTA_EXHAUSTED -> R.string.library_account_add_off_busy
+    ReaderCapabilityReason.CLIENT_VERSION_INVALID,
+    ReaderCapabilityReason.CLIENT_VERSION_MISSING,
+    ReaderCapabilityReason.CLIENT_VERSION_TOO_NEW,
+    ReaderCapabilityReason.CLIENT_VERSION_TOO_OLD,
+    -> R.string.library_account_add_off_version
+    ReaderCapabilityReason.ACTOR_DEPENDENCY_UNAVAILABLE -> R.string.library_account_add_off_later
+    // `enabled: false`, not enabled, not configured, and a missing or
+    // duplicated entry: the deployment is not taking books.
+    else -> R.string.library_account_add_off
 }

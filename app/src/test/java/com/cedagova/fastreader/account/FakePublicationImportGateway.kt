@@ -20,6 +20,9 @@ import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.ReaderAssetGrantResponse
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgressListResponse
+import com.cedagova.reader.library.model.ReaderCapabilityAvailability
+import com.cedagova.reader.library.model.ReaderCapabilityReason
+import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
@@ -56,6 +59,21 @@ class FakePublicationImportGateway : PublicationImportGateway {
     var policy: PublicationImportPolicyResponse = accepting()
     var policyFailure: ReaderAuthException? = null
 
+    /**
+     * What `reader.publication-import.v1` answers (#139). Available by default,
+     * so every test about the flow itself starts from an offered action.
+     */
+    var capability: ReaderPublicationImportCapability = IMPORT_AVAILABLE
+    var capabilityFailure: ReaderAuthException? = null
+
+    /**
+     * Capability reads, counted apart from [calls] on purpose: [calls] is the
+     * record of what touched the import routes, and the tests that assert
+     * "nothing about the book was sent" assert it on that list. A capabilities
+     * read names no book and is counted here instead.
+     */
+    var capabilityReads: Int = 0
+
     /** Answers for `start`/`resume`, in order; the last one repeats. */
     val steps = ArrayDeque<PublicationImportStep>()
     var stepFailure: ReaderAuthException? = null
@@ -69,6 +87,12 @@ class FakePublicationImportGateway : PublicationImportGateway {
         calls += "importPolicy()"
         policyFailure?.let { throw it }
         return policy
+    }
+
+    override suspend fun importCapability(): ReaderPublicationImportCapability {
+        capabilityReads++
+        capabilityFailure?.let { throw it }
+        return capability
     }
 
     override fun refuse(
@@ -121,6 +145,13 @@ class FakePublicationImportGateway : PublicationImportGateway {
 
         const val EPUB_MIME: String = "application/epub+zip"
 
+        /** Exactly one `reader.publication-import.v1` entry, available. */
+        val IMPORT_AVAILABLE: ReaderPublicationImportCapability = ReaderPublicationImportCapability(
+            availability = ReaderCapabilityAvailability.AVAILABLE,
+            reason = ReaderCapabilityReason.AVAILABLE,
+            entries = 1,
+        )
+
         /** A deployment that takes EPUBs up to [cap] bytes and says so. */
         fun accepting(cap: Long = 52_428_800, enabled: Boolean = true): PublicationImportPolicyResponse =
             PublicationImportPolicyResponse(
@@ -161,6 +192,7 @@ private object UnusedOperations : ReaderLibraryOperations {
     override suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse = nope()
     override suspend fun deltas(afterCursor: String, limit: Int): ReaderSyncDeltaResponse = nope()
     override suspend fun syncCapability(): ReaderSyncCapability = nope()
+    override suspend fun publicationImportCapability(): ReaderPublicationImportCapability = nope()
     override suspend fun importPolicy(): PublicationImportPolicyResponse = nope()
     override suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse = nope()
     override suspend fun importRecord(importId: String): PublicationImportResponse = nope()

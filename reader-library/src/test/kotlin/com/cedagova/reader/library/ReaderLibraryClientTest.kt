@@ -89,7 +89,11 @@ class ReaderLibraryClientTest {
         assertEquals(BOOK_ID, row.bookId)
         assertEquals(42.5, row.progressPercent, 0.0)
         assertEquals("Preface", row.chapterTitle)
-        assertEquals(JsonPrimitive("/6/14!/4/2/2"), row.locator["cfi"])
+        assertEquals(BOOK_ID, row.location.publication.publicationId)
+        assertEquals("epub", row.location.publication.format)
+        // The locator is carried through whole, including a field FastReader never writes.
+        assertEquals(JsonPrimitive("epubcfi(/6/14!/4/2/2)"), row.location.locator["epub_cfi"])
+        assertEquals(JsonPrimitive("OEBPS/preface.xhtml"), row.location.locator["href"])
         assertEquals("access-1", h.servers.requestsTo(ReaderLibraryClient.PROGRESS_PATH).single().bearer)
         h.close()
     }
@@ -398,6 +402,54 @@ class ReaderLibraryClientTest {
         assertEquals(ReaderCapabilityAvailability.UNAVAILABLE, capability.availability)
         assertEquals(ReaderCapabilityReason.UNKNOWN, capability.reason)
         h.close()
+    }
+
+    // ------------------------------------------ the publication-import capability (#139)
+
+    @Test
+    fun `exactly one available import entry is permission to offer import`() = runTest {
+        val h = Harness()
+        h.servers.on(CAPABILITIES) { json(capabilitiesBody(syncEntry() + ",\n    " + importEntry())) }
+
+        val capability = h.operations().publicationImportCapability()
+
+        assertTrue(capability.isAvailable)
+        assertEquals(1, capability.entries)
+        assertEquals(ReaderCapabilityReason.AVAILABLE, capability.reason)
+        h.close()
+    }
+
+    @Test
+    fun `an unavailable import entry carries the server's typed reason`() = runTest {
+        val h = Harness()
+        h.servers.on(CAPABILITIES) { json(capabilitiesBody(importEntry("unavailable", "quota_exhausted"))) }
+
+        val capability = h.operations().publicationImportCapability()
+
+        assertFalse(capability.isAvailable)
+        assertEquals(ReaderCapabilityAvailability.UNAVAILABLE, capability.availability)
+        assertEquals(ReaderCapabilityReason.QUOTA_EXHAUSTED, capability.reason)
+        h.close()
+    }
+
+    /** core.md §6: a missing or duplicated entry is not permission to import. */
+    @Test
+    fun `a missing or duplicated import entry is never permission`() = runTest {
+        val missing = Harness()
+        missing.servers.on(CAPABILITIES) { json(capabilitiesBody(syncEntry())) }
+        val none = missing.operations().publicationImportCapability()
+        assertFalse(none.isAvailable)
+        assertEquals(0, none.entries)
+        assertEquals(ReaderCapabilityReason.UNKNOWN, none.reason)
+        missing.close()
+
+        val doubled = Harness()
+        doubled.servers.on(CAPABILITIES) { json(capabilitiesBody(importEntry() + ",\n    " + importEntry())) }
+        val two = doubled.operations().publicationImportCapability()
+        assertFalse("two available entries are still not permission", two.isAvailable)
+        assertEquals(2, two.entries)
+        assertEquals(ReaderCapabilityReason.UNKNOWN, two.reason)
+        doubled.close()
     }
 
     // ------------------------------------------------------- error branches

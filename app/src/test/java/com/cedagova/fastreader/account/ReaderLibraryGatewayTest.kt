@@ -12,6 +12,7 @@ import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderMutationKind
 import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderResourceType
+import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
@@ -154,6 +155,9 @@ class ReaderLibraryGatewayTest {
             failure?.let { throw it }
             return capabilityResponse
         }
+
+        override suspend fun publicationImportCapability(): ReaderPublicationImportCapability =
+            error("the library gateway never reads the import capability")
 
         // The publication-import half of the interface (#116). The gateway is the
         // sync surface and calls none of it — LEAF802 (#117) owns the import flow

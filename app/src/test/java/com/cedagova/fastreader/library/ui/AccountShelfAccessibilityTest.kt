@@ -13,6 +13,7 @@ import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
@@ -177,6 +178,7 @@ class AccountShelfAccessibilityTest {
         var confirmed = 0
         showShelf(
             imports = AccountImportsState(
+                offer = ImportOffer.Available,
                 byDeviceBookId = mapOf(
                     LibraryAccountFixtures.RAYUELA_ID to
                         BookImportState.Consent(sizeBytes = 1_048_576, maxSourceBytes = 52_428_800),
@@ -207,6 +209,7 @@ class AccountShelfAccessibilityTest {
     fun `an add in progress is read out with the book, and called off by name`() {
         showShelf(
             imports = AccountImportsState(
+                offer = ImportOffer.Available,
                 byDeviceBookId = mapOf(
                     LibraryAccountFixtures.RAYUELA_ID to BookImportState.Sending(fraction = 0.42f),
                 ),
@@ -314,7 +317,7 @@ class AccountShelfAccessibilityTest {
             LibraryAccountFixtures.dublinersInAccountOnly(),
         ),
         accountUndo: AccountUndoNotice? = null,
-        imports: AccountImportsState = AccountImportsState.NONE,
+        imports: AccountImportsState = AccountImportsState(offer = ImportOffer.Available),
         downloads: AccountDownloadsState = AccountDownloadsState.NONE,
         catalog: Catalog = LibraryAccountFixtures.deviceCatalog(),
         onRemoveFromAccount: (LibraryBookItem) -> Unit = {},

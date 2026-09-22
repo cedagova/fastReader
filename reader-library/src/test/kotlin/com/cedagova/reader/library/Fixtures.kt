@@ -57,7 +57,11 @@ val PROGRESS_BODY = """
     {
       "book_id": "$BOOK_ID",
       "progress_percent": 42.5,
-      "locator": {"schemaVersion": "reader.epub-locator.v1", "cfi": "/6/14!/4/2/2"},
+      "location": {
+        "contract_version": "reader.portable-semantics.v1",
+        "publication": {"publication_id": "$BOOK_ID", "format": "epub", "media_type": "application/epub+zip", "source": "account"},
+        "locator": {"contract_version": "reader.portable-semantics.v1", "format": "epub", "href": "OEBPS/preface.xhtml", "progression": 0.425, "epub_cfi": "epubcfi(/6/14!/4/2/2)"}
+      },
       "chapter_title": "Preface",
       "updated_at": "2026-09-13T21:00:00Z"
     }
@@ -141,3 +145,6 @@ fun capabilitiesBody(syncEntry: String?) = """
 
 fun syncEntry(availability: String = "available", reason: String = "available") =
     """{"key": "reader.sync.v1", "availability": "$availability", "reason": "$reason", "quota": null, "actorState": {"books": 1}}"""
+
+fun importEntry(availability: String = "available", reason: String = "available") =
+    """{"key": "reader.publication-import.v1", "availability": "$availability", "reason": "$reason", "quota": null, "actorState": {}}"""

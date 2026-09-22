@@ -8,6 +8,7 @@ import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.ReaderAssetGrantResponse
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgressListResponse
+import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
@@ -79,6 +80,13 @@ interface ReaderLibraryOperations {
      * [ReaderSyncCapability.UNDECLARED] — unavailable, reason unknown.
      */
     suspend fun syncCapability(): ReaderSyncCapability
+
+    /**
+     * `GET /v1/reader/capabilities?clientVersion=…`: the
+     * `reader.publication-import.v1` entry, under the contract's exactly-one
+     * rule ([ReaderPublicationImportCapability]).
+     */
+    suspend fun publicationImportCapability(): ReaderPublicationImportCapability
 
     // ---- Publication imports (#116) ---------------------------------------------------------
 

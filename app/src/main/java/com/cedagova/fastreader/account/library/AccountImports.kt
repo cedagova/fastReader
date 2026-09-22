@@ -36,9 +36,11 @@ import kotlinx.coroutines.sync.withLock
  * wire, and it is split into exactly two steps so that the split is visible in
  * the code and not only in a dialog:
  *
- * - [requestAdd] reads the deployment's policy and works out what would happen.
- *   It sends `GET /reader/v1/imports/policy` — a request that carries no book,
- *   no name, no digest and no library — and nothing else. It cannot admit an
+ * - [requestAdd] re-reads the account's `reader.publication-import.v1`
+ *   capability and the deployment's policy, and works out what would happen.
+ *   It sends `GET /v1/reader/capabilities` and `GET /reader/v1/imports/policy`
+ *   — requests that carry no book, no name, no digest and no library — and
+ *   nothing else. It cannot admit an
  *   import: it has no [UploadConsent] to pass and there is no way to make one
  *   except the owner's answer.
  * - [confirmAdd] is the answer. It is the only call here that reaches
@@ -121,10 +123,25 @@ class AccountImports(
      */
     private val foreground = MutableStateFlow(true)
 
+    /** Whose session the current [AccountImportsState.offer] was read in; null while signed out. */
+    private var offerUser: String? = null
+
+    /** The capability read in flight, so a burst of account states asks once. */
+    private var offerJob: Job? = null
+
     init {
         scope.launch {
             accountState.collect { account ->
-                if (account.phase == AccountSyncPhase.SIGNED_OUT) forgetEverything()
+                if (account.phase == AccountSyncPhase.SIGNED_OUT) {
+                    offerUser = null
+                    forgetEverything()
+                } else if (account.userId != offerUser || _state.value.offer == ImportOffer.Unknown) {
+                    // A new session reads the capability afresh; an unanswered
+                    // read is retried on the next account state rather than
+                    // leaving the action off for the whole session.
+                    offerUser = account.userId
+                    refreshOffer()
+                }
             }
         }
     }
@@ -132,7 +149,33 @@ class AccountImports(
     /** The app came to the foreground: poll again, and pick up anything left in flight. */
     fun onForeground() {
         foreground.value = true
+        if (offerUser != null) refreshOffer()
         resumeStoredImports()
+    }
+
+    /**
+     * Re-reads `reader.publication-import.v1` in the background (#139).
+     *
+     * Active capacity frees up as imports finish, and a deployment can turn
+     * admissions back on, so the answer is read at the start of a session, on
+     * every return to the foreground and after an import settles — never kept as
+     * a constant. A failed read leaves the offer [ImportOffer.Unknown], which is
+     * not an offer.
+     */
+    private fun refreshOffer() {
+        val gateway = gateway ?: return
+        if (offerJob?.isActive == true) return
+        offerJob = scope.launch {
+            runCatching { readOffer(gateway) }
+        }
+    }
+
+    /** One capability read, published to the state and returned. */
+    private suspend fun readOffer(gateway: PublicationImportGateway): ImportOffer {
+        val capability = gateway.importCapability()
+        val offer = if (capability.isAvailable) ImportOffer.Available else ImportOffer.Unavailable(capability.reason)
+        _state.update { it.copy(offer = offer) }
+        return offer
     }
 
     /** The app went away: status reads stop until it is back. */
@@ -143,8 +186,8 @@ class AccountImports(
     /**
      * The owner tapped **Add to account library** on [deviceBookId].
      *
-     * Ends in the consent question, or in the refusal the policy already
-     * implies — shown from the policy's own numbers, with no admission made and
+     * Ends in the consent question, in the action withdrawn with the
+     * capability's reason, or in the refusal the policy already implies — shown from the policy's own numbers, with no admission made and
      * no byte sent either way.
      */
     fun requestAdd(deviceBookId: String) {
@@ -152,6 +195,20 @@ class AccountImports(
         launchFor(deviceBookId) {
             publish(deviceBookId, BookImportState.Checking)
             val source = sourceFor(deviceBookId) ?: return@launchFor
+            // The capability first (#139, core.md §7.6 step 1): the row offered
+            // the action on the last answer, and this tap re-asks before the
+            // policy read. A "no" takes the action off every row with its
+            // reason and sends nothing more.
+            val offer = try {
+                readOffer(gateway)
+            } catch (e: ReaderAuthException) {
+                publish(deviceBookId, refusalFor(e))
+                return@launchFor
+            }
+            if (offer != ImportOffer.Available) {
+                clear(deviceBookId)
+                return@launchFor
+            }
             val policy = try {
                 gateway.importPolicy()
             } catch (e: ReaderAuthException) {
@@ -360,6 +417,8 @@ class AccountImports(
             PublicationImportStatus.READY -> {
                 forget(deviceBookId, record)
                 clear(deviceBookId)
+                // A settled import frees active capacity the offer may have been waiting on.
+                refreshOffer()
                 // The row is the backend's to create; this only asks for the
                 // pass that will carry it here (AD-22, AD-23).
                 onImportReady()

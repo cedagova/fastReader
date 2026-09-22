@@ -1746,12 +1746,8 @@
             "title": "Label",
             "type": "string"
           },
-          "locator": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "title": "Locator",
-            "type": "object"
+          "location": {
+            "$ref": "#/components/schemas/ReaderPortableLocationV1"
           },
           "metadata": {
             "additionalProperties": {
@@ -1772,7 +1768,7 @@
           "label",
           "book_title",
           "file_fingerprint",
-          "locator"
+          "location"
         ],
         "title": "PutReaderBookmarkRequest",
         "type": "object"
@@ -1809,16 +1805,15 @@
       "PutReaderNoteRequest": {
         "properties": {
           "book_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Book Id"
+            "format": "uuid",
+            "title": "Book Id",
+            "type": "string"
+          },
+          "book_title": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Book Title",
+            "type": "string"
           },
           "definition": {
             "anyOf": [
@@ -1844,26 +1839,71 @@
             ],
             "title": "Example"
           },
-          "locator": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/JsonValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Locator"
+          "excerpt": {
+            "maxLength": 10000,
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "highlighted_text": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Highlighted Text",
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/ReaderPortableLocationV1"
           },
           "metadata": {
             "additionalProperties": {
               "$ref": "#/components/schemas/JsonValue"
             },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "sourceContextCompleteness"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "excerpt": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "excerptSelectionOffset": {
+                      "minimum": 0.0,
+                      "type": "integer"
+                    },
+                    "highlightedText": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "sourceContextCompleteness": {
+                      "enum": [
+                        "complete",
+                        "partial",
+                        "unavailable"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "sourceContextCompleteness",
+                    "excerpt",
+                    "highlightedText",
+                    "excerptSelectionOffset"
+                  ]
+                }
+              }
+            ],
+            "description": "Portable note metadata. When sourceContextCompleteness is present, excerpt, highlightedText, and excerptSelectionOffset form one validated source-context record. The offset is a UTF-16 code-unit offset and must identify highlightedText exactly. Unavailable context preserves only the selection: excerpt equals highlightedText and the offset is zero. Metadata without sourceContextCompleteness remains an ordinary note record.",
             "title": "Metadata",
             "type": "object"
+          },
+          "save_order": {
+            "minimum": 0.0,
+            "title": "Save Order",
+            "type": "integer"
           },
           "source_language": {
             "anyOf": [
@@ -1909,7 +1949,13 @@
           }
         },
         "required": [
-          "term"
+          "book_id",
+          "term",
+          "book_title",
+          "excerpt",
+          "highlighted_text",
+          "save_order",
+          "location"
         ],
         "title": "PutReaderNoteRequest",
         "type": "object"
@@ -2028,12 +2074,8 @@
             ],
             "title": "Chapter Title"
           },
-          "locator": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "title": "Locator",
-            "type": "object"
+          "location": {
+            "$ref": "#/components/schemas/ReaderPortableLocationV1"
           },
           "progress_percent": {
             "maximum": 100.0,
@@ -2044,7 +2086,7 @@
         },
         "required": [
           "progress_percent",
-          "locator"
+          "location"
         ],
         "title": "PutReaderProgressRequest",
         "type": "object"
@@ -2496,12 +2538,8 @@
             "title": "Label",
             "type": "string"
           },
-          "locator": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "title": "Locator",
-            "type": "object"
+          "location": {
+            "$ref": "#/components/schemas/ReaderPortableLocationV1"
           },
           "metadata": {
             "additionalProperties": {
@@ -2526,7 +2564,7 @@
           "label",
           "book_title",
           "file_fingerprint",
-          "locator",
+          "location",
           "save_order",
           "created_at",
           "updated_at"
@@ -2661,7 +2699,8 @@
             "enum": [
               "reader.sync.v1",
               "reader.ai-quota.v1",
-              "reader.notifications.registration.v1"
+              "reader.notifications.registration.v1",
+              "reader.publication-import.v1"
             ],
             "title": "Key",
             "type": "string"
@@ -3001,16 +3040,13 @@
       "ReaderNote": {
         "properties": {
           "book_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Book Id"
+            "format": "uuid",
+            "title": "Book Id",
+            "type": "string"
+          },
+          "book_title": {
+            "title": "Book Title",
+            "type": "string"
           },
           "created_at": {
             "format": "date-time",
@@ -3039,31 +3075,73 @@
             ],
             "title": "Example"
           },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "highlighted_text": {
+            "title": "Highlighted Text",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
           },
-          "locator": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/JsonValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Locator"
+          "location": {
+            "$ref": "#/components/schemas/ReaderPortableLocationV1"
           },
           "metadata": {
             "additionalProperties": {
               "$ref": "#/components/schemas/JsonValue"
             },
+            "allOf": [
+              {
+                "if": {
+                  "required": [
+                    "sourceContextCompleteness"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "excerpt": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "excerptSelectionOffset": {
+                      "minimum": 0.0,
+                      "type": "integer"
+                    },
+                    "highlightedText": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "sourceContextCompleteness": {
+                      "enum": [
+                        "complete",
+                        "partial",
+                        "unavailable"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "sourceContextCompleteness",
+                    "excerpt",
+                    "highlightedText",
+                    "excerptSelectionOffset"
+                  ]
+                }
+              }
+            ],
+            "description": "Portable note metadata. When sourceContextCompleteness is present, excerpt, highlightedText, and excerptSelectionOffset form one validated source-context record. The offset is a UTF-16 code-unit offset and must identify highlightedText exactly. Unavailable context preserves only the selection: excerpt equals highlightedText and the offset is zero. Metadata without sourceContextCompleteness remains an ordinary note record.",
             "title": "Metadata",
             "type": "object"
+          },
+          "save_order": {
+            "minimum": 0.0,
+            "title": "Save Order",
+            "type": "integer"
           },
           "source_language": {
             "anyOf": [
@@ -3110,7 +3188,13 @@
         },
         "required": [
           "id",
+          "book_id",
           "term",
+          "book_title",
+          "excerpt",
+          "highlighted_text",
+          "save_order",
+          "location",
           "created_at",
           "updated_at"
         ],
@@ -3283,6 +3367,45 @@
           "message_key"
         ],
         "title": "ReaderPortableDomainErrorV1",
+        "type": "object"
+      },
+      "ReaderPortableLocationV1": {
+        "additionalProperties": true,
+        "description": "Portable persisted place plus the publication identity it belongs to.",
+        "properties": {
+          "contract_version": {
+            "const": "reader.portable-semantics.v1",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "locator": {
+            "discriminator": {
+              "mapping": {
+                "epub": "#/components/schemas/ReaderEpubLocatorV1",
+                "pdf": "#/components/schemas/ReaderPdfLocatorV1"
+              },
+              "propertyName": "format"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReaderEpubLocatorV1"
+              },
+              {
+                "$ref": "#/components/schemas/ReaderPdfLocatorV1"
+              }
+            ],
+            "title": "Locator"
+          },
+          "publication": {
+            "$ref": "#/components/schemas/ReaderPortablePublicationV1"
+          }
+        },
+        "required": [
+          "contract_version",
+          "publication",
+          "locator"
+        ],
+        "title": "ReaderPortableLocationV1",
         "type": "object"
       },
       "ReaderPortablePreferencesApplicationContract": {
@@ -4404,12 +4527,8 @@
             ],
             "title": "Chapter Title"
           },
-          "locator": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "title": "Locator",
-            "type": "object"
+          "location": {
+            "$ref": "#/components/schemas/ReaderPortableLocationV1"
           },
           "progress_percent": {
             "maximum": 100.0,
@@ -4426,6 +4545,7 @@
         "required": [
           "book_id",
           "progress_percent",
+          "location",
           "updated_at"
         ],
         "title": "ReaderProgress",
@@ -8484,7 +8604,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -8643,7 +8763,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -8777,7 +8897,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -8919,7 +9039,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -9076,7 +9196,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -9218,7 +9338,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -9375,7 +9495,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -9546,7 +9666,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -9845,7 +9965,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -9986,7 +10106,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -10142,7 +10262,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -10276,7 +10396,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -10417,7 +10537,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -10573,7 +10693,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -10708,7 +10828,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -10851,7 +10971,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -10996,7 +11116,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -11220,7 +11340,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -11362,7 +11482,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -11496,7 +11616,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -11637,7 +11757,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -11793,7 +11913,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -11928,7 +12048,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -12071,7 +12191,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -12233,7 +12353,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {
@@ -12378,7 +12498,7 @@
                 }
               }
             },
-            "description": "Reader resource is invalid"
+            "description": "Reader resource or portable persisted location is invalid"
           },
           "429": {
             "content": {

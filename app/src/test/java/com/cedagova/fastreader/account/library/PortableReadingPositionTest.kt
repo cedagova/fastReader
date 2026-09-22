@@ -3,7 +3,9 @@ package com.cedagova.fastreader.account.library
 import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
+import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
 import com.cedagova.reader.library.model.PORTABLE_SEMANTICS_VERSION
+import com.cedagova.reader.library.model.PUBLICATION_SOURCE_ACCOUNT
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -41,23 +43,54 @@ class PortableReadingPositionTest {
      * payload is serialized, and the union of all their keys — and of their
      * locators' keys — is asserted to be exactly the contract's. A "does not
      * contain token_index" assertion would pass for a field nobody thought to
-     * name; this one fails for *any* key that is not one of these six.
+     * name; this one fails for *any* key that is not one of these, at every level
+     * of the body (#139 added the `location` and its `publication`).
      */
     @Test
     fun `the exact key set of every published position, over a whole book`() {
         val payloads = (0 until book.totalTokens)
             .mapNotNull { PortableReadingPosition.of(book, it) }
-            .map { PortableReadingPosition.payloadFor(it) }
+            .map { PortableReadingPosition.payloadFor(BOOK_ID, it) }
         assertEquals("every token must yield a position", book.totalTokens, payloads.size)
 
         val bodyKeys = payloads.flatMap { it.keys }.toSortedSet()
         assertEquals(
-            "a published position states its percentage, its locator and its chapter — nothing else",
-            setOf("chapter_title", "locator", "progress_percent").toSortedSet(),
+            "a published position states its percentage, its location and its chapter — nothing else",
+            setOf("chapter_title", "location", "progress_percent").toSortedSet(),
             bodyKeys,
         )
 
-        val locatorKeys = payloads.map { it["locator"]!!.jsonObject }.flatMap { it.keys }.toSortedSet()
+        val locations = payloads.map { it["location"]!!.jsonObject }
+        val locationKeys = locations.flatMap { it.keys }.toSortedSet()
+        assertEquals(
+            "a location states its version, its publication and its locator — nothing else",
+            setOf("contract_version", "locator", "publication").toSortedSet(),
+            locationKeys,
+        )
+
+        // The publication names the account book the envelope already addresses,
+        // plus constants — and never a digest of the book (#139).
+        val publications = locations.map { it["publication"]!!.jsonObject }
+        val publicationKeys = publications.flatMap { it.keys }.toSortedSet()
+        assertEquals(
+            "a publication states the account book id and three constants — nothing else",
+            setOf("format", "media_type", "publication_id", "source").toSortedSet(),
+            publicationKeys,
+        )
+        assertEquals(
+            "every publication is the same account EPUB, whatever the position",
+            setOf(
+                mapOf(
+                    "publication_id" to BOOK_ID,
+                    "format" to LOCATOR_FORMAT_EPUB,
+                    "media_type" to MEDIA_TYPE_EPUB,
+                    "source" to PUBLICATION_SOURCE_ACCOUNT,
+                ),
+            ),
+            publications.map { p -> p.mapValues { it.value.jsonPrimitive.content } }.toSet(),
+        )
+
+        val locatorKeys = locations.map { it["locator"]!!.jsonObject }.flatMap { it.keys }.toSortedSet()
         assertEquals(
             "a portable locator states its format, version, section and fraction — nothing else",
             setOf("contract_version", "format", "href", "progression").toSortedSet(),
@@ -66,11 +99,12 @@ class PortableReadingPositionTest {
 
         // The same claim said the other way round, naming the values that must
         // never appear, so the failure message points at the actual mistake.
-        val everyKey = bodyKeys + locatorKeys
+        val everyKey = bodyKeys + locationKeys + publicationKeys + locatorKeys
         listOf(
             "token_index", "tokenIndex", "wpm", "words_per_minute", "speed",
             "pipeline_version", "pipelineVersion", "structural_fingerprint",
             "structuralFingerprint", "book_digest", "bookDigest", "epub_cfi", "settings",
+            "content_identity", "sha256", "title",
         ).forEach { forbidden ->
             assertTrue("\"$forbidden\" must never be published", forbidden !in everyKey)
         }
@@ -79,13 +113,20 @@ class PortableReadingPositionTest {
     /** The locator's two constants are the contract's, not strings typed here. */
     @Test
     fun `a published locator carries the portable-semantics contract`() {
-        val locator = PortableReadingPosition
-            .payloadFor(PortableReadingPosition.of(book, 40)!!)["locator"]!!
+        val location = PortableReadingPosition
+            .payloadFor(BOOK_ID, PortableReadingPosition.of(book, 40)!!)["location"]!!
             .jsonObject
+        val locator = location["locator"]!!.jsonObject
 
+        assertEquals(PORTABLE_SEMANTICS_VERSION, location["contract_version"]!!.jsonPrimitive.content)
         assertEquals(LOCATOR_FORMAT_EPUB, locator["format"]!!.jsonPrimitive.content)
         assertEquals(PORTABLE_SEMANTICS_VERSION, locator["contract_version"]!!.jsonPrimitive.content)
         assertTrue("epub_cfi is never written", "epub_cfi" !in locator)
+        assertEquals(
+            "reader-api requires the locator's format to equal the publication's",
+            location["publication"]!!.jsonObject["format"]!!.jsonPrimitive.content,
+            locator["format"]!!.jsonPrimitive.content,
+        )
     }
 
     /**
@@ -109,8 +150,8 @@ class PortableReadingPositionTest {
     @Test
     fun `progression is the book-level token fraction, not the rounded percent`() {
         val index = book.totalTokens / 3
-        val payload = PortableReadingPosition.payloadFor(PortableReadingPosition.of(book, index)!!)
-        val progression = payload["locator"]!!.jsonObject["progression"]!!.jsonPrimitive.double
+        val payload = PortableReadingPosition.payloadFor(BOOK_ID, PortableReadingPosition.of(book, index)!!)
+        val progression = payload["location"]!!.jsonObject["locator"]!!.jsonObject["progression"]!!.jsonPrimitive.double
 
         assertEquals(book.progressFraction(index).toDouble(), progression, 1e-9)
         assertTrue("a fraction, never a percentage", progression in 0.0..1.0)
@@ -348,13 +389,15 @@ class PortableReadingPositionTest {
                 put("updated_at", JsonPrimitive("2026-09-20T10:00:00Z"))
                 put("chapter_title", JsonPrimitive(chapter.title))
                 put(
-                    "locator",
-                    buildJsonObject {
-                        put("format", JsonPrimitive(LOCATOR_FORMAT_EPUB))
-                        put("href", JsonPrimitive(chapter.spinePath))
-                        put("progression", JsonPrimitive(0.415))
-                        put("contract_version", JsonPrimitive(PORTABLE_SEMANTICS_VERSION))
-                    },
+                    "location",
+                    location(
+                        buildJsonObject {
+                            put("format", JsonPrimitive(LOCATOR_FORMAT_EPUB))
+                            put("href", JsonPrimitive(chapter.spinePath))
+                            put("progression", JsonPrimitive(0.415))
+                            put("contract_version", JsonPrimitive(PORTABLE_SEMANTICS_VERSION))
+                        },
+                    ),
                 )
             },
         )
@@ -376,7 +419,7 @@ class PortableReadingPositionTest {
         val position = PortableReadingPosition.positionOf(
             buildJsonObject {
                 put("progress_percent", JsonPrimitive(62.0))
-                put("locator", buildJsonObject { put("href", JsonPrimitive(listOf(1, 2).toString())) })
+                put("location", location(buildJsonObject { put("href", JsonPrimitive(listOf(1, 2).toString())) }))
             },
         )
 
@@ -392,18 +435,46 @@ class PortableReadingPositionTest {
             buildJsonObject {
                 put("progress_percent", JsonPrimitive(10.0))
                 put(
-                    "locator",
-                    buildJsonObject {
-                        put("format", JsonPrimitive("pdf"))
-                        put("href", JsonPrimitive("page-4"))
-                        put("progression", JsonPrimitive(0.1))
-                    },
+                    "location",
+                    location(
+                        buildJsonObject {
+                            put("format", JsonPrimitive("pdf"))
+                            put("href", JsonPrimitive("page-4"))
+                            put("progression", JsonPrimitive(0.1))
+                        },
+                    ),
                 )
             },
         )
 
         assertNull("a pdf locator's href is not a spine path", position.href)
         assertEquals(0.1, position.progression!!, 1e-9)
+    }
+
+    /**
+     * A pre-#139 payload — a bare top-level `locator`, no `location` — is not a
+     * shape the pinned contract has any more. It is read as what it still
+     * reliably says, the percentage, rather than kept alive by a second parser.
+     */
+    @Test
+    fun `a pre-cutover payload with a bare locator is read as its percentage alone`() {
+        val position = PortableReadingPosition.positionOf(
+            buildJsonObject {
+                put("progress_percent", JsonPrimitive(33.0))
+                put(
+                    "locator",
+                    buildJsonObject {
+                        put("format", JsonPrimitive(LOCATOR_FORMAT_EPUB))
+                        put("href", JsonPrimitive(chapters.first().spinePath))
+                        put("progression", JsonPrimitive(0.33))
+                    },
+                )
+            },
+        )
+
+        assertNull(position.href)
+        assertNull(position.progression)
+        assertEquals(33.0, position.percent!!, 1e-9)
     }
 
     /** A payload with no locator at all is a percentage, and that is legal. */
@@ -422,11 +493,32 @@ class PortableReadingPositionTest {
 
     /** A published position, read back as though the backend had returned it. */
     private fun LocalReadingPosition.asRemote(): RemoteReadingPosition =
-        PortableReadingPosition.positionOf(PortableReadingPosition.payloadFor(this))
+        PortableReadingPosition.positionOf(PortableReadingPosition.payloadFor(BOOK_ID, this))
+
+    /** A canonical `location` around [locator], as reader-api returns one. */
+    private fun location(locator: JsonObject): JsonObject = buildJsonObject {
+        put("contract_version", JsonPrimitive(PORTABLE_SEMANTICS_VERSION))
+        put(
+            "publication",
+            buildJsonObject {
+                put("publication_id", JsonPrimitive(BOOK_ID))
+                put("format", JsonPrimitive(LOCATOR_FORMAT_EPUB))
+                put("media_type", JsonPrimitive(MEDIA_TYPE_EPUB))
+                put("source", JsonPrimitive(PUBLICATION_SOURCE_ACCOUNT))
+            },
+        )
+        put("locator", locator)
+    }
 
     private fun progressPayload(bookId: String?): JsonObject = buildJsonObject {
         bookId?.let { put("book_id", JsonPrimitive(it)) }
         put("progress_percent", JsonPrimitive(12.0))
         put("updated_at", JsonPrimitive("2026-09-20T10:00:00Z"))
     }
+
+    private companion object {
+        /** An account book id, the envelope's `resource_id` and so the publication's id. */
+        const val BOOK_ID: String = "7f1c7a0e-0b8e-4d8a-9a52-3f0f7c1d2e11"
+    }
+
 }

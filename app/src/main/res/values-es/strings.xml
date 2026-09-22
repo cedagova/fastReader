@@ -393,6 +393,9 @@
     <string name="library_account_add_cancel">Cancelar el envío</string>
     <string name="library_account_add_cancel_label">Cancelar añadir %1$s a tu cuenta de Reader</string>
     <string name="library_account_add_off">Tu cuenta de Reader no está aceptando libros nuevos ahora mismo.</string>
+    <string name="library_account_add_off_busy">Tu cuenta de Reader todavía está recibiendo otros libros. Podrás añadir este cuando terminen.</string>
+    <string name="library_account_add_off_version">Esta versión de FastReader no puede añadir libros a tu cuenta de Reader.</string>
+    <string name="library_account_add_off_later">Tu cuenta de Reader no puede aceptar libros nuevos en este momento. Inténtalo más tarde.</string>
     <string name="library_account_add_retry">Reintentar</string>
     <string name="library_account_add_retry_label">Volver a intentar añadir %1$s a tu cuenta de Reader</string>
 

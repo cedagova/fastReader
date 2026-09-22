@@ -8,6 +8,7 @@ import com.cedagova.reader.library.imports.PublicationImportStep
 import com.cedagova.reader.library.imports.PublicationSource
 import com.cedagova.reader.library.imports.UploadConsent
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
+import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 
 /**
  * The publication-import seam, beside [ReaderLibraryGateway] and for the same
@@ -36,6 +37,14 @@ interface PublicationImportGateway {
 
     /** `GET /reader/v1/imports/policy`: what this deployment will admit today. */
     suspend fun importPolicy(): PublicationImportPolicyResponse
+
+    /**
+     * The account's `reader.publication-import.v1` capability under the
+     * contract's exactly-one rule: whether **Add to account library** may be
+     * offered at all (#139). A read of the capabilities document; it names no
+     * book and reserves nothing.
+     */
+    suspend fun importCapability(): ReaderPublicationImportCapability
 
     /**
      * What [policy] alone already refuses about [source], or null when it could
@@ -83,6 +92,9 @@ class ReaderApiPublicationImportGateway(
 ) : PublicationImportGateway {
 
     override suspend fun importPolicy(): PublicationImportPolicyResponse = operations.importPolicy()
+
+    override suspend fun importCapability(): ReaderPublicationImportCapability =
+        operations.publicationImportCapability()
 
     override fun refuse(
         policy: PublicationImportPolicyResponse,

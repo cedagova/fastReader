@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
- * One entry of `GET /v1/reader/capabilities`. The module reads exactly one of
- * them — `reader.sync.v1` — and ignores the rest.
+ * One entry of `GET /v1/reader/capabilities`. The module reads two of them —
+ * `reader.sync.v1` and `reader.publication-import.v1` — and ignores the rest.
  */
 @Serializable
 data class ReaderCapabilityEntry(
@@ -50,6 +50,41 @@ data class ReaderSyncCapability(
             reason = ReaderCapabilityReason.UNKNOWN,
             quota = null,
             declared = false,
+        )
+    }
+}
+
+/**
+ * The module's answer to "may this client offer to add a device book to the
+ * account right now?" (`reader.publication-import.v1`, core.md §6 and §7.6).
+ *
+ * The rule is the contract's, word for word: offer import only when the document
+ * holds **exactly one** `reader.publication-import.v1` entry and its
+ * `availability` is `available`. A missing entry ([entries] = 0) and a
+ * duplicated one ([entries] > 1) are both "not permission to import", and
+ * neither is an error — they read as unavailable with reason
+ * [ReaderCapabilityReason.UNKNOWN], so the host shows its generic sentence.
+ *
+ * Discovery reserves nothing and carries no numbers: its `quota` is always null,
+ * and caps and formats still come from `GET /reader/v1/imports/policy` on every
+ * attempt. Admission stays authoritative — this only decides whether the action
+ * is offered.
+ */
+data class ReaderPublicationImportCapability(
+    val availability: ReaderCapabilityAvailability,
+    val reason: ReaderCapabilityReason,
+    /** How many `reader.publication-import.v1` entries the document carried. */
+    val entries: Int,
+) {
+    val isAvailable: Boolean
+        get() = entries == 1 && availability == ReaderCapabilityAvailability.AVAILABLE
+
+    companion object {
+        /** A document with no entry at all, or one with more than one: never permission. */
+        fun undeclared(entries: Int): ReaderPublicationImportCapability = ReaderPublicationImportCapability(
+            availability = ReaderCapabilityAvailability.UNAVAILABLE,
+            reason = ReaderCapabilityReason.UNKNOWN,
+            entries = entries,
         )
     }
 }

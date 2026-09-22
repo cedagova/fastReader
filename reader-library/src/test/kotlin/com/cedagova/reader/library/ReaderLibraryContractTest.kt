@@ -25,6 +25,10 @@ import com.cedagova.reader.library.model.ReaderBookAssetKind
 import com.cedagova.reader.library.model.ReaderCapabilityEntry
 import com.cedagova.reader.library.model.ReaderCapabilityQuota
 import com.cedagova.reader.library.model.ReaderEpubLocatorV1
+import com.cedagova.reader.library.model.ReaderPortableLocationV1
+import com.cedagova.reader.library.model.ReaderPortablePublicationV1
+import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
+import com.cedagova.reader.library.model.PUBLICATION_SOURCE_ACCOUNT
 import com.cedagova.reader.library.model.ReaderLibraryItem
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgress
@@ -121,6 +125,9 @@ class ReaderLibraryContractTest {
         // The portable position FastReader publishes (#120).
         PutReaderProgressRequest.serializer() to "PutReaderProgressRequest",
         ReaderEpubLocatorV1.serializer() to "ReaderEpubLocatorV1",
+        // The location envelope the position travels in since the #139 re-pin.
+        ReaderPortableLocationV1.serializer() to "ReaderPortableLocationV1",
+        ReaderPortablePublicationV1.serializer() to "ReaderPortablePublicationV1",
         ReaderSyncMutationBatchRequest.serializer() to "ReaderSyncMutationBatchRequest",
         ReaderSyncMutationEnvelope.serializer() to "ReaderSyncMutationEnvelope",
         ReaderSyncMutationBatchResponse.serializer() to "ReaderSyncMutationBatchResponse",
@@ -168,7 +175,7 @@ class ReaderLibraryContractTest {
             recorded,
             actual,
         )
-        assertEquals("a550abfd7046368681d02aec50e80e80e372b152416c744669dd72ee534c6f9e", actual)
+        assertEquals("e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90", actual)
     }
 
     @Test
@@ -214,12 +221,16 @@ class ReaderLibraryContractTest {
         assertEquals(ReaderSyncMutationBatchRequest.MIN_MUTATIONS.toString(), mutations["minItems"].toString())
         assertEquals(ReaderSyncMutationBatchRequest.MAX_MUTATIONS.toString(), mutations["maxItems"].toString())
 
+        val capabilityKeys = schemas["ReaderCapabilityEntry"]!!.jsonObject["properties"]!!.jsonObject["key"]!!
+            .jsonObject["enum"]!!.let { it as JsonArray }
+            .mapNotNull { it.primitive() }
         assertTrue(
             "the sync capability key must be one the document declares",
-            schemas["ReaderCapabilityEntry"]!!.jsonObject["properties"]!!.jsonObject["key"]!!
-                .jsonObject["enum"]!!.let { it as JsonArray }
-                .mapNotNull { it.primitive() }
-                .contains(ReaderLibraryClient.SYNC_CAPABILITY_KEY),
+            capabilityKeys.contains(ReaderLibraryClient.SYNC_CAPABILITY_KEY),
+        )
+        assertTrue(
+            "the publication-import capability key must be one the document declares (#139)",
+            capabilityKeys.contains(ReaderLibraryClient.PUBLICATION_IMPORT_CAPABILITY_KEY),
         )
     }
 
@@ -334,10 +345,54 @@ class ReaderLibraryContractTest {
         assertEquals("0", percent["minimum"].toString().trimEnd('0').trimEnd('.'))
         assertEquals("100", percent["maximum"].toString().trimEnd('0').trimEnd('.'))
         assertEquals(
-            "a published position must state its percentage and its locator",
-            listOf("progress_percent", "locator"),
+            "a published position must state its percentage and its location",
+            listOf("progress_percent", "location"),
             (schemas["PutReaderProgressRequest"]!!.jsonObject["required"] as JsonArray)
                 .mapNotNull { it.primitive() },
+        )
+    }
+
+    /**
+     * The location envelope a position travels in since the #139 re-pin, against
+     * the document's own declarations.
+     *
+     * The shape checker compares fields and types. What it cannot see is that the
+     * `oneOf` locator really maps `epub` to the very schema the module builds its
+     * locator from, and that the publication values FastReader sends — `epub`,
+     * `application/epub+zip`, `account` — are members of the document's enums.
+     * Each of those is a 422 `invalid_payload` against stage if wrong.
+     */
+    @Test
+    fun `the portable location the module publishes is the document's own`() {
+        val location = schemas["ReaderPortableLocationV1"]!!.jsonObject
+        val properties = location["properties"]!!.jsonObject
+        assertEquals(PORTABLE_SEMANTICS_VERSION, properties["contract_version"]!!.constValue())
+        assertEquals(
+            listOf("contract_version", "publication", "locator"),
+            (location["required"] as JsonArray).mapNotNull { it.primitive() },
+        )
+        val discriminator = properties["locator"]!!.jsonObject["discriminator"]!!.jsonObject
+        assertEquals("format", discriminator["propertyName"]!!.primitive())
+        assertEquals(
+            "an epub locator must be the schema the module builds its locator from",
+            "#/components/schemas/ReaderEpubLocatorV1",
+            discriminator["mapping"]!!.jsonObject[LOCATOR_FORMAT_EPUB]!!.primitive(),
+        )
+
+        val publication = schemas["ReaderPortablePublicationV1"]!!.jsonObject["properties"]!!.jsonObject
+        fun enumOf(field: String) = (publication[field]!!.jsonObject["enum"] as JsonArray).mapNotNull { it.primitive() }
+        val sent = ReaderPortablePublicationV1.accountEpub("7f1c7a0e-0b8e-4d8a-9a52-3f0f7c1d2e11")
+        assertTrue("format", sent.format in enumOf("format"))
+        assertTrue("media_type", sent.mediaType in enumOf("media_type"))
+        assertTrue("source", sent.source in enumOf("source"))
+        assertEquals(MEDIA_TYPE_EPUB, sent.mediaType)
+        assertEquals(PUBLICATION_SOURCE_ACCOUNT, sent.source)
+        // The account book id is what goes in publication_id; it must fit the pattern.
+        val pattern = Regex(publication["publication_id"]!!.jsonObject["pattern"]!!.primitive()!!)
+        assertTrue("an account book id must be a legal publication_id", pattern.matches(sent.publicationId))
+        assertEquals(
+            listOf("publication_id", "format", "media_type", "source"),
+            (schemas["ReaderPortablePublicationV1"]!!.jsonObject["required"] as JsonArray).mapNotNull { it.primitive() },
         )
     }
 

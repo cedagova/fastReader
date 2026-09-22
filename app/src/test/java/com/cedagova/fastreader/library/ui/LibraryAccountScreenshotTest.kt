@@ -17,6 +17,7 @@ import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.account.library.ImportProblem
 import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.library.IngestionState
@@ -232,7 +233,23 @@ class LibraryAccountScreenshotTest {
             "library_account_add_off",
             shelf(
                 LibraryAccountFixtures.ficcionesInAccount(),
-                imports = AccountImportsState(disabled = ImportsOff("01JB7Q4KQZ8X")),
+                imports = AccountImportsState(offer = ImportOffer.Available, disabled = ImportsOff("01JB7Q4KQZ8X")),
+            ),
+        )
+    }
+
+    /**
+     * #139: the account's import capability is unavailable with a typed reason —
+     * here exhausted active capacity — so the sentence says what to expect and
+     * the reason is quoted as the code under it.
+     */
+    @Test
+    fun anUnavailableImportCapabilityShowsItsReasonInsteadOfTheAction() {
+        capture(
+            "library_account_add_off_capacity",
+            shelf(
+                LibraryAccountFixtures.ficcionesInAccount(),
+                imports = AccountImportsState(offer = ImportOffer.Unavailable(ReaderCapabilityReason.QUOTA_EXHAUSTED)),
             ),
         )
     }
@@ -329,7 +346,7 @@ class LibraryAccountScreenshotTest {
 
     /** The in-flight state on Rayuela, the one device-only book in the fixtures. */
     private fun importing(state: BookImportState): AccountImportsState =
-        AccountImportsState(byDeviceBookId = mapOf(LibraryAccountFixtures.RAYUELA_ID to state))
+        AccountImportsState(offer = ImportOffer.Available, byDeviceBookId = mapOf(LibraryAccountFixtures.RAYUELA_ID to state))
 
     /** Both kinds of account row and both device rows, with the offline note over them. */
     private fun wholeShelf(): LibraryUiState = shelf(
@@ -379,7 +396,7 @@ class LibraryAccountScreenshotTest {
         vararg books: com.cedagova.fastreader.account.library.AccountBook,
         account: AccountLibraryState = LibraryAccountFixtures.signedIn(*books),
         accountUndo: AccountUndoNotice? = null,
-        imports: AccountImportsState = AccountImportsState.NONE,
+        imports: AccountImportsState = AccountImportsState(offer = ImportOffer.Available),
         downloads: AccountDownloadsState = AccountDownloadsState.NONE,
         catalog: com.cedagova.fastreader.library.Catalog = LibraryAccountFixtures.deviceCatalog(),
     ): LibraryUiState = buildLibraryUiState(

@@ -12,6 +12,9 @@ import com.cedagova.reader.library.imports.UploadConsent
 import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.PublicationFormat
 import com.cedagova.reader.library.model.PublicationImportStatus
+import com.cedagova.reader.library.model.ReaderCapabilityAvailability
+import com.cedagova.reader.library.model.ReaderCapabilityReason
+import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,6 +134,64 @@ class AccountImportsTest {
         assertTrue("nothing may be sent without the question", gateway.calls.isEmpty())
         assertTrue(gateway.consents.isEmpty())
     }
+
+    // ---- the capability decides whether the action is offered (#139) ------------------------
+
+    @Test
+    fun `a signed-in session reads the import capability and offers the action on exactly one available entry`() =
+        runTest(dispatcher) {
+            imports.state // start the collector
+            advanceUntilIdle()
+
+            assertEquals(1, gateway.capabilityReads)
+            assertEquals(ImportOffer.Available, imports.state.value.offer)
+            assertTrue("reading the capability sends nothing about a book", gateway.calls.isEmpty())
+        }
+
+    @Test
+    fun `an unavailable capability at the tap withdraws the action with its reason and reads no policy`() =
+        runTest(dispatcher) {
+            givenBook(sizeBytes = 1_000)
+            imports.state
+            advanceUntilIdle()
+            gateway.capability = ReaderPublicationImportCapability(
+                availability = ReaderCapabilityAvailability.UNAVAILABLE,
+                reason = ReaderCapabilityReason.QUOTA_EXHAUSTED,
+                entries = 1,
+            )
+
+            imports.requestAdd(FICCIONES_ID)
+            advanceUntilIdle()
+
+            assertEquals(ImportOffer.Unavailable(ReaderCapabilityReason.QUOTA_EXHAUSTED), imports.state.value.offer)
+            assertNull("the row goes back to showing the reason", imports.state.value.byDeviceBookId[FICCIONES_ID])
+            assertTrue("no policy read, no admission", gateway.calls.isEmpty())
+            assertTrue(gateway.consents.isEmpty())
+        }
+
+    @Test
+    fun `a duplicated capability entry is not permission`() = runTest(dispatcher) {
+        gateway.capability = ReaderPublicationImportCapability.undeclared(entries = 2)
+        imports.state
+        advanceUntilIdle()
+
+        assertEquals(ImportOffer.Unavailable(ReaderCapabilityReason.UNKNOWN), imports.state.value.offer)
+    }
+
+    @Test
+    fun `a capability read that gets no answer leaves the action off, and the foreground asks again`() =
+        runTest(dispatcher) {
+            gateway.capabilityFailure = ReaderAuthException.NetworkUnavailable(java.io.IOException("offline"))
+            imports.state
+            advanceUntilIdle()
+            assertEquals(ImportOffer.Unknown, imports.state.value.offer)
+
+            gateway.capabilityFailure = null
+            imports.onForeground()
+            advanceUntilIdle()
+
+            assertEquals(ImportOffer.Available, imports.state.value.offer)
+        }
 
     // ---- the policy decides, never a constant ----------------------------------------------
 

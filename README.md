@@ -235,8 +235,8 @@ repository:**
 | | |
 | --- | --- |
 | Document | [`reader-library/contracts/reader-api.openapi.json`](reader-library/contracts/reader-api.openapi.json) |
-| Source | `Chunipers/reader-api@a517fc6db64560df309bce656ec4c34e0bc7e1bd`, `contracts/reader-api.openapi.json`, byte for byte |
-| sha256 | `a550abfd7046368681d02aec50e80e80e372b152416c744669dd72ee534c6f9e`, recorded in [`reader-library/contracts/reader-api.openapi.json.sha256`](reader-library/contracts/reader-api.openapi.json.sha256) |
+| Source | `Chunipers/reader-api@909174aff6a380514da7b81263d69a4e653cfe76`, `contracts/reader-api.openapi.json`, byte for byte |
+| sha256 | `e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90`, recorded in [`reader-library/contracts/reader-api.openapi.json.sha256`](reader-library/contracts/reader-api.openapi.json.sha256) |
 | Gate | `ReaderLibraryContractTest` recomputes that digest on every run, then checks every field name, JSON type, enum member and required flag the module sends or reads against the document's schemas |
 | Updating the pin | [`reader-library/contracts/PINNED.md`](reader-library/contracts/PINNED.md) |
 

@@ -13,14 +13,20 @@ data class ReaderProgressListResponse(
 )
 
 /**
- * One book's position. [locator] is the portable locator document the reader
- * publishes and consumes; this module carries it through untouched — mapping it
- * to and from FastReader's own position is the host's work (LEAF821's
- * `PortableReadingPosition`), not the contract module's.
+ * One book's position. [location] is the portable location the reader publishes
+ * and consumes — the publication it belongs to plus the portable locator inside
+ * it; this module carries the locator through untouched — mapping it to and
+ * from FastReader's own position is the host's work (`PortableReadingPosition`),
+ * not the contract module's.
  *
  * Note [bookId]: a position record's identity in this contract is the **book**,
  * and the document says so twice — this required `book_id`, and the only routes
  * that address a single position, `PUT` and `DELETE /v1/reader/progress/{book_id}`.
+ *
+ * [location] is required with no default, as the pinned document marks it: the
+ * server validates every row it lists against the same model before answering
+ * (reader-api `ReaderProductsRepository._progress`), so a row without one is a
+ * server fault to be seen, not a shape to paper over.
  */
 @Serializable
 data class ReaderProgress(
@@ -28,36 +34,86 @@ data class ReaderProgress(
     /** 0-100 inclusive, as the document declares it. */
     @SerialName("progress_percent") val progressPercent: Double,
     @SerialName("updated_at") val updatedAt: String,
-    @SerialName("locator") val locator: JsonObject = EMPTY_JSON_OBJECT,
+    @SerialName("location") val location: ReaderPortableLocationV1,
     @SerialName("chapter_title") val chapterTitle: String? = null,
 )
 
 /**
  * What a client states about a reading position (`PutReaderProgressRequest`).
  *
- * This is the shape of the position a client *publishes*, and it is the only
- * such shape the pinned document declares. FastReader publishes through
- * `POST /v1/reader/sync/mutations` rather than the `PUT` route — the queue,
- * the persisted idempotency key and canonical adoption of AD-22 only exist on
- * the mutations path — and the envelope's `payload` is typed as a free-form
- * object, so the document does not state per-resource payload shapes. This
- * model is therefore a **derivation**: the payload of a `reading_progress`
- * upsert is the body the document declares for stating a position. Nothing has
- * yet observed what the backend stores for a progress payload delivered that
- * way; see the host's `PortableReadingPosition` for the single seam that
- * assumption is isolated behind.
+ * This is the shape of the position a client *publishes*. FastReader publishes
+ * through `POST /v1/reader/sync/mutations` rather than the `PUT` route — the
+ * queue, the persisted idempotency key and canonical adoption of AD-22 only
+ * exist on the mutations path. The envelope's `payload` is typed as a free-form
+ * object in the document, but reader-api validates a `reading_progress` upsert's
+ * payload against exactly this model (`reader_sync.service._UPSERT_MODELS`) and
+ * rejects anything else as `invalid_payload` — so this is the payload's shape,
+ * not a derivation of it (#139).
  *
  * Three fields, and deliberately no fourth. A token index, a words-per-minute
  * value, a pipeline version and a structural fingerprint are FastReader's own
- * and have no field here to travel in (REQ-512).
+ * and have no field here to travel in (REQ-512). [location]'s publication names
+ * the account book the envelope already addresses — reader-api refuses one whose
+ * `publication_id` differs from the envelope's `resource_id` — and constants.
  */
 @Serializable
 data class PutReaderProgressRequest(
     /** 0-100 inclusive. FastReader sends the whole percent the reader is shown. */
     @SerialName("progress_percent") val progressPercent: Double,
-    @SerialName("locator") val locator: JsonObject = EMPTY_JSON_OBJECT,
+    @SerialName("location") val location: ReaderPortableLocationV1,
     @SerialName("chapter_title") val chapterTitle: String? = null,
 )
+
+/**
+ * `ReaderPortableLocationV1`: a portable place plus the publication it is in.
+ *
+ * [locator] is the document's `oneOf` of `ReaderEpubLocatorV1` and
+ * `ReaderPdfLocatorV1`, discriminated by its `format`. It is carried as an object
+ * because a location *read* may be either — another client can leave a PDF
+ * place — while the one FastReader *writes* is always built from
+ * [ReaderEpubLocatorV1] (see the host's `PortableReadingPosition.locatorFor`), so
+ * the outbound key set stays closed by a type.
+ *
+ * reader-api requires [locator]'s `format` to equal [publication]'s.
+ */
+@Serializable
+data class ReaderPortableLocationV1(
+    @SerialName("contract_version") val contractVersion: String = PORTABLE_SEMANTICS_VERSION,
+    @SerialName("publication") val publication: ReaderPortablePublicationV1,
+    @SerialName("locator") val locator: JsonObject,
+)
+
+/**
+ * `ReaderPortablePublicationV1`: which publication a portable place is in.
+ *
+ * FastReader states an account book here and nothing else: [publicationId] is
+ * the account's book id (which reader-api requires to equal the envelope's
+ * `resource_id`), [format] and [mediaType] are the EPUB constants, and [source]
+ * is `account`. `content_identity` is optional in the document and deliberately
+ * not modelled: FastReader never sends a digest of a book in a position.
+ *
+ * [format], [mediaType] and [source] are strings rather than enums so that a
+ * location read from another client's PDF record still decodes; the values this
+ * module *sends* are the constants below, which `ReaderLibraryContractTest`
+ * checks against the document's own enums.
+ */
+@Serializable
+data class ReaderPortablePublicationV1(
+    @SerialName("publication_id") val publicationId: String,
+    @SerialName("format") val format: String,
+    @SerialName("media_type") val mediaType: String,
+    @SerialName("source") val source: String,
+) {
+    companion object {
+        /** An EPUB the account holds, identified by the account's book id. */
+        fun accountEpub(bookId: String): ReaderPortablePublicationV1 = ReaderPortablePublicationV1(
+            publicationId = bookId,
+            format = LOCATOR_FORMAT_EPUB,
+            mediaType = MEDIA_TYPE_EPUB,
+            source = PUBLICATION_SOURCE_ACCOUNT,
+        )
+    }
+}
 
 /**
  * The portable EPUB locator (`ReaderEpubLocatorV1`), the whole of what a
@@ -86,3 +142,9 @@ const val PORTABLE_SEMANTICS_VERSION: String = "reader.portable-semantics.v1"
 
 /** The locator format discriminator for an EPUB. The only one FastReader writes. */
 const val LOCATOR_FORMAT_EPUB: String = "epub"
+
+/** `ReaderPortablePublicationV1.media_type` for an EPUB; the document requires it to agree with `format`. */
+const val MEDIA_TYPE_EPUB: String = "application/epub+zip"
+
+/** `ReaderPortablePublicationV1.source` for a publication the account holds. */
+const val PUBLICATION_SOURCE_ACCOUNT: String = "account"
