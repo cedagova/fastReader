@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.AccountLibraryState
+import com.cedagova.fastreader.account.library.AccountRemotePosition
 import com.cedagova.fastreader.account.library.AccountSyncError
 import com.cedagova.fastreader.account.library.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
@@ -344,6 +345,35 @@ class LibraryAccountScreenshotTest {
             queued = 1,
         ),
     )
+
+    /**
+     * REQ-511's shelf slot: Ficciones is 37 % read on this device and the account
+     * holds a place at 68 %, so the row says both numbers — and Rayuela, which the
+     * account does not have, still says one.
+     *
+     * The image is what settles that it is one line with two numbers rather than
+     * two lines or a replaced number, and that the row's other controls are where
+     * they were. Which number is *the* position is not in question here: this is a
+     * display choice, and nothing on the shelf moves the reader's place.
+     */
+    @Test
+    fun anAccountPlaceFurtherOnIsShownBesideThisDevices() {
+        capture(
+            "library_account_ahead",
+            shelf(
+                LibraryAccountFixtures.ficcionesInAccount().copy(
+                    remotePosition = AccountRemotePosition(
+                        href = "OEBPS/ch8.xhtml",
+                        chapterTitle = "El jardín de senderos que se bifurcan",
+                        progression = 0.68,
+                        percent = 68.0,
+                        updatedAt = "2026-09-20T10:00:00Z",
+                        revision = 4,
+                    ),
+                ),
+            ),
+        )
+    }
 
     private fun shelf(
         vararg books: com.cedagova.fastreader.account.library.AccountBook,

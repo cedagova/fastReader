@@ -1,0 +1,34 @@
+AndroidRuntime:E for the whole session (empty below the line means no crash):
+---
+---
+FastReader process, last lines:
+09-21 17:40:53.455  5644  5644 V GraphicsEnvironment: Currently set values for:
+09-21 17:40:53.455  5644  5644 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+09-21 17:40:53.455  5644  5644 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+09-21 17:40:53.455  5644  5644 V GraphicsEnvironment: com.cedagova.fastreader is not listed in per-application setting
+09-21 17:40:53.455  5644  5644 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+09-21 17:40:53.455  5644  5644 V GraphicsEnvironment: com.cedagova.fastreader is not listed in ANGLE allowlist or settings, returning default
+09-21 17:40:53.455  5644  5644 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+09-21 17:40:53.516  5644  5644 I Supabase-Core: SupabaseClient created! Please report any bugs you find.
+09-21 17:40:53.522  5644  5644 W System.err: SLF4J(W): No SLF4J providers were found.
+09-21 17:40:53.522  5644  5644 W System.err: SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+09-21 17:40:53.522  5644  5644 W System.err: SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+09-21 17:40:53.544  5644  5661 I Supabase-Auth: Loading session from storage...
+09-21 17:40:53.544  5644  5661 I Supabase-Auth: No session found in storage.
+--------- beginning of system
+09-21 17:40:53.564  5644  5664 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+09-21 17:40:53.565  5644  5644 I gova.fastreader: AssetManager2(0xb4000070d7db7298) locale list changing from [] to [es-ES]
+09-21 17:40:53.572  5644  5644 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+09-21 17:40:53.583  5644  5644 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+09-21 17:40:53.593  5644  5664 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+09-21 17:40:53.593  5644  5664 I EGL_emulation: Opening libGLESv2_emulation.so
+09-21 17:40:53.597  5644  5664 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+09-21 17:40:53.597  5644  5664 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+09-21 17:40:53.607  5644  5644 W HWUI    : Unknown dataspace 0
+09-21 17:40:53.762  5644  5644 I gova.fastreader: hiddenapi: Accessing hidden method Landroid/os/SystemProperties;->addChangeCallback(Ljava/lang/Runnable;)V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app) using reflection: allowed
+09-21 17:40:53.812  5644  5649 I gova.fastreader: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+09-21 17:40:53.975  5644  5644 D InsetsController: hide(ime(), fromIme=false)
+09-21 17:40:53.976  5644  5644 I ImeTracker: com.cedagova.fastreader:75dd4091: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+09-21 17:40:57.165  5644  5644 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=androidx.navigationevent.OnBackInvokedInput$createOnBackAnimationCallback$1@5805107
+09-21 17:40:58.843  5644  5685 D ProfileInstaller: Installing profile for com.cedagova.fastreader
+09-21 17:41:00.244  5644  5644 I gova.fastreader: hiddenapi: Accessing hidden method Landroid/view/ViewTreeObserver;->dispatchOnScrollChanged()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/compose/ui/platform/AndroidComposeView$Companion; (domain=app) using reflection: allowed

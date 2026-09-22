@@ -37,27 +37,39 @@ object AccountLibrarySchema {
      *   is content identity plus when it was placed; the bytes themselves are
      *   `AccountCopyStore`'s, and the device catalog's `ACCOUNT_COPY` source is
      *   what keeps them readable after sign-out (D4, AD-24).
+     * - **4** — increment 004 (LEAF821): `remotePosition` on a book row, the
+     *   portable position another client left for it (REQ-511, AD-25). It is
+     *   the account's position and deliberately *not* the device's: the local
+     *   `ReadingState` keeps its own shape and semantics, and the two are never
+     *   merged here.
+     * - **5** — increment 004 (LEAF822): `resumeOfferSettledFor` on a book row,
+     *   the remote change whose resume offer the reader has already answered
+     *   (REQ-511). It is this device's own note and never reaches the backend:
+     *   whether *this* reader was asked about *that* change is not a fact about
+     *   the account, and no mutation carries it.
      *
-     * LEAF821 takes the next step of its own, for remote positions and the
-     * resume record. Each adds a [MIGRATIONS] entry keyed by the version it
-     * upgrades *from*, exactly as `CatalogSchema` does.
+     * Each adds a [MIGRATIONS] entry keyed by the version it upgrades *from*,
+     * exactly as `CatalogSchema` does.
      */
-    const val CURRENT_VERSION: Int = 3
+    const val CURRENT_VERSION: Int = 5
 
     /**
      * Forward migrations keyed by the version they upgrade *from*.
      *
-     * Both steps so far are no-ops on the document's own keys, for the same
-     * reason: each adds a new list with an empty default, so an older document
-     * decodes with that list empty — which is exactly the truth about a device
-     * that has never added a book (1 → 2) or never downloaded one (2 → 3). The
-     * steps exist all the same, because the decoder demands one per version and
-     * a missing entry is how a forgotten migration is caught rather than a
-     * document quietly read as damaged.
+     * Every step so far is a no-op on the document's own keys, for the same
+     * reason: each adds something with an empty or absent default, so an older
+     * document decodes with it empty — which is exactly the truth about a device
+     * that has never added a book (1 → 2), never downloaded one (2 → 3), or
+     * never heard a position from another client (3 → 4), or never answered a
+     * resume offer (4 → 5). The steps exist all the same, because the decoder
+     * demands one per version and a missing entry is how a forgotten migration is
+     * caught rather than a document quietly read as damaged.
      */
     val MIGRATIONS: Map<Int, AccountLibraryMigration> = mapOf(
         1 to AccountLibraryMigration { document -> document },
         2 to AccountLibraryMigration { document -> document },
+        3 to AccountLibraryMigration { document -> document },
+        4 to AccountLibraryMigration { document -> document },
     )
 }
 
@@ -212,6 +224,36 @@ data class AccountBook(
      */
     @SerialName("progressPercent") val progressPercent: Double? = null,
     @SerialName("progressUpdatedAt") val progressUpdatedAt: String? = null,
+    /**
+     * The portable position the account holds for this book (schema 4, REQ-511,
+     * AD-25): the section another client named and how far through the book it
+     * was, with the server's own revision and admission time.
+     *
+     * This is **not** the device's position. `ReadingState` is unchanged in shape
+     * and semantics and stays in the catalog; this row never merges with it, and
+     * nothing here compares the two to decide which is further along — the
+     * backend's admission order decides that (`reader.activity-convergence.v1`).
+     * LEAF822 is what offers it to a reader.
+     */
+    @SerialName("remotePosition") val remotePosition: AccountRemotePosition? = null,
+    /**
+     * The remote change whose resume offer this reader has already answered
+     * (schema 5, REQ-511), as [AccountRemotePosition.changeKey] names it — or
+     * null while none has been.
+     *
+     * The one field on this row that is **not** the server's. Every other field
+     * here is adopted from a canonical payload; this is a note this device makes
+     * about itself, so that "offered once per remote change" survives the process
+     * that made the offer. It is never put in a mutation payload — whether a
+     * reader was asked a question is not a fact about their account — and
+     * `AccountCanonicalPayload` never writes it, so adopting a payload cannot
+     * clear it and cannot set it.
+     *
+     * Keyed by the change rather than by the book on purpose: declining settles
+     * *that* position, and a newer one from another client is a new question. A
+     * boolean per book would silence every later change too.
+     */
+    @SerialName("resumeOfferSettledFor") val resumeOfferSettledFor: String? = null,
 ) {
     companion object {
 
@@ -231,6 +273,56 @@ data class AccountBook(
             )
         }
     }
+}
+
+/**
+ * The account's portable position for one book (schema 4, REQ-511).
+ *
+ * Every field is the backend's own, adopted from a `reading_progress` payload
+ * (AD-22). Nothing here is computed, and nothing here is FastReader's: there is
+ * no token index, no pipeline version, no structural fingerprint and no reading
+ * speed, because the account never held any of them.
+ *
+ * [revision] and [serverAdmittedAt] are the server's ordering, kept so a host
+ * can tell one remote change from the next — which is what LEAF822's "offered
+ * once per remote change" needs — without inventing an ordering of its own.
+ * [href] may be absent: a locator states only its format as a minimum, and a
+ * record from a client that named no section is still a usable percentage.
+ */
+@Serializable
+data class AccountRemotePosition(
+    /** The section the other client named — a spine path, when it named one. */
+    @SerialName("href") val href: String? = null,
+    @SerialName("chapterTitle") val chapterTitle: String? = null,
+    /** `0.0..1.0`, the book-level fraction the record carried. */
+    @SerialName("progression") val progression: Double? = null,
+    /** `0..100` as the record stated it. */
+    @SerialName("percent") val percent: Double? = null,
+    /** The server's own time for the record; never compared with a device clock. */
+    @SerialName("updatedAt") val updatedAt: String? = null,
+    /** The server's revision of the progress resource this position came from. */
+    @SerialName("revision") val revision: Long = 0,
+    /** The server's admission time for the change that delivered it, when one came with it. */
+    @SerialName("serverAdmittedAt") val serverAdmittedAt: String? = null,
+) {
+
+    /**
+     * The identity of the remote change this position came from, as the resume
+     * offer's settled record keys itself by (REQ-511).
+     *
+     * Both of the server's own ordering values, and neither of this device's: the
+     * revision of the progress resource and the server's `updated_at` for the
+     * record. Nothing here is compared with anything — this is a *name* for one
+     * change, not a place in an order — and that is why it is safe for a client
+     * to build. `reader.activity-convergence.v1` still decides which position
+     * wins.
+     *
+     * Stable across a re-bootstrap, which is what makes "offered once" hold
+     * across a cursor expiry: a list read carries no revision and no admission
+     * time, and [AccountCanonicalPayload.remotePosition] keeps the stored ones in
+     * that case, so the same record keeps the same key.
+     */
+    val changeKey: String get() = "$revision:${updatedAt.orEmpty()}"
 }
 
 /**

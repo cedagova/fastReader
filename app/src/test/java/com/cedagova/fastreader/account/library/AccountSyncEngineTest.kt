@@ -314,8 +314,23 @@ class AccountSyncEngineTest {
         assertEquals(0, engine.state.value.queued)
     }
 
+    /**
+     * The four *library* actions the shelf offers produce `library_item`
+     * envelopes and nothing else.
+     *
+     * Deliberately named for what it drives. It used to be called "nothing but
+     * library_item mutations is ever produced", which read as a global invariant
+     * over the engine — and stopped being one in #120, when a published position
+     * became a second kind of envelope this class builds. The test itself never
+     * covered that: it drives remove, undo, open and finish, none of which is a
+     * position flush, so it kept passing while the claim in its name went false.
+     * A privacy promise was resting on that name (row 7 of
+     * `docs/privacy-statement.md`), which is the whole reason the rename matters.
+     *
+     * The invariant over the *engine* is the test below this one.
+     */
     @Test
-    fun `nothing but library_item mutations is ever produced`() = runTest(dispatcher) {
+    fun `a library mutation is only ever a library_item envelope`() = runTest(dispatcher) {
         gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
         gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
         val engine = engine()
@@ -349,6 +364,83 @@ class AccountSyncEngineTest {
             ),
             envelopes.map { it.mutationKind },
         )
+    }
+
+    /**
+     * The invariant row 7 of `docs/privacy-statement.md` actually rests on: over
+     * every operation this engine offers, the set of resource types it puts on
+     * the wire is exactly `library_item` and `reading_progress`.
+     *
+     * An equality over the whole set, not a per-envelope check against a list of
+     * allowed members: a `profile`, `settings`, `note` or `bookmark` envelope
+     * added later fails this, and so does silently dropping the position
+     * envelope. It drives all five operations in one run — remove, undo, open,
+     * finish *and* a position — so the assertion is about a batch that really
+     * contains both kinds rather than about one kind in isolation.
+     */
+    @Test
+    fun `only library_item and reading_progress envelopes are ever produced`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        admit("key-1", ReaderMutationKind.DELETE)
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+        admit("key-2", ReaderMutationKind.RESTORE)
+        engine.undoRemove("book-1")
+        advanceUntilIdle()
+        admit("key-3", ReaderMutationKind.UPSERT)
+        engine.recordOpened("book-1")
+        advanceUntilIdle()
+        admit("key-4", ReaderMutationKind.UPSERT)
+        engine.recordFinished("book-1")
+        advanceUntilIdle()
+        admit("key-5", ReaderMutationKind.UPSERT)
+        engine.recordPosition("book-1", position(href = "OEBPS/ch3.xhtml", percent = 40))
+        advanceUntilIdle()
+
+        val envelopes = gateway.submitted.flatten()
+        assertEquals(5, envelopes.size)
+        assertEquals(
+            "the engine can put no settings, note, bookmark or profile envelope on the wire",
+            setOf(ReaderResourceType.LIBRARY_ITEM, ReaderResourceType.READING_PROGRESS),
+            envelopes.map { it.resourceType }.toSet(),
+        )
+        assertEquals(
+            "exactly one of the five is a position",
+            1,
+            envelopes.count { it.resourceType == ReaderResourceType.READING_PROGRESS },
+        )
+    }
+
+    /**
+     * Settling the resume offer is a note to this device and never a mutation
+     * (#121).
+     *
+     * The record exists so the offer is made once per remote change; nothing
+     * about it belongs to the account's backend state, so answering it must add
+     * no envelope to the outbox and send nothing at all. Asserted beside the
+     * envelope invariant above because this is the operation most likely to grow
+     * a wire call by accident — it is the only thing on
+     * [AccountLibraryActions] that writes the account document without queueing.
+     */
+    @Test
+    fun `settling a resume offer is stored and sends nothing`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+        gateway.calls.clear()
+
+        engine.settleResumeOffer("book-1", "7:2026-09-20T10:00:00Z")
+        advanceUntilIdle()
+
+        assertTrue("settling must send nothing at all, got ${gateway.calls}", gateway.calls.isEmpty())
+        assertEquals(0, engine.state.value.queued)
+        val stored = stores.forUser("user-1").load() as AccountLibraryLoad.Loaded
+        assertEquals("7:2026-09-20T10:00:00Z", stored.document.book("book-1")?.resumeOfferSettledFor)
     }
 
     // ------------------------------------------------------- cursor expiry
@@ -524,7 +616,404 @@ class AccountSyncEngineTest {
         )
     }
 
+    // --------------------------------------------- portable position (#120)
+
+    /**
+     * A position is published as a `reading_progress` upsert carrying exactly the
+     * portable locator — and the envelope is addressed by the account's book id.
+     */
+    @Test
+    fun `a published position is a reading_progress upsert with the portable locator`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(
+            result(
+                "book-1",
+                ReaderSyncStatus.APPLIED,
+                revision = 3,
+                payload = JsonObject(emptyMap()),
+                key = "key-1",
+                kind = ReaderMutationKind.UPSERT,
+            ),
+        )
+
+        engine.recordPosition("book-1", position(href = "OEBPS/ch3.xhtml", percent = 40))
+        advanceUntilIdle()
+
+        val envelope = gateway.submitted.flatten().single()
+        assertEquals(ReaderResourceType.READING_PROGRESS, envelope.resourceType)
+        assertEquals(ReaderMutationKind.UPSERT, envelope.mutationKind)
+        assertEquals("book-1", envelope.resourceId)
+        assertEquals(
+            setOf("chapter_title", "locator", "progress_percent"),
+            envelope.payload.keys,
+        )
+        assertEquals(
+            "OEBPS/ch3.xhtml",
+            (envelope.payload["locator"] as JsonObject)["href"]!!.toString().trim('"'),
+        )
+    }
+
+    /**
+     * REQ-512, at the level where an envelope is actually built: over a long run
+     * of publishes, no key of any `reading_progress` payload is one of
+     * FastReader's own values.
+     */
+    @Test
+    fun `no published position payload ever carries a token index or a speed`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        repeat(12) { step ->
+            admitPosition("key-${step + 1}", revision = (step + 2).toLong())
+            engine.recordPosition("book-1", position(href = "OEBPS/ch$step.xhtml", percent = step * 8))
+            advanceUntilIdle()
+        }
+
+        val payloads = gateway.submitted.flatten().map { it.payload }
+        assertEquals(12, payloads.size)
+        val keys = payloads.flatMap { it.keys }.toSet() +
+            payloads.flatMap { (it["locator"] as JsonObject).keys }.toSet()
+        assertEquals(
+            setOf("chapter_title", "locator", "progress_percent", "contract_version", "format", "href", "progression"),
+            keys,
+        )
+    }
+
+    /** AD-25's guard: an unchanged section and percent says nothing new, so nothing is sent. */
+    @Test
+    fun `a flush that changed neither section nor whole percent publishes nothing`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.APPLIED, revision = 3, payload = JsonObject(emptyMap()), key = "key-1", kind = ReaderMutationKind.UPSERT),
+        )
+
+        engine.recordPosition("book-1", position("OEBPS/ch3.xhtml", 40))
+        advanceUntilIdle()
+        // The reader moved on a few words: a new fraction, the same whole percent
+        // and the same section. This is the case that would otherwise make a long
+        // chapter a stream of mutations.
+        engine.recordPosition("book-1", position("OEBPS/ch3.xhtml", 40))
+        engine.recordPosition("book-1", position("OEBPS/ch3.xhtml", 40))
+        advanceUntilIdle()
+
+        assertEquals("one publish, not three", 1, gateway.submitted.flatten().size)
+    }
+
+    /** A new section publishes even at the same percent; a new percent publishes too. */
+    @Test
+    fun `a new section or a new whole percent each publish`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+
+        // Each publish is answered before the next, so an unanswered envelope is
+        // never kept and retried onto a later batch (see `admit`'s note).
+        admitPosition("key-1", revision = 2)
+        engine.recordPosition("book-1", position("OEBPS/ch3.xhtml", 40))
+        advanceUntilIdle()
+        admitPosition("key-2", revision = 3)
+        engine.recordPosition("book-1", position("OEBPS/ch4.xhtml", 40))
+        advanceUntilIdle()
+        admitPosition("key-3", revision = 4)
+        engine.recordPosition("book-1", position("OEBPS/ch4.xhtml", 41))
+        advanceUntilIdle()
+
+        assertEquals(3, gateway.submitted.flatten().size)
+    }
+
+    /**
+     * `causal-progress-can-move-backward`: reading backwards is published exactly
+     * like reading forwards, and no client-side rule suppresses it.
+     *
+     * This is the test that would fail if anybody ever added a `max` or a
+     * furthest-wins comparison to the publish path.
+     */
+    @Test
+    fun `a position that moves backwards is published like any other`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+
+        admitPosition("key-1", revision = 2)
+        engine.recordPosition("book-1", position("OEBPS/ch8.xhtml", 80))
+        advanceUntilIdle()
+        admitPosition("key-2", revision = 3)
+        engine.recordPosition("book-1", position("OEBPS/ch2.xhtml", 12))
+        advanceUntilIdle()
+
+        val percents = gateway.submitted.flatten().map {
+            (it.payload["progress_percent"])!!.toString().toDouble()
+        }
+        assertEquals("the backward move is sent, second and unaltered", listOf(80.0, 12.0), percents)
+    }
+
+    /** Signed out there is no account to publish to, and nothing is queued. */
+    @Test
+    fun `nothing is published while signed out`() = runTest(dispatcher) {
+        val engine = engine()
+        advanceUntilIdle()
+
+        engine.recordPosition("book-1", position("OEBPS/ch3.xhtml", 40))
+        advanceUntilIdle()
+
+        assertTrue(gateway.submitted.isEmpty())
+        assertEquals(AccountSyncPhase.SIGNED_OUT, engine.state.value.phase)
+    }
+
+    /** A position envelope quotes the *progress* resource's revision, not the library item's. */
+    @Test
+    fun `a published position quotes the progress revision and not the library item's`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(
+            deltas(latestCursor = "1"),
+            deltas(
+                latestCursor = "7",
+                changes = listOf(progressChange("7", "book-1", revision = 5, percent = 30.0, href = "OEBPS/ch2.xhtml")),
+            ),
+        )
+        val engine = engine()
+        signIn("user-1")
+        engine.refresh()
+        advanceUntilIdle()
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.APPLIED, revision = 6, payload = JsonObject(emptyMap()), key = "key-1", kind = ReaderMutationKind.UPSERT),
+        )
+
+        engine.recordPosition("book-1", position("OEBPS/ch4.xhtml", 44))
+        advanceUntilIdle()
+
+        assertEquals(5L, gateway.submitted.flatten().single().baseRevision)
+    }
+
+    // ---- consuming
+
+    /**
+     * The clause carried into this increment from 001 (REQ-502): a position
+     * changed on another device is reflected on the next **foreground**.
+     *
+     * Driven through `AccountSyncTrigger.FOREGROUND` on purpose, rather than a
+     * manual refresh, because that is the trigger the requirement names.
+     */
+    @Test
+    fun `a position changed on another device is reflected on the next foreground`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(
+            deltas(latestCursor = "1"),
+            deltas(
+                latestCursor = "9",
+                changes = listOf(progressChange("9", "book-1", revision = 4, percent = 62.5, href = "OEBPS/ch8.xhtml")),
+            ),
+        )
+        val engine = engine()
+        signIn("user-1")
+
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+
+        val remote = engine.state.value.books.single().remotePosition!!
+        assertEquals("OEBPS/ch8.xhtml", remote.href)
+        assertEquals(0.625, remote.progression!!, 1e-9)
+        assertEquals(62.5, remote.percent!!, 1e-9)
+        assertEquals(4L, remote.revision)
+        assertEquals(SERVER_TIME, remote.serverAdmittedAt)
+        assertNull("a record this app could place is not an error", engine.state.value.lastError)
+    }
+
+    /** The bootstrap's progress list carries the locator too, not only the percentage. */
+    @Test
+    fun `the bootstrap stores the portable locator from the progress list`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.progressResponses = queueOf(
+            ReaderProgressListResponse(
+                requestId = REQUEST_ID,
+                progress = listOf(
+                    ReaderProgress(
+                        bookId = "book-1",
+                        progressPercent = 33.0,
+                        updatedAt = "2026-09-20T08:00:00Z",
+                        locator = locator("OEBPS/ch3.xhtml", 0.33),
+                        chapterTitle = "Chapter Three",
+                    ),
+                ),
+            ),
+        )
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+
+        val engine = engine()
+        signIn("user-1")
+
+        val remote = engine.state.value.books.single().remotePosition!!
+        assertEquals("OEBPS/ch3.xhtml", remote.href)
+        assertEquals("Chapter Three", remote.chapterTitle)
+        assertEquals(0.33, remote.progression!!, 1e-9)
+        assertEquals("2026-09-20T08:00:00Z", remote.updatedAt)
+    }
+
+    /**
+     * A remote position that moves the row backwards is adopted as it stands.
+     *
+     * The backend admitted it, so it is the answer; nothing here compares it with
+     * what was stored.
+     */
+    @Test
+    fun `a remote position that moves backwards is adopted, not filtered`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(
+            deltas(latestCursor = "1"),
+            deltas(
+                latestCursor = "4",
+                changes = listOf(
+                    progressChange("3", "book-1", revision = 3, percent = 80.0, href = "OEBPS/ch8.xhtml"),
+                    progressChange("4", "book-1", revision = 4, percent = 12.0, href = "OEBPS/ch2.xhtml"),
+                ),
+            ),
+        )
+        val engine = engine()
+        signIn("user-1")
+
+        engine.refresh()
+        advanceUntilIdle()
+
+        val remote = engine.state.value.books.single().remotePosition!!
+        assertEquals("the later admission stands, though it is further back", 12.0, remote.percent!!, 1e-9)
+        assertEquals("OEBPS/ch2.xhtml", remote.href)
+        assertEquals(4L, remote.revision)
+    }
+
+    /**
+     * The unverified derivation failing, as a visible outcome.
+     *
+     * A `reading_progress` change whose resource id is not a book id and whose
+     * payload names no book must not vanish: it becomes a typed error carrying
+     * both values, which is what makes the assumption falsifiable on stage.
+     */
+    @Test
+    fun `a progress record naming no known book is surfaced, not dropped`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(
+            deltas(latestCursor = "1"),
+            deltas(
+                latestCursor = "5",
+                changes = listOf(
+                    ReaderSyncChange(
+                        cursor = "5",
+                        resourceType = ReaderResourceType.READING_PROGRESS,
+                        resourceId = "progress:book-1:v7",
+                        revision = 2,
+                        kind = ReaderMutationKind.UPSERT,
+                        serverAdmittedAt = SERVER_TIME,
+                        canonicalPayload = buildJsonObject {
+                            put("progress_percent", JsonPrimitive(50.0))
+                            put("locator", locator("OEBPS/ch5.xhtml", 0.5))
+                        },
+                    ),
+                ),
+            ),
+        )
+        val engine = engine()
+        signIn("user-1")
+
+        engine.refresh()
+        advanceUntilIdle()
+
+        val error = engine.state.value.lastError as AccountSyncError.UnrecognizedProgressRecord
+        assertEquals("progress:book-1:v7", error.resourceId)
+        assertNull(error.payloadBookId)
+        assertTrue(error.reason.isNotBlank())
+        // The row is untouched and the run is not a failure: the cursor advanced.
+        assertNull(engine.state.value.books.single().remotePosition)
+        assertEquals(AccountSyncPhase.IDLE, engine.state.value.phase)
+        assertEquals("5", document("user-1").cursor)
+    }
+
+    /** A record whose payload names the book is placed by that, whatever the resource id is. */
+    @Test
+    fun `a progress record is placed by its payload's book_id`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(
+            deltas(latestCursor = "1"),
+            deltas(
+                latestCursor = "6",
+                changes = listOf(
+                    ReaderSyncChange(
+                        cursor = "6",
+                        resourceType = ReaderResourceType.READING_PROGRESS,
+                        resourceId = "some-opaque-progress-row",
+                        revision = 2,
+                        kind = ReaderMutationKind.UPSERT,
+                        serverAdmittedAt = SERVER_TIME,
+                        canonicalPayload = buildJsonObject {
+                            put("book_id", JsonPrimitive("book-1"))
+                            put("progress_percent", JsonPrimitive(50.0))
+                            put("locator", locator("OEBPS/ch5.xhtml", 0.5))
+                        },
+                    ),
+                ),
+            ),
+        )
+        val engine = engine()
+        signIn("user-1")
+
+        engine.refresh()
+        advanceUntilIdle()
+
+        assertNull(engine.state.value.lastError)
+        assertEquals("OEBPS/ch5.xhtml", engine.state.value.books.single().remotePosition!!.href)
+    }
+
     // ------------------------------------------------------------- helpers
+
+    /** An engine signed in with one book and a settled bootstrap. */
+    private fun TestScope.signedInEngine(): AccountSyncEngine {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+        return engine
+    }
+
+    /** Answer the next batch's single position envelope as admitted. */
+    private fun admitPosition(key: String, revision: Long) {
+        gateway.answerMutations(
+            result(
+                "book-1",
+                ReaderSyncStatus.APPLIED,
+                revision = revision,
+                payload = JsonObject(emptyMap()),
+                key = key,
+                kind = ReaderMutationKind.UPSERT,
+            ),
+        )
+    }
+
+    private fun position(href: String, percent: Int) = LocalReadingPosition(
+        href = href,
+        chapterTitle = "Chapter",
+        progression = percent / 100.0,
+        percent = percent,
+    )
+
+    private fun locator(href: String, progression: Double) = buildJsonObject {
+        put("format", JsonPrimitive("epub"))
+        put("href", JsonPrimitive(href))
+        put("progression", JsonPrimitive(progression))
+        put("contract_version", JsonPrimitive("reader.portable-semantics.v1"))
+    }
+
+    private fun progressChange(
+        cursor: String,
+        bookId: String,
+        revision: Long,
+        percent: Double,
+        href: String,
+    ) = ReaderSyncChange(
+        cursor = cursor,
+        resourceType = ReaderResourceType.READING_PROGRESS,
+        resourceId = bookId,
+        revision = revision,
+        kind = ReaderMutationKind.UPSERT,
+        serverAdmittedAt = SERVER_TIME,
+        canonicalPayload = buildJsonObject {
+            put("book_id", JsonPrimitive(bookId))
+            put("progress_percent", JsonPrimitive(percent))
+            put("updated_at", JsonPrimitive("2026-09-20T09:00:00Z"))
+            put("locator", locator(href, percent / 100.0))
+        },
+    )
 
     /** Answer the next batch's single envelope as admitted, with an empty canonical payload. */
     private fun admit(key: String, kind: ReaderMutationKind) {

@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.reader
 
+import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.TokenPosition
@@ -182,6 +183,84 @@ class ReaderViewModelPersistenceTest {
         )
     }
 
+    /**
+     * AD-25's "never on the per-word throttle", at the only place that decides it.
+     *
+     * The same run as `streaming words records without forcing a write`: the
+     * longest chapter, played word by word at full speed. Every one of those
+     * words records a position, and not one of them offers a portable position
+     * to publish — because the offer is made from the flush branch and streaming
+     * does not take it.
+     */
+    @Test
+    fun `streaming words never offers a portable position to publish`() = runTest(dispatcher) {
+        val chapter = book.chapters.filter { !it.isEmpty }.maxBy { it.tokenCount }
+        val reader = openedReader()
+        reader.jumpToChapter(chapter.index)
+        reader.togglePlay()
+        val publishedBefore = positions.published.size
+        val recordedBefore = positions.recorded.size
+
+        repeat(chapter.tokenCount - 1) { reader.advance() }
+        advanceUntilIdle()
+
+        assertEquals(
+            "every word was recorded",
+            chapter.tokenCount - 1,
+            positions.recorded.size - recordedBefore,
+        )
+        assertEquals(
+            "and not one of them was published",
+            publishedBefore,
+            positions.published.size,
+        )
+    }
+
+    /**
+     * The other half: each discrete act does offer one, at the word it happened
+     * on. Pause, jump, speed and scrub are the moments AD-25 names.
+     */
+    @Test
+    fun `pausing, jumping and changing speed each offer a portable position`() = runTest(dispatcher) {
+        val reader = openedReader()
+        reader.togglePlay()
+        val before = positions.published.size
+
+        reader.togglePlay()
+        reader.forwardParagraph()
+        reader.setWpm(600)
+        reader.scrubTo(0.5f)
+        advanceUntilIdle()
+
+        assertEquals(before + 4, positions.published.size)
+        assertEquals(
+            "the last offer is at the word the reader actually landed on",
+            positions.recorded.last().position.tokenIndex,
+            positions.published.last().second,
+        )
+        assertEquals(ReaderFixtures.ENGLISH_NOVEL_ID, positions.published.last().first)
+    }
+
+    /** Closing the book offers the last position, so a close is never a lost publish. */
+    @Test
+    fun `a chapter boundary offers a portable position`() = runTest(dispatcher) {
+        val chapter = book.chapters.filter { !it.isEmpty }.first { it.index < book.chapters.last().index }
+        val reader = openedReader()
+        reader.jumpToChapter(chapter.index)
+        reader.togglePlay()
+        repeat(chapter.tokenCount - 1) { reader.advance() }
+        val before = positions.published.size
+
+        reader.advance()
+        advanceUntilIdle()
+
+        assertEquals(before + 1, positions.published.size)
+        // The stream stopped *on* the next chapter's first word, which is the
+        // place the reader comes back to — so that is the position published,
+        // not the last word of the chapter just finished.
+        assertEquals(chapter.endTokenIndex, positions.published.last().second)
+    }
+
     private fun TestScope.openedReader(): ReaderViewModel {
         val reader = ReaderViewModel(
             books = FixtureBooks,
@@ -226,5 +305,22 @@ class ReaderViewModelPersistenceTest {
         override fun flush() {
             flushes++
         }
+
+        /**
+         * Every portable position the ViewModel offered, with the token index it
+         * offered it at — so a test can assert not just how many there were but
+         * which words they were taken at.
+         */
+        val published = mutableListOf<Pair<String, Int>>()
+
+        override fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int) {
+            published += bookId to tokenIndex
+        }
+
+        /**
+         * The resume offer has its own test class with its own fake; here the
+         * account holds no place, so nothing is ever offered.
+         */
+        override fun remoteOffer(bookId: String, content: BookContent, tokenIndex: Int): ResumeOffer? = null
     }
 }

@@ -90,22 +90,26 @@ use that account. When you do, your email address, the code or
 password you type and the account's session go to the Reader identity
 provider and the Reader API. FastReader also asks the Reader API which
 books your account already holds, and for those books only it tells
-the Reader API that you opened one, when you last opened it, whether
-you have finished it, and when you take one out of your account or put
-it back. When you choose Add to account library for a book on this
-device and confirm, FastReader asks the Reader API what kinds and
-sizes of file your account accepts and then sends that book's file,
-its name, its size, its format and its checksum to the Reader API and
-its storage, where your account keeps them; nothing about that book is
-sent before you confirm. When you choose Download and open for a book
-your account already holds, FastReader asks the Reader API for a
-one-off address for that book's file and fetches the file from that
-address; the request names only a book your account already has, and
-the account's sign-in is never given to the storage the file comes
-from. That is all that leaves this device: a book file is sent only
-for a book you add that way, a book that is only on this device is
-never named to the Reader API until you add it, and your reading
-positions, your reading speed, your other settings and any crash
+the Reader API that you opened one, when you last opened it, how far
+through it you are and which chapter you are in, whether you have
+finished it, and when you take one out of your account or put it back;
+it also asks for the place another device left in those books, so it
+can offer to take you there. When you choose Add to account library
+for a book on this device and confirm, FastReader asks the Reader API
+what kinds and sizes of file your account accepts and then sends that
+book's file, its name, its size, its format and its checksum to the
+Reader API and its storage, where your account keeps them; nothing
+about that book is sent before you confirm. When you choose Download
+and open for a book your account already holds, FastReader asks the
+Reader API for a one-off address for that book's file and fetches the
+file from that address; the request names only a book your account
+already has, and the account's sign-in is never given to the storage
+the file comes from. That is all that leaves this device: a book file
+is sent only for a book you add that way, a book that is only on this
+device is never named to the Reader API until you add it, your place
+in a book leaves this device only for a book your account holds and
+only as the chapter and how far through it you are, and the exact word
+you are on, your reading speed, your other settings and any crash
 report stay on this device and are never sent. The account session is
 kept encrypted on this device, outside its backup, and is removed when
 you sign out. Check for updates only hands a web address to your

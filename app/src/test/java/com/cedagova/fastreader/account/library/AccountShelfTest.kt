@@ -200,9 +200,21 @@ class AccountShelfTest {
      * There is no `settings`, `note` or `bookmark` operation in it for the shelf
      * to call, and no catalog, file or grant operation either. Adding one would
      * fail here, which is what LEAF704's privacy statement inherits (AD-27).
+     *
+     * `recordPosition` is the seventh since #120: the portable position of an
+     * account book. Its payload is built from the contract's own body type and
+     * carries no token index or reading speed — `PortableReadingPositionTest`
+     * asserts that key set — so the surface grew by a position and not by a new
+     * category of data.
+     *
+     * `settleResumeOffer` is the eighth, added by #121, and it is the only one of
+     * the eight that puts nothing on the wire at all: it records that this reader
+     * was asked about one remote change, which is a note this device makes about
+     * itself. `AccountSyncEngineTest.settling a resume offer is stored and sends
+     * nothing` is what holds that.
      */
     @Test
-    fun `the shelf's whole library surface is these six operations`() {
+    fun `the shelf's whole library surface is these eight operations`() {
         val declared = AccountLibraryActions::class.java.declaredMethods
             .map { it.name }
             .toSortedSet()
@@ -213,9 +225,11 @@ class AccountShelfTest {
             sortedSetOf(
                 "recordFinished",
                 "recordOpened",
+                "recordPosition",
                 "recordStatus",
                 "refresh",
                 "removeFromAccount",
+                "settleResumeOffer",
                 "undoRemove",
             ),
             declared,
@@ -273,6 +287,14 @@ class AccountShelfTest {
 
         override fun recordFinished(bookId: String) {
             calls += "finished:$bookId"
+        }
+
+        override fun recordPosition(bookId: String, position: LocalReadingPosition) {
+            calls += "position:$bookId:${position.href}:${position.percent}"
+        }
+
+        override fun settleResumeOffer(bookId: String, changeKey: String) {
+            calls += "settle:$bookId:$changeKey"
         }
 
         override fun recordStatus(bookId: String, status: ReaderLibraryStatus) {

@@ -128,6 +128,42 @@ class ReaderViewModel(
      */
     val frontMatterOffer: StateFlow<FrontMatterOffer?> = _frontMatterOffer.asStateFlow()
 
+    private val _resumeOffer = MutableStateFlow<ResumeOffer?>(null)
+
+    /**
+     * The remote changes whose offer has been answered *in this session*, by
+     * [ResumeOffer.changeKey].
+     *
+     * The session-lived twin of the durable record on the account row, and it
+     * exists for the gap between the two: answering writes to the account
+     * document asynchronously, and [considerResumeOffer] can be asked again — by
+     * the very sync that carried the answer's own published position — before that
+     * write has landed. Keyed by the change rather than by the book, exactly as
+     * the durable record is, so a *newer* position from another client is still a
+     * new question after this one was declined.
+     */
+    private val settledResumeOffers = mutableSetOf<String>()
+
+    /**
+     * The offer to resume from the place another client left, or null (REQ-511).
+     *
+     * Non-null only while the account holds a position for the open book that
+     * maps ahead of where the reader is, and that has not been answered this
+     * session. Whether it has *already been answered on this device* is a durable
+     * per-change fact and is not known here —
+     * [com.cedagova.fastreader.account.library.AccountBook.resumeOfferSettledFor]
+     * holds it and the caller that can read the account applies it. The same
+     * split [frontMatterOffer] makes, and for the same reason: this class stays
+     * free of the store.
+     *
+     * Unlike the front-matter offer, reading on does **not** dismiss it. That one
+     * is about being on a book's very first word, so a single step answers it;
+     * this one is about a place elsewhere in the book, and a reader who carries on
+     * for a paragraph has not decided anything. It goes when it is answered, or
+     * when [considerResumeOffer] finds the position no longer ahead of them.
+     */
+    val resumeOffer: StateFlow<ResumeOffer?> = _resumeOffer.asStateFlow()
+
     init {
         // A failing store must be visible on the reading surface, not only on the
         // library's banner: this is where the reader is when their place is lost.
@@ -178,6 +214,11 @@ class ReaderViewModel(
         session = null
         _frontMatterOffer.value = null
         frontMatterOfferSettled = false
+        _resumeOffer.value = null
+        // The answered set is the *book*'s, not the session's: it keys on a
+        // change of one book's position, and leaving it in place would carry one
+        // book's answers onto the next book opened in the same reader.
+        settledResumeOffers.clear()
         val title = request.title
         _state.value = ReaderUiState.Opening(title, null)
         parse = viewModelScope.launch { parse(request) }
@@ -230,6 +271,7 @@ class ReaderViewModel(
                     chapterPauseEnabled = chapterPauseEnabled,
                 )
                 raiseFrontMatterOffer()
+                considerResumeOffer()
                 publish()
                 // The setting can have changed while this book was parsing, and
                 // the index above was measured at whatever it was when the parse
@@ -291,6 +333,10 @@ class ReaderViewModel(
         // The late restore can have moved the reader off the first token, and the
         // key the "already offered" record is stored under only exists now.
         raiseFrontMatterOffer()
+        // The same window: until the digest landed there was no key to resolve an
+        // account book from, so a handed-over book that turns out to be an account
+        // book gets its offer here (AD-8).
+        considerResumeOffer()
         publish()
         persist(flush = true)
     }
@@ -397,6 +443,62 @@ class ReaderViewModel(
     }
 
     /**
+     * Takes the resume offer: the reader lands on the token the other client's
+     * position maps to (REQ-511).
+     *
+     * An ordinary [jumpTo], exactly like [skipFrontMatter], so the local
+     * `ReadingState` is written by the one writer that already writes it and the
+     * jump inherits everything a jump does — the re-orientation hold, the paused
+     * context view, the durable write, and the publish of the position the reader
+     * is now at.
+     *
+     * That last one is worth being explicit about: accepting makes this device's
+     * position the one it states next, so the account converges because the
+     * *reader* said so. Nothing here adopts a position on its own.
+     */
+    fun acceptResumeOffer() {
+        val offer = _resumeOffer.value ?: return
+        settledResumeOffers += offer.changeKey
+        _resumeOffer.value = null
+        update { it.jumpTo(offer.targetTokenIndex) }
+    }
+
+    /**
+     * Declines the offer: the local position is kept exactly as it was, and this
+     * remote change is not offered again.
+     *
+     * The only thing that happens is the offer going away — deliberately no
+     * [update], because declining is not a change to the session and must not
+     * write a position or publish one.
+     */
+    fun dismissResumeOffer() {
+        val offer = _resumeOffer.value ?: return
+        settledResumeOffers += offer.changeKey
+        _resumeOffer.value = null
+    }
+
+    /**
+     * Re-asks whether there is a place from another device worth offering.
+     *
+     * Called at open, when a deferred identity lands, and — by the route — every
+     * time the account's rows change, which is how REQ-502's position clause
+     * reaches a book that is *already open*: a change made on another device
+     * arrives on an ordinary foreground sync, not on an open.
+     *
+     * Idempotent and cheap: it recomputes the same offer from live state and
+     * assigns it, so an unchanged account produces an unchanged value and no
+     * recomposition. A change that has been answered this session is filtered
+     * here; one answered on an earlier run is filtered by the route against the
+     * durable record.
+     */
+    fun considerResumeOffer() {
+        val current = session ?: return
+        val positionKey = openRequest?.positionKey ?: return
+        val offer = positions.remoteOffer(positionKey, current.content, current.index)
+        _resumeOffer.value = offer?.takeIf { it.changeKey !in settledResumeOffers }
+    }
+
+    /**
      * Publishes the offer when this book and this position still warrant one.
      *
      * The position test is REQ-202's "on first open" made mechanical: the offer
@@ -485,7 +587,13 @@ class ReaderViewModel(
         val positionKey = openRequest?.positionKey ?: return
         val current = session ?: return
         positions.record(positionKey, current.toPosition())
-        if (flush) positions.flush()
+        if (flush) {
+            positions.flush()
+            // The same moments, and only those: pause, jump, speed, background,
+            // close, and a stream that stopped itself. AD-25's "never on the
+            // per-word throttle" is this `if` and nothing else.
+            positions.publishPortable(positionKey, current.content, current.index)
+        }
     }
 
     /** Leaving the reader for good; the last word read must not depend on timing. */

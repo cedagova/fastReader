@@ -73,15 +73,27 @@ internal object AccountCanonicalPayload {
     }
 
     /**
-     * The row [payload] describes for the reading progress of [resourceId].
+     * The row [payload] describes for a book's reading progress.
      *
-     * Only the percentage and its time are read: the portable locator is
-     * carried by `:reader-library` untouched and mapped by LEAF821, not here.
-     * A progress payload for a book the account has no row for is ignored —
-     * the row arrives with the library item, and inventing one from a position
-     * would put a titleless book on the shelf.
+     * A progress payload for a book the account has no row for is ignored — the
+     * row arrives with the library item, and inventing one from a position would
+     * put a titleless book on the shelf. Which book the payload is *about* is not
+     * decided here: [PortableReadingPosition.recordFor] owns that, and hands the
+     * already-resolved [position] in (#120).
+     *
+     * Nothing is compared. The position replaces whatever was stored, because the
+     * backend decides who wins by admission order and a record that arrives is by
+     * definition the one it admitted — a position that moves the row *backwards*
+     * is adopted exactly like one that moves it forwards
+     * (`causal-progress-can-move-backward`).
      */
-    fun readingProgress(existing: AccountBook?, payload: JsonObject): AccountBook? {
+    fun readingProgress(
+        existing: AccountBook?,
+        payload: JsonObject,
+        position: RemoteReadingPosition,
+        revision: Long?,
+        serverAdmittedAt: String?,
+    ): AccountBook? {
         if (existing == null) return null
         return existing.copy(
             progressPercent = payload.double("progress_percent") ?: existing.progressPercent,
@@ -90,8 +102,37 @@ internal object AccountCanonicalPayload {
             } else {
                 existing.progressUpdatedAt
             },
+            remotePosition = remotePosition(
+                position = position,
+                existing = existing.remotePosition,
+                revision = revision,
+                serverAdmittedAt = serverAdmittedAt,
+            ),
         )
     }
+
+    /**
+     * The stored remote position for [position], keeping the server's ordering.
+     *
+     * [revision] and [serverAdmittedAt] are the change's own and replace the
+     * stored ones when the answer carries them; a list read that carries neither
+     * leaves what is already recorded alone, exactly as a thinner library payload
+     * leaves a row's title alone.
+     */
+    fun remotePosition(
+        position: RemoteReadingPosition,
+        existing: AccountRemotePosition?,
+        revision: Long?,
+        serverAdmittedAt: String?,
+    ): AccountRemotePosition = AccountRemotePosition(
+        href = position.href,
+        chapterTitle = position.chapterTitle,
+        progression = position.progression,
+        percent = position.percent,
+        updatedAt = position.updatedAt ?: existing?.updatedAt,
+        revision = revision ?: existing?.revision ?: 0,
+        serverAdmittedAt = serverAdmittedAt ?: existing?.serverAdmittedAt,
+    )
 
     /** The revision a canonical payload states, when it states one. */
     fun revision(payload: JsonObject): Long? = (payload["revision"] as? JsonPrimitive)?.longOrNull

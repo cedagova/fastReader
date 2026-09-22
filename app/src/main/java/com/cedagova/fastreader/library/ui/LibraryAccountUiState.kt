@@ -12,6 +12,7 @@ import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.account.library.wireName
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
+import kotlin.math.roundToInt
 
 /**
  * The account half of the shelf (LEAF703): the merge, the states, and the
@@ -37,6 +38,17 @@ data class AccountRow(
     val bookId: String,
     val status: ReaderLibraryStatus = ReaderLibraryStatus.QUEUED,
     val onThisDevice: Boolean = true,
+    /**
+     * How far through the book the account's own position is, as a whole percent,
+     * or null when the account holds no position for it (REQ-511).
+     *
+     * The backend's own number, rounded for display and nothing else. It is a
+     * *second* number on the row beside the device's, never a replacement for it
+     * and never merged with it: `LibraryBookItem.progressPercent` is still the
+     * catalog's, and the reader's place is still the device's until the reader
+     * answers the resume offer in the reader.
+     */
+    val remotePercent: Int? = null,
 )
 
 /** The account removal the reader can still take back (REQ-508). */
@@ -191,12 +203,23 @@ fun accountNoticeFor(account: AccountLibraryState): AccountNotice? = when (accou
 /**
  * The notice one error is, or null for an error the shelf says nothing about.
  *
- * `NotConfigured` is that one: a build with no stage values has no account
+ * Two are those. `NotConfigured`: a build with no stage values has no account
  * surface at all, and the account screen of #100 already says so in the one
  * place a reader would go looking.
+ *
+ * `UnrecognizedProgressRecord` is the other, and deliberately so. It reports
+ * that *this app's* derivation about a progress record's identity did not hold
+ * against a real record (#120) — a thing to be read in state, not a sentence
+ * about somebody's library. A reader can do nothing with it, their books are all
+ * still there, and the only consequence is one position that was not adopted.
+ * It stays a typed value on the state so a test and a device run can both see
+ * it; making it a notice would put a developer's diagnostic on the shelf.
  */
 private fun AccountSyncError?.toNotice(): AccountNotice? = when (this) {
-    null, AccountSyncError.NotConfigured -> null
+    null,
+    AccountSyncError.NotConfigured,
+    is AccountSyncError.UnrecognizedProgressRecord,
+    -> null
 
     AccountSyncError.NetworkUnavailable -> AccountNotice(AccountNoticeKind.OFFLINE)
 
@@ -267,7 +290,14 @@ internal fun List<LibraryBookItem>.withAccountBooks(account: AccountLibraryState
         val identity = contentIdentity(item.id) ?: return@map item
         val book = byIdentity[identity] ?: return@map item
         matched += identity
-        item.copy(account = AccountRow(bookId = book.bookId, status = book.status, onThisDevice = true))
+        item.copy(
+            account = AccountRow(
+                bookId = book.bookId,
+                status = book.status,
+                onThisDevice = true,
+                remotePercent = book.remotePercent(),
+            ),
+        )
     }
     val accountOnly = account.books
         .filter { contentIdentity(it.contentSha256)?.let { id -> id !in matched } ?: true }
@@ -293,8 +323,27 @@ private fun AccountBook.toAccountOnlyItem(): LibraryBookItem = LibraryBookItem(
     // until the download lands, at which point it is a device row with the
     // cover the ingestion took from the copy.
     hasCover = false,
-    account = AccountRow(bookId = bookId, status = status, onThisDevice = false),
+    account = AccountRow(
+        bookId = bookId,
+        status = status,
+        onThisDevice = false,
+        remotePercent = remotePercent(),
+    ),
 )
+
+/**
+ * The whole percent the account's portable position is at, or null when there is
+ * none.
+ *
+ * Read from the portable position rather than from `progressPercent`, which is
+ * the same number from the bootstrap's progress list and is kept for that list's
+ * sake: one source for one displayed value, so the row cannot show the percent
+ * from one read and the chapter from another.
+ */
+private fun AccountBook.remotePercent(): Int? =
+    remotePosition?.percent?.roundToInt()?.coerceIn(0, MAX_PERCENT)
+
+private const val MAX_PERCENT = 100
 
 /** The prefix an account-only row's id carries; see [toAccountOnlyItem]. */
 internal const val ACCOUNT_ONLY_ID_PREFIX: String = "account:"

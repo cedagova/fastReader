@@ -125,6 +125,27 @@ class AccountShelf(
     fun recordFinished(bookId: String) = actions.recordFinished(bookId)
 
     /**
+     * The reader reached a place worth stating portably in this account book
+     * (REQ-511, AD-25).
+     *
+     * Straight through, like the two above it: the engine owns whether this says
+     * anything new, and this class owns only the Undo window.
+     */
+    fun recordPosition(bookId: String, position: LocalReadingPosition) =
+        actions.recordPosition(bookId, position)
+
+    /**
+     * The reader has answered the resume offer for one remote change (REQ-511).
+     *
+     * Straight through like the three above it, and the only one of the four that
+     * puts nothing on the wire: it records that the question was asked, so the
+     * next open of this book does not ask it again. Called for **both** answers —
+     * the requirement is that the offer is *made* once.
+     */
+    fun settleResumeOffer(bookId: String, changeKey: String) =
+        actions.settleResumeOffer(bookId, changeKey)
+
+    /**
      * Ends the offer, or ends [expected]'s offer only when one is named.
      *
      * Takes the lock itself, so it must only ever be called from a coroutine

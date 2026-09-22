@@ -53,6 +53,35 @@ interface AccountLibraryActions {
 
     /** Any other library status the shelf sets. */
     fun recordStatus(bookId: String, status: ReaderLibraryStatus)
+
+    /**
+     * Publishes the portable position of an account book (REQ-511, AD-25).
+     *
+     * [bookId] is the **account's** book id. A device book the account does not
+     * hold has no account id to resolve, so nothing is published for it — the
+     * caller's `accountBookIdForDevice` returns null and this is never reached.
+     *
+     * Called only when the position writer flushes for a non-word event and the
+     * section or the whole percent changed since the last publish; never on the
+     * per-word throttle. A position that moves *backwards* is published exactly
+     * like one that moves forwards: `causal-progress-can-move-backward`, and the
+     * backend's admission order decides who wins.
+     */
+    fun recordPosition(bookId: String, position: LocalReadingPosition)
+
+    /**
+     * Records that the resume offer for one remote change has been answered
+     * (REQ-511), whichever way it was answered.
+     *
+     * The one operation on this interface that **queues nothing and sends
+     * nothing**. Whether this reader was asked about a position another client
+     * left is a note this device makes about itself, not a change to the
+     * account — so it is written straight into the account document and no
+     * envelope is built. It is here rather than on a separate interface only
+     * because the account document has exactly one writer, and a second one
+     * racing it would be the first way to lose a queued mutation.
+     */
+    fun settleResumeOffer(bookId: String, changeKey: String)
 }
 
 /**
@@ -140,8 +169,18 @@ interface AccountCopyReferences {
  * (AD-21): the only things that make it run are the triggers of
  * [AccountSyncTrigger]. It writes nothing but the account document — the
  * device catalog is not this leaf's to touch. And it sends nothing but
- * `library_item` mutations: no `profile`, `settings`, `note` or `bookmark`
- * envelope exists in this file.
+ * `library_item` and `reading_progress` mutations: no `profile`, `settings`,
+ * `note` or `bookmark` envelope exists in this file. A `reading_progress`
+ * envelope carries the portable position and only ever that — the section, the
+ * fraction and the percent — because [PortableReadingPosition] builds its
+ * payload from the contract's own body type, which has no field a token index or
+ * a reading speed could travel in (REQ-512, #120).
+ *
+ * It also never decides which of two positions is further along. The backend
+ * does, by admission order (`reader.activity-convergence.v1`), so a position
+ * that moves backwards is published exactly like one that moves forwards and
+ * there is no `max`, latest-wins or percentage comparison on a position
+ * anywhere in this file.
  *
  * ## Sign-out (D4)
  *
@@ -176,6 +215,28 @@ class AccountSyncEngine(
 
     /** A session the backend rejected, kept until the signed-out state has shown it once. */
     private var pendingSessionGone: AccountSyncError.SessionGone? = null
+
+    /**
+     * What this device last published for each account book, as AD-25's
+     * section-or-whole-percent key.
+     *
+     * This device's memory of its own sends and nothing else: it is compared
+     * only with the next local position, never with a remote one, and it selects
+     * no winner. In memory on purpose — see [recordPosition].
+     */
+    private val published = mutableMapOf<String, Pair<String?, Int>>()
+
+    /**
+     * A `reading_progress` record this app could not place on a book, kept until
+     * the next settled state has surfaced it once.
+     *
+     * The same shape as [pendingSessionGone] and for the same reason: the record
+     * is noticed while the stream is being read, and the state that reports it is
+     * published after. Without this the mapping derivation could be wrong for as
+     * long as nobody happened to look — see
+     * [AccountSyncError.UnrecognizedProgressRecord].
+     */
+    private var progressMismatch: AccountSyncError.UnrecognizedProgressRecord? = null
 
     private class ActiveAccount(
         val userId: String,
@@ -227,6 +288,61 @@ class AccountSyncEngine(
     override fun recordStatus(bookId: String, status: ReaderLibraryStatus) {
         val payload = buildJsonObject { put("status", JsonPrimitive(status.wireName())) }
         enqueue(bookId, ReaderMutationKind.UPSERT, payload) { it.copy(status = status) }
+    }
+
+    /**
+     * Publishes a portable position, when it says something new.
+     *
+     * The guard is AD-25's, and it is the whole reason reading a long chapter is
+     * not a stream of mutations: a flush publishes only when the section or the
+     * *whole percent* differs from what this device last published for that book.
+     * [published] is this device's own memory of its own sends — it is never
+     * compared with a remote position and never decides a winner.
+     *
+     * It is deliberately in memory rather than in the document. The cost of
+     * forgetting it is one redundant upsert after a cold start, which the
+     * backend admits like any other; the cost of persisting it would be a
+     * durable write on the path whose entire purpose is to avoid durable writes.
+     *
+     * Nothing about the local position is queued: [PortableReadingPosition]
+     * builds the payload from the contract's own body type, so the token index
+     * and the reading speed have no field to travel in (REQ-512).
+     */
+    override fun recordPosition(bookId: String, position: LocalReadingPosition) {
+        if (published[bookId] == position.publishKey) return
+        published[bookId] = position.publishKey
+        enqueue(
+            bookId = bookId,
+            kind = ReaderMutationKind.UPSERT,
+            payload = PortableReadingPosition.payloadFor(position),
+            resourceType = ReaderResourceType.READING_PROGRESS,
+        ) { it }
+    }
+
+    /**
+     * Stores the answered remote change on the book's row, and does nothing else.
+     *
+     * No `enqueue`, so no envelope and no sync: this is the only write in this
+     * class that reaches the document without going near the outbox. It goes
+     * through [persistQuietly] for the reason an import record does — the row the
+     * shelf draws has not changed, so re-publishing the state would re-trigger
+     * the shelf's effects for a fact the shelf does not show.
+     *
+     * A book the account has no row for is skipped rather than invented: there is
+     * nothing to have been offered for.
+     */
+    override fun settleResumeOffer(bookId: String, changeKey: String) {
+        scope.launch {
+            mutex.withLock {
+                val account = active ?: return@withLock
+                val existing = account.document.book(bookId) ?: return@withLock
+                if (existing.resumeOfferSettledFor == changeKey) return@withLock
+                persistQuietly(
+                    account,
+                    account.document.withBook(existing.copy(resumeOfferSettledFor = changeKey)),
+                )
+            }
+        }
     }
 
     // ---------------------------------------------------------- import records
@@ -344,6 +460,12 @@ class AccountSyncEngine(
         mutex.withLock {
             active = null
             capabilityConfirmed = false
+            // This device's memory of what it last published goes with the
+            // session: the next sign-in publishes its first position afresh
+            // rather than suppressing it because some earlier account was at the
+            // same percent of some other book.
+            published.clear()
+            progressMismatch = null
             val reason = pendingSessionGone ?: if (notConfigured) AccountSyncError.NotConfigured else null
             pendingSessionGone = null
             publish(AccountSyncPhase.SIGNED_OUT, trigger = null, error = reason)
@@ -445,7 +567,9 @@ class AccountSyncEngine(
                 } else {
                     bootstrap(account, gateway, trigger)
                 }
-                publish(AccountSyncPhase.IDLE, trigger, error = rejection)
+                // A rejection the backend stated outranks a record this app could
+                // not place; both are surfaced, a rejection first.
+                publish(AccountSyncPhase.IDLE, trigger, error = rejection ?: takeProgressMismatch())
             } catch (e: ReaderAuthException) {
                 onFailure(e, trigger)
             } catch (e: IOException) {
@@ -555,8 +679,28 @@ class AccountSyncEngine(
         val positions = gateway.progress().progress.associateBy { it.bookId }
         val books = library.items.map { item ->
             val row = AccountBook.of(item)
-            positions[row.bookId]?.let {
-                row.copy(progressPercent = it.progressPercent, progressUpdatedAt = it.updatedAt)
+            positions[row.bookId]?.let { progress ->
+                // The bootstrap's second list is keyed by `book_id`, which the
+                // document marks required on `ReaderProgress` — so unlike the
+                // stream there is nothing to derive here, and the portable
+                // locator is read through the same seam the stream uses (#120).
+                row.copy(
+                    progressPercent = progress.progressPercent,
+                    progressUpdatedAt = progress.updatedAt,
+                    remotePosition = AccountCanonicalPayload.remotePosition(
+                        position = PortableReadingPosition.positionOf(
+                            buildJsonObject {
+                                put("locator", progress.locator)
+                                put("progress_percent", JsonPrimitive(progress.progressPercent))
+                                put("updated_at", JsonPrimitive(progress.updatedAt))
+                                progress.chapterTitle?.let { put("chapter_title", JsonPrimitive(it)) }
+                            },
+                        ),
+                        existing = row.remotePosition,
+                        revision = null,
+                        serverAdmittedAt = null,
+                    ),
+                )
             } ?: row
         }
         persist(account, account.document.copy(books = books, cursor = head.latestCursor))
@@ -594,6 +738,7 @@ class AccountSyncEngine(
                     kind = change.kind,
                     payload = change.canonicalPayload,
                     revision = change.revision,
+                    serverAdmittedAt = change.serverAdmittedAt,
                 )
             }
             val next = response.nextCursor ?: response.latestCursor
@@ -619,6 +764,13 @@ class AccountSyncEngine(
         bookId: String,
         kind: ReaderMutationKind,
         payload: JsonObject,
+        /**
+         * Which resource the envelope is about. `library_item` for everything the
+         * shelf does; `reading_progress` only for a published position (AD-25).
+         * No other member of the enum is ever passed here — there is no
+         * `profile`, `settings`, `note` or `bookmark` caller in this file.
+         */
+        resourceType: ReaderResourceType = ReaderResourceType.LIBRARY_ITEM,
         locally: (AccountBook) -> AccountBook,
     ) {
         scope.launch {
@@ -627,10 +779,18 @@ class AccountSyncEngine(
                 val existing = account.document.book(bookId)
                 val entry = AccountOutboxEntry(
                     idempotencyKey = newIdempotencyKey(),
-                    resourceType = ReaderResourceType.LIBRARY_ITEM,
+                    resourceType = resourceType,
                     resourceId = bookId,
                     mutationKind = kind,
-                    baseRevision = existing?.revision ?: 0,
+                    // The revision of the resource this envelope is about, which
+                    // for a position is the *progress* resource's own and not the
+                    // library item's — two resources whose revisions have nothing
+                    // to do with each other. 0 for one this device has never seen,
+                    // which is what the contract asks for.
+                    baseRevision = when (resourceType) {
+                        ReaderResourceType.READING_PROGRESS -> existing?.remotePosition?.revision ?: 0
+                        else -> existing?.revision ?: 0
+                    },
                     payload = payload,
                     clientCreatedAt = now(),
                 )
@@ -677,6 +837,7 @@ class AccountSyncEngine(
             kind = result.mutationKind,
             payload = payload,
             revision = result.revision ?: result.conflict?.remoteRevision,
+            serverAdmittedAt = result.serverAdmittedAt,
         )
     }
 
@@ -687,6 +848,8 @@ class AccountSyncEngine(
         kind: ReaderMutationKind,
         payload: JsonObject,
         revision: Long?,
+        /** The server's admission time for this change, when it came from the stream. */
+        serverAdmittedAt: String? = null,
     ): AccountLibraryDocument = when (resourceType) {
         ReaderResourceType.LIBRARY_ITEM, ReaderResourceType.BOOK -> {
             val existing = document.book(resourceId)
@@ -703,10 +866,38 @@ class AccountSyncEngine(
             }
         }
 
+        // Which book a position record is about is a *derivation*, not a fact the
+        // document states, so it goes through the one seam that owns it and a
+        // record this app cannot place becomes a visible outcome rather than a
+        // dropped one (REQ-511).
         ReaderResourceType.READING_PROGRESS ->
-            AccountCanonicalPayload.readingProgress(document.book(resourceId), payload)
-                ?.let(document::withBook)
-                ?: document
+            when (
+                val record = PortableReadingPosition.recordFor(
+                    resourceId = resourceId,
+                    payload = payload,
+                    knownBook = { document.book(it) != null },
+                )
+            ) {
+                is ProgressRecord.Recognized ->
+                    AccountCanonicalPayload.readingProgress(
+                        existing = document.book(record.bookId),
+                        payload = payload,
+                        position = record.position,
+                        revision = revision,
+                        serverAdmittedAt = serverAdmittedAt,
+                    )
+                        ?.let(document::withBook)
+                        ?: document
+
+                is ProgressRecord.Unrecognized -> {
+                    progressMismatch = AccountSyncError.UnrecognizedProgressRecord(
+                        resourceId = record.resourceId,
+                        payloadBookId = record.payloadBookId,
+                        reason = record.reason,
+                    )
+                    document
+                }
+            }
 
         // profile, settings, note and bookmark are never sent and never shown.
         ReaderResourceType.PROFILE,
@@ -718,6 +909,19 @@ class AccountSyncEngine(
     }
 
     // -------------------------------------------------------------- plumbing
+
+    /**
+     * The unplaceable progress record, if one arrived, and clears it.
+     *
+     * Taken rather than read so it is reported once per occurrence: the next
+     * settled state after a clean run says nothing, which is what makes the
+     * report mean "this happened just now" rather than "this happened once".
+     */
+    private fun takeProgressMismatch(): AccountSyncError.UnrecognizedProgressRecord? {
+        val mismatch = progressMismatch
+        progressMismatch = null
+        return mismatch
+    }
 
     private suspend fun persist(account: ActiveAccount, document: AccountLibraryDocument) {
         val stamped = document.copy(userId = account.userId)

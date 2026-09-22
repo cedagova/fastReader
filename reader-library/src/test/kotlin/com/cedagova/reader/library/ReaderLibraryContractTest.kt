@@ -2,6 +2,9 @@ package com.cedagova.reader.library
 
 import com.cedagova.reader.library.model.CancelPublicationImportRequest
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
+import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
+import com.cedagova.reader.library.model.PORTABLE_SEMANTICS_VERSION
+import com.cedagova.reader.library.model.PutReaderProgressRequest
 import com.cedagova.reader.library.model.PublicationArchivePolicy
 import com.cedagova.reader.library.model.PublicationFormatPolicy
 import com.cedagova.reader.library.model.PublicationImport
@@ -21,6 +24,7 @@ import com.cedagova.reader.library.model.ReaderBookAsset
 import com.cedagova.reader.library.model.ReaderBookAssetKind
 import com.cedagova.reader.library.model.ReaderCapabilityEntry
 import com.cedagova.reader.library.model.ReaderCapabilityQuota
+import com.cedagova.reader.library.model.ReaderEpubLocatorV1
 import com.cedagova.reader.library.model.ReaderLibraryItem
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderProgress
@@ -114,6 +118,9 @@ class ReaderLibraryContractTest {
         ReaderBookAsset.serializer() to "ReaderBookAsset",
         ReaderProgressListResponse.serializer() to "ReaderProgressListResponse",
         ReaderProgress.serializer() to "ReaderProgress",
+        // The portable position FastReader publishes (#120).
+        PutReaderProgressRequest.serializer() to "PutReaderProgressRequest",
+        ReaderEpubLocatorV1.serializer() to "ReaderEpubLocatorV1",
         ReaderSyncMutationBatchRequest.serializer() to "ReaderSyncMutationBatchRequest",
         ReaderSyncMutationEnvelope.serializer() to "ReaderSyncMutationEnvelope",
         ReaderSyncMutationBatchResponse.serializer() to "ReaderSyncMutationBatchResponse",
@@ -275,6 +282,72 @@ class ReaderLibraryContractTest {
         // REQ-507's promise, in the contract itself: a failed import never
         // leaves a broken account entry behind.
         assertEquals("false", failure["broken_account_entry_created"]!!.jsonObject["const"].toString())
+    }
+
+    /**
+     * The portable locator object, against the document's own declarations (#120).
+     *
+     * The shape checker above compares fields and types; these are *values* and
+     * *bounds*, and each one is something the host relies on rather than checks:
+     * that `reader.portable-semantics.v1` and `epub` are the document's own
+     * constants and not strings typed from memory, that `progression` really is
+     * the `0.0..1.0` fraction the mapping clamps to (and not a percentage),
+     * that `progress_percent` really is `0..100`, and that a locator carrying
+     * only `format` is legal — which is what makes "the href may be absent" a
+     * contract fact rather than a hopeful fallback.
+     */
+    @Test
+    fun `the portable locator the module publishes is the document's own`() {
+        val locator = schemas["ReaderEpubLocatorV1"]!!.jsonObject
+        val properties = locator["properties"]!!.jsonObject
+
+        assertEquals(
+            "the portable-semantics version must be the document's own constant",
+            PORTABLE_SEMANTICS_VERSION,
+            properties["contract_version"]!!.constValue(),
+        )
+        assertEquals(
+            "the epub format discriminator must be the document's own constant",
+            LOCATOR_FORMAT_EPUB,
+            properties["format"]!!.constValue(),
+        )
+
+        // `format` is the only required field: a locator that states nothing but
+        // its format is a legal document, so an absent href is a shape the
+        // contract allows and the mapping must answer for.
+        assertEquals(
+            "only format may be required, or an href-less locator would be invalid",
+            listOf("format"),
+            (locator["required"] as JsonArray).mapNotNull { it.primitive() },
+        )
+
+        // `progression` is a fraction, not a percentage. The mapping multiplies
+        // it by the token count, so a 0..100 bound here would be a 100x error.
+        val progression = progressionBounds(properties["progression"]!!.jsonObject)
+        assertEquals("progression's minimum", "0", progression.first)
+        assertEquals("progression's maximum", "1", progression.second)
+
+        // The percentage the module sends, on the body the document declares for
+        // stating a position.
+        val percent = schemas["PutReaderProgressRequest"]!!.jsonObject["properties"]!!
+            .jsonObject["progress_percent"]!!.jsonObject
+        assertEquals("0", percent["minimum"].toString().trimEnd('0').trimEnd('.'))
+        assertEquals("100", percent["maximum"].toString().trimEnd('0').trimEnd('.'))
+        assertEquals(
+            "a published position must state its percentage and its locator",
+            listOf("progress_percent", "locator"),
+            (schemas["PutReaderProgressRequest"]!!.jsonObject["required"] as JsonArray)
+                .mapNotNull { it.primitive() },
+        )
+    }
+
+    /** The numeric bounds of a nullable `anyOf … null` schema, as plain strings. */
+    private fun progressionBounds(property: JsonObject): Pair<String, String> {
+        val bounded = (property["anyOf"] as JsonArray)
+            .map { it.jsonObject }
+            .first { it.containsKey("maximum") }
+        fun trim(value: String) = value.trimEnd('0').trimEnd('.')
+        return trim(bounded["minimum"].toString()) to trim(bounded["maximum"].toString())
     }
 
     /**

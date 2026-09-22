@@ -12,6 +12,7 @@ import com.cedagova.fastreader.content.ContentFailureReason
 import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderSession
+import com.cedagova.fastreader.reader.ResumeOffer
 import com.cedagova.fastreader.settings.CueSettings
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.ReaderSettings
@@ -220,6 +221,60 @@ class ReaderScreenScreenshotTest {
             fontScale = 1.3f,
         )
     }
+
+    // --- REQ-511, the resume offer -------------------------------------------
+    //
+    // Three images, and each settles something the accessibility test beside them
+    // cannot: that the banner sits *above* the reading surface rather than inside
+    // it (REQ-062, REQ-302, AD-6), that the Spanish sentence and its two labels —
+    // the longer pair — still fit, and that the whole thing survives the
+    // narrowest screen in the matrix at a large font scale, where the
+    // destination-naming label is what wraps.
+
+    /**
+     * The offer as it normally appears: a place another device left, further on in
+     * the book, named by the chapter this parse has for it and the percent the
+     * other client published.
+     *
+     * Captured paused with the context view under it, like the front-matter offer
+     * above, so the image shows the banner outside the stream's own fixed-size,
+     * static-background area.
+     */
+    @Test
+    fun anAccountBookOffersThePlaceAnotherDeviceLeft() {
+        capture("reader_resume_offer", pausedAt(12), resumeOffer = resumeOffer())
+    }
+
+    /** REQ-206 on the same banner: the Spanish sentence and the longer label pair. */
+    @Test
+    @Config(qualifiers = "+es")
+    fun theResumeOfferIsSpanishOnASpanishDevice() {
+        capture("reader_resume_offer_spanish", pausedAt(12), resumeOffer = resumeOffer())
+    }
+
+    /**
+     * Where it has to survive: 360 dp of width at a large font scale, which is
+     * where "Resume at <chapter title>" is long enough to take the whole row and
+     * push the way to decline off a plain `Row`.
+     */
+    @Test
+    @Config(sdk = [35], qualifiers = COMPACT_PHONE)
+    fun theResumeOfferFitsACrampedScreenAtALargeFontScale() {
+        capture(
+            "reader_resume_offer_compact",
+            pausedAt(12),
+            resumeOffer = resumeOffer(),
+            fontScale = 1.3f,
+        )
+    }
+
+    private fun resumeOffer() = ResumeOffer(
+        accountBookId = "acct-1",
+        changeKey = "4:2026-09-20T10:00:00Z",
+        targetTokenIndex = 24,
+        chapterTitle = "Chapter Four: The Signal",
+        percent = 77,
+    )
 
     // --- The cue matrix ------------------------------------------------------
     //
@@ -530,6 +585,7 @@ class ReaderScreenScreenshotTest {
         externalNotice: Boolean = false,
         speedNotice: String? = null,
         frontMatterOffer: String? = null,
+        resumeOffer: ResumeOffer? = null,
         progressShown: Boolean = true,
     ) {
         composeRule.setContent {
@@ -551,6 +607,7 @@ class ReaderScreenScreenshotTest {
                         externalNotice = externalNotice,
                         speedNotice = speedNotice,
                         frontMatterOffer = frontMatterOffer,
+                        resumeOffer = resumeOffer,
                         progressShown = progressShown,
                     )
                 }
