@@ -47,11 +47,16 @@ object AccountLibrarySchema {
      *   (REQ-511). It is this device's own note and never reaches the backend:
      *   whether *this* reader was asked about *that* change is not a fact about
      *   the account, and no mutation carries it.
+     * - **6** — #140: `ownPositionChangeKey` on a book row, the position change
+     *   the backend admitted from *this* device's own publish. Like schema 5 it
+     *   is this device's note about itself and never reaches the backend; it is
+     *   what keeps this device's own position, echoed back by the change stream
+     *   or read back by a re-bootstrap, from being offered as another device's.
      *
      * Each adds a [MIGRATIONS] entry keyed by the version it upgrades *from*,
      * exactly as `CatalogSchema` does.
      */
-    const val CURRENT_VERSION: Int = 5
+    const val CURRENT_VERSION: Int = 6
 
     /**
      * Forward migrations keyed by the version they upgrade *from*.
@@ -60,8 +65,8 @@ object AccountLibrarySchema {
      * reason: each adds something with an empty or absent default, so an older
      * document decodes with it empty — which is exactly the truth about a device
      * that has never added a book (1 → 2), never downloaded one (2 → 3), or
-     * never heard a position from another client (3 → 4), or never answered a
-     * resume offer (4 → 5). The steps exist all the same, because the decoder
+     * never heard a position from another client (3 → 4), never answered a
+     * resume offer (4 → 5), or never had a position of its own admitted (5 → 6). The steps exist all the same, because the decoder
      * demands one per version and a missing entry is how a forgotten migration is
      * caught rather than a document quietly read as damaged.
      */
@@ -70,6 +75,7 @@ object AccountLibrarySchema {
         2 to AccountLibraryMigration { document -> document },
         3 to AccountLibraryMigration { document -> document },
         4 to AccountLibraryMigration { document -> document },
+        5 to AccountLibraryMigration { document -> document },
     )
 }
 
@@ -254,6 +260,27 @@ data class AccountBook(
      * boolean per book would silence every later change too.
      */
     @SerialName("resumeOfferSettledFor") val resumeOfferSettledFor: String? = null,
+    /**
+     * The position change this device itself published and the backend admitted
+     * (schema 6, #140), as [AccountRemotePosition.changeKey] names it — or null
+     * while none has been.
+     *
+     * Set only when adopting this device's own `reading_progress` result that
+     * the backend `applied` or `replayed`: the canonical position it returns is
+     * the one this device sent, stored with the revision it was admitted at
+     * (client contract §7.4). The change stream later delivers that same
+     * revision back — it carries no originating-client field — and §7.3 drops it
+     * because it is not newer than the stored one, so [remotePosition] keeps this
+     * key. A `superseded` or `conflict` answer carries somebody else's position
+     * and sets nothing.
+     *
+     * While [remotePosition]'s key equals this one, the account's position *is*
+     * this device's own, and the resume offer does not present it as another
+     * device's. A genuinely newer change from elsewhere has a newer revision and
+     * so a different key. Like [resumeOfferSettledFor] it is never put in a
+     * mutation payload and `AccountCanonicalPayload` never writes it.
+     */
+    @SerialName("ownPositionChangeKey") val ownPositionChangeKey: String? = null,
 ) {
     companion object {
 

@@ -311,6 +311,39 @@ class AccountLibraryStoreTest {
         )
     }
 
+    /**
+     * Schema 6 (#140): a document written before this device marked its own
+     * admitted position reads back with none marked. Everything else is untouched.
+     */
+    @Test
+    fun `a version five document migrates forward with no own position marked`() {
+        val codec = AccountLibraryCodec()
+        val version5 = codec.encode(sample())
+            .replace("\"schemaVersion\":${AccountLibrarySchema.CURRENT_VERSION}", "\"schemaVersion\":5")
+            .replace(",\"ownPositionChangeKey\":null", "")
+        assertTrue("the fixture must really be a version 5 document", version5.contains("\"schemaVersion\":5"))
+        assertTrue("a version 5 document names no own position", !version5.contains("ownPositionChangeKey"))
+
+        val decoded = codec.decode(version5) as AccountLibraryDecoding.Decoded
+
+        assertEquals(5, decoded.migratedFrom)
+        assertEquals(AccountLibrarySchema.CURRENT_VERSION, decoded.document.schemaVersion)
+        assertEquals(sample().books, decoded.document.books)
+        assertTrue(decoded.document.books.all { it.ownPositionChangeKey == null })
+    }
+
+    /** The own-position mark survives a write and a read. */
+    @Test
+    fun `an own position mark round trips`() {
+        val codec = AccountLibraryCodec()
+        val book = sample().books.first().copy(ownPositionChangeKey = "5:2026-09-20T09:00:00Z")
+        val document = sample().withBook(book)
+
+        val decoded = codec.decode(codec.encode(document)) as AccountLibraryDecoding.Decoded
+
+        assertEquals("5:2026-09-20T09:00:00Z", decoded.document.book(book.bookId)!!.ownPositionChangeKey)
+    }
+
     /** The settled record survives a write and a read, keyed by the remote change. */
     @Test
     fun `a settled resume offer round trips as the remote change it answered`() {

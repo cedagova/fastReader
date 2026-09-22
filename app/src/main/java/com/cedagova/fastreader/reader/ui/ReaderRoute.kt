@@ -448,12 +448,18 @@ internal class CatalogPositions(
      *
      * The same two gates [publishPortable] has, in the same order and for the
      * same reasons — a device book resolves to no account id, and signed out
-     * there are no rows to resolve against — and then three of its own:
+     * there are no rows to resolve against — and then four of its own:
      *
      * 1. **The account holds no position for this book.** Nothing has been said
      *    about it by anybody, so there is nothing to offer.
      * 2. **The position maps to where the reader already is, or behind it.**
      * 3. **The book has no tokens.** There is no word to land on.
+     * 4. **The position is this device's own** (#140): the backend admitted it
+     *    from this device's publish, as
+     *    [com.cedagova.fastreader.account.library.AccountBook.ownPositionChangeKey]
+     *    records. Gate 2 alone does not cover it — publish at 40 %, rewind to
+     *    30 %, and the account's 40 % is ahead of the reader but was never
+     *    another device's.
      *
      * ## Gate 2 is a question about whether to ask, not about who wins
      *
@@ -479,7 +485,12 @@ internal class CatalogPositions(
         val shelf = account ?: return null
         val state = shelf.state.value
         val accountBookId = accountBookIdForDevice(bookId, state) ?: return null
-        val remote = state.books.firstOrNull { it.bookId == accountBookId }?.remotePosition ?: return null
+        val row = state.books.firstOrNull { it.bookId == accountBookId } ?: return null
+        val remote = row.remotePosition ?: return null
+        // Gate 4 (#140): the account's position is this device's own admitted
+        // publish. It is not another device's place, whatever the reader has done
+        // since — a rewind below it included — so it is never offered as one.
+        if (remote.changeKey == row.ownPositionChangeKey) return null
         val position = RemoteReadingPosition(
             href = remote.href,
             chapterTitle = remote.chapterTitle,
