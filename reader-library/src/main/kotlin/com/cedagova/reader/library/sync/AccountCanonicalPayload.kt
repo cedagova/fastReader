@@ -81,9 +81,10 @@ internal object AccountCanonicalPayload {
      * decided here: [PortableProgress.recordFor] owns that, and hands the
      * already-resolved [position] in (#120).
      *
-     * Nothing is compared. The position replaces whatever was stored, because the
-     * backend decides who wins by admission order and a record that arrives is by
-     * definition the one it admitted — a position that moves the row *backwards*
+     * Nothing is compared here. The position replaces whatever was stored, because
+     * the backend decides who wins by admission order and a record that arrives is
+     * the one it admitted — the engine has already dropped one whose revision is
+     * not newer than the stored one (§7.3) — a position that moves the row *backwards*
      * is adopted exactly like one that moves it forwards
      * (`causal-progress-can-move-backward`).
      */

@@ -813,7 +813,9 @@ class AccountSyncEngine(
     /**
      * Adopts one mutation result. A rejection carries an empty canonical
      * payload by contract and changes no row; everything else — `applied`,
-     * `replayed`, `superseded` and `conflict` alike — is adopted as it stands.
+     * `replayed`, `superseded` and `conflict` alike — is adopted as it stands,
+     * unless its revision is older than the one already stored (§7.3, #147: a
+     * late answer never moves a book's state backwards).
      *
      * `applied` and `replayed` are the backend admitting *this device's own*
      * mutation, so for a position they are recorded as this device's own
@@ -868,15 +870,25 @@ class AccountSyncEngine(
     ): AccountLibraryDocument = when (resourceType) {
         ReaderResourceType.LIBRARY_ITEM, ReaderResourceType.BOOK -> {
             val existing = document.book(resourceId)
-            when (kind) {
-                ReaderMutationKind.DELETE ->
-                    existing
-                        ?.let { document.withBook(it.copy(removed = true, revision = revision ?: it.revision)) }
-                        ?: document
+            if (existing != null && revision != null && revision < existing.revision) {
+                // Client contract §7.3 (#147): a result or change whose revision is
+                // older than the stored one never replaces it — a late `replayed`
+                // answer or an out-of-order delivery must not move the row back or
+                // take it off the shelf. An *equal* revision is the same server
+                // state and is adopted as before: that is what discards a queued
+                // local intent the backend did not keep (`superseded`, `conflict`).
+                document
+            } else {
+                when (kind) {
+                    ReaderMutationKind.DELETE ->
+                        existing
+                            ?.let { document.withBook(it.copy(removed = true, revision = revision ?: it.revision)) }
+                            ?: document
 
-                else -> {
-                    val row = AccountCanonicalPayload.libraryItem(existing, resourceId, payload, revision)
-                    document.withBook(row.copy(removed = false))
+                    else -> {
+                        val row = AccountCanonicalPayload.libraryItem(existing, resourceId, payload, revision)
+                        document.withBook(row.copy(removed = false))
+                    }
                 }
             }
         }
@@ -896,16 +908,24 @@ class AccountSyncEngine(
                 is ProgressRecord.Recognized -> {
                     val existing = document.book(record.bookId)
                     val stored = existing?.remotePosition
-                    if (origin == CanonicalOrigin.STREAM && stored != null && revision != null &&
-                        revision <= stored.revision
-                    ) {
-                        // Client contract §7.3: a stream change is applied only when
-                        // its revision is newer than the one this device already
-                        // holds for the resource. The stream names no originating
-                        // client, so this is also what recognises this device's own
-                        // admitted position coming back to it (#140): it carries the
-                        // very revision §7.4 stored when the result was adopted.
-                        document
+                    if (existing != null && stored != null && revision != null && revision <= stored.revision) {
+                        // Client contract §7.3: a result or stream change is applied
+                        // only when its revision is newer than the one this device
+                        // already holds for the resource — whatever its source
+                        // (#147: a late `replayed` result used to overwrite a newer
+                        // position the stream had delivered). The stream names no
+                        // originating client, so this is also what recognises this
+                        // device's own admitted position coming back to it (#140):
+                        // it carries the very revision §7.4 stored when the result
+                        // was adopted. An admitted result at the *same* revision is
+                        // that same record, so it is still marked as this device's.
+                        if (origin == CanonicalOrigin.ADMITTED_HERE && revision == stored.revision &&
+                            existing.ownPositionChangeKey != stored.changeKey
+                        ) {
+                            document.withBook(existing.copy(ownPositionChangeKey = stored.changeKey))
+                        } else {
+                            document
+                        }
                     } else {
                         AccountCanonicalPayload.readingProgress(
                             existing = existing,
