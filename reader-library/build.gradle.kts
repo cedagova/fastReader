@@ -4,7 +4,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 //
 // It is the contract boundary: typed models and typed operations for the
 // account library, reading progress and the sync protocol, on top of the one
-// authenticated client :reader-auth owns. Like :reader-auth it must stay
+// authenticated client :reader-auth owns — and, since #147, the account sync
+// engine any Reader client can reuse (package com.cedagova.reader.library.sync). Like :reader-auth it must stay
 // liftable — no dependency on :app, no com.cedagova.fastreader symbol, no
 // FastReader naming — because it is the half of this work the owner may later
 // propose upstream (AD-19).
@@ -55,6 +56,10 @@ dependencies {
     // depends on :reader-library must see :reader-auth's types.
     api(project(":reader-auth"))
     implementation(libs.kotlinx.serialization.json)
+    // The account sync engine (#147) is process-scoped and flow-driven: its
+    // public API takes a CoroutineScope and a Flow and publishes a StateFlow, so
+    // a host must see the coroutine types.
+    api(libs.kotlinx.coroutines.android)
     // The publication-import transfer (#116) speaks TUS straight to the storage
     // provider under the grant's signed headers. It is a SECOND, plain client on
     // purpose — it holds no session and cannot reach a token — so it brings its

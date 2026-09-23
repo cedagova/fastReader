@@ -1,5 +1,9 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.library.sync.AccountLibraryActions
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncPhase
+import com.cedagova.reader.library.sync.LocalReadingPosition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -41,6 +45,8 @@ data class AccountRemoval(val bookId: String, val title: String)
  */
 class AccountShelf(
     private val actions: AccountLibraryActions,
+    /** The answered resume offers, a host record the engine stores for this app (#147). */
+    private val resumeOffers: AccountResumeOffers,
     /** The account library the engine publishes; the shelf renders exactly this. */
     val state: StateFlow<AccountLibraryState>,
     private val scope: CoroutineScope,
@@ -142,8 +148,9 @@ class AccountShelf(
      * next open of this book does not ask it again. Called for **both** answers —
      * the requirement is that the offer is *made* once.
      */
-    fun settleResumeOffer(bookId: String, changeKey: String) =
-        actions.settleResumeOffer(bookId, changeKey)
+    fun settleResumeOffer(bookId: String, changeKey: String) {
+        scope.launch { resumeOffers.settle(bookId, changeKey) }
+    }
 
     /**
      * Ends the offer, or ends [expected]'s offer only when one is named.

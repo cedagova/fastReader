@@ -1,12 +1,14 @@
 package com.cedagova.fastreader.reader.ui
 
-import com.cedagova.fastreader.account.library.AccountBook
-import com.cedagova.fastreader.account.library.AccountLibraryActions
-import com.cedagova.fastreader.account.library.AccountLibraryState
-import com.cedagova.fastreader.account.library.AccountRemotePosition
+import com.cedagova.fastreader.account.library.AccountResumeOffers
+import com.cedagova.fastreader.account.library.RecordingHostRecords
+import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.sync.AccountLibraryActions
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountRemotePosition
 import com.cedagova.fastreader.account.library.AccountShelf
-import com.cedagova.fastreader.account.library.AccountSyncPhase
-import com.cedagova.fastreader.account.library.LocalReadingPosition
+import com.cedagova.reader.library.sync.AccountSyncPhase
+import com.cedagova.reader.library.sync.LocalReadingPosition
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.CatalogIngestor
@@ -102,6 +104,7 @@ class CatalogPositionsTest {
         val bookId = repository.catalog.value.books.single().id
         val actions = RecordingActions()
         val shelf = AccountShelf(
+            resumeOffers = AccountResumeOffers(RecordingHostRecords()),
             actions = actions,
             state = MutableStateFlow(
                 AccountLibraryState(
@@ -128,6 +131,7 @@ class CatalogPositionsTest {
         val bookId = repository.catalog.value.books.single().id
         val actions = RecordingActions()
         val shelf = AccountShelf(
+            resumeOffers = AccountResumeOffers(RecordingHostRecords()),
             actions = actions,
             state = MutableStateFlow(
                 AccountLibraryState(
@@ -161,6 +165,7 @@ class CatalogPositionsTest {
         val bookId = repository.catalog.value.books.single().id
         val actions = RecordingActions()
         val shelf = AccountShelf(
+            resumeOffers = AccountResumeOffers(RecordingHostRecords()),
             actions = actions,
             state = MutableStateFlow(AccountLibraryState.SIGNED_OUT),
             scope = backgroundScope,
@@ -418,6 +423,7 @@ class CatalogPositionsTest {
         return CatalogPositions(
             repository,
             AccountShelf(
+                resumeOffers = AccountResumeOffers(RecordingHostRecords()),
                 actions = RecordingActions(),
                 state = MutableStateFlow(state),
                 scope = backgroundScope,
@@ -443,13 +449,6 @@ class CatalogPositionsTest {
 
         override fun recordPosition(bookId: String, position: LocalReadingPosition) {
             positions += bookId to position
-        }
-
-        /** Every settled resume offer, in order, as `<book id>:<change key>`. */
-        val settled = mutableListOf<String>()
-
-        override fun settleResumeOffer(bookId: String, changeKey: String) {
-            settled += "$bookId:$changeKey"
         }
     }
 }

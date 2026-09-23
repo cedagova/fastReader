@@ -1,5 +1,8 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.downloads.AssetDownloadException
 import kotlinx.coroutines.CoroutineScope

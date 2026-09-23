@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.model.ReaderCapabilityReason
@@ -110,7 +110,7 @@ sealed interface AccountSyncError {
      * failure. The pinned document types a change's `resource_id` as a bare
      * string and fixes no meaning for it per resource type; that a progress
      * record's identity is the book is *derived* (see
-     * [PortableReadingPosition.recordFor]) and has never been observed against
+     * [PortableProgress.recordFor]) and has never been observed against
      * stage. If the derivation is wrong, the record cannot be filed — and the
      * one thing that must not happen then is nothing. So it becomes this: the
      * resource id verbatim, the `book_id` the payload carried if it carried one,
@@ -149,7 +149,7 @@ data class AccountLibraryState(
     val lastTrigger: AccountSyncTrigger? = null,
 ) {
     companion object {
-        /** Nobody is signed in: the v1.6.0 shelf, with no account rows at all (D4). */
+        /** Nobody is signed in: no account rows at all (D4). */
         val SIGNED_OUT: AccountLibraryState = AccountLibraryState()
     }
 }

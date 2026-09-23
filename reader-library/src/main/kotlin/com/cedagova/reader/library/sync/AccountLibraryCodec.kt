@@ -1,9 +1,13 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Result of turning stored bytes back into an [AccountLibraryDocument]. */
@@ -33,6 +37,12 @@ sealed interface AccountLibraryDecoding {
  *
  * [currentVersion] and [migrations] are injectable so the migration chain can
  * be exercised before a real second version exists.
+ *
+ * It is also where host records cross the boundary (#147): on the way in, every
+ * key of the document or of a book row that the schema does not declare is
+ * gathered into that level's `host` object; on the way out, those entries are
+ * written back as keys of the same level. A declared key always wins — a host
+ * record can add to a level, never shadow what the schema says there.
  */
 class AccountLibraryCodec(
     private val json: Json = defaultJson,
@@ -40,8 +50,20 @@ class AccountLibraryCodec(
     private val migrations: Map<Int, AccountLibraryMigration> = AccountLibrarySchema.MIGRATIONS,
 ) {
 
-    fun encode(document: AccountLibraryDocument): String =
-        json.encodeToString(AccountLibraryDocument.serializer(), document.copy(schemaVersion = currentVersion))
+    fun encode(document: AccountLibraryDocument): String {
+        val encoded = json.encodeToJsonElement(
+            AccountLibraryDocument.serializer(),
+            document.copy(schemaVersion = currentVersion),
+        ).jsonObject
+        val books = (encoded["books"] as? JsonArray)?.let { rows ->
+            JsonArray(rows.map { row -> flatten(row.jsonObject, BOOK_KEYS) })
+        }
+        val flat = flatten(encoded, DOCUMENT_KEYS)
+        return json.encodeToString(
+            JsonObject.serializer(),
+            if (books == null) flat else JsonObject(flat + ("books" to books)),
+        )
+    }
 
     fun decode(text: String): AccountLibraryDecoding {
         val root = try {
@@ -71,7 +93,7 @@ class AccountLibraryCodec(
         }
 
         return try {
-            val document = json.decodeFromJsonElement(AccountLibraryDocument.serializer(), working)
+            val document = json.decodeFromJsonElement(AccountLibraryDocument.serializer(), gatherHostRecords(working))
             AccountLibraryDecoding.Decoded(
                 document = document.copy(schemaVersion = currentVersion),
                 migratedFrom = documentVersion.takeIf { it != currentVersion },
@@ -81,7 +103,44 @@ class AccountLibraryCodec(
         }
     }
 
+    /** Undeclared keys of the document and of every book row, gathered into each level's `host`. */
+    private fun gatherHostRecords(root: JsonObject): JsonObject {
+        val books = (root["books"] as? JsonArray)?.let { rows ->
+            JsonArray(rows.map { row -> (row as? JsonObject)?.let { gather(it, BOOK_KEYS) } ?: row })
+        }
+        val gathered = gather(root, DOCUMENT_KEYS)
+        return if (books == null) gathered else JsonObject(gathered + ("books" to books))
+    }
+
     companion object {
+
+        /** The keys the schema declares for a document, read from its serializer. */
+        private val DOCUMENT_KEYS: Set<String> = declared(AccountLibraryDocument.serializer().descriptor)
+
+        /** The keys the schema declares for a book row, read from its serializer. */
+        private val BOOK_KEYS: Set<String> = declared(AccountBook.serializer().descriptor)
+
+        private fun declared(descriptor: SerialDescriptor): Set<String> =
+            (0 until descriptor.elementsCount).map(descriptor::getElementName).toSet() - HOST_RECORDS_KEY
+
+        /** [level] with its undeclared keys moved into its `host` object; a stray `host` key is dropped. */
+        private fun gather(level: JsonObject, declared: Set<String>): JsonObject {
+            val (own, host) = level.entries
+                .filter { it.key != HOST_RECORDS_KEY }
+                .partition { it.key in declared }
+            val ownMap: Map<String, JsonElement> = own.associate { it.key to it.value }
+            if (host.isEmpty()) return JsonObject(ownMap)
+            return JsonObject(ownMap + (HOST_RECORDS_KEY to JsonObject(host.associate { it.key to it.value })))
+        }
+
+        /** [level] with its `host` entries written back as keys of the same level; declared keys win. */
+        private fun flatten(level: JsonObject, declared: Set<String>): JsonObject {
+            val host = level[HOST_RECORDS_KEY] as? JsonObject
+            val own = level - HOST_RECORDS_KEY
+            if (host.isNullOrEmpty()) return JsonObject(own)
+            return JsonObject(own + host.filterKeys { it !in declared })
+        }
+
         /**
          * Tolerant on the way in for the catalog codec's reason and one more of
          * this document's own: the values it stores are the *server's* enums, so

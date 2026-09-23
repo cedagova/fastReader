@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.library.imports.PublicationImportRecord
 import com.cedagova.reader.library.model.EMPTY_JSON_OBJECT
@@ -15,12 +15,23 @@ import kotlinx.serialization.json.JsonObject
 /**
  * The persisted account-library schema (AD-20).
  *
- * Deliberately **not** the device catalog: that codec drops unknown keys, its
- * schema is the device library's own contract, and D4 needs one document per
- * account so signing in as somebody else cannot see the previous account's
- * rows or queue. The discipline is the catalog's, though — one JSON document
- * written atomically, carrying its own version, migrated forward step by step
- * and *refused* when it was written by a newer build.
+ * One document per account, so signing in as somebody else cannot see the
+ * previous account's rows or queue (D4): one JSON document written atomically,
+ * carrying its own version, migrated forward step by step and *refused* when it
+ * was written by a newer build.
+ *
+ * ## Host records
+ *
+ * A host app keeps a little state of its own beside the account's — FastReader
+ * keeps its verified-copy references and its answered resume offers — and it has
+ * to live in this document, because the document has exactly one writer and a
+ * second file racing it would be the first way to lose a queued mutation. The
+ * schema therefore reserves nothing for any host: every key the document or a
+ * book row does not declare is a **host record**, kept verbatim through every
+ * load, adoption and save ([AccountLibraryDocument.host], [AccountBook.host]),
+ * and written back at the same level it was read from. That is also what keeps
+ * a document written before #147 byte-compatible: FastReader's `copies` and
+ * `resumeOfferSettledFor` keys are where they always were.
  */
 object AccountLibrarySchema {
 
@@ -32,26 +43,25 @@ object AccountLibrarySchema {
      * - **2** — increment 002 (LEAF802): `imports`, the durable publication
      *   import records of AD-26, so an add interrupted by app death addresses
      *   the same admission instead of making a second one.
-     * - **3** — increment 003 (LEAF811): `copies`, this account's references to
-     *   the verified private copies on this device (REQ-510, D2). A reference
-     *   is content identity plus when it was placed; the bytes themselves are
-     *   `AccountCopyStore`'s, and the device catalog's `ACCOUNT_COPY` source is
-     *   what keeps them readable after sign-out (D4, AD-24).
+     * - **3** — increment 003 (LEAF811): `copies`, FastReader's references to
+     *   the verified private copies on its device (REQ-510, D2). A host record
+     *   since #147: the schema number stays, the key is the host's.
      * - **4** — increment 004 (LEAF821): `remotePosition` on a book row, the
      *   portable position another client left for it (REQ-511, AD-25). It is
      *   the account's position and deliberately *not* the device's: the local
      *   `ReadingState` keeps its own shape and semantics, and the two are never
      *   merged here.
      * - **5** — increment 004 (LEAF822): `resumeOfferSettledFor` on a book row,
-     *   the remote change whose resume offer the reader has already answered
-     *   (REQ-511). It is this device's own note and never reaches the backend:
-     *   whether *this* reader was asked about *that* change is not a fact about
-     *   the account, and no mutation carries it.
+     *   FastReader's note of the resume offer the reader already answered
+     *   (REQ-511). A book host record since #147; it never reaches the backend.
      * - **6** — #140: `ownPositionChangeKey` on a book row, the position change
      *   the backend admitted from *this* device's own publish. Like schema 5 it
      *   is this device's note about itself and never reaches the backend; it is
      *   what keeps this device's own position, echoed back by the change stream
      *   or read back by a re-bootstrap, from being offered as another device's.
+     *
+     * #147 moved this schema into `:reader-library` without a version change:
+     * the bytes a schema 6 document holds are exactly the bytes it held before.
      *
      * Each adds a [MIGRATIONS] entry keyed by the version it upgrades *from*,
      * exactly as `CatalogSchema` does.
@@ -85,7 +95,7 @@ fun interface AccountLibraryMigration {
 }
 
 /**
- * Everything FastReader holds for one signed-in account.
+ * Everything a Reader client holds for one signed-in account.
  *
  * [userId] is the provider subject the session reports; it is written into the
  * document as well as deciding which file the document lives in, so a document
@@ -118,22 +128,16 @@ data class AccountLibraryDocument(
      */
     @SerialName("imports") val imports: List<PublicationImportRecord> = emptyList(),
     /**
-     * The verified private copies this account has on this device (schema 3,
-     * REQ-510, D2).
+     * The host's own records for this account: every top-level key this schema
+     * does not declare, kept verbatim (see [AccountLibrarySchema]).
      *
-     * It is a *reference*, not the bytes and not their location: the bytes are
-     * `AccountCopyStore`'s, keyed by the same content identity, and the file
-     * they live in is named by the device catalog's `ACCOUNT_COPY` source. This
-     * list is how the shelf answers "is this account book on this device?"
-     * without reading the filesystem for every row it draws.
-     *
-     * It is deliberately account-scoped and deliberately not authoritative. A
-     * copy the store no longer holds is reconciled away on the next start, and
-     * two accounts that hold the same book each carry their own reference to
-     * the one shared file — which is why signing out drops the reference and
-     * never the copy (D4).
+     * Never serialized under this name. [AccountLibraryCodec] reads undeclared
+     * keys into it and writes its entries back as top-level keys, so the stored
+     * document carries no `host` key at all. The engine never reads a value in
+     * here; a host changes it only through the engine's
+     * [AccountHostRecords.updateHostRecord], under the one writer.
      */
-    @SerialName("copies") val copies: List<AccountCopy> = emptyList(),
+    @SerialName(HOST_RECORDS_KEY) val host: JsonObject = EMPTY_JSON_OBJECT,
 ) {
 
     /** True once the account's library has been read at least once on this device. */
@@ -158,27 +162,6 @@ data class AccountLibraryDocument(
     /** Drops the import [clientImportId] names; nothing happens when there is none. */
     fun withoutImport(clientImportId: String): AccountLibraryDocument =
         copy(imports = imports.filterNot { it.clientImportId == clientImportId })
-
-    /** True when this account has a copy reference for that content identity. */
-    fun hasCopy(contentSha256: String): Boolean = copies.any { it.contentSha256 == contentSha256 }
-
-    /** Records [copy], replacing any earlier reference to the same content. */
-    fun withCopy(copy: AccountCopy): AccountLibraryDocument {
-        val index = copies.indexOfFirst { it.contentSha256 == copy.contentSha256 }
-        return if (index < 0) {
-            copy(copies = copies + copy)
-        } else {
-            copy(copies = copies.toMutableList().apply { this[index] = copy })
-        }
-    }
-
-    /** Drops the copy reference for [contentSha256]; the bytes are not this document's to delete. */
-    fun withoutCopy(contentSha256: String): AccountLibraryDocument =
-        copy(copies = copies.filterNot { it.contentSha256 == contentSha256 })
-
-    /** Keeps only the copy references [present] still names — the start-up reconciliation. */
-    fun retainingCopies(present: Set<String>): AccountLibraryDocument =
-        copy(copies = copies.filter { it.contentSha256 in present })
 
     /** Replaces [book]'s row, or appends it when the account has no row for that book yet. */
     fun withBook(book: AccountBook): AccountLibraryDocument {
@@ -224,7 +207,7 @@ data class AccountBook(
     /**
      * The account's reading position for this book as a percentage, carried
      * through from `GET /v1/reader/progress` and the `reading_progress` stream
-     * untouched. The portable locator and FastReader's own position are
+     * untouched. The portable locator and a host's own position are
      * LEAF821's work, not this increment's; this is the one field of that read
      * the store keeps so the bootstrap's second list is not thrown away.
      */
@@ -243,24 +226,6 @@ data class AccountBook(
      */
     @SerialName("remotePosition") val remotePosition: AccountRemotePosition? = null,
     /**
-     * The remote change whose resume offer this reader has already answered
-     * (schema 5, REQ-511), as [AccountRemotePosition.changeKey] names it — or
-     * null while none has been.
-     *
-     * The one field on this row that is **not** the server's. Every other field
-     * here is adopted from a canonical payload; this is a note this device makes
-     * about itself, so that "offered once per remote change" survives the process
-     * that made the offer. It is never put in a mutation payload — whether a
-     * reader was asked a question is not a fact about their account — and
-     * `AccountCanonicalPayload` never writes it, so adopting a payload cannot
-     * clear it and cannot set it.
-     *
-     * Keyed by the change rather than by the book on purpose: declining settles
-     * *that* position, and a newer one from another client is a new question. A
-     * boolean per book would silence every later change too.
-     */
-    @SerialName("resumeOfferSettledFor") val resumeOfferSettledFor: String? = null,
-    /**
      * The position change this device itself published and the backend admitted
      * (schema 6, #140), as [AccountRemotePosition.changeKey] names it — or null
      * while none has been.
@@ -277,10 +242,19 @@ data class AccountBook(
      * While [remotePosition]'s key equals this one, the account's position *is*
      * this device's own, and the resume offer does not present it as another
      * device's. A genuinely newer change from elsewhere has a newer revision and
-     * so a different key. Like [resumeOfferSettledFor] it is never put in a
+     * so a different key. Like every host record it is never put in a
      * mutation payload and `AccountCanonicalPayload` never writes it.
      */
     @SerialName("ownPositionChangeKey") val ownPositionChangeKey: String? = null,
+    /**
+     * The host's own records for this book: every key of a stored row this
+     * schema does not declare, kept verbatim (see [AccountLibrarySchema]).
+     *
+     * Adopting a canonical payload keeps it, exactly as it keeps any field the
+     * payload does not carry; it is never put in a mutation payload. Like
+     * [AccountLibraryDocument.host] it is never serialized under this name.
+     */
+    @SerialName(HOST_RECORDS_KEY) val host: JsonObject = EMPTY_JSON_OBJECT,
 ) {
     companion object {
 
@@ -306,7 +280,7 @@ data class AccountBook(
  * The account's portable position for one book (schema 4, REQ-511).
  *
  * Every field is the backend's own, adopted from a `reading_progress` payload
- * (AD-22). Nothing here is computed, and nothing here is FastReader's: there is
+ * (AD-22). Nothing here is computed, and nothing here is a host's: there is
  * no token index, no pipeline version, no structural fingerprint and no reading
  * speed, because the account never held any of them.
  *
@@ -353,26 +327,6 @@ data class AccountRemotePosition(
 }
 
 /**
- * One account book whose bytes are on this device (REQ-510, D2).
- *
- * [contentSha256] is the whole of the identity — the same digest the shelf
- * merges rows on (AD-23) and the same one `AccountCopyStore` names its file
- * after. There is deliberately no path here: a reference that recorded where
- * the bytes were would be a second answer to a question the catalog's
- * `ACCOUNT_COPY` source already answers, and two answers drift.
- *
- * [sizeBytes] and [placedAtEpochMs] are what a host shows about a copy — how
- * much freeing it would recover, and when it arrived. Neither is load-bearing:
- * a reference with both at zero still means "this account's copy is here".
- */
-@Serializable
-data class AccountCopy(
-    @SerialName("contentSha256") val contentSha256: String,
-    @SerialName("sizeBytes") val sizeBytes: Long = 0,
-    @SerialName("placedAtEpochMs") val placedAtEpochMs: Long = 0,
-)
-
-/**
  * One mutation waiting to be admitted.
  *
  * [idempotencyKey] is minted once, here, and then *persisted*: it is what
@@ -400,3 +354,10 @@ data class AccountOutboxEntry(
         clientCreatedAt = clientCreatedAt,
     )
 }
+
+/**
+ * The in-memory name of a document's or a row's host records. Reserved: a host
+ * record cannot itself be called this, and [AccountLibraryCodec] refuses to
+ * let one shadow a declared key.
+ */
+internal const val HOST_RECORDS_KEY: String = "host"

@@ -1,7 +1,5 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
-import com.cedagova.fastreader.account.ReaderAccountState
-import com.cedagova.fastreader.account.ReaderLibraryGateway
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.ReaderLibraryClient
 import com.cedagova.reader.library.imports.PublicationImportRecord
@@ -31,11 +29,34 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
-/** The account-library actions the shelf performs (LEAF703). */
+/**
+ * Who is signed in, as the engine needs to know it (D4).
+ *
+ * The host maps its own session state onto this; the engine reads nothing else
+ * about the session. [Loading] means the stored session has not been read yet,
+ * so nothing changes.
+ */
+sealed interface AccountSession {
+
+    /** The stored session has not been read yet. */
+    data object Loading : AccountSession
+
+    /** The host carries no service values, so there is no account to sync. */
+    data object NotConfigured : AccountSession
+
+    /** Nobody is signed in. */
+    data object SignedOut : AccountSession
+
+    /** [userId] is the provider subject the session reports. */
+    data class SignedIn(val userId: String) : AccountSession
+}
+
+/** The account-library actions a host's shelf performs (LEAF703). */
 interface AccountLibraryActions {
 
     /** The reader asked for a refresh. */
@@ -71,19 +92,6 @@ interface AccountLibraryActions {
      */
     fun recordPosition(bookId: String, position: LocalReadingPosition)
 
-    /**
-     * Records that the resume offer for one remote change has been answered
-     * (REQ-511), whichever way it was answered.
-     *
-     * The one operation on this interface that **queues nothing and sends
-     * nothing**. Whether this reader was asked about a position another client
-     * left is a note this device makes about itself, not a change to the
-     * account — so it is written straight into the account document and no
-     * envelope is built. It is here rather than on a separate interface only
-     * because the account document has exactly one writer, and a second one
-     * racing it would be the first way to lose a queued mutation.
-     */
-    fun settleResumeOffer(bookId: String, changeKey: String)
 }
 
 /**
@@ -114,37 +122,40 @@ interface AccountImportRecords {
 }
 
 /**
- * The account document's copy references, as the download flow uses them
- * (LEAF811, REQ-510, D2).
+ * The host's own records in the account document (#147).
  *
- * Beside [AccountImportRecords] and for the same reason: the account document
- * has exactly one writer, and a second one racing it would be the first way to
- * lose a queued mutation. These say which account books this device holds
- * bytes for; the bytes are [AccountCopyStore]'s and the readable source is the
- * device catalog's.
+ * A host keeps a little state of its own beside the account's — FastReader
+ * keeps its verified-copy references and the resume offers a reader answered —
+ * and it has to be written by the same single writer as everything else in the
+ * document, because a second writer racing it would be the first way to lose a
+ * queued mutation. These are that writer's host-facing half: values the engine
+ * stores verbatim and never reads, never queues and never sends.
+ *
+ * Every update runs under the engine's lock, so a read-modify-write here is
+ * atomic with every other write to the document. An update while nobody is
+ * signed in does nothing; an update that changes nothing writes nothing. Neither
+ * publishes a new state: a host record changes no row the account describes.
  */
-interface AccountCopyReferences {
+interface AccountHostRecords {
 
     /** The signed-in account's user id, or null when nobody is signed in. */
     fun accountId(): String?
 
-    /** The content identities the signed-in account has copies of on this device. */
-    suspend fun copyReferences(): List<AccountCopy>
-
-    /** Records [copy], replacing any earlier reference to the same content. */
-    suspend fun putCopyReference(copy: AccountCopy)
-
-    /** Forgets the reference to [contentSha256]. The bytes are not dropped here. */
-    suspend fun dropCopyReference(contentSha256: String)
+    /** The document-level host record [key], or null when there is none or nobody is signed in. */
+    suspend fun hostRecord(key: String): JsonElement?
 
     /**
-     * Keeps only the references [present] names.
-     *
-     * The start-up reconciliation: the store is the authority on what is
-     * actually on disk, and a reference to a copy a dead process never finished
-     * placing must not outlive it.
+     * Replaces the document-level host record [key] with what [transform]
+     * returns for its current value; null removes it.
      */
-    suspend fun retainCopyReferences(present: Set<String>)
+    suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?)
+
+    /**
+     * Replaces the host record [key] on [bookId]'s row with what [transform]
+     * returns for its current value; null removes it. A book the account has no
+     * row for is skipped rather than invented.
+     */
+    suspend fun updateBookHostRecord(bookId: String, key: String, transform: (JsonElement?) -> JsonElement?)
 }
 
 /**
@@ -169,14 +180,14 @@ interface AccountCopyReferences {
  * change is adopted from the backend's canonical payload, a `conflict` result
  * included. It runs no scheduler, holds no wake lock and registers no receiver
  * (AD-21): the only things that make it run are the triggers of
- * [AccountSyncTrigger]. It writes nothing but the account document — the
- * device catalog is not this leaf's to touch. And it sends nothing but
+ * [AccountSyncTrigger]. It writes nothing but the account document — a host's
+ * own storage is the host's. And it sends nothing but
  * `library_item` and `reading_progress` mutations: no `profile`, `settings`,
  * `note` or `bookmark` envelope exists in this file. A `reading_progress`
  * envelope carries the portable position and only ever that — the section, the
- * fraction and the percent — because [PortableReadingPosition] builds its
- * payload from the contract's own body type, which has no field a token index or
- * a reading speed could travel in (REQ-512, #120).
+ * fraction and the percent — because [PortableProgress] builds its
+ * payload from the contract's own body type, which has no field a host's reading
+ * unit or a reading speed could travel in (REQ-512, #120).
  *
  * It also never decides which of two positions is further along. The backend
  * does, by admission order (`reader.activity-convergence.v1`), so a position
@@ -196,13 +207,13 @@ interface AccountCopyReferences {
 class AccountSyncEngine(
     private val gateway: ReaderLibraryGateway?,
     private val stores: AccountLibraryStores,
-    accountState: Flow<ReaderAccountState>,
+    accountState: Flow<AccountSession>,
     private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     /** Minted once per queued mutation and then persisted; never re-minted for a retry. */
     private val newIdempotencyKey: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> String = { kotlin.time.Clock.System.now().toString() },
-) : AccountLibraryActions, AccountImportRecords, AccountCopyReferences {
+) : AccountLibraryActions, AccountImportRecords, AccountHostRecords {
 
     private val mutex = Mutex()
     private val _state = MutableStateFlow(AccountLibraryState.SIGNED_OUT)
@@ -306,7 +317,7 @@ class AccountSyncEngine(
      * backend admits like any other; the cost of persisting it would be a
      * durable write on the path whose entire purpose is to avoid durable writes.
      *
-     * Nothing about the local position is queued: [PortableReadingPosition]
+     * Nothing about the local position is queued: [PortableProgress]
      * builds the payload from the contract's own body type, so the token index
      * and the reading speed have no field to travel in (REQ-512).
      */
@@ -316,35 +327,9 @@ class AccountSyncEngine(
         enqueue(
             bookId = bookId,
             kind = ReaderMutationKind.UPSERT,
-            payload = PortableReadingPosition.payloadFor(bookId, position),
+            payload = PortableProgress.payloadFor(bookId, position),
             resourceType = ReaderResourceType.READING_PROGRESS,
         ) { it }
-    }
-
-    /**
-     * Stores the answered remote change on the book's row, and does nothing else.
-     *
-     * No `enqueue`, so no envelope and no sync: this is the only write in this
-     * class that reaches the document without going near the outbox. It goes
-     * through [persistQuietly] for the reason an import record does — the row the
-     * shelf draws has not changed, so re-publishing the state would re-trigger
-     * the shelf's effects for a fact the shelf does not show.
-     *
-     * A book the account has no row for is skipped rather than invented: there is
-     * nothing to have been offered for.
-     */
-    override fun settleResumeOffer(bookId: String, changeKey: String) {
-        scope.launch {
-            mutex.withLock {
-                val account = active ?: return@withLock
-                val existing = account.document.book(bookId) ?: return@withLock
-                if (existing.resumeOfferSettledFor == changeKey) return@withLock
-                persistQuietly(
-                    account,
-                    account.document.withBook(existing.copy(resumeOfferSettledFor = changeKey)),
-                )
-            }
-        }
     }
 
     // ---------------------------------------------------------- import records
@@ -378,48 +363,42 @@ class AccountSyncEngine(
         }
     }
 
-    // ---------------------------------------------------------- copy references
+    // ------------------------------------------------------------ host records
 
-    override suspend fun copyReferences(): List<AccountCopy> =
-        mutex.withLock { active?.document?.copies.orEmpty() }
+    override suspend fun hostRecord(key: String): JsonElement? =
+        mutex.withLock { active?.document?.host?.get(key) }
 
-    /**
-     * Records a copy under the one writer of the account document.
-     *
-     * Silently does nothing when nobody is signed in, and that is the right
-     * answer rather than a failure: the bytes are already placed and the
-     * catalog's `ACCOUNT_COPY` source already makes them readable, so a
-     * reference that has no account to belong to costs nothing (D4 — a copy
-     * outlives the session that fetched it). Signing back in re-binds it.
-     */
-    override suspend fun putCopyReference(copy: AccountCopy) {
+    override suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?) {
         mutex.withLock {
             val account = active ?: return@withLock
-            persistQuietly(account, account.document.withCopy(copy))
+            val host = account.document.host
+            val updated = host.withRecord(key, transform(host[key]))
+            if (updated == host) return@withLock
+            persistQuietly(account, account.document.copy(host = updated))
         }
     }
 
-    override suspend fun dropCopyReference(contentSha256: String) {
+    override suspend fun updateBookHostRecord(
+        bookId: String,
+        key: String,
+        transform: (JsonElement?) -> JsonElement?,
+    ) {
         mutex.withLock {
             val account = active ?: return@withLock
-            if (!account.document.hasCopy(contentSha256)) return@withLock
-            persistQuietly(account, account.document.withoutCopy(contentSha256))
+            val existing = account.document.book(bookId) ?: return@withLock
+            val updated = existing.host.withRecord(key, transform(existing.host[key]))
+            if (updated == existing.host) return@withLock
+            persistQuietly(account, account.document.withBook(existing.copy(host = updated)))
         }
     }
 
-    override suspend fun retainCopyReferences(present: Set<String>) {
-        mutex.withLock {
-            val account = active ?: return@withLock
-            val retained = account.document.retainingCopies(present)
-            if (retained.copies.size == account.document.copies.size) return@withLock
-            persistQuietly(account, retained)
-        }
-    }
+    private fun JsonObject.withRecord(key: String, value: JsonElement?): JsonObject =
+        if (value == null) JsonObject(this - key) else JsonObject(this + (key to value))
 
     /**
      * Writes the document and publishes nothing.
      *
-     * An import record changes no row the shelf draws — the account row arrives
+     * An import or host record changes no row the shelf draws — the account row arrives
      * from the change stream when the backend has made one (AD-23) — so a write
      * here must not re-publish a state and re-trigger the shelf's own effects.
      * A storage failure is surfaced as the deferred state every other write
@@ -447,11 +426,11 @@ class AccountSyncEngine(
     }
 
     /** `Loading` is not a target: the stored session has not been read, so nothing changes yet. */
-    private fun targetOf(state: ReaderAccountState): SessionTarget? = when (state) {
-        ReaderAccountState.Loading -> null
-        is ReaderAccountState.NotConfigured -> SessionTarget.None(notConfigured = true)
-        is ReaderAccountState.SignedOut -> SessionTarget.None(notConfigured = false)
-        is ReaderAccountState.SignedIn -> SessionTarget.User(state.userId)
+    private fun targetOf(state: AccountSession): SessionTarget? = when (state) {
+        AccountSession.Loading -> null
+        AccountSession.NotConfigured -> SessionTarget.None(notConfigured = true)
+        AccountSession.SignedOut -> SessionTarget.None(notConfigured = false)
+        is AccountSession.SignedIn -> SessionTarget.User(state.userId)
     }
 
     /**
@@ -696,7 +675,7 @@ class AccountSyncEngine(
                 val held = account.document.book(row.bookId)
                     ?.takeIf { it.remotePosition?.updatedAt == progress.updatedAt }
                 val remote = AccountCanonicalPayload.remotePosition(
-                    position = PortableReadingPosition.positionOf(
+                    position = PortableProgress.positionOf(
                         buildJsonObject {
                             put("location", Json.encodeToJsonElement(ReaderPortableLocationV1.serializer(), progress.location))
                             put("progress_percent", JsonPrimitive(progress.progressPercent))
@@ -908,7 +887,7 @@ class AccountSyncEngine(
         // dropped one (REQ-511).
         ReaderResourceType.READING_PROGRESS ->
             when (
-                val record = PortableReadingPosition.recordFor(
+                val record = PortableProgress.recordFor(
                     resourceId = resourceId,
                     payload = payload,
                     knownBook = { document.book(it) != null },

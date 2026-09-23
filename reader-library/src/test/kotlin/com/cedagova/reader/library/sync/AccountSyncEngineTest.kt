@@ -1,7 +1,5 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
-import com.cedagova.fastreader.account.FakeReaderLibraryGateway
-import com.cedagova.fastreader.account.ReaderAccountState
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderBookAsset
@@ -64,7 +62,7 @@ class AccountSyncEngineTest {
     val temporaryFolder = TemporaryFolder()
 
     private val gateway = FakeReaderLibraryGateway()
-    private val session = MutableStateFlow<ReaderAccountState>(ReaderAccountState.Loading)
+    private val session = MutableStateFlow<AccountSession>(AccountSession.Loading)
     private val directory: File by lazy { File(temporaryFolder.root, "account-library") }
     private val stores: AccountLibraryStores by lazy { FileAccountLibraryStores(directory) }
     private var keys = 0
@@ -229,7 +227,7 @@ class AccountSyncEngineTest {
         // Rewind the store to before the save and start a second engine on it:
         // the key must come back out of the document, not out of a new UUID.
         storeFile("user-1").writeText(beforeDrain)
-        session.value = ReaderAccountState.Loading
+        session.value = AccountSession.Loading
         advanceUntilIdle()
         gateway.submitted.clear()
         gateway.answerMutations(
@@ -428,31 +426,72 @@ class AccountSyncEngineTest {
     }
 
     /**
-     * Settling the resume offer is a note to this device and never a mutation
-     * (#121).
-     *
-     * The record exists so the offer is made once per remote change; nothing
-     * about it belongs to the account's backend state, so answering it must add
-     * no envelope to the outbox and send nothing at all. Asserted beside the
-     * envelope invariant above because this is the operation most likely to grow
-     * a wire call by accident — it is the only thing on
-     * [AccountLibraryActions] that writes the account document without queueing.
+     * A host record — FastReader's answered resume offer, its copy references —
+     * is stored under the one writer and adds no envelope to the outbox and sends
+     * nothing at all. Asserted beside the envelope invariant above because this
+     * is the write most likely to grow a wire call by accident: it is the only
+     * thing the engine writes to the account document without queueing (#147).
      */
     @Test
-    fun `settling a resume offer is stored and sends nothing`() = runTest(dispatcher) {
+    fun `a host record is stored verbatim and sends nothing`() = runTest(dispatcher) {
         gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
         gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
         val engine = engine()
         signIn("user-1")
         gateway.calls.clear()
 
-        engine.settleResumeOffer("book-1", "7:2026-09-20T10:00:00Z")
+        engine.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:2026-09-20T10:00:00Z") }
+        engine.updateHostRecord("copies") { buildJsonArray { add(JsonPrimitive("a")) } }
+        engine.updateBookHostRecord("book-unknown", "note") { JsonPrimitive("x") }
         advanceUntilIdle()
 
-        assertTrue("settling must send nothing at all, got ${gateway.calls}", gateway.calls.isEmpty())
+        assertTrue("a host record must send nothing at all, got ${gateway.calls}", gateway.calls.isEmpty())
         assertEquals(0, engine.state.value.queued)
-        val stored = stores.forUser("user-1").load() as AccountLibraryLoad.Loaded
-        assertEquals("7:2026-09-20T10:00:00Z", stored.document.book("book-1")?.resumeOfferSettledFor)
+        val stored = (stores.forUser("user-1").load() as AccountLibraryLoad.Loaded).document
+        assertEquals(JsonPrimitive("7:2026-09-20T10:00:00Z"), stored.book("book-1")?.host?.get("resumeOfferSettledFor"))
+        assertEquals(buildJsonArray { add(JsonPrimitive("a")) }, stored.host["copies"])
+        assertNull("a row the account does not hold is not invented", stored.book("book-unknown"))
+        assertEquals(buildJsonArray { add(JsonPrimitive("a")) }, engine.hostRecord("copies"))
+        // Written back at the level it was read from, never under a `host` key.
+        val raw = storeFile("user-1").readText()
+        assertTrue(raw.contains("\"resumeOfferSettledFor\":\"7:2026-09-20T10:00:00Z\""))
+        assertFalse(raw.contains("\"host\""))
+    }
+
+    /** A host record survives an adoption of the row it sits on: the payload does not carry it. */
+    @Test
+    fun `adopting a canonical payload keeps the row's host records`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+        engine.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:x") }
+
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "2",
+                changes = listOf(change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune II", "reading"))),
+            ),
+        )
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals("Dune II", row.title)
+        assertEquals(JsonPrimitive("7:x"), row.host["resumeOfferSettledFor"])
+    }
+
+    /** Signed out, a host record is neither read nor written. */
+    @Test
+    fun `host records are unavailable while signed out`() = runTest(dispatcher) {
+        val engine = engine()
+        session.value = AccountSession.SignedOut
+        advanceUntilIdle()
+
+        engine.updateHostRecord("copies") { JsonPrimitive("x") }
+
+        assertNull(engine.hostRecord("copies"))
+        assertNull(engine.accountId())
     }
 
     // ------------------------------------------------------- cursor expiry
@@ -544,7 +583,7 @@ class AccountSyncEngineTest {
         signIn("user-1")
         assertTrue(engine.state.value.books.isNotEmpty())
 
-        session.value = ReaderAccountState.SignedOut()
+        session.value = AccountSession.SignedOut
         advanceUntilIdle()
 
         assertEquals(AccountSyncPhase.SIGNED_OUT, engine.state.value.phase)
@@ -565,7 +604,7 @@ class AccountSyncEngineTest {
         advanceUntilIdle()
         assertEquals(1, document("user-1").outbox.size)
 
-        session.value = ReaderAccountState.SignedOut()
+        session.value = AccountSession.SignedOut
         advanceUntilIdle()
         gateway.submitted.clear()
         admit("key-1", ReaderMutationKind.DELETE)
@@ -620,7 +659,7 @@ class AccountSyncEngineTest {
 
         // `:reader-auth` drops the session behind this; the reason survives that
         // transition, and is shown once.
-        session.value = ReaderAccountState.SignedOut()
+        session.value = AccountSession.SignedOut
         advanceUntilIdle()
         assertEquals(
             AccountSyncError.SessionGone("session_revoked", "req-9"),
@@ -1255,7 +1294,7 @@ class AccountSyncEngineTest {
     }
 
     private fun TestScope.signIn(userId: String) {
-        session.value = ReaderAccountState.SignedIn(userId = userId, email = null)
+        session.value = AccountSession.SignedIn(userId)
         advanceUntilIdle()
     }
 

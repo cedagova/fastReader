@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account
+package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.library.ReaderLibraryClient
 import com.cedagova.reader.library.ReaderLibraryOperations
@@ -10,18 +10,18 @@ import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
 
 /**
- * The seam the account-library surface owns, beside [ReaderAccountGateway].
+ * The five library operations [AccountSyncEngine] needs, as a seam a host can
+ * substitute.
  *
- * Same shape and same reason as that one: `:reader-library`'s operations run
- * over a client whose constructor is internal, so nothing in this app could
- * build a double of it — and the sync engine, its unit tests and the shelf
- * goldens all need to run with no SDK, no network and no Keystore. Production
- * is [ReaderApiLibraryGateway], a pass-through; tests substitute a scripted
- * fake.
+ * `ReaderLibraryClient`'s constructor is internal, so nothing outside this
+ * module could build a double of it — and the sync engine, its unit tests and a
+ * host's own screenshot tests all need to run with no SDK, no network and no
+ * Keystore. Production is [ReaderApiLibraryGateway], a pass-through; tests
+ * substitute a scripted fake.
  *
  * Every method here is a *named library operation*. There is deliberately no
  * `get(path)`, `post(path, body)` or any other generic call on this seam: the
- * set of requests FastReader can send is the set below, each one declared by
+ * set of requests the engine can send is the set below, each one declared by
  * the pinned OpenAPI document `:reader-library` commits, and a generic escape
  * hatch would quietly undo that.
  *

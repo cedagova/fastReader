@@ -2,7 +2,7 @@ package com.cedagova.fastreader.library.ui
 
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.fastreader.account.library.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus

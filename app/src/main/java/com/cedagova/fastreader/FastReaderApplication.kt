@@ -8,20 +8,23 @@ import com.cedagova.fastreader.account.LibraryReaderAccountGateway
 import com.cedagova.fastreader.account.AssetDownloadGateway
 import com.cedagova.fastreader.account.PublicationImportGateway
 import com.cedagova.fastreader.account.ReaderApiAssetDownloadGateway
-import com.cedagova.fastreader.account.ReaderApiLibraryGateway
+import com.cedagova.reader.library.sync.ReaderApiLibraryGateway
 import com.cedagova.fastreader.account.ReaderApiPublicationImportGateway
-import com.cedagova.fastreader.account.ReaderLibraryGateway
+import com.cedagova.reader.library.sync.ReaderLibraryGateway
 import com.cedagova.fastreader.account.ReaderAccountConfiguration
 import com.cedagova.fastreader.account.ReaderAccountController
 import com.cedagova.fastreader.account.library.AccountBookCopies
+import com.cedagova.fastreader.account.library.AccountDocumentCopyReferences
+import com.cedagova.fastreader.account.library.AccountResumeOffers
+import com.cedagova.fastreader.account.toAccountSession
 import com.cedagova.fastreader.account.library.AccountCopyStore
 import com.cedagova.fastreader.account.library.AccountDownloads
 import com.cedagova.fastreader.account.library.AccountImports
 import com.cedagova.fastreader.account.library.AccountShelf
-import com.cedagova.fastreader.account.library.AccountSyncEngine
-import com.cedagova.fastreader.account.library.AccountSyncTrigger
+import com.cedagova.reader.library.sync.AccountSyncEngine
+import com.cedagova.reader.library.sync.AccountSyncTrigger
 import com.cedagova.fastreader.account.library.DeviceBookSources
-import com.cedagova.fastreader.account.library.FileAccountLibraryStores
+import com.cedagova.reader.library.sync.FileAccountLibraryStores
 import com.cedagova.fastreader.crash.CrashReportStore
 import com.cedagova.fastreader.crash.installCrashReporting
 import com.cedagova.fastreader.library.LibraryGraph
@@ -37,6 +40,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -212,11 +216,12 @@ class FastReaderApplication : Application() {
         accountLibrary = AccountSyncEngine(
             gateway = readerLibrary,
             stores = FileAccountLibraryStores(File(filesDir, FileAccountLibraryStores.DIRECTORY_NAME)),
-            accountState = readerAccount.state,
+            accountState = readerAccount.state.map { it.toAccountSession() },
             scope = applicationScope,
         )
         accountShelf = AccountShelf(
             actions = accountLibrary,
+            resumeOffers = AccountResumeOffers(accountLibrary),
             state = accountLibrary.state,
             scope = applicationScope,
         )
@@ -234,7 +239,7 @@ class FastReaderApplication : Application() {
         accountCopies = AccountBookCopies(
             gateway = readerDownloads,
             store = AccountCopyStore(File(filesDir, AccountCopyStore.DIRECTORY_NAME)),
-            references = accountLibrary,
+            references = AccountDocumentCopyReferences(accountLibrary),
             library = library.repository,
         )
         accountDownloads = AccountDownloads(

@@ -1,16 +1,16 @@
 package com.cedagova.fastreader.library.ui
 
-import com.cedagova.fastreader.account.library.AccountBook
+import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.BookDownloadState
-import com.cedagova.fastreader.account.library.AccountLibraryState
-import com.cedagova.fastreader.account.library.AccountSyncError
-import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncError
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.account.library.ImportsOff
-import com.cedagova.fastreader.account.library.wireName
+import com.cedagova.reader.library.sync.wireName
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import kotlin.math.roundToInt

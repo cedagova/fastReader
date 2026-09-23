@@ -30,7 +30,7 @@ data class ResumeOffer(
     val accountBookId: String,
     /**
      * Which remote change this offer is about, as
-     * [com.cedagova.fastreader.account.library.AccountRemotePosition.changeKey]
+     * [com.cedagova.reader.library.sync.AccountRemotePosition.changeKey]
      * names it.
      *
      * The whole of "offered once per remote change": answering settles this key,

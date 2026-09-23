@@ -31,7 +31,7 @@ import kotlinx.coroutines.CompletableDeferred
 
 /**
  * A scripted stand-in for the publication-import seam, the same shape as
- * [FakeReaderLibraryGateway] and for the same reason: the add-to-account flow
+ * `FakeReaderLibraryGateway` (in `:reader-library`'s tests) and for the same reason: the add-to-account flow
  * has to be provable with no network, no storage provider and no Keystore.
  *
  * Two things are **not** scripted, on purpose.

@@ -1,5 +1,8 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.library.sync.AccountImportRecords
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.FakePublicationImportGateway
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookSource
