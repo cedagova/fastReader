@@ -1,7 +1,5 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
-import com.cedagova.fastreader.account.FakeReaderLibraryGateway
-import com.cedagova.fastreader.account.ReaderAccountState
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderBookAsset
@@ -25,6 +23,7 @@ import com.cedagova.reader.library.model.ReaderSyncChange
 import com.cedagova.reader.library.model.ReaderSyncConflict
 import com.cedagova.reader.library.model.ReaderSyncConflictCode
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
+import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationResult
 import com.cedagova.reader.library.model.ReaderSyncRejection
 import com.cedagova.reader.library.model.ReaderSyncRejectionCode
@@ -64,7 +63,7 @@ class AccountSyncEngineTest {
     val temporaryFolder = TemporaryFolder()
 
     private val gateway = FakeReaderLibraryGateway()
-    private val session = MutableStateFlow<ReaderAccountState>(ReaderAccountState.Loading)
+    private val session = MutableStateFlow<AccountSession>(AccountSession.Loading)
     private val directory: File by lazy { File(temporaryFolder.root, "account-library") }
     private val stores: AccountLibraryStores by lazy { FileAccountLibraryStores(directory) }
     private var keys = 0
@@ -229,7 +228,7 @@ class AccountSyncEngineTest {
         // Rewind the store to before the save and start a second engine on it:
         // the key must come back out of the document, not out of a new UUID.
         storeFile("user-1").writeText(beforeDrain)
-        session.value = ReaderAccountState.Loading
+        session.value = AccountSession.Loading
         advanceUntilIdle()
         gateway.submitted.clear()
         gateway.answerMutations(
@@ -428,31 +427,72 @@ class AccountSyncEngineTest {
     }
 
     /**
-     * Settling the resume offer is a note to this device and never a mutation
-     * (#121).
-     *
-     * The record exists so the offer is made once per remote change; nothing
-     * about it belongs to the account's backend state, so answering it must add
-     * no envelope to the outbox and send nothing at all. Asserted beside the
-     * envelope invariant above because this is the operation most likely to grow
-     * a wire call by accident — it is the only thing on
-     * [AccountLibraryActions] that writes the account document without queueing.
+     * A host record — FastReader's answered resume offer, its copy references —
+     * is stored under the one writer and adds no envelope to the outbox and sends
+     * nothing at all. Asserted beside the envelope invariant above because this
+     * is the write most likely to grow a wire call by accident: it is the only
+     * thing the engine writes to the account document without queueing (#147).
      */
     @Test
-    fun `settling a resume offer is stored and sends nothing`() = runTest(dispatcher) {
+    fun `a host record is stored verbatim and sends nothing`() = runTest(dispatcher) {
         gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
         gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
         val engine = engine()
         signIn("user-1")
         gateway.calls.clear()
 
-        engine.settleResumeOffer("book-1", "7:2026-09-20T10:00:00Z")
+        engine.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:2026-09-20T10:00:00Z") }
+        engine.updateHostRecord("copies") { buildJsonArray { add(JsonPrimitive("a")) } }
+        engine.updateBookHostRecord("book-unknown", "note") { JsonPrimitive("x") }
         advanceUntilIdle()
 
-        assertTrue("settling must send nothing at all, got ${gateway.calls}", gateway.calls.isEmpty())
+        assertTrue("a host record must send nothing at all, got ${gateway.calls}", gateway.calls.isEmpty())
         assertEquals(0, engine.state.value.queued)
-        val stored = stores.forUser("user-1").load() as AccountLibraryLoad.Loaded
-        assertEquals("7:2026-09-20T10:00:00Z", stored.document.book("book-1")?.resumeOfferSettledFor)
+        val stored = (stores.forUser("user-1").load() as AccountLibraryLoad.Loaded).document
+        assertEquals(JsonPrimitive("7:2026-09-20T10:00:00Z"), stored.book("book-1")?.host?.get("resumeOfferSettledFor"))
+        assertEquals(buildJsonArray { add(JsonPrimitive("a")) }, stored.host["copies"])
+        assertNull("a row the account does not hold is not invented", stored.book("book-unknown"))
+        assertEquals(buildJsonArray { add(JsonPrimitive("a")) }, engine.hostRecord("copies"))
+        // Written back at the level it was read from, never under a `host` key.
+        val raw = storeFile("user-1").readText()
+        assertTrue(raw.contains("\"resumeOfferSettledFor\":\"7:2026-09-20T10:00:00Z\""))
+        assertFalse(raw.contains("\"host\""))
+    }
+
+    /** A host record survives an adoption of the row it sits on: the payload does not carry it. */
+    @Test
+    fun `adopting a canonical payload keeps the row's host records`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+        engine.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:x") }
+
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "2",
+                changes = listOf(change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune II", "reading"))),
+            ),
+        )
+        engine.requestSync(AccountSyncTrigger.FOREGROUND)
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals("Dune II", row.title)
+        assertEquals(JsonPrimitive("7:x"), row.host["resumeOfferSettledFor"])
+    }
+
+    /** Signed out, a host record is neither read nor written. */
+    @Test
+    fun `host records are unavailable while signed out`() = runTest(dispatcher) {
+        val engine = engine()
+        session.value = AccountSession.SignedOut
+        advanceUntilIdle()
+
+        engine.updateHostRecord("copies") { JsonPrimitive("x") }
+
+        assertNull(engine.hostRecord("copies"))
+        assertNull(engine.accountId())
     }
 
     // ------------------------------------------------------- cursor expiry
@@ -544,7 +584,7 @@ class AccountSyncEngineTest {
         signIn("user-1")
         assertTrue(engine.state.value.books.isNotEmpty())
 
-        session.value = ReaderAccountState.SignedOut()
+        session.value = AccountSession.SignedOut
         advanceUntilIdle()
 
         assertEquals(AccountSyncPhase.SIGNED_OUT, engine.state.value.phase)
@@ -565,7 +605,7 @@ class AccountSyncEngineTest {
         advanceUntilIdle()
         assertEquals(1, document("user-1").outbox.size)
 
-        session.value = ReaderAccountState.SignedOut()
+        session.value = AccountSession.SignedOut
         advanceUntilIdle()
         gateway.submitted.clear()
         admit("key-1", ReaderMutationKind.DELETE)
@@ -620,7 +660,7 @@ class AccountSyncEngineTest {
 
         // `:reader-auth` drops the session behind this; the reason survives that
         // transition, and is shown once.
-        session.value = ReaderAccountState.SignedOut()
+        session.value = AccountSession.SignedOut
         advanceUntilIdle()
         assertEquals(
             AccountSyncError.SessionGone("session_revoked", "req-9"),
@@ -1149,6 +1189,188 @@ class AccountSyncEngineTest {
         assertEquals("OEBPS/ch5.xhtml", engine.state.value.books.single().remotePosition!!.href)
     }
 
+    // ---------------------------------------------- never backwards (§7.3, #147)
+
+    /**
+     * Client contract §7.3 at the pinned reader-api `909174af`: a mutation result
+     * whose revision is not newer than the stored one never replaces it.
+     *
+     * The case #147 names: this device's publish was admitted at revision 5 but
+     * the answer for its envelope never arrived, so the entry stays queued under
+     * the same key. The stream then delivers that revision 5 and another device's
+     * revision 8. The retry is answered `replayed` at revision 5 — and before
+     * #147 that late answer was adopted as it stood, moving the account's
+     * position back from 81 % to 40 %.
+     */
+    @Test
+    fun `a late replayed position result never replaces a newer position from the stream`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.mutationResponses = queueOf(ReaderSyncMutationBatchResponse(requestId = REQUEST_ID))
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "8",
+                changes = listOf(
+                    progressChange("5", "book-1", revision = 5, percent = 40.0, href = "OEBPS/ch4.xhtml"),
+                    progressChange("8", "book-1", revision = 8, percent = 81.0, href = "OEBPS/ch8.xhtml"),
+                ),
+            ),
+        )
+        engine.recordPosition("book-1", position(href = "OEBPS/ch4.xhtml", percent = 40))
+        advanceUntilIdle()
+        assertEquals("the unanswered envelope stays queued", 1, engine.state.value.queued)
+        assertEquals(8L, engine.state.value.books.single().remotePosition!!.revision)
+
+        gateway.answerMutations(
+            positionResult("key-1", ReaderSyncStatus.REPLAYED, revision = 5, percent = 40.0, href = "OEBPS/ch4.xhtml"),
+        )
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "8"))
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals("the replay is admitted and leaves the queue", 0, engine.state.value.queued)
+        assertEquals("a stale result never moves the position back", 8L, row.remotePosition!!.revision)
+        assertEquals(81.0, row.remotePosition!!.percent!!, 1e-9)
+        assertEquals("OEBPS/ch8.xhtml", row.remotePosition!!.href)
+        assertEquals(81.0, row.progressPercent!!, 1e-9)
+        assertTrue(
+            "the newer position is another device's, not this device's own",
+            row.ownPositionChangeKey != row.remotePosition!!.changeKey,
+        )
+    }
+
+    /**
+     * §7.3 for a stream change on a position: an older revision than the held one
+     * is dropped even when the held one was this device's own admitted result.
+     * (This half already held before #147; it is here beside its three siblings.)
+     */
+    @Test
+    fun `a stale stream position never replaces a newer admitted one`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(
+            positionResult("key-1", ReaderSyncStatus.APPLIED, revision = 8, percent = 81.0, href = "OEBPS/ch8.xhtml"),
+        )
+        engine.recordPosition("book-1", position(href = "OEBPS/ch8.xhtml", percent = 81))
+        advanceUntilIdle()
+
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(progressChange("9", "book-1", revision = 6, percent = 30.0, href = "OEBPS/ch3.xhtml")),
+            ),
+        )
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals(8L, row.remotePosition!!.revision)
+        assertEquals(81.0, row.remotePosition!!.percent!!, 1e-9)
+        assertEquals("still this device's own", row.remotePosition!!.changeKey, row.ownPositionChangeKey)
+    }
+
+    /**
+     * §7.3 for a library item's mutation result: the same late replay as the
+     * position case, on the row. Before #147 the `replayed` answer at revision 5
+     * put the book back to `reading` after another device had finished it at 8.
+     */
+    @Test
+    fun `a late replayed library result never replaces a newer row from the stream`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.mutationResponses = queueOf(ReaderSyncMutationBatchResponse(requestId = REQUEST_ID))
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "8",
+                changes = listOf(
+                    change("5", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading")),
+                    change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished")),
+                ),
+            ),
+        )
+        engine.recordOpened("book-1")
+        advanceUntilIdle()
+        assertEquals(1, engine.state.value.queued)
+        assertEquals(ReaderLibraryStatus.FINISHED, engine.state.value.books.single().status)
+
+        gateway.answerMutations(
+            result(
+                "book-1",
+                ReaderSyncStatus.REPLAYED,
+                revision = 5,
+                payload = itemPayload("book-1", "Dune", "reading"),
+                key = "key-1",
+            ),
+        )
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "8"))
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = engine.state.value.books.single()
+        assertEquals(0, engine.state.value.queued)
+        assertEquals("a stale result never moves the row back", ReaderLibraryStatus.FINISHED, row.status)
+        assertEquals(8L, row.revision)
+        assertEquals(8L, document("user-1").book("book-1")!!.revision)
+    }
+
+    /**
+     * §7.3 for a library item's stream change. Before #147 the revision rule was
+     * applied to positions only (#140), so an older upsert or delete arriving after
+     * a newer one — a replayed page, an out-of-order delivery — moved the row back
+     * or took it off the shelf.
+     */
+    @Test
+    fun `a stale library stream change never replaces a newer row`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "8",
+                changes = listOf(change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished"))),
+            ),
+        )
+        engine.refresh()
+        advanceUntilIdle()
+        assertEquals(ReaderLibraryStatus.FINISHED, engine.state.value.books.single().status)
+
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "10",
+                changes = listOf(
+                    change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 6),
+                    change("10", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap()), revision = 7),
+                ),
+            ),
+        )
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals("an older upsert leaves the row", ReaderLibraryStatus.FINISHED, row.status)
+        assertEquals(8L, row.revision)
+        assertFalse("an older delete leaves the book on the shelf", row.removed)
+        assertEquals(listOf("book-1"), engine.state.value.books.map { it.bookId })
+        assertEquals("but the cursor still moves past both", "10", document("user-1").cursor)
+    }
+
+    /** A newer change still applies after the rule: §7.3 only ever drops the stale. */
+    @Test
+    fun `a newer library change still applies after a stale one was dropped`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "12",
+                changes = listOf(
+                    change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished")),
+                    change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 6),
+                    change("12", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap())),
+                ),
+            ),
+        )
+        engine.refresh()
+        advanceUntilIdle()
+
+        assertTrue(document("user-1").book("book-1")!!.removed)
+        assertEquals(12L, document("user-1").book("book-1")!!.revision)
+    }
+
     // ------------------------------------------------------------- helpers
 
     /** An engine signed in with one book and a settled bootstrap. */
@@ -1255,7 +1477,7 @@ class AccountSyncEngineTest {
     }
 
     private fun TestScope.signIn(userId: String) {
-        session.value = ReaderAccountState.SignedIn(userId = userId, email = null)
+        session.value = AccountSession.SignedIn(userId)
         advanceUntilIdle()
     }
 
@@ -1352,11 +1574,12 @@ class AccountSyncEngineTest {
         resourceId: String,
         kind: ReaderMutationKind,
         payload: JsonObject,
+        revision: Long = cursor.toLong(),
     ) = ReaderSyncChange(
         cursor = cursor,
         resourceType = ReaderResourceType.LIBRARY_ITEM,
         resourceId = resourceId,
-        revision = cursor.toLong(),
+        revision = revision,
         kind = kind,
         serverAdmittedAt = SERVER_TIME,
         canonicalPayload = payload,

@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderCoverStatus
@@ -78,12 +78,13 @@ internal object AccountCanonicalPayload {
      * A progress payload for a book the account has no row for is ignored — the
      * row arrives with the library item, and inventing one from a position would
      * put a titleless book on the shelf. Which book the payload is *about* is not
-     * decided here: [PortableReadingPosition.recordFor] owns that, and hands the
+     * decided here: [PortableProgress.recordFor] owns that, and hands the
      * already-resolved [position] in (#120).
      *
-     * Nothing is compared. The position replaces whatever was stored, because the
-     * backend decides who wins by admission order and a record that arrives is by
-     * definition the one it admitted — a position that moves the row *backwards*
+     * Nothing is compared here. The position replaces whatever was stored, because
+     * the backend decides who wins by admission order and a record that arrives is
+     * the one it admitted — the engine has already dropped one whose revision is
+     * not newer than the stored one (§7.3) — a position that moves the row *backwards*
      * is adopted exactly like one that moves it forwards
      * (`causal-progress-can-move-backward`).
      */
@@ -157,15 +158,15 @@ internal object AccountCanonicalPayload {
  * serializer's own descriptor rather than restated here — so a `@SerialName`
  * that changes in `:reader-library` changes this too, instead of drifting.
  */
-internal fun ReaderLibraryStatus.wireName(): String =
+fun ReaderLibraryStatus.wireName(): String =
     ReaderLibraryStatus.serializer().descriptor.getElementName(ordinal)
 
-internal fun ReaderCoverStatus.wireName(): String =
+fun ReaderCoverStatus.wireName(): String =
     ReaderCoverStatus.serializer().descriptor.getElementName(ordinal)
 
-internal fun ReaderSyncRejectionCode.wireName(): String =
+fun ReaderSyncRejectionCode.wireName(): String =
     ReaderSyncRejectionCode.serializer().descriptor.getElementName(ordinal)
 
 /** The reason a capability document states, as the shelf quotes it. */
-internal fun ReaderCapabilityReason.wireName(): String =
+fun ReaderCapabilityReason.wireName(): String =
     ReaderCapabilityReason.serializer().descriptor.getElementName(ordinal)

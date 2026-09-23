@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.reader.ui
 
+import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -25,10 +26,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.account.library.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.PortableReadingPosition
-import com.cedagova.fastreader.account.library.RemoteReadingPosition
+import com.cedagova.reader.library.sync.RemoteReadingPosition
 import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.external.ExternalOpen
@@ -456,7 +457,7 @@ internal class CatalogPositions(
      * 3. **The book has no tokens.** There is no word to land on.
      * 4. **The position is this device's own** (#140): the backend admitted it
      *    from this device's publish, as
-     *    [com.cedagova.fastreader.account.library.AccountBook.ownPositionChangeKey]
+     *    [com.cedagova.reader.library.sync.AccountBook.ownPositionChangeKey]
      *    records. Gate 2 alone does not cover it — publish at 40 %, rewind to
      *    30 %, and the account's 40 % is ahead of the reader but was never
      *    another device's.

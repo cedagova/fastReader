@@ -8,9 +8,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.fastreader.account.library.AccountLibraryState
-import com.cedagova.fastreader.account.library.AccountSyncError
-import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncError
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.ImportOffer

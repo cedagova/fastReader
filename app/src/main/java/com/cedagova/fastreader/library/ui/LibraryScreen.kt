@@ -89,7 +89,7 @@ import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.ImportProblem
 import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.account.library.PublicationSourceProblem
-import com.cedagova.fastreader.account.library.wireName
+import com.cedagova.reader.library.sync.wireName
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger

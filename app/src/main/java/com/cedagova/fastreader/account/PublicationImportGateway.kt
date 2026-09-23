@@ -11,7 +11,7 @@ import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 
 /**
- * The publication-import seam, beside [ReaderLibraryGateway] and for the same
+ * The publication-import seam, beside `ReaderLibraryGateway` and for the same
  * reason (#117).
  *
  * `:reader-library` owns the lifecycle; this app owns *when* it runs, and the

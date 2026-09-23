@@ -1,5 +1,7 @@
 package com.cedagova.fastreader.account
 
+import com.cedagova.reader.library.sync.AccountSession
+
 /**
  * What the Reader account surface renders (#100, REQ-401): exactly the
  * definition's three states — not configured, signed out, signed in as
@@ -51,6 +53,17 @@ sealed interface ReaderAccountState {
         /** The last capabilities document fetched, until the next fetch or a sign-out. */
         val capabilities: LoadedCapabilities? = null,
     ) : ReaderAccountState
+}
+
+/**
+ * The session as `:reader-library`'s account sync engine reads it (#147): who is
+ * signed in, and nothing else of this surface's state.
+ */
+fun ReaderAccountState.toAccountSession(): AccountSession = when (this) {
+    ReaderAccountState.Loading -> AccountSession.Loading
+    is ReaderAccountState.NotConfigured -> AccountSession.NotConfigured
+    is ReaderAccountState.SignedOut -> AccountSession.SignedOut
+    is ReaderAccountState.SignedIn -> AccountSession.SignedIn(userId)
 }
 
 /** One library operation, from the tap until it returns; the surface runs at most one at a time. */

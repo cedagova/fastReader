@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.library.imports.PublicationImportRecord
 import com.cedagova.reader.library.model.PublicationFormat
@@ -7,8 +7,12 @@ import com.cedagova.reader.library.model.ReaderCoverStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.model.ReaderMutationKind
 import java.io.File
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -202,7 +206,7 @@ class AccountLibraryStoreTest {
         assertEquals(sample().books, decoded.document.books)
         assertEquals(sample().outbox, decoded.document.outbox)
         assertEquals(emptyList<PublicationImportRecord>(), decoded.document.imports)
-        assertEquals(emptyList<AccountCopy>(), decoded.document.copies)
+        assertEquals(sample().host, decoded.document.host)
     }
 
     /**
@@ -230,7 +234,7 @@ class AccountLibraryStoreTest {
         assertEquals(sample().books, decoded.document.books)
         assertEquals(sample().outbox, decoded.document.outbox)
         assertEquals(sample().imports, decoded.document.imports)
-        assertEquals(emptyList<AccountCopy>(), decoded.document.copies)
+        assertEquals(sample().host, decoded.document.host)
     }
 
     /**
@@ -255,7 +259,7 @@ class AccountLibraryStoreTest {
         assertEquals(sample().books, decoded.document.books)
         assertEquals(sample().outbox, decoded.document.outbox)
         assertEquals(sample().imports, decoded.document.imports)
-        assertEquals(sample().copies, decoded.document.copies)
+        assertEquals(sample().host, decoded.document.host)
         assertTrue(
             "every row comes back without a remote position",
             decoded.document.books.all { it.remotePosition == null },
@@ -304,10 +308,10 @@ class AccountLibraryStoreTest {
         assertEquals(sample().books, decoded.document.books)
         assertEquals(sample().outbox, decoded.document.outbox)
         assertEquals(sample().imports, decoded.document.imports)
-        assertEquals(sample().copies, decoded.document.copies)
+        assertEquals(sample().host, decoded.document.host)
         assertTrue(
             "every row comes back never having been asked",
-            decoded.document.books.all { it.resumeOfferSettledFor == null },
+            decoded.document.books.all { it.host.isEmpty() },
         )
     }
 
@@ -344,16 +348,43 @@ class AccountLibraryStoreTest {
         assertEquals("5:2026-09-20T09:00:00Z", decoded.document.book(book.bookId)!!.ownPositionChangeKey)
     }
 
-    /** The settled record survives a write and a read, keyed by the remote change. */
+    /**
+     * Host records (#147) survive a write and a read at the level they were
+     * written, and are stored as plain keys of that level — never under a `host`
+     * key, which is what keeps a document from before the move byte-compatible.
+     */
     @Test
-    fun `a settled resume offer round trips as the remote change it answered`() {
+    fun `host records round trip at their own level and never under a host key`() {
         val codec = AccountLibraryCodec()
-        val book = sample().books.first().copy(resumeOfferSettledFor = "11:2026-09-20T09:00:00Z")
-        val document = sample().withBook(book)
+        val copies = buildJsonArray { add(buildJsonObject { put("contentSha256", JsonPrimitive("b".repeat(64))) }) }
+        val book = sample().books.first().copy(
+            host = buildJsonObject { put("resumeOfferSettledFor", JsonPrimitive("11:2026-09-20T09:00:00Z")) },
+        )
+        val document = sample().withBook(book).copy(host = buildJsonObject { put("copies", copies) })
+
+        val text = codec.encode(document)
+        val decoded = codec.decode(text) as AccountLibraryDecoding.Decoded
+
+        assertEquals(document.copy(schemaVersion = AccountLibrarySchema.CURRENT_VERSION), decoded.document)
+        val raw = Json.parseToJsonElement(text).jsonObject
+        assertEquals(copies, raw["copies"])
+        assertEquals(
+            JsonPrimitive("11:2026-09-20T09:00:00Z"),
+            raw["books"]!!.jsonArray.first().jsonObject["resumeOfferSettledFor"],
+        )
+        assertTrue("no level is ever written with a host key", !text.contains("\"host\""))
+    }
+
+    /** A host record can add to a level but never shadow a key the schema declares there. */
+    @Test
+    fun `a host record never shadows a declared key`() {
+        val codec = AccountLibraryCodec()
+        val document = sample().copy(host = buildJsonObject { put("cursor", JsonPrimitive("999")) })
 
         val decoded = codec.decode(codec.encode(document)) as AccountLibraryDecoding.Decoded
 
-        assertEquals("11:2026-09-20T09:00:00Z", decoded.document.book(book.bookId)!!.resumeOfferSettledFor)
+        assertEquals("412", decoded.document.cursor)
+        assertTrue(decoded.document.host.isEmpty())
     }
 
     /**
@@ -377,24 +408,56 @@ class AccountLibraryStoreTest {
         )
     }
 
-    /** A copy reference survives a write and a read, and replaces rather than duplicates. */
+    /**
+     * #147's compatibility promise, on a real document: `account-library-v6.json`
+     * is what FastReader's own codec wrote at main `ab175bc`, before the engine
+     * moved here — every schema 6 field set, including FastReader's `copies` and
+     * a row's `resumeOfferSettledFor`, which are host records now.
+     *
+     * It loads through the file store with no migration and no recovery, every
+     * value reads back, and writing it again produces the same JSON key for key:
+     * nothing the old build stored is dropped by the new one.
+     */
     @Test
-    fun `copy references round trip and are keyed by content`() {
-        val codec = AccountLibraryCodec()
-        val copy = AccountCopy(contentSha256 = "b".repeat(64), sizeBytes = 4_096, placedAtEpochMs = 1_700_000_000_000)
-        val document = sample().withCopy(copy)
+    fun `a schema 6 document written before the move loads and saves without loss`() {
+        val text = javaClass.getResource("/account-library-v6.json")!!.readText().trim()
+        directory.mkdirs()
+        val file = File(directory, "account-legacy.json").apply { writeText(text) }
 
-        val decoded = codec.decode(codec.encode(document)) as AccountLibraryDecoding.Decoded
+        val load = FileAccountLibraryStore(file).load() as AccountLibraryLoad.Loaded
+        assertNull("schema 6 is current: nothing to migrate", load.migratedFrom)
+        assertNull("and nothing was set aside as damaged", load.recoveredFrom)
 
-        assertEquals(listOf(copy), decoded.document.copies)
-        assertTrue(decoded.document.hasCopy("b".repeat(64)))
+        val document = load.document
+        assertEquals("user-1", document.userId)
+        assertEquals("412", document.cursor)
+        assertEquals(listOf("book-1", "book-2"), document.books.map { it.bookId })
+        val dune = document.book("book-1")!!
+        assertEquals("Dune", dune.title)
+        assertEquals(ReaderLibraryStatus.READING, dune.status)
+        assertEquals(ReaderCoverStatus.COVERED, dune.coverStatus)
+        assertEquals(7L, dune.revision)
+        assertEquals(41.5, dune.progressPercent!!, 0.0)
+        assertEquals(11L, dune.remotePosition!!.revision)
+        assertEquals("OEBPS/ch3.xhtml", dune.remotePosition!!.href)
+        assertEquals("11:2026-09-14T10:01:00Z", dune.ownPositionChangeKey)
+        assertEquals(JsonPrimitive("9:2026-09-13T08:00:00Z"), dune.host["resumeOfferSettledFor"])
+        assertTrue(document.book("book-2")!!.removed)
+        assertEquals(listOf("key-1", "key-2"), document.outbox.map { it.idempotencyKey })
+        assertEquals(ReaderMutationKind.DELETE, document.outbox.first().mutationKind)
+        assertEquals(11L, document.outbox.last().baseRevision)
+        assertEquals(PublicationImportStatus.PENDING_UPLOAD, document.imports.single().status)
+        assertEquals(
+            "4096",
+            document.host["copies"]!!.jsonArray.single().jsonObject["sizeBytes"]!!.toString(),
+        )
 
-        val replaced = decoded.document.withCopy(copy.copy(sizeBytes = 8_192))
-        assertEquals("the same content is one reference, not two", 1, replaced.copies.size)
-        assertEquals(8_192L, replaced.copies.single().sizeBytes)
-
-        assertEquals(emptyList<AccountCopy>(), replaced.withoutCopy("b".repeat(64)).copies)
-        assertEquals(emptyList<AccountCopy>(), replaced.retainingCopies(emptySet()).copies)
-        assertEquals(replaced.copies, replaced.retainingCopies(setOf("b".repeat(64))).copies)
+        assertEquals(
+            "re-encoding a schema 6 document must reproduce it key for key",
+            Json.parseToJsonElement(text),
+            Json.parseToJsonElement(AccountLibraryCodec().encode(document)),
+        )
+        FileAccountLibraryStore(file).save(document)
+        assertEquals(Json.parseToJsonElement(text), Json.parseToJsonElement(file.readText()))
     }
 }

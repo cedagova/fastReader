@@ -11,10 +11,10 @@ import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.fastreader.account.library.AccountLibraryState
-import com.cedagova.fastreader.account.library.AccountRemotePosition
-import com.cedagova.fastreader.account.library.AccountSyncError
-import com.cedagova.fastreader.account.library.AccountSyncPhase
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountRemotePosition
+import com.cedagova.reader.library.sync.AccountSyncError
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.BookImportState
@@ -409,7 +409,7 @@ class LibraryAccountScreenshotTest {
     }
 
     private fun shelf(
-        vararg books: com.cedagova.fastreader.account.library.AccountBook,
+        vararg books: com.cedagova.reader.library.sync.AccountBook,
         account: AccountLibraryState = LibraryAccountFixtures.signedIn(*books),
         accountUndo: AccountUndoNotice? = null,
         imports: AccountImportsState = AccountImportsState(offer = ImportOffer.Available),

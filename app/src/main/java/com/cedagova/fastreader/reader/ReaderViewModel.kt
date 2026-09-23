@@ -151,7 +151,7 @@ class ReaderViewModel(
      * maps ahead of where the reader is, and that has not been answered this
      * session. Whether it has *already been answered on this device* is a durable
      * per-change fact and is not known here —
-     * [com.cedagova.fastreader.account.library.AccountBook.resumeOfferSettledFor]
+     * [com.cedagova.fastreader.account.library.resumeOfferSettledFor]
      * holds it and the caller that can read the account applies it. The same
      * split [frontMatterOffer] makes, and for the same reason: this class stays
      * free of the store.

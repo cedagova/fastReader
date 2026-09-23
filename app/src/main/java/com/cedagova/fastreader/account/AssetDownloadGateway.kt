@@ -6,7 +6,7 @@ import com.cedagova.reader.library.model.ReaderAssetGrant
 import java.io.OutputStream
 
 /**
- * The asset-download seam, beside [ReaderLibraryGateway] and
+ * The asset-download seam, beside `ReaderLibraryGateway` and
  * [PublicationImportGateway] and for the same reason (#118).
  *
  * `:reader-library` owns the grant and the transport; this app owns *when* a

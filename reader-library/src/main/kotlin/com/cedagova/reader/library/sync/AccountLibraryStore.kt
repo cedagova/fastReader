@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.library.sync
 
 import java.io.File
 import java.io.FileOutputStream
