@@ -114,6 +114,18 @@ class AccountLibraryCodec(
 
     companion object {
 
+        /**
+         * The keys a document-level host record may not be named (#149): every key
+         * the schema declares at that level, which would win over it on the way
+         * out, and `host` itself, which the way in drops. A record under either
+         * would be written and then silently lost, so [AccountHostRecords] refuses
+         * both at write time.
+         */
+        val RESERVED_DOCUMENT_KEYS: Set<String> by lazy { DOCUMENT_KEYS + HOST_RECORDS_KEY }
+
+        /** The keys a book row's host record may not be named, for the same reason. */
+        val RESERVED_BOOK_KEYS: Set<String> by lazy { BOOK_KEYS + HOST_RECORDS_KEY }
+
         /** The keys the schema declares for a document, read from its serializer. */
         private val DOCUMENT_KEYS: Set<String> = declared(AccountLibraryDocument.serializer().descriptor)
 

@@ -122,6 +122,22 @@ interface AccountImportRecords {
 }
 
 /**
+ * A host record was given a key the account document reserves (#149).
+ *
+ * [key] is either one the schema declares at that level — which would win over
+ * the record when the document is written — or `host`, which is dropped when it
+ * is read back. Either way the record would be stored and then silently lost, so
+ * the write is refused instead. [bookLevel] says which level the key was for.
+ */
+class ReservedHostRecordKeyException(
+    val key: String,
+    val bookLevel: Boolean,
+) : IllegalArgumentException(
+    "\"$key\" is reserved by the account document ${if (bookLevel) "for a book row" else "at the top level"}; " +
+        "a host record under it would be lost",
+)
+
+/**
  * The host's own records in the account document (#147).
  *
  * A host keeps a little state of its own beside the account's — FastReader
@@ -135,6 +151,20 @@ interface AccountImportRecords {
  * atomic with every other write to the document. An update while nobody is
  * signed in does nothing; an update that changes nothing writes nothing. Neither
  * publishes a new state: a host record changes no row the account describes.
+ *
+ * **A `transform` must not call back into the engine** (#149) — not this
+ * interface, not [AccountImportRecords], not [AccountLibraryActions], not
+ * [AccountSyncEngine.requestSync]. It runs while the engine holds its lock, and
+ * that lock is not re-entrant: a callback that waits on the engine from inside
+ * a transform would wait for ever. [AccountSyncEngine] detects the call made
+ * from the transform's own thread and throws [IllegalStateException] instead of
+ * hanging; one handed to another thread and awaited is not detectable, and is a
+ * deadlock. Compute what the transform needs *before* calling the update, and
+ * act on its outcome *after* it returns.
+ *
+ * A key the document reserves — one its schema declares at that level, or
+ * `host` — is refused with [ReservedHostRecordKeyException] before anything is
+ * written (#149), because a record under it would be stored and then lost.
  */
 interface AccountHostRecords {
 
@@ -147,6 +177,10 @@ interface AccountHostRecords {
     /**
      * Replaces the document-level host record [key] with what [transform]
      * returns for its current value; null removes it.
+     *
+     * [transform] runs under the engine's lock and must not call back into the
+     * engine. Throws [ReservedHostRecordKeyException] when [key] is in
+     * [AccountLibraryCodec.RESERVED_DOCUMENT_KEYS].
      */
     suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?)
 
@@ -154,6 +188,10 @@ interface AccountHostRecords {
      * Replaces the host record [key] on [bookId]'s row with what [transform]
      * returns for its current value; null removes it. A book the account has no
      * row for is skipped rather than invented.
+     *
+     * [transform] runs under the engine's lock and must not call back into the
+     * engine. Throws [ReservedHostRecordKeyException] when [key] is in
+     * [AccountLibraryCodec.RESERVED_BOOK_KEYS].
      */
     suspend fun updateBookHostRecord(bookId: String, key: String, transform: (JsonElement?) -> JsonElement?)
 }
@@ -216,6 +254,19 @@ class AccountSyncEngine(
 ) : AccountLibraryActions, AccountImportRecords, AccountHostRecords {
 
     private val mutex = Mutex()
+
+    /**
+     * True on the thread that is running a host's `transform`, for as long as it
+     * runs (#149).
+     *
+     * A transform is a plain function called under [mutex], which is not
+     * re-entrant, so anything it does that waits on the engine — a `runBlocking`
+     * around one of the suspend calls here — would wait for ever. The transform
+     * cannot suspend, so it runs start to finish on the thread that set this,
+     * and every public entry point checks it and fails instead of hanging.
+     */
+    private val inHostCallback = ThreadLocal.withInitial { false }
+
     private val _state = MutableStateFlow(AccountLibraryState.SIGNED_OUT)
 
     /** The account library as the shelf builds from it. */
@@ -274,6 +325,7 @@ class AccountSyncEngine(
 
     /** Run one sync. Safe to call from any trigger; concurrent calls queue on the same lock. */
     fun requestSync(trigger: AccountSyncTrigger) {
+        checkNotInHostCallback()
         scope.launch { sync(trigger) }
     }
 
@@ -322,6 +374,7 @@ class AccountSyncEngine(
      * and the reading speed have no field to travel in (REQ-512).
      */
     override fun recordPosition(bookId: String, position: LocalReadingPosition) {
+        checkNotInHostCallback()
         if (published[bookId] == position.publishKey) return
         published[bookId] = position.publishKey
         enqueue(
@@ -334,10 +387,13 @@ class AccountSyncEngine(
 
     // ---------------------------------------------------------- import records
 
-    override fun accountId(): String? = active?.userId
+    override fun accountId(): String? {
+        checkNotInHostCallback()
+        return active?.userId
+    }
 
     override suspend fun importRecords(): List<PublicationImportRecord> =
-        mutex.withLock { active?.document?.imports.orEmpty() }
+        locked { active?.document?.imports.orEmpty() }
 
     /**
      * Stores [record] under the one writer of the account document.
@@ -348,17 +404,17 @@ class AccountSyncEngine(
      * have bound to.
      */
     override suspend fun putImportRecord(record: PublicationImportRecord) {
-        mutex.withLock {
-            val account = active ?: return@withLock
-            if (record.accountId != account.userId) return@withLock
+        locked {
+            val account = active ?: return@locked
+            if (record.accountId != account.userId) return@locked
             persistQuietly(account, account.document.withImport(record))
         }
     }
 
     override suspend fun dropImportRecord(clientImportId: String) {
-        mutex.withLock {
-            val account = active ?: return@withLock
-            if (account.document.import(clientImportId) == null) return@withLock
+        locked {
+            val account = active ?: return@locked
+            if (account.document.import(clientImportId) == null) return@locked
             persistQuietly(account, account.document.withoutImport(clientImportId))
         }
     }
@@ -366,14 +422,15 @@ class AccountSyncEngine(
     // ------------------------------------------------------------ host records
 
     override suspend fun hostRecord(key: String): JsonElement? =
-        mutex.withLock { active?.document?.host?.get(key) }
+        locked { active?.document?.host?.get(key) }
 
     override suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?) {
-        mutex.withLock {
-            val account = active ?: return@withLock
+        if (key in AccountLibraryCodec.RESERVED_DOCUMENT_KEYS) throw ReservedHostRecordKeyException(key, bookLevel = false)
+        locked {
+            val account = active ?: return@locked
             val host = account.document.host
-            val updated = host.withRecord(key, transform(host[key]))
-            if (updated == host) return@withLock
+            val updated = host.withRecord(key, hostCallback { transform(host[key]) })
+            if (updated == host) return@locked
             persistQuietly(account, account.document.copy(host = updated))
         }
     }
@@ -383,17 +440,40 @@ class AccountSyncEngine(
         key: String,
         transform: (JsonElement?) -> JsonElement?,
     ) {
-        mutex.withLock {
-            val account = active ?: return@withLock
-            val existing = account.document.book(bookId) ?: return@withLock
-            val updated = existing.host.withRecord(key, transform(existing.host[key]))
-            if (updated == existing.host) return@withLock
+        if (key in AccountLibraryCodec.RESERVED_BOOK_KEYS) throw ReservedHostRecordKeyException(key, bookLevel = true)
+        locked {
+            val account = active ?: return@locked
+            val existing = account.document.book(bookId) ?: return@locked
+            val updated = existing.host.withRecord(key, hostCallback { transform(existing.host[key]) })
+            if (updated == existing.host) return@locked
             persistQuietly(account, account.document.withBook(existing.copy(host = updated)))
         }
     }
 
     private fun JsonObject.withRecord(key: String, value: JsonElement?): JsonObject =
         if (value == null) JsonObject(this - key) else JsonObject(this + (key to value))
+
+    private inline fun <T> hostCallback(block: () -> T): T {
+        inHostCallback.set(true)
+        try {
+            return block()
+        } finally {
+            inHostCallback.set(false)
+        }
+    }
+
+    private fun checkNotInHostCallback() {
+        check(!inHostCallback.get()) {
+            "an AccountHostRecords transform must not call back into AccountSyncEngine: it runs under the " +
+                "engine's lock, which is not re-entrant"
+        }
+    }
+
+    /** [block] under the engine's lock, from a public entry point: refused inside a host callback. */
+    private suspend inline fun <T> locked(crossinline block: suspend () -> T): T {
+        checkNotInHostCallback()
+        return mutex.withLock { block() }
+    }
 
     /**
      * Writes the document and publishes nothing.
@@ -766,6 +846,7 @@ class AccountSyncEngine(
         resourceType: ReaderResourceType = ReaderResourceType.LIBRARY_ITEM,
         locally: (AccountBook) -> AccountBook,
     ) {
+        checkNotInHostCallback()
         scope.launch {
             val queued = mutex.withLock {
                 val account = active ?: return@withLock false
@@ -870,13 +951,18 @@ class AccountSyncEngine(
     ): AccountLibraryDocument = when (resourceType) {
         ReaderResourceType.LIBRARY_ITEM, ReaderResourceType.BOOK -> {
             val existing = document.book(resourceId)
-            if (existing != null && revision != null && revision < existing.revision) {
-                // Client contract §7.3 (#147): a result or change whose revision is
-                // older than the stored one never replaces it — a late `replayed`
-                // answer or an out-of-order delivery must not move the row back or
-                // take it off the shelf. An *equal* revision is the same server
-                // state and is adopted as before: that is what discards a queued
-                // local intent the backend did not keep (`superseded`, `conflict`).
+            if (existing != null && revision != null && !replaces(revision, existing.revision, origin)) {
+                // Client contract §7.3 (#147, #149): a stream change is applied only
+                // when its revision is strictly newer than the stored one, and a
+                // mutation result only when it is not older. An older answer — a late
+                // `replayed` result, an out-of-order delivery — must not move the row
+                // back or take it off the shelf; an equal-revision stream change is
+                // the state this device already holds, and applying it would revert
+                // a local intent still queued in the outbox (a pending removal would
+                // reappear). A *result* at an equal revision is different (§7.4): it
+                // is the backend's verdict on this device's own queued mutation, and
+                // it is what discards an optimistic row the backend did not keep
+                // (`superseded`, `conflict`).
                 document
             } else {
                 when (kind) {
@@ -963,6 +1049,16 @@ class AccountSyncEngine(
         ReaderResourceType.BOOKMARK,
         ReaderResourceType.UNKNOWN,
         -> document
+    }
+
+    /**
+     * Whether a library item's canonical state at [incoming] replaces the one
+     * stored at [stored] (§7.3, §7.4): a stream change must be strictly newer, a
+     * mutation result must be equal or newer.
+     */
+    private fun replaces(incoming: Long, stored: Long, origin: CanonicalOrigin): Boolean = when (origin) {
+        CanonicalOrigin.STREAM -> incoming > stored
+        CanonicalOrigin.ADMITTED_HERE, CanonicalOrigin.RESULT -> incoming >= stored
     }
 
     // -------------------------------------------------------------- plumbing

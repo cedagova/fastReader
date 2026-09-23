@@ -6,8 +6,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 
 /**
  * One account book whose bytes are on this device (REQ-510, D2).
@@ -108,17 +108,24 @@ class AccountDocumentCopyReferences(private val records: AccountHostRecords) : A
     }
 
     /**
-     * The stored list, or none. A value that is not a list of references is read
+     * The stored list's valid references, element by element (#149).
+     *
+     * An element that is not a reference is skipped on its own, never taken as a
+     * reason to read the whole list as empty: the next [update] rewrites the list
+     * from what this returns, so reading it as empty would drop every valid
+     * reference beside the damaged one. A value that is not a list at all is read
      * as none rather than failing the caller: the references are a cache of what
      * [AccountCopyStore] holds, and the next download or reconciliation rebuilds
      * them.
      */
     private fun decode(element: JsonElement?): List<AccountCopy> {
-        if (element == null || element is JsonNull) return emptyList()
-        return try {
-            json.decodeFromJsonElement(SERIALIZER, element)
-        } catch (e: IllegalArgumentException) {
-            emptyList()
+        if (element !is JsonArray) return emptyList()
+        return element.mapNotNull { item ->
+            try {
+                json.decodeFromJsonElement(ELEMENT, item)
+            } catch (e: IllegalArgumentException) {
+                null
+            }
         }
     }
 
@@ -127,6 +134,8 @@ class AccountDocumentCopyReferences(private val records: AccountHostRecords) : A
         const val KEY: String = "copies"
 
         private val SERIALIZER: KSerializer<List<AccountCopy>> = ListSerializer(AccountCopy.serializer())
+
+        private val ELEMENT: KSerializer<AccountCopy> = AccountCopy.serializer()
 
         /** The account codec's own settings, so a reference is written exactly as schema 3 wrote it. */
         private val json: Json = Json {
