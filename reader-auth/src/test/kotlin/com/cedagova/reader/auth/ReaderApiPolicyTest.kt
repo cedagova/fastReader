@@ -3,6 +3,7 @@ package com.cedagova.reader.auth
 import com.cedagova.reader.auth.api.ReaderApiClient
 import com.cedagova.reader.auth.api.ReaderProfileUpdate
 import io.ktor.http.HttpStatusCode
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -13,7 +14,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -132,21 +132,29 @@ class ReaderApiPolicyTest {
     @Test
     fun `concurrent expired_token rejections share one refresh`() = runTest {
         val gate = CompletableDeferred<Unit>()
-        var capabilitiesCalls = 0
+        val rejected = Arrivals(4)
+        val capabilitiesCalls = AtomicInteger()
         servers.on(CAPABILITIES) { request ->
-            capabilitiesCalls += 1
-            if (request.bearer == "access-1") json(apiError("auth.expired_token"), HttpStatusCode.Unauthorized) else json(CAPABILITIES_BODY)
+            capabilitiesCalls.incrementAndGet()
+            if (request.bearer == "access-1") {
+                rejected.arrive()
+                json(apiError("auth.expired_token"), HttpStatusCode.Unauthorized)
+            } else {
+                json(CAPABILITIES_BODY)
+            }
         }
         servers.on(REFRESH_GRANT, gated(gate) { json(sessionJson("access-2", "refresh-2")) })
         val client = client()
 
         val callers = (1..4).map { async { client.capabilities() } }
-        repeat(50) { yield() }
+        // All four were refused with access-1 before any refresh can finish.
+        rejected.await()
         gate.complete(Unit)
         callers.awaitAll()
 
         assertEquals(1, servers.requestsTo("/auth/v1/token").size)
-        assertEquals(8, capabilitiesCalls)
+        assertEquals(8, capabilitiesCalls.get())
+        assertEquals(listOf("access-1", "access-1", "access-1", "access-1", "access-2", "access-2", "access-2", "access-2"), servers.requestsTo("/v1/reader/capabilities").map { it.bearer.orEmpty() }.sorted())
         client.close()
     }
 

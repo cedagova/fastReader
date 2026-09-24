@@ -244,24 +244,26 @@ class SignOutOrderingTest {
     fun `sign-out waits for a refresh in flight and the refreshed session is not re-saved`() = kotlinx.coroutines.test.runTest {
         val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
         val servers = FakeServers()
-        servers.on(REFRESH_GRANT, gated(gate) { json(sessionJson("access-2", "refresh-2")) })
-        var bearerAtLogout: String? = null
-        servers.on(LOGOUT_LOCAL) { bearerAtLogout = it.bearer; json("{}", HttpStatusCode.NoContent) }
+        val refreshing = Arrivals(1)
+        servers.on(REFRESH_GRANT, gated(gate, refreshing) { json(sessionJson("access-2", "refresh-2")) })
+        val bearerAtLogout = java.util.concurrent.atomic.AtomicReference<String?>()
+        servers.on(LOGOUT_LOCAL) { bearerAtLogout.set(it.bearer); json("{}", HttpStatusCode.NoContent) }
         val store = InMemorySessionStore(session(expiresAt = clock.expiring(60)))
         val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter)
         client.awaitReady()
 
         val foreground = async { client.onForeground() }
-        repeat(50) { kotlinx.coroutines.yield() }
+        // The foreground refresh is at the provider, so it holds the refresh lock.
+        refreshing.await()
         val signOut = async { client.signOut() }
-        repeat(50) { kotlinx.coroutines.yield() }
+        testScheduler.runCurrent()
         assertTrue("sign-out must not run while the refresh is in flight", servers.requestsTo("/auth/v1/logout").isEmpty())
         gate.complete(Unit)
         foreground.await()
         signOut.await()
 
         assertEquals(listOf(REFRESH_GRANT, LOGOUT_LOCAL), servers.routes())
-        assertEquals("access-2", bearerAtLogout)
+        assertEquals("access-2", bearerAtLogout.get())
         assertNull("the refreshed session was re-saved after sign-out", store.session)
         assertEquals(ReaderSessionState.SignedOut, client.currentState())
         client.close()
