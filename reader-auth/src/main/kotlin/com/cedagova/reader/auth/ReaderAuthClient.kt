@@ -6,6 +6,7 @@ import com.cedagova.reader.auth.api.PreAuthDocument
 import com.cedagova.reader.auth.api.ReaderApiClient
 import com.cedagova.reader.auth.api.ReaderApiResponse
 import com.cedagova.reader.auth.api.ReaderProfileUpdate
+import com.cedagova.reader.auth.api.SignInMethod
 import com.cedagova.reader.auth.session.FileSessionStore
 import com.cedagova.reader.auth.session.KeystoreSessionCipher
 import com.cedagova.reader.auth.session.SessionStore
@@ -60,12 +61,15 @@ class ReaderAuthClient internal constructor(
     private val refresher: SessionRefresher,
     /** The reader-api client, for any further route a host needs. */
     val api: ReaderApiClient,
+    private val clock: ReaderClock = ReaderClock.System,
 ) {
     private val auth: Auth get() = supabase.auth
     private val bootstrapLock = Mutex()
 
     @Volatile
-    private var verifiedPreAuth: PreAuthDocument? = null
+    private var verifiedPreAuth: VerifiedPreAuth? = null
+
+    private class VerifiedPreAuth(val document: PreAuthDocument, val lifetime: PreAuthDocument.Lifetime)
 
     /** The stored session as a host renders it; emits on every change. */
     val sessionState: Flow<ReaderSessionState> = auth.sessionStatus.map { it.toState() }
@@ -79,21 +83,48 @@ class ReaderAuthClient internal constructor(
     // ---- Bootstrap ---------------------------------------------------------------------------
 
     /**
-     * `GET /v1/reader/pre-auth` and the fail-closed wiring check: sign-in is
-     * refused with [ReaderAuthException.ConfigurationMismatch] unless the
-     * document names this client's application id, publishable key, and
-     * authority (CONTRACT.md, "Bootstrap and first calls"). The verified
-     * document is kept, so later sign-in calls do not fetch it again.
+     * `GET /v1/reader/pre-auth` and the fail-closed checks (CONTRACT.md,
+     * "Bootstrap and first calls"): sign-in is refused with
+     * [ReaderAuthException.ConfigurationMismatch] unless the document names
+     * this client's application id, publishable key, and authority, and with
+     * [ReaderAuthException.SignInUnavailable] unless its account entry is
+     * available. A host reads [PreAuthDocument.enabledMethods] from the
+     * result to offer only the methods the server has turned on.
+     *
+     * The verified document is reused until its `freshUntil`, then fetched
+     * again. If that fetch fails with [ReaderAuthException.NetworkUnavailable]
+     * or [ReaderAuthException.TryLater], the old document stands in until its
+     * `staleUntil`; after that the failure is thrown. A document that fails a
+     * check is never kept.
      */
     suspend fun bootstrap(): PreAuthDocument = bootstrapLock.withLock {
-        verifiedPreAuth?.let { return it }
-        val document = api.preAuth()
+        val kept = verifiedPreAuth
+        val now = clock.now()
+        if (kept != null && now < kept.lifetime.freshUntil) return kept.document
+        val document = try {
+            api.preAuth()
+        } catch (e: ReaderAuthException) {
+            val transient = e is ReaderAuthException.NetworkUnavailable || e is ReaderAuthException.TryLater
+            if (transient && kept != null && now < kept.lifetime.staleUntil) return kept.document
+            verifiedPreAuth = null
+            throw e
+        }
+        val receivedAt = clock.now()
+        verifiedPreAuth = null
         document.mismatch(config)?.let { throw ReaderAuthException.ConfigurationMismatch(it) }
-        document.also { verifiedPreAuth = it }
+        if (!document.accountEntryAvailable) {
+            val entry = document.accountEntry
+            throw ReaderAuthException.SignInUnavailable(entry?.reason ?: "account_entry_${entry?.availability ?: "missing"}", entry?.retryable ?: false)
+        }
+        verifiedPreAuth = VerifiedPreAuth(document, document.lifetime(receivedAt))
+        document
     }
 
-    private suspend fun ensureBootstrapped() {
-        bootstrap()
+    /** [bootstrap], then refuses [method] with [ReaderAuthException.SignInUnavailable] when the server has turned it off. */
+    private suspend fun ensureBootstrapped(method: SignInMethod) {
+        if (method !in bootstrap().enabledMethods) {
+            throw ReaderAuthException.SignInUnavailable(METHOD_DISABLED, retryable = false, method = method)
+        }
     }
 
     // ---- Sign-in methods, in the contract's preference order ---------------------------------
@@ -104,7 +135,7 @@ class ReaderAuthClient internal constructor(
      * refuses an unknown address.
      */
     suspend fun requestEmailCode(email: String, createUser: Boolean) {
-        ensureBootstrapped()
+        ensureBootstrapped(SignInMethod.EMAIL_CODE)
         provider {
             auth.signInWith(OTP) {
                 this.email = email
@@ -121,13 +152,13 @@ class ReaderAuthClient internal constructor(
      * and a provider 429 is [ReaderAuthException.TryLater].
      */
     suspend fun verifyEmailCode(email: String, code: String, purpose: EmailCodePurpose = EmailCodePurpose.SIGN_IN): ReaderSessionState.SignedIn {
-        ensureBootstrapped()
+        ensureBootstrapped(SignInMethod.EMAIL_CODE)
         return verify(purpose.otpType, email, code)
     }
 
     /** Password sign-in. */
     suspend fun signInWithPassword(email: String, password: String): ReaderSessionState.SignedIn {
-        ensureBootstrapped()
+        ensureBootstrapped(SignInMethod.PASSWORD)
         refresher.withoutRefresh {
             provider {
                 auth.signInWith(Email) {
@@ -141,13 +172,13 @@ class ReaderAuthClient internal constructor(
 
     /** Code-based recovery, step one: ask the provider to email a recovery code. */
     suspend fun requestRecoveryCode(email: String) {
-        ensureBootstrapped()
+        ensureBootstrapped(SignInMethod.PASSWORD)
         provider { auth.resetPasswordForEmail(email) }
     }
 
     /** Code-based recovery, step two: the recovery code yields a session; then call [setPassword]. */
     suspend fun verifyRecoveryCode(email: String, code: String): ReaderSessionState.SignedIn {
-        ensureBootstrapped()
+        ensureBootstrapped(SignInMethod.PASSWORD)
         return verify(OtpType.Email.RECOVERY, email, code)
     }
 
@@ -296,6 +327,9 @@ class ReaderAuthClient internal constructor(
 
     companion object {
 
+        /** [ReaderAuthException.SignInUnavailable.reason] when the server has turned the method off. */
+        const val METHOD_DISABLED: String = "method_disabled"
+
         /**
          * The production client: Keystore-encrypted store under the no-backup
          * files directory, OkHttp engine, device clock. Throws
@@ -373,7 +407,7 @@ class ReaderAuthClient internal constructor(
             }
             val refresher = SessionRefresher(supabase.auth, clock, waiter, sessions)
             val api = ReaderApiClient(config, ReaderApiClient.httpClient(engine), refresher, waiter, requestIds)
-            return ReaderAuthClient(config, supabase, store, sessions, refresher, api)
+            return ReaderAuthClient(config, supabase, store, sessions, refresher, api, clock)
         }
 
         private val json = Json { ignoreUnknownKeys = true }

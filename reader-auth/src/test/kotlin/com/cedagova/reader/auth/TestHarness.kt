@@ -84,13 +84,27 @@ fun preAuthJson(
     publicClientId: String = PUBLISHABLE_KEY,
     authorityOrigin: String = SUPABASE_URL,
     status: String = "compatible",
+    enabledProviders: List<String> = listOf("password"),
+    emailOtp: Boolean = true,
+    availability: String = "available",
+    reason: String = "available",
+    retryable: Boolean = false,
+    generatedAt: String = PRE_AUTH_GENERATED_AT,
+    freshUntil: String = "2026-09-11T01:00:00Z",
+    staleUntil: String = "2026-09-11T02:00:00Z",
+    validUntil: String = "2026-12-01T00:00:00Z",
 ) = """
-    {"schemaVersion":"reader.pre-auth.v1","compatibility":{"status":"$status","requestedVersion":"1.0.0","minimumVersion":"1.0.0","supportedMajor":1},
-     "accountEntry":{"availability":"available","reason":"available","retryable":false},
-     "configuration":{"revision":"2026-09-11.1","client":{"applicationId":"$applicationId"},
-       "authentication":{"kind":"supabase","authorityOrigin":"$authorityOrigin","publicClientId":"$publicClientId","enabledProviders":["password"],"emailOtp":true}},
+    {"schemaVersion":"reader.pre-auth.v1","generatedAt":"$generatedAt","freshUntil":"$freshUntil","staleUntil":"$staleUntil",
+     "compatibility":{"status":"$status","requestedVersion":"1.0.0","minimumVersion":"1.0.0","supportedMajor":1},
+     "accountEntry":{"availability":"$availability","reason":"$reason","retryable":$retryable},
+     "configuration":{"revision":"2026-09-11.1","validUntil":"$validUntil","client":{"applicationId":"$applicationId"},
+       "authentication":{"kind":"supabase","authorityOrigin":"$authorityOrigin","publicClientId":"$publicClientId",
+         "enabledProviders":[${enabledProviders.joinToString(",") { "\"$it\"" }}],"emailOtp":$emailOtp}},
      "postAuth":{"schemaVersion":"reader.capabilities.v1","path":"/v1/reader/capabilities","actorScoped":true}}
 """.trimIndent()
+
+/** `generatedAt` of [preAuthJson]; its default document is fresh for an hour after it and stale an hour later. */
+const val PRE_AUTH_GENERATED_AT = "2026-09-11T00:00:00Z"
 
 const val NO_SELECTOR_PRE_AUTH = """{"schemaVersion":"reader.pre-auth.v1","compatibility":{"status":"client_unknown","requestedVersion":"1.0.0","minimumVersion":null,"supportedMajor":null},"accountEntry":{"availability":"unavailable","reason":"client_selection_missing","retryable":false},"configuration":null}"""
 

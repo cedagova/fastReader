@@ -54,8 +54,31 @@ document reports `compatibility.status: compatible` and its
 client was configured with, and its `authentication.authorityOrigin` (when
 present) is the configured Supabase URL. The check is a client-side wiring
 guard, not a server requirement; a host may relax it, but this module does
-not. The verified document is kept for the life of the process, so later
-sign-ins do not fetch it again.
+not.
+
+Three more fields decide what a matching document allows (#160):
+
+- **Account availability.** Unless `accountEntry.availability` is
+  `available`, sign-in is **refused with `SignInUnavailable` before any
+  provider call**, carrying the server's `accountEntry.reason` and
+  `retryable`.
+- **Enabled methods.** The verified document exposes `enabledMethods`: the
+  email code when `authentication.emailOtp` is true, and password when
+  `authentication.enabledProviders` contains `password`. A host offers only
+  these. The module enforces the same set: a method that is off is
+  **refused with `SignInUnavailable` (`method_disabled`, naming the method)
+  before any provider call**. The email code covers requesting and verifying
+  it; password covers password sign-in and code-based password recovery,
+  which exists only to set a password.
+- **Freshness.** The verified document is reused until its `freshUntil`,
+  then fetched again before the next sign-in. If that fetch fails with a
+  network error or `TryLater`, the old document stands in until its
+  `staleUntil`; after that the failure is thrown. `configuration.validUntil`
+  caps both bounds. The bounds are applied on the device clock shifted by
+  its offset from the document's `generatedAt`, so a device clock that is
+  wrong does not stretch or shrink them; a missing or unreadable bound
+  means the document is used only for the call that fetched it. A document
+  that fails any check is never kept, so the next sign-in fetches it again.
 
 The **first authenticated call is `GET /v1/reader/capabilities`**
 (`clientVersion=1.0.0`), which answers a `reader.capabilities.v1` document

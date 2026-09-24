@@ -188,6 +188,7 @@ class ReaderAccountController(
 internal fun ReaderAuthException.toOutcome(): AccountOutcome = when (this) {
     is ReaderAuthException.NotConfigured -> AccountOutcome.ConfigurationMismatch(message.orEmpty())
     is ReaderAuthException.ConfigurationMismatch -> AccountOutcome.ConfigurationMismatch(reason)
+    is ReaderAuthException.SignInUnavailable -> AccountOutcome.SignInUnavailable(reason)
     is ReaderAuthException.NetworkUnavailable -> AccountOutcome.NetworkUnavailable
     is ReaderAuthException.TryLater -> AccountOutcome.TryLater(status, code, retryAfter?.inWholeSeconds, requestId)
     is ReaderAuthException.SignedOut -> AccountOutcome.SessionGone(code, requestId)

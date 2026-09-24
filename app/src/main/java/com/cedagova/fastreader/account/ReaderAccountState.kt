@@ -115,6 +115,9 @@ sealed interface AccountOutcome {
     /** `ReaderAuthException.ConfigurationMismatch`: refused before any provider call, with the library's reason. */
     data class ConfigurationMismatch(val reason: String) : AccountOutcome
 
+    /** `ReaderAuthException.SignInUnavailable`: the server does not allow this sign-in now (#160); nothing was sent. */
+    data class SignInUnavailable(val reason: String) : AccountOutcome
+
     /** `ReaderAuthException.SignedOut`: the server rejected the session and the library cleared it. Shown once. */
     data class SessionGone(val code: String?, val requestId: String?) : AccountOutcome
 

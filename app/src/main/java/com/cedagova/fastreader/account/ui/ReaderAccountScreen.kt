@@ -396,6 +396,7 @@ internal fun describe(outcome: AccountOutcome): String = when (outcome) {
     )
     AccountOutcome.NetworkUnavailable -> stringResource(R.string.account_outcome_network)
     is AccountOutcome.ConfigurationMismatch -> stringResource(R.string.account_outcome_mismatch, outcome.reason)
+    is AccountOutcome.SignInUnavailable -> stringResource(R.string.account_outcome_sign_in_unavailable, outcome.reason)
     is AccountOutcome.SessionGone -> stringResource(
         R.string.account_outcome_session_gone,
         details(code = outcome.code, requestId = outcome.requestId),

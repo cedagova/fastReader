@@ -347,6 +347,7 @@
     <string name="account_outcome_try_later">Inténtalo más tarde (%1$s). No se ha cambiado nada.</string>
     <string name="account_outcome_network">Sin red. No se ha enviado nada y no se ha cambiado nada.</string>
     <string name="account_outcome_mismatch">La configuración de Reader de esta compilación no coincide con la del servidor, así que no se ha enviado nada al servicio de inicio de sesión: %1$s</string>
+    <string name="account_outcome_sign_in_unavailable">El servidor de Reader no permite este inicio de sesión ahora mismo, así que no se ha enviado nada al servicio de inicio de sesión (%1$s).</string>
     <string name="account_outcome_session_gone">El servidor ya no acepta esta sesión (%1$s). Este dispositivo ha cerrado sesión.</string>
     <string name="account_outcome_forbidden">No permitido (%1$s). Sigues con la sesión iniciada.</string>
     <string name="account_outcome_storage_unavailable">Has iniciado sesión, pero este dispositivo no ha podido guardar la sesión, así que tendrás que volver a iniciarla cuando se reinicie la app.</string>
