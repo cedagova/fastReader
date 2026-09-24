@@ -13,11 +13,13 @@ import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
  * The five library operations [AccountSyncEngine] needs, as a seam a host can
  * substitute.
  *
- * `ReaderLibraryClient`'s constructor is internal, so nothing outside this
- * module could build a double of it — and the sync engine, its unit tests and a
- * host's own screenshot tests all need to run with no SDK, no network and no
- * Keystore. Production is [ReaderApiLibraryGateway], a pass-through; tests
- * substitute a scripted fake.
+ * It exists for testability. [ReaderLibraryClient] needs a live
+ * `ReaderApiClient` behind it, and [ReaderLibraryOperations] carries every
+ * import and download route the engine never calls — while the sync engine, its
+ * unit tests and a host's own screenshot tests all need to run with no SDK, no
+ * network and no Keystore against a double of just these five calls.
+ * Production is [ReaderApiLibraryGateway], a pass-through; tests substitute a
+ * scripted fake.
  *
  * Every method here is a *named library operation*. There is deliberately no
  * `get(path)`, `post(path, body)` or any other generic call on this seam: the

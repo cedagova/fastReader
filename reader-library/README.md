@@ -8,7 +8,8 @@ owns. Added by [#112](https://github.com/cedagova/fastReader/issues/112)
 ## What it is
 
 Typed operations for the Reader library API, and — since #147 — the account sync
-engine built on them (see below). Six library operations, and nothing else:
+engine built on them (see below). The operations are exactly the ones
+`ReaderLibraryOperations` declares, and nothing else:
 
 | Operation | Route |
 | --- | --- |
@@ -18,11 +19,27 @@ engine built on them (see below). Six library operations, and nothing else:
 | `deltas(afterCursor, limit)` | `GET /v1/reader/sync/deltas` (limit ≤ 500) |
 | `syncCapability()` | `GET /v1/reader/capabilities?clientVersion=…`, the `reader.sync.v1` entry |
 | `publicationImportCapability()` | the same document's `reader.publication-import.v1` entry, available only when there is exactly one (#139) |
+| `importPolicy()` | `GET /reader/v1/imports/policy` (#116) |
+| `admitImport(request)` | `POST /reader/v1/imports`, idempotent on `client_import_id`; refuses locally without explicit upload consent |
+| `importRecord(importId)` | `GET /reader/v1/imports/{id}` |
+| `completeImport(importId)` | `POST /reader/v1/imports/{id}/complete` |
+| `cancelImport(importId, reason)` | `POST /reader/v1/imports/{id}/cancel` |
+| `assetDownloadGrant(assetId)` | `POST /v1/reader/assets/{asset_id}/download-grant` (#118) |
 
 `ReaderLibraryOperations` is the interface; `ReaderLibraryClient` is the one
 implementation, constructed with the `ReaderApiClient` a `ReaderAuthClient`
 exposes. There is no generic `call(path, body)` on it: every request this module
-can send is one of the six above or one of the publication-import and download-grant routes `ReaderLibraryOperations` declares.
+sends to reader-api is one of the operations above.
+
+## Packages
+
+| Package | What it holds |
+| --- | --- |
+| `com.cedagova.reader.library` | `ReaderLibraryOperations`, `ReaderLibraryClient` and the JSON setup: the typed reader-api operations above. |
+| `…library.model` | The hand-written request and response models, checked against the pinned contract (see below). |
+| `…library.sync` | The account sync engine (see below). |
+| `…library.imports` | Publication import: `PublicationImportEngine` runs one add from policy to completion over a caller-held `PublicationImportRecord`; `PublicationTransferClient` is the TUS upload to the storage provider, with no session and no bearer; `UploadConsent`, `PublicationSource` and `PublicationImportRefusal` are its inputs and local refusals. |
+| `…library.downloads` | `AssetDownloadClient`: fetches a book's bytes from the provider URL an `assetDownloadGrant` returns, sending only the grant's signed headers — no session, no bearer. Checking the digest and placing the file are the host's. |
 
 ## What it is not
 
@@ -52,7 +69,7 @@ index, no device catalog, no downloaded copy, no UI.
 | `AccountLibraryActions` | The mutations a shelf performs: `refresh`, `removeFromAccount`, `undoRemove`, `recordOpened`, `recordFinished`, `recordStatus`, `recordPosition`. Only `library_item` and `reading_progress` envelopes are ever built. |
 | `AccountImportRecords` | The durable publication-import records (AD-26), under the same writer. |
 | `AccountHostRecords` | The host's own records in the same document — values the engine stores verbatim and never reads, queues or sends. Document-level (`hostRecord`, `updateHostRecord`) and per book row (`updateBookHostRecord`, read back as `AccountBook.host`). FastReader keeps its copy references and answered resume offers here. |
-| `ReaderLibraryGateway` | The five library operations the engine calls; `ReaderApiLibraryGateway` passes them to `ReaderLibraryOperations`. Tests substitute a scripted fake. |
+| `ReaderLibraryGateway` | The five library operations the engine calls (`library`, `progress`, `applyMutations`, `deltas`, `syncCapability`); `ReaderApiLibraryGateway` passes them to `ReaderLibraryOperations`. Tests substitute a scripted fake. |
 | `AccountLibraryStores` / `FileAccountLibraryStores` | Storage the host supplies: one atomically written JSON file per account, named after the SHA-256 of the user id. |
 | `AccountLibraryDocument`, `AccountBook`, `AccountRemotePosition`, `AccountOutboxEntry`, `AccountLibraryCodec`, `AccountLibrarySchema` | The persisted canonical state (schema 6), migrated forward step by step and refused when newer. Keys a level does not declare are host records, kept verbatim and written back at the same level. |
 | `PortableProgress`, `LocalReadingPosition`, `RemoteReadingPosition`, `ProgressRecord` | The portable position: the `reading_progress` payload built from `PutReaderProgressRequest` (a closed key set), which book a record is about, and what a canonical payload states. Mapping these to and from a host's own reading unit is the host's. |
@@ -140,7 +157,19 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
   ./gradlew :reader-library:test
 ```
 
-Every test runs against a Ktor mock engine driving a **real** `ReaderAuthClient`
-— real bearer, real single-flight refresh, real 401/403/429/502 policy — so the
-module is proved to inherit that behaviour rather than restate it. No network,
-no device and no backend value is involved.
+No network, no device and no backend value is involved. The tests use three
+kinds of double:
+
+- **reader-api operations** (`ReaderLibraryClientTest`, and the import
+  lifecycle in `PublicationImportEngineTest`) drive a **real** `ReaderAuthClient`
+  over a Ktor mock engine — real bearer, real single-flight refresh, real
+  401/403/429/502 policy — so the module is proved to inherit that behaviour
+  rather than restate it.
+- **Storage transfers** (`PublicationTransferClientTest`,
+  `AssetDownloadClientTest`) drive the real transfer clients over a mock
+  storage provider; no `ReaderAuthClient` is involved, because those clients
+  hold no session.
+- **The sync engine and its gateway seam** (`AccountSyncEngineTest`,
+  `ReaderLibraryGatewayTest`) run against scripted doubles —
+  `FakeReaderLibraryGateway` and a recording `ReaderLibraryOperations` — not an
+  HTTP stack.
