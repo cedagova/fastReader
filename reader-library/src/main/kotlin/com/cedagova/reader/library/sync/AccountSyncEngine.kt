@@ -14,9 +14,11 @@ import com.cedagova.reader.library.model.ReaderSyncMutationResult
 import com.cedagova.reader.library.model.ReaderSyncStatus
 import java.io.IOException
 import java.util.UUID
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -282,7 +284,31 @@ class AccountSyncEngine(
     /** The account library as the shelf builds from it. */
     val state: StateFlow<AccountLibraryState> = _state.asStateFlow()
 
+    /** Written only under [mutex]; volatile because [accountId] reads it without the lock. */
+    @Volatile
     private var active: ActiveAccount? = null
+
+    /**
+     * Whose session the engine is in, as a caller sees it at the moment it acts
+     * (#162). Read without the lock by [enqueue], written under [mutex] by
+     * [signIn] and [signOut] only.
+     */
+    @Volatile
+    private var owner: Owner = Owner.Unresolved
+
+    /**
+     * The first session the engine settles on: its user id, or null for nobody
+     * (#163). A change asked for before then — during `Loading` — waits for it
+     * rather than being dropped.
+     */
+    private val firstSession = CompletableDeferred<String?>()
+
+    /**
+     * Every own write, in the order it was asked for (#161). One consumer —
+     * [runQueue] — takes them off in that order, so the outbox order is the call
+     * order whatever dispatcher the host's scope runs on.
+     */
+    private val changes = Channel<QueuedChange>(Channel.UNLIMITED)
 
     /** Cleared on every session change: the capability is read once per signed-in session. */
     private var capabilityConfirmed: Boolean = false
@@ -297,6 +323,10 @@ class AccountSyncEngine(
      * This device's memory of its own sends and nothing else: it is compared
      * only with the next local position, never with a remote one, and it selects
      * no winner. In memory on purpose — see [recordPosition].
+     *
+     * Read and written only under [mutex], and a key is recorded only once its
+     * entry is in the outbox on disk (#163): a position that was never queued is
+     * never taken for one that was.
      */
     private val published = mutableMapOf<String, Pair<String?, Int>>()
 
@@ -318,7 +348,30 @@ class AccountSyncEngine(
         var document: AccountLibraryDocument,
     )
 
+    /** Whose change a queued change is, decided when it is asked for (#162). */
+    private sealed interface Owner {
+        /** No session has been read yet (`Loading`): the first one decides. */
+        data object Unresolved : Owner
+
+        /** Nobody is signed in: there is no account to hold the change. */
+        data object Nobody : Owner
+
+        data class User(val userId: String) : Owner
+    }
+
+    /** One own write as it was asked for, before it reaches the outbox. */
+    private class QueuedChange(
+        val owner: Owner,
+        val bookId: String,
+        val kind: ReaderMutationKind,
+        val payload: JsonObject,
+        val resourceType: ReaderResourceType,
+        /** AD-25's key, for a position only: recorded once the entry is persisted (#163). */
+        val publishKey: Pair<String?, Int>?,
+    )
+
     init {
+        scope.launch { runQueue() }
         scope.launch {
             accountState
                 .map(::targetOf)
@@ -377,19 +430,23 @@ class AccountSyncEngine(
      * backend admits like any other; the cost of persisting it would be a
      * durable write on the path whose entire purpose is to avoid durable writes.
      *
+     * The guard is applied where the change reaches the outbox, under the
+     * engine's lock, and the key is recorded only once the entry is persisted
+     * (#163): a position that could not be queued — the store refused it, or the
+     * session was still loading — is not remembered as sent, so the next flush
+     * with the same key queues it.
+     *
      * Nothing about the local position is queued: [PortableProgress]
      * builds the payload from the contract's own body type, so the token index
      * and the reading speed have no field to travel in (REQ-512).
      */
     override fun recordPosition(bookId: String, position: LocalReadingPosition) {
-        checkNotInHostCallback()
-        if (published[bookId] == position.publishKey) return
-        published[bookId] = position.publishKey
         enqueue(
             bookId = bookId,
             kind = ReaderMutationKind.UPSERT,
             payload = PortableProgress.payloadFor(bookId, position),
             resourceType = ReaderResourceType.READING_PROGRESS,
+            publishKey = position.publishKey,
         )
     }
 
@@ -528,6 +585,8 @@ class AccountSyncEngine(
     private suspend fun signOut(notConfigured: Boolean) {
         mutex.withLock {
             active = null
+            owner = Owner.Nobody
+            firstSession.complete(null)
             capabilityConfirmed = false
             // This device's memory of what it last published goes with the
             // session: the next sign-in publishes its first position afresh
@@ -543,8 +602,12 @@ class AccountSyncEngine(
 
     private suspend fun signIn(userId: String) {
         val opened = mutex.withLock {
+            owner = Owner.User(userId)
+            firstSession.complete(userId)
             capabilityConfirmed = false
             pendingSessionGone = null
+            // What an earlier session published says nothing about this one.
+            published.clear()
             withContext(ioDispatcher) { discardOtherAccountQueues(userId) }
             val store = stores.forUser(userId)
             when (val load = withContext(ioDispatcher) { store.load() }) {
@@ -896,6 +959,10 @@ class AccountSyncEngine(
     /**
      * Queues one mutation and runs a sync for it.
      *
+     * The change is only *taken* here: who it belongs to is read now, at the
+     * call, and its place in [changes] is the call order (#161, #162). [runQueue]
+     * then puts it in the outbox under the lock.
+     *
      * The row takes the entry's queued intent at once ([intentOf]) — the removal
      * leaving the shelf, the status the reader just set — so the shelf reacts
      * while offline. It decides nothing: the moment the backend answers, its
@@ -914,48 +981,143 @@ class AccountSyncEngine(
          * `profile`, `settings`, `note` or `bookmark` caller in this file.
          */
         resourceType: ReaderResourceType = ReaderResourceType.LIBRARY_ITEM,
+        publishKey: Pair<String?, Int>? = null,
     ) {
         checkNotInHostCallback()
-        scope.launch {
-            val queued = mutex.withLock {
-                val account = active ?: return@withLock false
-                val existing = account.document.book(bookId)
-                val entry = AccountOutboxEntry(
-                    idempotencyKey = newIdempotencyKey(),
-                    resourceType = resourceType,
-                    resourceId = bookId,
-                    mutationKind = kind,
-                    // The revision of the resource this envelope is about, which
-                    // for a position is the *progress* resource's own and not the
-                    // library item's — two resources whose revisions have nothing
-                    // to do with each other. 0 for one this device has never seen,
-                    // which is what the contract asks for.
-                    baseRevision = when (resourceType) {
-                        ReaderResourceType.READING_PROGRESS -> existing?.remotePosition?.revision ?: 0
-                        else -> existing?.revision ?: 0
-                    },
-                    payload = payload,
-                    clientCreatedAt = now(),
-                )
-                var document = account.document.copy(outbox = account.document.outbox + entry)
-                if (existing != null) document = document.withBook(intentOf(entry, existing))
-                try {
-                    persist(account, document)
-                } catch (e: IOException) {
-                    publish(
-                        AccountSyncPhase.DEFERRED,
-                        AccountSyncTrigger.OWN_WRITE,
-                        error = AccountSyncError.StoreBlocked(
-                            e.message ?: "the account library could not be written",
-                        ),
-                    )
-                    return@withLock false
-                }
-                publish(AccountSyncPhase.SYNCING, AccountSyncTrigger.OWN_WRITE)
-                true
+        val sent = changes.trySend(QueuedChange(owner, bookId, kind, payload, resourceType, publishKey))
+        // An unlimited channel that is never closed takes every element.
+        check(sent.isSuccess) { "the engine's change queue refused a change" }
+    }
+
+    /**
+     * The one consumer of [changes]: every own write reaches the outbox here, one
+     * at a time and in call order, whatever the host's dispatcher (#161).
+     *
+     * Everything already waiting is queued before one sync is started for all of
+     * it, so a burst of taps is one drain rather than one per tap.
+     */
+    private suspend fun runQueue() {
+        while (true) {
+            var queued = queue(changes.receive())
+            while (true) {
+                val next = changes.tryReceive().getOrNull() ?: break
+                queued = queue(next) || queued
             }
-            if (queued) sync(AccountSyncTrigger.OWN_WRITE)
+            if (queued) scope.launch { sync(AccountSyncTrigger.OWN_WRITE) }
         }
+    }
+
+    /**
+     * Puts [change] in the outbox of the account it was asked for in (#162);
+     * true when that is the signed-in account, which then needs a sync.
+     *
+     * - The account it was asked for is signed in: its outbox, as always.
+     * - That account is not the signed-in one any more — the session changed
+     *   between the call and now: that account's own stored document, whose file
+     *   outlives its session (D4), and never the account signed in now.
+     * - Nobody was signed in when it was asked for: there is no account to hold
+     *   it, and nothing is queued.
+     * - The session was still loading: the first session the engine settles on
+     *   is the one the reader was acting in (#163).
+     */
+    private suspend fun queue(change: QueuedChange): Boolean {
+        val userId = when (val owner = change.owner) {
+            Owner.Unresolved -> firstSession.await()
+            Owner.Nobody -> null
+            is Owner.User -> owner.userId
+        } ?: return false
+        return mutex.withLock {
+            val account = active
+            if (account != null && account.userId == userId) {
+                queueActive(account, change)
+            } else {
+                queueHeld(userId, change)
+                false
+            }
+        }
+    }
+
+    /** [change] into the signed-in account's outbox. Runs under [mutex]. */
+    private suspend fun queueActive(account: ActiveAccount, change: QueuedChange): Boolean {
+        // AD-25's guard, under the lock that also clears it (#163).
+        if (change.publishKey != null && published[change.bookId] == change.publishKey) return false
+        val document = account.document.queuing(change)
+        try {
+            persist(account, document)
+        } catch (e: IOException) {
+            publish(
+                AccountSyncPhase.DEFERRED,
+                AccountSyncTrigger.OWN_WRITE,
+                error = AccountSyncError.StoreBlocked(
+                    e.message ?: "the account library could not be written",
+                ),
+            )
+            return false
+        }
+        // Only now is the position this device's to remember as sent (#163).
+        change.publishKey?.let { published[change.bookId] = it }
+        publish(AccountSyncPhase.SYNCING, AccountSyncTrigger.OWN_WRITE)
+        return true
+    }
+
+    /**
+     * [change] into the stored document of [userId], an account that is not the
+     * signed-in one (#162). Runs under [mutex], which is also the only writer of
+     * that file. It is sent the next time that account signs in.
+     *
+     * A document that cannot be read or written, or that names another account,
+     * is not written; the refusal is reported on the current state rather than
+     * lost without a word. Nothing about the signed-in account changes.
+     */
+    private suspend fun queueHeld(userId: String, change: QueuedChange) {
+        val store = stores.forUser(userId)
+        val refusal = try {
+            withContext(ioDispatcher) {
+                when (val load = store.load()) {
+                    is AccountLibraryLoad.Blocked -> load.message
+                    is AccountLibraryLoad.Loaded -> {
+                        val stored = load.document
+                        if (stored.userId.isNotEmpty() && stored.userId != userId) {
+                            "the stored account library belongs to another account"
+                        } else {
+                            store.save(stored.copy(userId = userId).queuing(change))
+                            null
+                        }
+                    }
+                }
+            }
+        } catch (e: IOException) {
+            e.message ?: "the account library could not be written"
+        }
+        if (refusal != null) {
+            _state.value = _state.value.copy(
+                lastError = AccountSyncError.StoreBlocked("a change made before the session changed was not kept: $refusal"),
+            )
+        }
+    }
+
+    /** This document with [change] appended to its outbox and its intent on the row. */
+    private fun AccountLibraryDocument.queuing(change: QueuedChange): AccountLibraryDocument {
+        val existing = book(change.bookId)
+        val entry = AccountOutboxEntry(
+            idempotencyKey = newIdempotencyKey(),
+            resourceType = change.resourceType,
+            resourceId = change.bookId,
+            mutationKind = change.kind,
+            // The revision of the resource this envelope is about, which
+            // for a position is the *progress* resource's own and not the
+            // library item's — two resources whose revisions have nothing
+            // to do with each other. 0 for one this device has never seen,
+            // which is what the contract asks for.
+            baseRevision = when (change.resourceType) {
+                ReaderResourceType.READING_PROGRESS -> existing?.remotePosition?.revision ?: 0
+                else -> existing?.revision ?: 0
+            },
+            payload = change.payload,
+            clientCreatedAt = now(),
+        )
+        val queued = copy(outbox = outbox + entry)
+        return if (existing != null) queued.withBook(intentOf(entry, existing)) else queued
     }
 
     /**
