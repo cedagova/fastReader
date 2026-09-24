@@ -43,6 +43,20 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
     class SignedOut(val code: String?, val requestId: String? = null) :
         ReaderAuthException("signed out by the server${code?.let { ": $it" } ?: ""}")
 
+    /**
+     * The provider issued a session (a sign-in or a refresh succeeded) but this
+     * device could not save it: the Keystore or the session file failed. The
+     * session is kept in memory for this process, so the device stays signed
+     * in and repeating the operation that needed it works without a new
+     * provider call. After a refresh the stored copy, which holds the consumed
+     * refresh token, is removed, so the next process start is signed out.
+     * Never retried: the provider has already rotated the refresh token.
+     */
+    class StorageUnavailable(cause: Throwable) :
+        ReaderAuthException("the session could not be saved on this device: ${cause.javaClass.simpleName}") {
+        init { initCause(cause) }
+    }
+
     /** reader-api 403: the caller is authenticated but not allowed; the session is intact. */
     class Forbidden(val code: String?, val requestId: String?) :
         ReaderAuthException("forbidden${code?.let { ": $it" } ?: ""}")

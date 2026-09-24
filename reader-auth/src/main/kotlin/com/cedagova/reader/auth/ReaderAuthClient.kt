@@ -56,6 +56,7 @@ class ReaderAuthClient internal constructor(
     val config: ReaderAuthConfig,
     internal val supabase: SupabaseClient,
     private val store: SessionStore,
+    private val sessions: StoreSessionManager,
     private val refresher: SessionRefresher,
     /** The reader-api client, for any further route a host needs. */
     val api: ReaderApiClient,
@@ -229,8 +230,20 @@ class ReaderAuthClient internal constructor(
     private fun signedInOrThrow(): ReaderSessionState.SignedIn =
         currentState() as? ReaderSessionState.SignedIn ?: throw ReaderAuthException.SignedOut(code = null)
 
-    /** Runs one provider operation and maps its failure into the contract's closed set. */
-    private suspend inline fun <T> provider(block: () -> T): T = try {
+    /**
+     * Runs one provider operation and maps its failure into the contract's
+     * closed set. An operation that issued a session the device could not
+     * save (#154) keeps it in memory and throws
+     * [ReaderAuthException.StorageUnavailable].
+     */
+    private suspend inline fun <T> provider(block: () -> T): T {
+        sessions.takeSaveFailure()
+        val result = providerCall(block)
+        sessions.throwIfSaveFailed()
+        return result
+    }
+
+    private suspend inline fun <T> providerCall(block: () -> T): T = try {
         block()
     } catch (e: CancellationException) {
         throw e
@@ -334,11 +347,12 @@ class ReaderAuthClient internal constructor(
             requestIds: () -> String = { UUID.randomUUID().toString().lowercase() },
         ): ReaderAuthClient {
             if (!config.isConfigured) throw ReaderAuthException.NotConfigured()
+            val sessions = StoreSessionManager(store)
             val supabase = createSupabaseClient(config.supabaseUrl, config.publishableKey) {
                 httpEngine = engine
                 requestTimeout = ReaderAuthPolicy.REQUEST_TIMEOUT
                 install(Auth) {
-                    sessionManager = StoreSessionManager(store)
+                    sessionManager = sessions
                     codeVerifierCache = MemoryCodeVerifierCache()
                     alwaysAutoRefresh = false
                     enableLifecycleCallbacks = false
@@ -347,9 +361,9 @@ class ReaderAuthClient internal constructor(
                     flowType = FlowType.PKCE
                 }
             }
-            val refresher = SessionRefresher(supabase.auth, clock, waiter)
+            val refresher = SessionRefresher(supabase.auth, clock, waiter, sessions)
             val api = ReaderApiClient(config, ReaderApiClient.httpClient(engine), refresher, waiter, requestIds)
-            return ReaderAuthClient(config, supabase, store, refresher, api)
+            return ReaderAuthClient(config, supabase, store, sessions, refresher, api)
         }
 
         private val json = Json { ignoreUnknownKeys = true }

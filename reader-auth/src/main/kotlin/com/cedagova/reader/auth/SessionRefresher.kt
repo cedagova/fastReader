@@ -1,5 +1,6 @@
 package com.cedagova.reader.auth
 
+import com.cedagova.reader.auth.session.StoreSessionManager
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.exception.AuthRestException
 import io.github.jan.supabase.auth.status.SessionSource
@@ -28,6 +29,7 @@ internal class SessionRefresher(
     private val auth: Auth,
     private val clock: ReaderClock,
     private val waiter: RetryWaiter,
+    private val sessions: StoreSessionManager,
 ) {
     private val mutex = Mutex()
 
@@ -77,14 +79,38 @@ internal class SessionRefresher(
      */
     suspend fun <T> withoutRefresh(block: suspend () -> T): T = mutex.withLock { block() }
 
-    /** Runs under [mutex]. */
+    /**
+     * Runs under [mutex]. The grant and the save are separate steps (#154):
+     * only the grant is retried. Once it succeeded the provider has rotated
+     * the refresh token, so a failed save never sends the old one again — the
+     * new session stays current in memory and the failure surfaces as
+     * [ReaderAuthException.StorageUnavailable].
+     */
     private suspend fun refresh(session: UserSession): UserSession {
+        val refreshed = grant(session)
+        sessions.takeSaveFailure()
+        auth.importSession(refreshed, autoRefresh = false, source = SessionSource.Refresh(session))
+        sessions.takeSaveFailure()?.let { failure ->
+            // The stored copy still holds the refresh token the grant just
+            // consumed; a restart that replayed it would be signed out anyway.
+            try {
+                sessions.store.clear()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Best effort: the failure below is what the caller hears.
+            }
+            throw ReaderAuthException.StorageUnavailable(failure)
+        }
+        return refreshed
+    }
+
+    /** The provider's refresh grant, with the contract's one retry; nothing is saved here. */
+    private suspend fun grant(session: UserSession): UserSession {
         var retried = 0
         while (true) {
             try {
-                val refreshed = auth.refreshSession(session.refreshToken)
-                auth.importSession(refreshed, autoRefresh = false, source = SessionSource.Refresh(session))
-                return refreshed
+                return auth.refreshSession(session.refreshToken)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: AuthRestException) {
@@ -127,3 +153,8 @@ internal class SessionRefresher(
 
 /** 429 and every 5xx keep the session and earn one retry; everything else is final. */
 internal fun RestException.isTransient(): Boolean = statusCode == 429 || statusCode >= 500
+
+/** Surfaces a save the SDK just attempted through [StoreSessionManager] as the contract's typed branch. */
+internal fun StoreSessionManager.throwIfSaveFailed() {
+    takeSaveFailure()?.let { throw ReaderAuthException.StorageUnavailable(it) }
+}
