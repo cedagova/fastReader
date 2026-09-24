@@ -4,10 +4,12 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.security.GeneralSecurityException
 import java.security.KeyStore
+import java.util.concurrent.locks.ReentrantLock
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlin.concurrent.withLock
 
 /**
  * AES-256-GCM with a key that is generated in, and never leaves, the Android
@@ -21,11 +23,18 @@ import javax.crypto.spec.GCMParameterSpec
  * protects must never be backed up either: a restored blob without its key is
  * undecryptable, and [FileSessionStore] reads that as "signed out".
  *
+ * The key is created on first use, get-or-create under one process-wide lock,
+ * so two first uses never generate two keys (the second replacing the first
+ * under the same alias and orphaning whatever the first encrypted).
+ *
  * Blob layout: one version byte, the 12-byte IV, then ciphertext and tag.
  */
-class KeystoreSessionCipher(
-    private val alias: String = DEFAULT_ALIAS,
+class KeystoreSessionCipher internal constructor(
+    private val alias: String,
+    private val keys: SessionKeyStore,
 ) : SessionCipher {
+
+    constructor(alias: String = DEFAULT_ALIAS) : this(alias, AndroidSessionKeyStore)
 
     override fun encrypt(plaintext: ByteArray): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -47,8 +56,47 @@ class KeystoreSessionCipher(
     }
 
     private fun key(): SecretKey {
-        val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
-        (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
+        keys.find(alias)?.let { return it }
+        return keyCreation.withLock {
+            keys.find(alias) ?: run {
+                keys.generate(alias)
+                // Read back what the store now holds rather than trusting the generator's handle.
+                keys.find(alias) ?: throw GeneralSecurityException("generated key $alias is not in the key store")
+            }
+        }
+    }
+
+    companion object {
+        /** The one Keystore alias the module uses; app-scoped, so hosts never collide. */
+        const val DEFAULT_ALIAS: String = "com.cedagova.reader.auth.session"
+        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val IV_BYTES = 12
+        private const val TAG_BYTES = 16
+        private const val FORMAT_VERSION: Byte = 1
+
+        /** Serialises first-use key creation across every instance in the process. */
+        internal val keyCreation = ReentrantLock()
+    }
+}
+
+/** The seam between [KeystoreSessionCipher]'s get-or-create rule and the platform key store. */
+internal interface SessionKeyStore {
+    /** The key stored under [alias], or `null` when there is none yet. */
+    fun find(alias: String): SecretKey?
+
+    /** Generates a new key under [alias], replacing any existing one. */
+    fun generate(alias: String)
+}
+
+/** The production key store: AES-256-GCM keys held by the Android Keystore. */
+internal object AndroidSessionKeyStore : SessionKeyStore {
+    private const val PROVIDER = "AndroidKeyStore"
+    private const val KEY_BITS = 256
+
+    override fun find(alias: String): SecretKey? =
+        KeyStore.getInstance(PROVIDER).apply { load(null) }.getKey(alias, null) as? SecretKey
+
+    override fun generate(alias: String) {
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
         generator.init(
             KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
@@ -59,17 +107,6 @@ class KeystoreSessionCipher(
                 .setRandomizedEncryptionRequired(true)
                 .build(),
         )
-        return generator.generateKey()
-    }
-
-    companion object {
-        /** The one Keystore alias the module uses; app-scoped, so hosts never collide. */
-        const val DEFAULT_ALIAS: String = "com.cedagova.reader.auth.session"
-        private const val PROVIDER = "AndroidKeyStore"
-        private const val TRANSFORMATION = "AES/GCM/NoPadding"
-        private const val KEY_BITS = 256
-        private const val IV_BYTES = 12
-        private const val TAG_BYTES = 16
-        private const val FORMAT_VERSION: Byte = 1
+        generator.generateKey()
     }
 }

@@ -6,13 +6,25 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.reader.auth.FakeCipher
 import com.cedagova.reader.auth.session
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.Collections
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -121,6 +133,62 @@ class FileSessionStoreTest {
         assertEquals(stored.accessToken, manager.loadSession().accessToken)
         manager.deleteSession()
         assertNull(manager.loadSessionOrNull())
+    }
+
+    @Test
+    fun `concurrent saves each write their own temp file and always leave a loadable session`() {
+        val saves = 8
+        val pool = Executors.newFixedThreadPool(saves)
+        val temporaries = Collections.synchronizedList(mutableListOf<File>())
+        // Every save has fully written its temp file before any of them renames.
+        val allWritten = CyclicBarrier(saves)
+        val racing = FileSessionStore(store.file.parentFile!!, cipher, pool.asCoroutineDispatcher()) { temporary, target ->
+            temporaries += temporary
+            allWritten.await(10, TimeUnit.SECONDS)
+            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        }
+        val sessions = (1..saves).map { n ->
+            session(accessToken = "access-$n-" + "x".repeat(n * 97), refreshToken = "refresh-$n", expiresAt = Clock.System.now() + 3600.seconds)
+        }
+        try {
+            runBlocking { sessions.map { async(pool.asCoroutineDispatcher()) { racing.save(it) } }.awaitAll() }
+        } finally {
+            pool.shutdownNow()
+        }
+
+        assertEquals("two saves shared a temp file: $temporaries", saves, temporaries.map { it.name }.toSet().size)
+        val loaded = runBlocking { store.load() }
+        assertNotNull("the raced file did not load", loaded)
+        assertTrue(loaded!!.accessToken in sessions.map { it.accessToken })
+        assertEquals(listOf(FileSessionStore.FILE_NAME), store.file.parentFile!!.list()!!.toList())
+    }
+
+    @Test
+    fun `a failing rename throws and leaves the previous session file intact`() = runTest {
+        store.save(stored)
+        val before = store.file.readBytes()
+        val failing = FileSessionStore(store.file.parentFile!!, cipher, kotlinx.coroutines.Dispatchers.IO) { _, _ ->
+            throw IOException("rename refused")
+        }
+
+        assertThrows(IOException::class.java) {
+            runBlocking { failing.save(session(accessToken = "replacement", refreshToken = "r", expiresAt = Clock.System.now() + 60.seconds)) }
+        }
+
+        assertTrue(before.contentEquals(store.file.readBytes()))
+        assertEquals(stored.accessToken, store.load()?.accessToken)
+        assertEquals("the failed save left a temp file", listOf(FileSessionStore.FILE_NAME), store.file.parentFile!!.list()!!.toList())
+    }
+
+    @Test
+    fun `clear also removes orphaned temp files`() = runTest {
+        store.save(stored)
+        File(store.file.parentFile, "session.bin.123.tmp").writeBytes(byteArrayOf(1))
+        File(store.file.parentFile, "session.bin.tmp").writeBytes(byteArrayOf(1))
+
+        store.clear()
+
+        assertEquals(emptyList<String>(), store.file.parentFile!!.list()!!.toList())
     }
 
     private fun ByteArray.containsSlice(needle: ByteArray): Boolean {
