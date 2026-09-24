@@ -47,7 +47,7 @@ index, no device catalog, no downloaded copy, no UI.
 
 | Type | What it is |
 | --- | --- |
-| `AccountSyncEngine` | The one writer of an account's document. Bootstraps from the library/progress snapshot, drains the outbox in batches of ≤ 50 with persisted idempotency keys, reads the change stream to `has_more = false` (re-bootstrapping on an expired/invalid cursor), adopts every result and change from the backend's canonical payload, and publishes `state: StateFlow<AccountLibraryState>`. Runs only when asked: `requestSync(trigger)`. |
+| `AccountSyncEngine` | The one writer of an account's document. Bootstraps by merging the library/progress snapshot into the stored rows (and repairs that way after a non-retryable rejection), drains the outbox in batches of ≤ 50 with persisted idempotency keys, reads the change stream to `has_more = false` (re-bootstrapping on an expired/invalid cursor), adopts every result and change from the backend's canonical payload, and publishes `state: StateFlow<AccountLibraryState>`. Runs only when asked: `requestSync(trigger)`. |
 | `AccountSession` | What the host tells the engine about the session (`Loading`, `NotConfigured`, `SignedOut`, `SignedIn(userId)`), as a `Flow`. Signing out keeps the file; a different user discards the other accounts' held queues (D4). |
 | `AccountLibraryActions` | The mutations a shelf performs: `refresh`, `removeFromAccount`, `undoRemove`, `recordOpened`, `recordFinished`, `recordStatus`, `recordPosition`. Only `library_item` and `reading_progress` envelopes are ever built. |
 | `AccountImportRecords` | The durable publication-import records (AD-26), under the same writer. |
@@ -68,6 +68,30 @@ queued mutation, and they discard the optimistic row. Such a result's presence
 comes from its canonical payload, not from the mutation kind: a removal answered
 with the live book ends on the shelf, and an upsert answered with the tombstone
 (the empty payload) ends off it.
+
+**Repair by merging, never rebuilding (§7.2, #151).** A bootstrap or
+re-bootstrap merges the library/progress snapshot into the stored rows:
+
+- a book the snapshot still lists takes every field the snapshot states, and
+  keeps its host records and its known revision — a list read carries no
+  revision, so the one the backend already stated stays as a lower bound and
+  the strictly-newer rule above keeps holding across the re-bootstrap;
+- a book the snapshot no longer lists is gone from the account, and its row
+  goes with its host records;
+- every change still queued in the outbox is re-applied on top, in queue order
+  (§7.2 step 5), from the entry alone — the same intent function that applied
+  it when it was queued. The queue is untouched: same entries, same keys.
+
+A **non-retryable rejection** of a library change carries `{}`, so nothing in
+the answer says what the row was before the optimistic change. The engine drops
+the entry and clears the stored cursor **in the same save**, so the owed repair
+is durable: that run — or, if its read fails or the process dies first, the next
+one — finds no cursor and runs the merge-style bootstrap as a repair read
+instead of reading the stream. The refused change leaves the shelf, every other
+queued change is re-applied, host records stay, and the bootstrap stores a fresh
+cursor, so the repair runs once. A repair over a populated shelf does not
+announce `BOOTSTRAPPING`. A refused position changed no row and triggers no
+repair.
 
 **Host records (`AccountHostRecords`).**
 
