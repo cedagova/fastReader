@@ -2,11 +2,15 @@ package com.cedagova.reader.auth
 
 import io.github.jan.supabase.auth.user.UserSession
 import io.ktor.http.HttpStatusCode
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -16,7 +20,8 @@ import org.junit.Test
  * #153: every path that writes the stored session — the 401 clear and
  * sign-in, beside refresh and sign-out — goes through the refresh mutex, so a
  * refresh in flight can neither undo a clear nor overwrite a sign-in, and a
- * stale rejection cannot wipe a newer session.
+ * stale rejection cannot wipe a newer session. #179 adds setPassword, whose
+ * provider call saves the session again.
  *
  * The races are pinned with gates, not scheduling: a refresh grant parks in
  * the fake provider until the test opens its gate, and the test waits on
@@ -149,6 +154,49 @@ class SessionLockTest {
         assertEquals("access-pw", store.session?.accessToken)
         assertEquals("refresh-pw", store.session?.refreshToken)
         assertEquals("user-2", (client.currentState() as ReaderSessionState.SignedIn).userId)
+        client.close()
+    }
+
+    @Test
+    fun `a password change during an in-flight refresh waits for it and keeps the rotated token`() = runTest {
+        val refreshEntered = Arrivals(1)
+        val refreshGate = CompletableDeferred<Unit>()
+        // Caller A: reader-api says its token expired, so it refreshes; the grant parks.
+        servers.queue(
+            GENERIC_POST,
+            { json(apiError("auth.expired_token"), HttpStatusCode.Unauthorized) },
+            { json("{}") },
+        )
+        servers.queue(
+            REFRESH_GRANT,
+            gated(refreshGate, entered = refreshEntered) { json(sessionJson("access-2", "refresh-2")) },
+            { json(sessionJson("access-3", "refresh-3")) },
+        )
+        servers.on(USER) { json("""{"id":"user-1","aud":"authenticated","email":"reader@example.test"}""") }
+        // The session is fresh, so setPassword itself has no reason to refresh.
+        val (client, store) = clientWith(session(expiresAt = clock.expiring(3600)))
+
+        val refreshing = async { client.api.post(GENERIC_PATH, JsonObject(emptyMap())) }
+        // A holds the refresh mutex once its grant is on the wire.
+        refreshEntered.await()
+        val changing = async { client.setPassword("new correct horse battery staple") }
+        // Everything up to the refresh mutex runs on the test thread: the password
+        // change is now parked behind the refresh (fixed code) or has already built
+        // its request with the old session (#179).
+        runCurrent()
+        refreshGate.complete(Unit)
+        refreshing.await()
+        changing.await()
+
+        assertEquals("the password change waited for the refresh", listOf("access-2"), servers.requestsTo("/auth/v1/user").map { it.bearer })
+        assertEquals("refresh-2", store.session?.refreshToken)
+
+        // The next refresh sends the rotated token, not the spent one.
+        clock.advance(3600.seconds)
+        client.onForeground()
+        val grants = servers.requestsTo("/auth/v1/token").map { Json.parseToJsonElement(it.body).jsonObject["refresh_token"]?.jsonPrimitive?.content }
+        assertEquals(listOf("refresh-1", "refresh-2"), grants)
+        assertEquals("refresh-3", store.session?.refreshToken)
         client.close()
     }
 }

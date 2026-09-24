@@ -172,6 +172,9 @@ keeping a session the server rejects would only repeat the rejection.
   token is the thing to destroy.
 - **Sign-in saves its session under the same mutex**, so a refresh of the
   previous session that is still in flight cannot overwrite the new one.
+  Setting a password does too: the provider call saves the current session
+  again, and a refresh landing in between would have that save restore the
+  refresh token the refresh just spent.
 - **Sign out other devices** uses `scope=others`; the local session is kept.
 - A provider `global` sign-out is not offered.
 
