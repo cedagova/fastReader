@@ -36,9 +36,18 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
         ReaderAuthException("try later: HTTP $status${code?.let { " $it" } ?: ""}")
 
     /**
-     * The server rejected the session, and the module cleared it: any reader-api
-     * 401 `auth.*` other than an expiry, or a provider refresh failure that
-     * names a revoked or missing session. The host must show the sign-in screen.
+     * There is no usable session. It has two meanings, and [code] tells them
+     * apart:
+     *
+     * - **The server rejected the session** ([code] is the server's code): any
+     *   reader-api 401 `auth.*` other than an expiry, or a provider refresh
+     *   failure that names a revoked or missing session — the module cleared
+     *   the session — or a 401 expiry after the session was already gone, so
+     *   there was nothing left to refresh.
+     * - **No session existed to send** ([code] `null`): the call was made while
+     *   signed out, so no request reached the server.
+     *
+     * Either way the host must show the sign-in screen.
      */
     class SignedOut(val code: String?, val requestId: String? = null) :
         ReaderAuthException("signed out by the server${code?.let { ": $it" } ?: ""}")

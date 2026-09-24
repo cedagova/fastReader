@@ -27,7 +27,8 @@ jobs:
       - name: Check out the commit under test
         uses: actions/checkout@v4
 
-      # Gradle 8.x cannot run on JDK 25; the project pins JDK 21 everywhere.
+      # JDK 21 is the one JDK this project builds and validates on (locally, in
+      # scripts/release.sh and here), so CI never runs on a runner-default JDK.
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
