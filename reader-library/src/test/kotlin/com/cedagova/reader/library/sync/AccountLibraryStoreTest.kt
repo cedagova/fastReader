@@ -7,15 +7,18 @@ import com.cedagova.reader.library.model.ReaderCoverStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.model.ReaderMutationKind
 import java.io.File
+import java.io.IOException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -79,6 +82,38 @@ class AccountLibraryStoreTest {
         val loaded = store.load()
         assertTrue(loaded is AccountLibraryLoad.Loaded)
         assertEquals(sample(), (loaded as AccountLibraryLoad.Loaded).document)
+    }
+
+    @Test
+    fun `a second save replaces the first and leaves no temporary file`() {
+        val store = FileAccountLibraryStores(directory).forUser("user-1")
+        store.save(AccountLibraryDocument(userId = "user-1", cursor = "1"))
+        store.save(sample())
+
+        assertEquals(sample(), (store.load() as AccountLibraryLoad.Loaded).document)
+        assertEquals(1, directory.listFiles()!!.size)
+    }
+
+    @Test
+    fun `a failed replace throws and the previous document survives`() {
+        val file = File(directory, "account-test.json")
+        FileAccountLibraryStore(file).save(sample())
+        val before = file.readBytes()
+
+        val failing = FileAccountLibraryStore(
+            file = file,
+            codec = AccountLibraryCodec(),
+            clock = { 0L },
+            replace = { _, _ -> throw IOException("injected rename failure") },
+        )
+        val thrown = assertThrows(IOException::class.java) {
+            failing.save(AccountLibraryDocument(userId = "user-1"))
+        }
+
+        assertEquals("injected rename failure", thrown.cause?.message)
+        assertArrayEquals(before, file.readBytes())
+        assertEquals(sample(), (FileAccountLibraryStore(file).load() as AccountLibraryLoad.Loaded).document)
+        assertEquals(listOf(file.name), directory.list()!!.toList())
     }
 
     @Test
