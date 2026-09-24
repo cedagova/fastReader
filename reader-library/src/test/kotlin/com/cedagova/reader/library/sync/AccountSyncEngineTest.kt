@@ -262,7 +262,7 @@ class AccountSyncEngineTest {
     }
 
     @Test
-    fun `a rejection is surfaced with the backend's own code and does not move the row`() = runTest(dispatcher) {
+    fun `a rejection is surfaced with the backend's own code and is not retried`() = runTest(dispatcher) {
         gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
         gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
         val engine = engine()
@@ -524,6 +524,163 @@ class AccountSyncEngineTest {
         assertEquals(listOf("Dune"), engine.state.value.books.map { it.title })
         assertEquals("77", document("user-1").cursor)
         assertFalse(gateway.calls.any { it.startsWith("applyMutations") })
+    }
+
+    // -------------------------------------------- merge, not rebuild (#151)
+
+    /**
+     * §7.2: a re-bootstrap merges the lists into the stored rows. A book still in
+     * the account keeps the host's records; a book gone from the account goes,
+     * its host records with it; the document's own host records stay.
+     */
+    @Test
+    fun `a re-bootstrap keeps the host records of books still present and drops rows the snapshot lacks`() =
+        runTest(dispatcher) {
+            gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune"), item("book-2", "Emma")))
+            gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+            val engine = engine()
+            signIn("user-1")
+            engine.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:x") }
+            engine.updateBookHostRecord("book-2", "resumeOfferSettledFor") { JsonPrimitive("8:y") }
+            engine.updateHostRecord("copies") { JsonPrimitive("kept") }
+
+            gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune (revised)")))
+            expireCursorOnNextRead()
+            engine.refresh()
+            advanceUntilIdle()
+
+            val stored = document("user-1")
+            assertEquals(listOf("book-1"), stored.books.map { it.bookId })
+            assertEquals("the snapshot's fields are the backend's", "Dune (revised)", stored.book("book-1")!!.title)
+            assertEquals(JsonPrimitive("7:x"), stored.book("book-1")!!.host["resumeOfferSettledFor"])
+            assertNull("a book gone from the account goes, host records with it", stored.book("book-2"))
+            assertEquals(JsonPrimitive("kept"), stored.host["copies"])
+            assertEquals("77", stored.cursor)
+        }
+
+    /** §7.2 step 5: a removal still queued when the cursor expires stays off the shelf. */
+    @Test
+    fun `a re-bootstrap re-applies a still-queued removal on top of the snapshot`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        // No answer for the removal: it stays queued under its key.
+        gateway.mutationResponses = queueOf(ReaderSyncMutationBatchResponse(requestId = REQUEST_ID))
+        expireCursorOnNextRead()
+
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        val stored = document("user-1")
+        assertEquals(listOf("key-1"), stored.outbox.map { it.idempotencyKey })
+        assertTrue("the queued removal is re-applied on the snapshot's row", stored.book("book-1")!!.removed)
+        assertTrue(engine.state.value.books.isEmpty())
+        assertEquals("77", stored.cursor)
+    }
+
+    /** §7.2 step 5: a queued status is re-applied over the snapshot's, and sent once with its original key. */
+    @Test
+    fun `a re-bootstrap re-applies a still-queued status and sends it once under its key`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.mutationResponses = queueOf(ReaderSyncMutationBatchResponse(requestId = REQUEST_ID))
+        expireCursorOnNextRead()
+
+        engine.recordOpened("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(ReaderLibraryStatus.READING, row.status)
+        assertEquals(CLIENT_TIME, row.lastOpenedAt)
+        assertEquals(1, engine.state.value.queued)
+        assertEquals(listOf("key-1"), gateway.submitted.flatten().map { it.idempotencyKey })
+    }
+
+    /**
+     * §7.2/§7.3 (#147, #149): a list read carries no revision, so the revision
+     * the backend already stated for a book is kept — and a stream change no
+     * newer than it still cannot revert the row after a re-bootstrap.
+     */
+    @Test
+    fun `a re-bootstrap keeps the known revision so a stale stream change cannot revert the row`() =
+        runTest(dispatcher) {
+            val engine = engineAtRevision8()
+            gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune", status = ReaderLibraryStatus.FINISHED)))
+            expireCursorOnNextRead()
+            engine.refresh()
+            advanceUntilIdle()
+            assertEquals(8L, document("user-1").book("book-1")!!.revision)
+
+            gateway.deltaResponses = queueOf(
+                deltas(
+                    latestCursor = "80",
+                    changes = listOf(
+                        change("78", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 8),
+                    ),
+                ),
+            )
+            engine.refresh()
+            advanceUntilIdle()
+
+            assertEquals(ReaderLibraryStatus.FINISHED, document("user-1").book("book-1")!!.status)
+            assertEquals("80", document("user-1").cursor)
+        }
+
+    // --------------------------------------------- refused changes (#151)
+
+    /** A refused status leaves the shelf: the repair read restores the backend's row, host records kept. */
+    @Test
+    fun `a non-retryable rejection restores the row to the backend's state`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        engine.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:x") }
+        gateway.calls.clear()
+        gateway.answerMutations(rejected("key-1", ReaderMutationKind.UPSERT))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "5"))
+
+        engine.recordStatus("book-1", ReaderLibraryStatus.ARCHIVED)
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals("the refused status is undone", ReaderLibraryStatus.QUEUED, row.status)
+        assertEquals(JsonPrimitive("7:x"), row.host["resumeOfferSettledFor"])
+        assertEquals(0, engine.state.value.queued)
+        assertTrue(engine.state.value.lastError is AccountSyncError.Rejected)
+        assertEquals(
+            listOf("applyMutations(1)", "deltas(0, 1)", "library()", "progress()"),
+            gateway.calls,
+        )
+    }
+
+    /** A refused removal puts the book back on the shelf. */
+    @Test
+    fun `a rejected removal puts the book back on the shelf`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.answerMutations(rejected("key-1", ReaderMutationKind.DELETE))
+
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        assertFalse(document("user-1").book("book-1")!!.removed)
+        assertEquals(listOf("Dune"), engine.state.value.books.map { it.title })
+    }
+
+    /** The repair read undoes only the refused change: another one still queued is re-applied. */
+    @Test
+    fun `the repair after a rejection keeps every other queued change`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        // First run: neither change is answered, both stay queued.
+        gateway.mutationResponses = queueOf(ReaderSyncMutationBatchResponse(requestId = REQUEST_ID))
+        engine.recordStatus("book-1", ReaderLibraryStatus.ARCHIVED)
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+        assertEquals(2, engine.state.value.queued)
+
+        // Next run: the status is refused for good; the removal is still unanswered.
+        gateway.answerMutations(rejected("key-1", ReaderMutationKind.UPSERT))
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(listOf("key-2"), document("user-1").outbox.map { it.idempotencyKey })
+        assertEquals("the refused status is undone", ReaderLibraryStatus.QUEUED, row.status)
+        assertTrue("the queued removal still holds", row.removed)
     }
 
     // ------------------------------------------------------ capability gate
@@ -1673,6 +1830,28 @@ class AccountSyncEngineTest {
         }
         throw AssertionError("expected ${T::class.simpleName}, nothing was thrown")
     }
+
+    /** The next delta read answers `cursor_expired`; the re-bootstrap's head read then answers cursor 77. */
+    private fun expireCursorOnNextRead() {
+        gateway.deltaResponses = queueOf(
+            deltas(status = ReaderDeltaStatus.CURSOR_EXPIRED, latestCursor = "77", rebootstrapRequired = true),
+            deltas(latestCursor = "77"),
+        )
+    }
+
+    /** A non-retryable rejection of book-1's library change [key], with the contract's empty payload. */
+    private fun rejected(key: String, kind: ReaderMutationKind) = ReaderSyncMutationResult(
+        idempotencyKey = key,
+        resourceType = ReaderResourceType.LIBRARY_ITEM,
+        resourceId = "book-1",
+        mutationKind = kind,
+        status = ReaderSyncStatus.REJECTED,
+        rejection = ReaderSyncRejection(
+            code = ReaderSyncRejectionCode.UNSUPPORTED_MUTATION,
+            detail = "this resource does not accept that",
+            retryable = false,
+        ),
+    )
 
     /** [signedInEngine], with book-1 moved to revision 8 by the stream. */
     private fun TestScope.engineAtRevision8(): AccountSyncEngine {

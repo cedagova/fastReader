@@ -258,8 +258,27 @@ data class AccountBook(
 ) {
     companion object {
 
-        /** The row a `GET /v1/reader/library` item describes. */
-        fun of(item: ReaderLibraryItem): AccountBook {
+        /**
+         * The row a `GET /v1/reader/library` item describes, merged into [held] —
+         * the row this device already stored for the same book, if any (#151).
+         *
+         * Every field the item states replaces the stored one: a snapshot is the
+         * backend's truth. Two things a snapshot cannot state are kept from [held]:
+         *
+         * - the **host records**, which the backend never sees, so a re-bootstrap
+         *   does not forget what the host noted about a book still in the account;
+         * - the **revision**, because a list read carries none (client contract
+         *   §7.2: "initialize each snapshot row's server revision as unknown …
+         *   once a change or mutation receipt supplies a revision, retain it and
+         *   reject older revisions for that identity"). A revision the backend
+         *   already stated for this book is a lower bound the snapshot cannot be
+         *   below, so the stream's strictly-newer rule (§7.3, #147/#149) keeps
+         *   holding across a re-bootstrap instead of restarting from 0.
+         *
+         * [removed] is false: a book the list returns is a live membership. A
+         * still-queued removal is re-applied on top by the engine, not here.
+         */
+        fun of(item: ReaderLibraryItem, held: AccountBook? = null): AccountBook {
             val asset = item.assets.firstOrNull { it.checksum != null }
             return AccountBook(
                 bookId = item.book.id,
@@ -271,6 +290,8 @@ data class AccountBook(
                 status = item.status,
                 coverStatus = item.coverStatus,
                 lastOpenedAt = item.lastOpenedAt,
+                revision = held?.revision ?: 0,
+                host = held?.host ?: EMPTY_JSON_OBJECT,
             )
         }
     }

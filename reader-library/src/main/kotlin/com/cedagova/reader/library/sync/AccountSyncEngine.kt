@@ -218,7 +218,9 @@ interface AccountHostRecords {
  *    is read, so this device's own change is never applied to it twice.
  * 3. Reads the stream from the stored cursor until `has_more` is false — or
  *    bootstraps, when there is no cursor yet or the stream says the cursor is
- *    expired, invalid or ahead.
+ *    expired, invalid or ahead, or when the backend refused a library change for
+ *    good (the repair read, #151). A bootstrap merges the lists into the stored
+ *    rows and re-applies the queued changes; it never rebuilds them.
  *
  * ## What it never does
  *
@@ -340,10 +342,10 @@ class AccountSyncEngine(
     override fun refresh() = requestSync(AccountSyncTrigger.MANUAL_REFRESH)
 
     override fun removeFromAccount(bookId: String) =
-        enqueue(bookId, ReaderMutationKind.DELETE, JsonObject(emptyMap())) { it.copy(removed = true) }
+        enqueue(bookId, ReaderMutationKind.DELETE, JsonObject(emptyMap()))
 
     override fun undoRemove(bookId: String) =
-        enqueue(bookId, ReaderMutationKind.RESTORE, JsonObject(emptyMap())) { it.copy(removed = false) }
+        enqueue(bookId, ReaderMutationKind.RESTORE, JsonObject(emptyMap()))
 
     override fun recordOpened(bookId: String) {
         val at = now()
@@ -351,16 +353,14 @@ class AccountSyncEngine(
             put("status", JsonPrimitive(ReaderLibraryStatus.READING.wireName()))
             put("last_opened_at", JsonPrimitive(at))
         }
-        enqueue(bookId, ReaderMutationKind.UPSERT, payload) {
-            it.copy(status = ReaderLibraryStatus.READING, lastOpenedAt = at)
-        }
+        enqueue(bookId, ReaderMutationKind.UPSERT, payload)
     }
 
     override fun recordFinished(bookId: String) = recordStatus(bookId, ReaderLibraryStatus.FINISHED)
 
     override fun recordStatus(bookId: String, status: ReaderLibraryStatus) {
         val payload = buildJsonObject { put("status", JsonPrimitive(status.wireName())) }
-        enqueue(bookId, ReaderMutationKind.UPSERT, payload) { it.copy(status = status) }
+        enqueue(bookId, ReaderMutationKind.UPSERT, payload)
     }
 
     /**
@@ -390,7 +390,7 @@ class AccountSyncEngine(
             kind = ReaderMutationKind.UPSERT,
             payload = PortableProgress.payloadFor(bookId, position),
             resourceType = ReaderResourceType.READING_PROGRESS,
-        ) { it }
+        )
     }
 
     // ---------------------------------------------------------- import records
@@ -630,15 +630,20 @@ class AccountSyncEngine(
                 }
 
                 publish(AccountSyncPhase.SYNCING, trigger)
-                val rejection = drainOutbox(account, gateway)
-                if (account.document.bootstrapped) {
-                    readDeltas(account, gateway, trigger)
-                } else {
-                    bootstrap(account, gateway, trigger)
+                val drained = drainOutbox(account, gateway)
+                when {
+                    !account.document.bootstrapped -> bootstrap(account, gateway, trigger)
+                    // A refused change left its optimistic row on the shelf, and the
+                    // refusal carries no canonical state to put back (#151). The
+                    // merge-style repair read restores the backend's truth for it
+                    // and re-applies every change still queued; the next trigger
+                    // reads the stream from the new barrier.
+                    drained.repair -> bootstrap(account, gateway, trigger, announce = false)
+                    else -> readDeltas(account, gateway, trigger)
                 }
                 // A rejection the backend stated outranks a record this app could
                 // not place; both are surfaced, a rejection first.
-                publish(AccountSyncPhase.IDLE, trigger, error = rejection ?: takeProgressMismatch())
+                publish(AccountSyncPhase.IDLE, trigger, error = drained.rejection ?: takeProgressMismatch())
             } catch (e: ReaderAuthException) {
                 onFailure(e, trigger)
             } catch (e: IOException) {
@@ -681,17 +686,19 @@ class AccountSyncEngine(
      * admission.
      *
      * Returns the last rejection the backend reported, so the caller can
-     * surface its code; a rejection is not a failure of the run.
+     * surface its code — a rejection is not a failure of the run — and whether a
+     * refused library change needs the repair read (#151).
      */
     private suspend fun drainOutbox(
         account: ActiveAccount,
         gateway: ReaderLibraryGateway,
-    ): AccountSyncError.Rejected? {
+    ): DrainOutcome {
         val pending = account.document.outbox
-        if (pending.isEmpty()) return null
+        if (pending.isEmpty()) return DrainOutcome(rejection = null, repair = false)
 
         val kept = mutableListOf<AccountOutboxEntry>()
         var rejection: AccountSyncError.Rejected? = null
+        var repair = false
         var index = 0
         while (index < pending.size) {
             val batch = pending.subList(index, minOf(index + MAX_BATCH, pending.size))
@@ -715,17 +722,32 @@ class AccountSyncEngine(
                 }
                 document = adopt(document, result)
                 if (result.status == ReaderSyncStatus.REJECTED) {
-                    result.rejection?.let {
-                        rejection = it.toSyncError(result.resourceId)
-                        if (it.retryable) kept += entry
+                    val retryable = result.rejection?.retryable == true
+                    result.rejection?.let { rejection = it.toSyncError(result.resourceId) }
+                    if (retryable) {
+                        kept += entry
+                    } else if (entry.resourceType.isLibraryItem()) {
+                        // Dropped for good, and its optimistic row with it: a
+                        // refusal carries `{}`, so nothing here can say what the
+                        // row was before. The repair read does (#151). A refused
+                        // position changed no row, so it needs none.
+                        repair = true
                     }
                 }
             }
             index += batch.size
             persist(account, document.copy(outbox = kept + pending.drop(index)))
         }
-        return rejection
+        return DrainOutcome(rejection = rejection, repair = repair)
     }
+
+    /** What one drain of the outbox reports to the run that made it. */
+    private class DrainOutcome(
+        /** The last rejection the backend stated, surfaced with its own code. */
+        val rejection: AccountSyncError.Rejected?,
+        /** A non-retryable rejection dropped a library change whose optimistic row must be undone. */
+        val repair: Boolean,
+    )
 
     /**
      * Reads the account's lists and takes the stream's head as the cursor.
@@ -736,18 +758,40 @@ class AccountSyncEngine(
      * change the lists never showed, and that change would be lost. `latest_cursor`
      * is present in every delta answer, an expired one included, so the head read
      * asks for one change and uses nothing but that field.
+     *
+     * ## A merge, not a rebuild (#151)
+     *
+     * The snapshot is merged into the stored rows, because the stored rows carry
+     * what no list read can state:
+     *
+     * - a book the lists still return keeps its host records and its known
+     *   revision ([AccountBook.of]); every field the lists state is theirs;
+     * - a book the lists no longer return is gone from the account, so its row
+     *   goes — host records with it;
+     * - every change still queued in the outbox is re-applied on top, in queue
+     *   order ([withQueuedIntents]), which is client contract §7.2 step 5:
+     *   "reconcile the saved outbox against this canonical state". The queue
+     *   itself is untouched — same entries, same idempotency keys — so nothing is
+     *   re-sent or re-minted.
+     *
+     * The document's own host records, import records and outbox are carried
+     * through as they stand. [announce] is false for the repair read after a
+     * refusal: the shelf is not being loaded, only corrected, so it stays in the
+     * syncing phase.
      */
     private suspend fun bootstrap(
         account: ActiveAccount,
         gateway: ReaderLibraryGateway,
         trigger: AccountSyncTrigger,
+        announce: Boolean = true,
     ) {
-        publish(AccountSyncPhase.BOOTSTRAPPING, trigger)
+        if (announce) publish(AccountSyncPhase.BOOTSTRAPPING, trigger)
         val head = gateway.deltas(ReaderLibraryClient.FIRST_CURSOR, HEAD_LIMIT)
         val library = gateway.library()
         val positions = gateway.progress().progress.associateBy { it.bookId }
+        val stored = account.document
         val books = library.items.map { item ->
-            val row = AccountBook.of(item)
+            val row = AccountBook.of(item, held = stored.book(item.book.id))
             positions[row.bookId]?.let { progress ->
                 // The bootstrap's second list is keyed by `book_id`, which the
                 // document marks required on `ReaderProgress` — so unlike the
@@ -760,7 +804,7 @@ class AccountSyncEngine(
                 // device's own (#140); a re-bootstrap must not turn this device's
                 // own position into "another device's". A different record keeps
                 // neither.
-                val held = account.document.book(row.bookId)
+                val held = stored.book(row.bookId)
                     ?.takeIf { it.remotePosition?.updatedAt == progress.updatedAt }
                 val remote = AccountCanonicalPayload.remotePosition(
                     position = PortableProgress.positionOf(
@@ -783,7 +827,7 @@ class AccountSyncEngine(
                 )
             } ?: row
         }
-        persist(account, account.document.copy(books = books, cursor = head.latestCursor))
+        persist(account, stored.copy(books = books, cursor = head.latestCursor).withQueuedIntents())
     }
 
     /** Reads the stream from the stored cursor until `has_more` is false. */
@@ -836,10 +880,12 @@ class AccountSyncEngine(
     /**
      * Queues one mutation and runs a sync for it.
      *
-     * [locally] is the row's queued intent — the removal leaving the shelf, the
-     * status the reader just set — applied at once so the shelf reacts while
-     * offline. It decides nothing: the moment the backend answers, its
-     * canonical payload replaces the row wholesale (AD-22).
+     * The row takes the entry's queued intent at once ([intentOf]) — the removal
+     * leaving the shelf, the status the reader just set — so the shelf reacts
+     * while offline. It decides nothing: the moment the backend answers, its
+     * canonical payload replaces the row wholesale (AD-22). The intent is derived
+     * from the stored entry alone, so a re-bootstrap re-applies exactly the same
+     * change on top of the snapshot (#151, §7.2 step 5).
      */
     private fun enqueue(
         bookId: String,
@@ -852,7 +898,6 @@ class AccountSyncEngine(
          * `profile`, `settings`, `note` or `bookmark` caller in this file.
          */
         resourceType: ReaderResourceType = ReaderResourceType.LIBRARY_ITEM,
-        locally: (AccountBook) -> AccountBook,
     ) {
         checkNotInHostCallback()
         scope.launch {
@@ -877,7 +922,7 @@ class AccountSyncEngine(
                     clientCreatedAt = now(),
                 )
                 var document = account.document.copy(outbox = account.document.outbox + entry)
-                if (existing != null) document = document.withBook(locally(existing))
+                if (existing != null) document = document.withBook(intentOf(entry, existing))
                 try {
                     persist(account, document)
                 } catch (e: IOException) {
@@ -897,11 +942,57 @@ class AccountSyncEngine(
         }
     }
 
+    /**
+     * The row as [entry]'s queued intent leaves it: what the shelf shows while
+     * the change waits to be admitted.
+     *
+     * A pure function of the stored entry, so the intent applied when the change
+     * is queued and the intent re-applied on top of a re-bootstrap's snapshot
+     * (#151) are one and the same. A removal takes the row off the shelf, an Undo
+     * puts it back, a status upsert sets the status and, when the payload names
+     * one, the last-opened time. A position changes no library row — its
+     * account-side record arrives with the backend's answer.
+     */
+    private fun intentOf(entry: AccountOutboxEntry, book: AccountBook): AccountBook {
+        if (!entry.resourceType.isLibraryItem()) return book
+        return when (entry.mutationKind) {
+            ReaderMutationKind.DELETE -> book.copy(removed = true)
+            ReaderMutationKind.RESTORE -> book.copy(removed = false)
+            ReaderMutationKind.UPSERT -> {
+                val status = (entry.payload["status"] as? JsonPrimitive)?.content
+                    ?.let { wire -> ReaderLibraryStatus.entries.firstOrNull { it.wireName() == wire } }
+                book.copy(
+                    status = status ?: book.status,
+                    lastOpenedAt = if (entry.payload.containsKey("last_opened_at")) {
+                        (entry.payload["last_opened_at"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                    } else {
+                        book.lastOpenedAt
+                    },
+                )
+            }
+            ReaderMutationKind.UNKNOWN -> book
+        }
+    }
+
+    /**
+     * Every queued change's intent, re-applied in queue order on top of this
+     * document's rows (client contract §7.2 step 5, #151). A change for a book
+     * the account holds no row for invents none, exactly as queueing it did not.
+     */
+    private fun AccountLibraryDocument.withQueuedIntents(): AccountLibraryDocument =
+        outbox.fold(this) { document, entry ->
+            document.book(entry.resourceId)?.let { document.withBook(intentOf(entry, it)) } ?: document
+        }
+
+    private fun ReaderResourceType.isLibraryItem(): Boolean =
+        this == ReaderResourceType.LIBRARY_ITEM || this == ReaderResourceType.BOOK
+
     // ------------------------------------------------------------- adoption
 
     /**
      * Adopts one mutation result. A rejection carries an empty canonical
-     * payload by contract and changes no row; everything else — `applied`,
+     * payload by contract and changes no row here — a non-retryable one is
+     * undone by the repair read the drain asks for (#151); everything else — `applied`,
      * `replayed`, `superseded` and `conflict` alike — is adopted as it stands,
      * unless its revision is older than the one already stored (§7.3, #147: a
      * late answer never moves a book's state backwards).
