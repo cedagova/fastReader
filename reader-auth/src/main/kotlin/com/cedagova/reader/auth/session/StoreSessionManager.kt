@@ -20,6 +20,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * with [takeSaveFailure]. The SDK also re-saves the session it loads at
  * start-up; a failure there is recorded too and discarded by the next caller,
  * which is why the stored copy is left alone here.
+ *
+ * One slot is enough because every caller that saves — refresh, sign-in and
+ * setPassword — does so under the refresh mutex, so no two saves
+ * overlap between a caller's reset and its read.
  */
 class StoreSessionManager(val store: SessionStore) : SessionManager {
 

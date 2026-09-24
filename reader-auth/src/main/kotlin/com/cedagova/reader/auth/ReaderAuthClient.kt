@@ -151,10 +151,20 @@ class ReaderAuthClient internal constructor(
         return verify(OtpType.Email.RECOVERY, email, code)
     }
 
-    /** Sets the signed-in user's password (recovery step three, or a plain change). */
+    /**
+     * Sets the signed-in user's password (recovery step three, or a plain
+     * change). The provider call saves the session again with the updated
+     * user, so it runs under the refresh mutex (#179): a refresh in flight
+     * finishes first, and none can land between the SDK reading the session
+     * and saving it back, which would restore the spent refresh token.
+     */
     suspend fun setPassword(newPassword: String) {
         refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
-        provider { auth.updateUser { password = newPassword } }
+        refresher.withoutRefresh {
+            // A sign-out may have run while this call waited for the mutex.
+            auth.currentSessionOrNull() ?: throw ReaderAuthException.SignedOut(code = null)
+            provider { auth.updateUser { password = newPassword } }
+        }
     }
 
     // ---- Protected calls ---------------------------------------------------------------------

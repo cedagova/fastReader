@@ -75,7 +75,8 @@ internal class SessionRefresher(
      * Runs [block] while no refresh is in flight and holds off any refresh
      * until it returns. Sign-out uses it so a refresh that started a moment
      * earlier cannot re-save a session after the store was cleared, and
-     * sign-in uses it so such a refresh cannot overwrite the new session.
+     * sign-in and setPassword use it so such a refresh cannot overwrite, or be
+     * overwritten by, the session they save.
      */
     suspend fun <T> withoutRefresh(block: suspend () -> T): T = mutex.withLock { block() }
 
