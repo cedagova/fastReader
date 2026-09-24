@@ -5,7 +5,6 @@ import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.auth.ReaderAuthPolicy
 import com.cedagova.reader.auth.RetryWaiter
 import com.cedagova.reader.auth.SessionRefresher
-import io.github.jan.supabase.auth.Auth
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpTimeout
@@ -45,7 +44,10 @@ import kotlinx.serialization.json.jsonPrimitive
  *   surfaced as [ReaderAuthException.ApiError] with the session intact;
  * - any other 401 `auth.*` on a protected call: the session is cleared and
  *   [ReaderAuthException.SignedOut] is thrown (a public route's 401 is an
- *   [ReaderAuthException.ApiError]; it said nothing about the session);
+ *   [ReaderAuthException.ApiError]; it said nothing about the session). The
+ *   clear waits for any refresh in flight and happens only while the rejected
+ *   token is still the stored one; when another caller already replaced it,
+ *   the call is retried once with the replacement instead (#153);
  * - 403: [ReaderAuthException.Forbidden], session intact;
  * - 429, and 502 `auth.jwks_dependency_failed`: one retry after `Retry-After`
  *   (default 10 s), then [ReaderAuthException.TryLater];
@@ -56,7 +58,6 @@ import kotlinx.serialization.json.jsonPrimitive
 class ReaderApiClient internal constructor(
     private val config: ReaderAuthConfig,
     private val http: HttpClient,
-    private val auth: Auth,
     private val refresher: SessionRefresher,
     private val waiter: RetryWaiter,
     private val requestIds: () -> String = { UUID.randomUUID().toString().lowercase() },
@@ -160,8 +161,15 @@ class ReaderApiClient internal constructor(
                         continue
                     }
                     if (session != null && error.code != ReaderAuthPolicy.EXPIRED_TOKEN_CODE && error.code?.startsWith(AUTH_CODE_PREFIX) == true) {
-                        auth.clearSession()
-                        throw ReaderAuthException.SignedOut(error.code, error.requestId)
+                        if (refresher.clearAfterRejection(session.accessToken)) {
+                            throw ReaderAuthException.SignedOut(error.code, error.requestId)
+                        }
+                        // Another caller already replaced the rejected token (a refresh or a
+                        // sign-in): the rejection is stale, so retry once with the replacement.
+                        if (refreshed < ReaderAuthPolicy.RETRY_LIMIT) {
+                            refreshed += 1
+                            continue
+                        }
                     }
                     throw ReaderAuthException.ApiError(response.status.value, error.code, error.requestId, error.message)
                 }
