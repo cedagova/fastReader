@@ -6,7 +6,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -62,12 +61,15 @@ class RefreshPolicyTest {
     @Test
     fun `concurrent callers collapse to one refresh request`() = runTest {
         val gate = CompletableDeferred<Unit>()
-        servers.on(REFRESH_GRANT, gated(gate) { json(sessionJson("access-2", "refresh-2")) })
+        val refreshing = Arrivals(1)
+        servers.on(REFRESH_GRANT, gated(gate, refreshing) { json(sessionJson("access-2", "refresh-2")) })
         servers.on(CAPABILITIES) { json(CAPABILITIES_BODY) }
         val (client, _) = clientWith(session(expiresAt = clock.expiring(120)))
 
         val callers = (1..8).map { async { client.capabilities() } }
-        repeat(50) { yield() }
+        // One caller's refresh is at the provider; run the other seven up to the refresh lock.
+        refreshing.await()
+        testScheduler.runCurrent()
         gate.complete(Unit)
         callers.awaitAll()
 

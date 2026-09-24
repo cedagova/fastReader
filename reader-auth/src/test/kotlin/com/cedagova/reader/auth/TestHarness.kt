@@ -16,6 +16,7 @@ import io.ktor.http.headersOf
 import java.io.File
 import java.io.IOException
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -25,6 +26,11 @@ import kotlinx.coroutines.CompletableDeferred
 // The seams the unit tests substitute: a reversible fake cipher, a settable
 // clock, a waiter that records instead of sleeping, an in-memory store, and
 // one mock engine that plays both the identity provider and reader-api.
+//
+// MockEngine answers on its own dispatcher threads, not on the runTest
+// scheduler, so anything a responder touches must be thread-safe, and a test
+// that needs callers parked must wait on a signal from the responders
+// ([Arrivals]), never on yield(), which only advances the test scheduler.
 
 /** XORs every byte; reversible, and guarantees no plaintext byte survives unchanged. */
 class FakeCipher(private val key: Byte = 0x5A, var failDecrypt: Boolean = false) : SessionCipher {
@@ -108,25 +114,28 @@ typealias Responder = suspend MockRequestHandleScope.(Recorded) -> HttpResponseD
  */
 class FakeServers {
     val requests: MutableList<Recorded> = Collections.synchronizedList(mutableListOf())
+    // Guarded by itself: responders are picked on engine threads.
     private val routes = mutableMapOf<String, ArrayDeque<Responder>>()
 
     val engine = MockEngine { data ->
         val recorded = data.record()
         requests += recorded
-        val queue = routes[recorded.route] ?: routes["${recorded.method} ${recorded.path}"]
-            ?: error("unexpected ${recorded.route}")
-        val responder = if (queue.size > 1) queue.removeFirst() else queue.first()
+        val responder = synchronized(routes) {
+            val queue = routes[recorded.route] ?: routes["${recorded.method} ${recorded.path}"]
+                ?: error("unexpected ${recorded.route}")
+            if (queue.size > 1) queue.removeFirst() else queue.first()
+        }
         responder(this, recorded)
     }
 
     /** The answer for [route]; a later call replaces it. */
     fun on(route: String, responder: Responder) {
-        routes[route] = ArrayDeque(listOf(responder))
+        synchronized(routes) { routes[route] = ArrayDeque(listOf(responder)) }
     }
 
     /** Successive answers for [route]; the last one repeats. */
     fun queue(route: String, vararg responders: Responder) {
-        routes[route] = ArrayDeque(responders.toList())
+        synchronized(routes) { routes[route] = ArrayDeque(responders.toList()) }
     }
 
     fun requestsTo(path: String): List<Recorded> = requests.filter { it.path == path }
@@ -150,8 +159,28 @@ fun MockRequestHandleScope.json(body: String, status: HttpStatusCode = HttpStatu
 
 fun networkFailure(): Nothing = throw IOException("connection refused")
 
-/** A responder that parks until [gate] completes, so a test can prove callers were waiting concurrently. */
-fun gated(gate: CompletableDeferred<Unit>, then: Responder): Responder = { recorded ->
+/**
+ * A count of events seen on engine threads that a test can suspend on:
+ * [await] resumes once [arrive] has been called [expected] times.
+ */
+class Arrivals(private val expected: Int) {
+    private val count = AtomicInteger()
+    private val reached = CompletableDeferred<Unit>()
+
+    fun arrive() {
+        if (count.incrementAndGet() == expected) reached.complete(Unit)
+    }
+
+    suspend fun await() = reached.await()
+}
+
+/**
+ * A responder that parks until [gate] completes, so a test can prove callers
+ * were waiting concurrently. [entered], when given, is told as each request
+ * reaches the gate.
+ */
+fun gated(gate: CompletableDeferred<Unit>, entered: Arrivals? = null, then: Responder): Responder = { recorded ->
+    entered?.arrive()
     gate.await()
     then(this, recorded)
 }
