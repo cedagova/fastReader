@@ -23,7 +23,8 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * One slot is enough because every caller that saves — refresh, sign-in and
  * setPassword — does so under the refresh mutex, so no two saves
- * overlap between a caller's reset and its read.
+ * overlap between a caller's reset and its read. Callers that save nothing
+ * never reset or read it (#183), so none can take a refresh's failure.
  */
 class StoreSessionManager(val store: SessionStore) : SessionManager {
 

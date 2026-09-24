@@ -105,7 +105,7 @@ class ReaderAuthClient internal constructor(
      */
     suspend fun requestEmailCode(email: String, createUser: Boolean) {
         ensureBootstrapped()
-        provider {
+        providerCall {
             auth.signInWith(OTP) {
                 this.email = email
                 this.createUser = createUser
@@ -142,7 +142,7 @@ class ReaderAuthClient internal constructor(
     /** Code-based recovery, step one: ask the provider to email a recovery code. */
     suspend fun requestRecoveryCode(email: String) {
         ensureBootstrapped()
-        provider { auth.resetPasswordForEmail(email) }
+        providerCall { auth.resetPasswordForEmail(email) }
     }
 
     /** Code-based recovery, step two: the recovery code yields a session; then call [setPassword]. */
@@ -227,7 +227,7 @@ class ReaderAuthClient internal constructor(
     /** Revokes every other device's session (`others` scope); this device stays signed in. */
     suspend fun signOutOtherDevices() {
         refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
-        provider { auth.signOut(SignOutScope.OTHERS) }
+        providerCall { auth.signOut(SignOutScope.OTHERS) }
     }
 
     /** Releases the provider SDK's resources; the stored session is untouched. */
@@ -255,6 +255,12 @@ class ReaderAuthClient internal constructor(
      * closed set. An operation that issued a session the device could not
      * save (#154) keeps it in memory and throws
      * [ReaderAuthException.StorageUnavailable].
+     *
+     * Only an operation that saves a session goes through here, and only
+     * under the refresh mutex: the save-failure slot is shared, so a caller
+     * outside the mutex could reset or read it in the moment between a
+     * refresh's failed save and the refresh reading it back, and take that
+     * failure from it (#183). Operations that save nothing use [providerCall].
      */
     private suspend inline fun <T> provider(block: () -> T): T {
         sessions.takeSaveFailure()
@@ -263,6 +269,7 @@ class ReaderAuthClient internal constructor(
         return result
     }
 
+    /** [provider] without the save-failure slot, for operations that save no session. */
     private suspend inline fun <T> providerCall(block: () -> T): T = try {
         block()
     } catch (e: CancellationException) {
