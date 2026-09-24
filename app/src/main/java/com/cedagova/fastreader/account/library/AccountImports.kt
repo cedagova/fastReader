@@ -640,7 +640,8 @@ class AccountImports(
         is ReaderAuthException.ProviderRejected ->
             BookImportState.Refused(ImportProblem.Api(error.status), code = error.code)
 
-        is ReaderAuthException.NotConfigured, is ReaderAuthException.ConfigurationMismatch ->
+        is ReaderAuthException.NotConfigured, is ReaderAuthException.ConfigurationMismatch,
+        is ReaderAuthException.SignInUnavailable ->
             BookImportState.Refused(ImportProblem.Api(null), retryable = false)
 
         // The session is kept in memory, so the same import succeeds when repeated (#154).

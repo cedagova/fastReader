@@ -1,5 +1,6 @@
 package com.cedagova.reader.auth
 
+import com.cedagova.reader.auth.api.SignInMethod
 import kotlin.time.Duration
 
 /**
@@ -20,6 +21,16 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      */
     class ConfigurationMismatch(val reason: String) :
         ReaderAuthException("pre-auth does not match this client: $reason")
+
+    /**
+     * The pre-auth document describes this client, but it does not allow this
+     * sign-in now, so nothing was sent to the provider (#160). Either account
+     * entry is unavailable ([method] `null`, [reason] is the server's
+     * `accountEntry.reason`, [retryable] its `retryable`), or the server has
+     * turned off [method] ([reason] `method_disabled`, [retryable] false).
+     */
+    class SignInUnavailable(val reason: String, val retryable: Boolean, val method: SignInMethod? = null) :
+        ReaderAuthException("sign-in unavailable: ${method?.let { "$it " } ?: ""}$reason")
 
     /** The network was unreachable or the request timed out; nothing was cleared. */
     class NetworkUnavailable(cause: Throwable) :

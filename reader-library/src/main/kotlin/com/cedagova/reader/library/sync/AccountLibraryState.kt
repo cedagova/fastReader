@@ -165,6 +165,9 @@ internal fun ReaderAuthException.toSyncError(): AccountSyncError = when (this) {
     is ReaderAuthException.ConfigurationMismatch ->
         AccountSyncError.ApiError(status = 0, code = null, requestId = null, description = reason)
 
+    is ReaderAuthException.SignInUnavailable ->
+        AccountSyncError.ApiError(status = 0, code = reason, requestId = null, description = message.orEmpty())
+
     is ReaderAuthException.NetworkUnavailable -> AccountSyncError.NetworkUnavailable
     is ReaderAuthException.TryLater ->
         AccountSyncError.TryLater(status, code, retryAfter?.inWholeSeconds, requestId)

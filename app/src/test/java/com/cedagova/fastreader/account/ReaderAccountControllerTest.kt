@@ -196,6 +196,7 @@ class ReaderAccountControllerTest {
     fun `every library branch lands as its own outcome`() {
         assertEquals(AccountOutcome.NetworkUnavailable, ReaderAuthException.NetworkUnavailable(java.io.IOException("x")).toOutcome())
         assertEquals(AccountOutcome.ConfigurationMismatch("client.applicationId is x"), ReaderAuthException.ConfigurationMismatch("client.applicationId is x").toOutcome())
+        assertEquals(AccountOutcome.SignInUnavailable("configuration_stale"), ReaderAuthException.SignInUnavailable("configuration_stale", retryable = true).toOutcome())
         assertEquals(AccountOutcome.TryLater(429, "over_request_rate_limit", 30, "r1"), ReaderAuthException.TryLater(429, "over_request_rate_limit", 30.seconds, "r1").toOutcome())
         assertEquals(AccountOutcome.TryLater(503, null, null, null), ReaderAuthException.TryLater(503, null, null).toOutcome())
         assertEquals(AccountOutcome.SessionGone("auth.invalid_token", "r2"), ReaderAuthException.SignedOut("auth.invalid_token", "r2").toOutcome())
