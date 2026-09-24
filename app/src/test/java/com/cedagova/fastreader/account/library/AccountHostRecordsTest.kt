@@ -4,7 +4,10 @@ import com.cedagova.reader.library.sync.AccountLibraryLoad
 import com.cedagova.reader.library.sync.FileAccountLibraryStore
 import java.io.File
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -60,6 +63,43 @@ class AccountHostRecordsTest {
 
         assertTrue(records.writes.isEmpty())
         assertNull(records.document[AccountDocumentCopyReferences.KEY])
+    }
+
+    /**
+     * #149: one damaged element costs that element and nothing else. Before, the
+     * whole list read as empty, and the next put rewrote it with only the new
+     * reference — dropping every valid one beside the damaged element.
+     */
+    @Test
+    fun `a malformed copies element keeps the valid references across read and put`() = runTest {
+        val records = RecordingHostRecords()
+        val first = AccountCopy(contentSha256 = "a".repeat(64), sizeBytes = 4_096, placedAtEpochMs = 1_700_000_000_000)
+        val second = AccountCopy(contentSha256 = "c".repeat(64), sizeBytes = 2_048, placedAtEpochMs = 1_700_000_000_001)
+        records.document[AccountDocumentCopyReferences.KEY] = buildJsonArray {
+            add(copyJson(first))
+            add(buildJsonObject { put("sizeBytes", JsonPrimitive(12)) }) // no contentSha256
+            add(JsonPrimitive("not a reference"))
+            add(copyJson(second))
+        }
+        val references = AccountDocumentCopyReferences(records)
+
+        assertEquals(listOf(first, second), references.copyReferences())
+
+        val added = AccountCopy(contentSha256 = sha, sizeBytes = 1_024, placedAtEpochMs = 1_700_000_000_002)
+        references.putCopyReference(added)
+
+        assertEquals(listOf(first, second, added), references.copyReferences())
+        assertEquals(
+            "only the malformed elements are gone from what is stored",
+            JsonArray(listOf(copyJson(first), copyJson(second), copyJson(added))),
+            records.document[AccountDocumentCopyReferences.KEY],
+        )
+    }
+
+    private fun copyJson(copy: AccountCopy) = buildJsonObject {
+        put("contentSha256", JsonPrimitive(copy.contentSha256))
+        put("sizeBytes", JsonPrimitive(copy.sizeBytes))
+        put("placedAtEpochMs", JsonPrimitive(copy.placedAtEpochMs))
     }
 
     /** D4: signed out, a reference has no account to belong to, and nothing is stored. */

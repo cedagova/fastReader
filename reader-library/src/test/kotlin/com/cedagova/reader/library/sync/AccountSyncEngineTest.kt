@@ -1371,7 +1371,323 @@ class AccountSyncEngineTest {
         assertEquals(12L, document("user-1").book("book-1")!!.revision)
     }
 
+    /**
+     * #149: §7.3's strictly-newer rule for a library item's *stream* change. An
+     * equal-revision change is the state this device already holds; applying it
+     * used to revert the optimistic row while its mutation still sat in the
+     * outbox, so a pending removal came back onto the shelf.
+     */
+    @Test
+    fun `an equal-revision library stream change never replaces the optimistic row`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "8",
+                changes = listOf(change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"))),
+            ),
+        )
+        engine.refresh()
+        advanceUntilIdle()
+        assertEquals(8L, document("user-1").book("book-1")!!.revision)
+
+        // The removal stays queued (no answer for it), and the stream echoes the
+        // row at the revision this device already holds — an upsert and a status.
+        gateway.mutationResponses = queueOf(ReaderSyncMutationBatchResponse(requestId = REQUEST_ID))
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "10",
+                changes = listOf(
+                    change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 8),
+                    change("10", "book-1", ReaderMutationKind.RESTORE, itemPayload("book-1", "Dune", "finished"), revision = 8),
+                ),
+            ),
+        )
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(1, engine.state.value.queued)
+        assertTrue("the pending removal stays off the shelf", row.removed)
+        assertEquals("an equal revision replaces nothing", ReaderLibraryStatus.READING, row.status)
+        assertTrue(engine.state.value.books.isEmpty())
+        assertEquals("but the cursor still moves past both", "10", document("user-1").cursor)
+    }
+
+    /** §7.4: an equal-revision `superseded` result is the backend's verdict and still replaces the optimistic row. */
+    @Test
+    fun `an equal-revision superseded result still replaces the optimistic row`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.SUPERSEDED, revision = 8, payload = itemPayload("book-1", "Dune", "reading"), key = "key-1"),
+        )
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "8"))
+        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertEquals("the optimistic status is discarded", ReaderLibraryStatus.READING, row.status)
+        assertEquals(8L, row.revision)
+    }
+
+    /** §7.4: the same for a `conflict` whose remote revision equals the stored one. */
+    @Test
+    fun `an equal-revision conflict result still replaces the optimistic row`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            ReaderSyncMutationResult(
+                idempotencyKey = "key-1",
+                resourceType = ReaderResourceType.LIBRARY_ITEM,
+                resourceId = "book-1",
+                mutationKind = ReaderMutationKind.UPSERT,
+                status = ReaderSyncStatus.CONFLICT,
+                canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                conflict = ReaderSyncConflict(
+                    conflictId = "c-1",
+                    code = ReaderSyncConflictCode.REVISION_CONFLICT,
+                    remoteRevision = 8,
+                    canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                ),
+            ),
+        )
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "8"))
+        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertEquals("the backend's value wins over the optimistic status", ReaderLibraryStatus.READING, row.status)
+        assertEquals(8L, row.revision)
+    }
+
+    /**
+     * #149 review B1: a queued removal the backend answers `conflict` with the
+     * book still live must end on the shelf. Presence is the canonical payload's,
+     * not the mutation kind's — and since the stream's equal-revision echo of the
+     * winning change is no longer re-applied, nothing else would repair it.
+     */
+    @Test
+    fun `a removal answered conflict with the book present ends present, and the equal-revision echo keeps it`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            ReaderSyncMutationResult(
+                idempotencyKey = "key-1",
+                resourceType = ReaderResourceType.LIBRARY_ITEM,
+                resourceId = "book-1",
+                mutationKind = ReaderMutationKind.DELETE,
+                status = ReaderSyncStatus.CONFLICT,
+                canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                conflict = ReaderSyncConflict(
+                    conflictId = "c-1",
+                    code = ReaderSyncConflictCode.REVISION_CONFLICT,
+                    remoteRevision = 9,
+                    canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                ),
+            ),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"))),
+            ),
+        )
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertFalse("the backend kept the book, so it is back on the shelf", row.removed)
+        assertEquals(9L, row.revision)
+        assertEquals(ReaderLibraryStatus.READING, row.status)
+        assertEquals(listOf("book-1"), engine.state.value.books.map { it.bookId })
+        assertEquals("9", document("user-1").cursor)
+    }
+
+    /** #149 review B1: the same for a removal answered `superseded` by a live book. */
+    @Test
+    fun `a removal answered superseded with the book present ends present`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            result(
+                "book-1",
+                ReaderSyncStatus.SUPERSEDED,
+                revision = 9,
+                payload = itemPayload("book-1", "Dune", "finished"),
+                key = "key-1",
+                kind = ReaderMutationKind.DELETE,
+            ),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished"))),
+            ),
+        )
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertFalse("a superseded removal leaves the winner's live book", row.removed)
+        assertEquals(9L, row.revision)
+        assertEquals(ReaderLibraryStatus.FINISHED, row.status)
+        assertEquals(listOf("book-1"), engine.state.value.books.map { it.bookId })
+    }
+
+    /**
+     * #149 review B1, the mirror: a queued upsert the backend answers with the
+     * tombstone (the empty canonical payload of a removed membership) ends off
+     * the shelf, and the equal-revision stream tombstone does not undo that.
+     */
+    @Test
+    fun `an upsert answered conflict with the canonical tombstone ends removed`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            ReaderSyncMutationResult(
+                idempotencyKey = "key-1",
+                resourceType = ReaderResourceType.LIBRARY_ITEM,
+                resourceId = "book-1",
+                mutationKind = ReaderMutationKind.UPSERT,
+                status = ReaderSyncStatus.CONFLICT,
+                conflict = ReaderSyncConflict(
+                    conflictId = "c-1",
+                    code = ReaderSyncConflictCode.TOMBSTONE_REQUIRES_RESTORE,
+                    remoteRevision = 9,
+                ),
+            ),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap()))),
+            ),
+        )
+        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertTrue("the backend removed the book, so the status change does not keep it", row.removed)
+        assertEquals(9L, row.revision)
+        assertTrue(engine.state.value.books.isEmpty())
+    }
+
+    /** #149 review B1, the mirror for `superseded`: an upsert beaten by a later removal ends removed. */
+    @Test
+    fun `an upsert answered superseded by a removal ends removed`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.SUPERSEDED, revision = 9, payload = JsonObject(emptyMap()), key = "key-1"),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap()))),
+            ),
+        )
+        engine.recordOpened("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertTrue(row.removed)
+        assertEquals(9L, row.revision)
+        assertTrue(engine.state.value.books.isEmpty())
+    }
+
+    /**
+     * #149: a host record under a key the document reserves would be written and
+     * then lost — a declared key wins over it on the way out, and `host` is dropped
+     * on the way in. The write is refused with a typed error, and nothing is written.
+     */
+    @Test
+    fun `a reserved host record key is refused with a typed error`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        val before = storeFile("user-1").readText()
+
+        for (key in listOf("host", "cursor", "books", "outbox")) {
+            val error = assertThrowsSuspending<ReservedHostRecordKeyException> {
+                engine.updateHostRecord(key) { JsonPrimitive("x") }
+            }
+            assertEquals(key, error.key)
+            assertFalse(error.bookLevel)
+        }
+        for (key in listOf("host", "revision", "bookId", "removed")) {
+            val error = assertThrowsSuspending<ReservedHostRecordKeyException> {
+                engine.updateBookHostRecord("book-1", key) { JsonPrimitive("x") }
+            }
+            assertEquals(key, error.key)
+            assertTrue(error.bookLevel)
+        }
+
+        assertEquals("nothing was written", before, storeFile("user-1").readText())
+        // An unreserved key is still a host record.
+        engine.updateHostRecord("copies") { JsonPrimitive("kept") }
+        assertEquals(JsonPrimitive("kept"), engine.hostRecord("copies"))
+    }
+
+    /**
+     * #149: a transform runs under the engine's non-reentrant lock. A call back
+     * into the engine from inside it fails loudly instead of deadlocking, and the
+     * engine is usable again afterwards. The timeout is the regression guard: a
+     * reentrant call on the old code hangs for ever.
+     */
+    @Test(timeout = 30_000)
+    fun `a host record transform that calls back into the engine fails instead of hanging`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+
+        val suspendCallback = assertThrowsSuspending<IllegalStateException> {
+            engine.updateHostRecord("copies") { current ->
+                kotlinx.coroutines.runBlocking { engine.hostRecord("copies") } ?: current
+            }
+        }
+        assertTrue(suspendCallback.message!!.contains("must not call back"))
+        assertThrowsSuspending<IllegalStateException> {
+            engine.updateBookHostRecord("book-1", "note") {
+                engine.refresh()
+                JsonPrimitive("x")
+            }
+        }
+        assertThrowsSuspending<IllegalStateException> {
+            engine.updateHostRecord("copies") {
+                engine.removeFromAccount("book-1")
+                JsonPrimitive("x")
+            }
+        }
+        assertEquals("a refused callback queued nothing", 0, engine.state.value.queued)
+
+        engine.updateHostRecord("copies") { JsonPrimitive("after") }
+        assertEquals(JsonPrimitive("after"), engine.hostRecord("copies"))
+        assertEquals("user-1", engine.accountId())
+    }
+
     // ------------------------------------------------------------- helpers
+
+    /** Runs [block] and returns the [T] it throws; fails when it throws nothing. */
+    private suspend inline fun <reified T : Throwable> assertThrowsSuspending(block: () -> Unit): T {
+        try {
+            block()
+        } catch (e: Throwable) {
+            if (e is T) return e
+            throw e
+        }
+        throw AssertionError("expected ${T::class.simpleName}, nothing was thrown")
+    }
+
+    /** [signedInEngine], with book-1 moved to revision 8 by the stream. */
+    private fun TestScope.engineAtRevision8(): AccountSyncEngine {
+        val engine = signedInEngine()
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "8",
+                changes = listOf(change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"))),
+            ),
+        )
+        engine.refresh()
+        advanceUntilIdle()
+        assertEquals(8L, document("user-1").book("book-1")!!.revision)
+        return engine
+    }
 
     /** An engine signed in with one book and a settled bootstrap. */
     private fun TestScope.signedInEngine(): AccountSyncEngine {

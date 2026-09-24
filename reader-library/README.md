@@ -57,9 +57,37 @@ index, no device catalog, no downloaded copy, no UI.
 | `AccountLibraryDocument`, `AccountBook`, `AccountRemotePosition`, `AccountOutboxEntry`, `AccountLibraryCodec`, `AccountLibrarySchema` | The persisted canonical state (schema 6), migrated forward step by step and refused when newer. Keys a level does not declare are host records, kept verbatim and written back at the same level. |
 | `PortableProgress`, `LocalReadingPosition`, `RemoteReadingPosition`, `ProgressRecord` | The portable position: the `reading_progress` payload built from `PutReaderProgressRequest` (a closed key set), which book a record is about, and what a canonical payload states. Mapping these to and from a host's own reading unit is the host's. |
 
-**Freshness (contract `core.md` §7.3).** A mutation result or stream change
+**Freshness (contract `core.md` §7.3, §7.4).** A mutation result or stream change
 never moves a book's state backwards: one whose revision is older than the
-stored one never replaces it, for positions and library items alike.
+stored one never replaces it, for positions and library items alike. A stream
+change must be *strictly* newer (#149) — an equal-revision echo is the state
+already held, and applying it would revert a local intent still queued in the
+outbox. A library item's mutation *result* at an equal revision still replaces
+the row: `superseded` and `conflict` are the backend's verdict on this device's
+queued mutation, and they discard the optimistic row. Such a result's presence
+comes from its canonical payload, not from the mutation kind: a removal answered
+with the live book ends on the shelf, and an upsert answered with the tombstone
+(the empty payload) ends off it.
+
+**Host records (`AccountHostRecords`).**
+
+- **A `transform` must not call back into the engine** — no `AccountHostRecords`,
+  `AccountImportRecords` or `AccountLibraryActions` call and no `requestSync`.
+  It runs under the engine's lock, which is not re-entrant, so a callback that
+  waits on the engine would wait for ever. A call made from the transform's own
+  thread throws `IllegalStateException` instead of hanging; one handed to another
+  thread and awaited cannot be detected and deadlocks. Compute inputs before the
+  update and act on its outcome after it returns.
+- **A `transform` must be pure** — a function of its argument with no side
+  effects. The re-entrancy guard is a flag on the transform's thread, so a side
+  effect that synchronously resumes another coroutine there (completing a
+  deferred, emitting to a flow collected on `Dispatchers.Unconfined`, a nested
+  `runBlocking`) would make that coroutine's engine calls throw as if they were
+  the transform's own.
+- **Reserved keys are refused** (#149). A key the schema declares at that level
+  (`AccountLibraryCodec.RESERVED_DOCUMENT_KEYS` / `RESERVED_BOOK_KEYS`) or `host`
+  itself throws `ReservedHostRecordKeyException` before anything is written: a
+  record under it would be stored and then silently lost on the next load.
 
 **What it never does.** It resolves no conflict and prompts for none, picks no
 winner between two positions (the backend's admission order does), runs no
