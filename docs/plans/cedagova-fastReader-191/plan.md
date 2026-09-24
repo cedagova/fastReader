@@ -16,8 +16,8 @@
 | `supabase-community/supabase-kt` | `233683736f9b8cd5971da4a18c0ff056489323a5` |
 
 `cedagova/fastReader` is `origin/main` on 2026-09-24 (after #187, #189, #190).
-It hosts the root, the `:reader-auth` library, its `CONTRACT.md`, and the
-FastReader host app, and receives the change. `supabase-kt` is the SDK the
+It hosts the root, the `:reader-auth` library, its `CONTRACT.md`, the
+`:reader-library` sync module, and the FastReader host app, and receives the change. `supabase-kt` is the SDK the
 library pins (`supabase = "3.8.0"` in `gradle/libs.versions.toml`); the SHA
 is its `3.8.0` tag, read only to establish which exceptions the provider
 calls can throw.
@@ -39,8 +39,10 @@ makes `onForeground()` return the current state without throwing, and makes a
 protected call throw the chosen typed `ReaderAuthException`.
 
 Boundaries. In: `:reader-auth` provider-call error mapping, `ReaderApiClient`
-body reading, `CONTRACT.md`, the exception KDoc, and the FastReader host's
-mapping of the closed set (a compile-time consequence of any new subtype).
+body reading, `CONTRACT.md`, the exception KDoc, and the two consumers' exhaustive
+mappings of the closed set — `:reader-library`'s sync-error map and the
+FastReader host's account layer (a compile-time consequence of any new
+subtype).
 Out: any change to retry counts, margins, the `Retry-After` ceiling (#157),
 the retryable-5xx rule (#158), storage-failure handling (#180), and every
 reader-api or Supabase server behaviour.
@@ -50,9 +52,9 @@ reader-api or Supabase server behaviour.
 - **ROOT #191 — `LEAF`.** One module's failure-mapping defect, one
   repository, one PR to `main`. The provider-side mapping, the
   `ReaderApiClient` hardening, the contract text, and the host's one new
-  branch together produce one observable result — "no unexpected provider or
+  branches together produce one observable result — "no unexpected provider or
   body failure escapes the closed set" — and none is independently useful:
-  a new subtype without the host branch does not compile, and the
+  a new subtype without the consumers' branches does not compile, and the
   `ReaderApiClient` hardening is two small edits on the same principle. No
   children; the fast-leaf path applies.
 
@@ -110,9 +112,15 @@ At `0abfe5312a60feaf4e932b1eb15f7dc76b847156` unless marked SDK:
     `PreAuthDocument.parse` (`decodeFromJsonElement`), so a JSON object with
     a wrongly typed field throws `SerializationException` out of
     `bootstrap()` and every sign-in that bootstraps.
-- **Host.** `ReaderAccountController.toOutcome()` is an exhaustive `when` over
-  the closed set (no `else`); `AccountDownloads` and `AccountImports` map a
-  subset with an `else`/grouped fallback. `TryLater` is rendered as "Try
+- **Consumers of the closed set.** Exhaustive `when`s with no `else`:
+  `:reader-library`'s `ReaderAuthException.toSyncError()`
+  (`AccountLibraryState.kt`, deliberately total so a new `:reader-auth` branch
+  fails to compile there; `StorageUnavailable` maps to
+  `AccountSyncError.ApiError(status = 0, code = STORAGE_UNAVAILABLE, …)`,
+  which leaves the sync idle with the outbox kept), and FastReader's
+  `ReaderAccountController.toOutcome()` and `AccountImports.refusalFor()`
+  (the latter maps `StorageUnavailable` to a retryable refusal).
+  `AccountDownloads` has an `else` fallback. `TryLater` is rendered as "Try
   again later (HTTP …). Nothing was changed."; `ProviderRejected` is
   documented to the user as a wrong code or password.
 - **Precedent for growing the set.** #180 added `StorageUnavailable(cause)`
@@ -121,8 +129,9 @@ At `0abfe5312a60feaf4e932b1eb15f7dc76b847156` unless marked SDK:
 
 ## Selected implementation direction
 
-One PR on `main` touching `reader-auth/` (main, tests, `CONTRACT.md`) and the
-FastReader account layer's outcome mapping and its one user string.
+One PR on `main` touching `reader-auth/` (main, tests, `CONTRACT.md`),
+`reader-library/`'s sync-error map, and the FastReader account layer's
+mappings and its one user string.
 
 1. **New closed-set member `ReaderAuthException.UnexpectedResponse(cause)`.**
    Meaning: the identity provider's answer could not be read (a 2xx whose
@@ -159,13 +168,19 @@ FastReader account layer's outcome mapping and its one user string.
    among the outcomes that return `SignedIn`, and the reader-api table notes
    that an unreadable body is surfaced with its status and request id,
    session intact.
-6. **Host.** FastReader's `toOutcome()` gains one outcome for the new member,
-   rendered as a generic "the sign-in service answered with something
-   unexpected; nothing was changed; try again" message. The download and
-   import mappers keep their fallbacks unless the compiler requires a branch.
+6. **Consumers.**
+   - `:reader-library` `toSyncError()` maps the new member like
+     `StorageUnavailable`: `AccountSyncError.ApiError(status = 0, code =
+     "unexpected_response", …)`, so the sync goes idle with the outbox kept
+     and the next sync tries again.
+   - FastReader's `toOutcome()` gains one outcome, rendered as a generic "the
+     sign-in service answered with something unexpected; nothing was changed;
+     try again" message. `AccountImports.refusalFor()` gains a retryable
+     refusal (session intact, like `StorageUnavailable`); `AccountDownloads`
+     keeps its `else`.
 
 Reversibility: the new member is additive to the library's own closed set in
-the same repository; the one host is updated in the same PR. Switching to
+the same repository; both consumers are updated in the same PR. Switching to
 `TryLater` later is a mapping change plus removing the member.
 
 ## Issue publication manifest
@@ -184,14 +199,16 @@ the same repository; the one host is updated in the same PR. Switching to
 | `ReaderApiClient` checked for the same gap | Direction 4; `ReaderApiPolicyTest`: an error body with an object-valued `code` on a 503 still follows the status policy (typed, no crash); a pre-auth 200 with a wrongly typed field makes `bootstrap()` throw `ApiError` and cache nothing |
 | `CONTRACT.md` updated for a new documented case | Direction 5; review reads the three edited passages against the code |
 | (Same defect, sign-in path) | Direction 2; `ProviderOperationsTest`: a verify or password sign-in answered with a 200 HTML body throws `UnexpectedResponse` and saves no session |
-| Host compiles and shows the new outcome | Direction 6; `:app` unit test for `toOutcome()` mapping the new member |
+| Sync engine maps the new member | Direction 6; `:reader-library` unit test: `toSyncError()` gives `ApiError(0, "unexpected_response", …)` and the outbox is kept |
+| Host compiles and shows the new outcome | Direction 6; `:app` unit test for `toOutcome()` mapping the new member; the import refusal is retryable |
 
 No orphan or overlapping outcome: the root is the only node.
 
 ## Validation and feedback
 
-- `./gradlew :reader-auth:testDebugUnitTest :app:testDebugUnitTest lint
-  assembleDebug` under JDK 21; hosted `checks.yml` on the PR.
+- `./gradlew testDebugUnitTest lint assembleDebug` from the root (covers
+  `:reader-auth`, `:reader-library` and `:app`, as `checks.yml` does) under
+  JDK 21; hosted `checks.yml` on the PR.
 - Provider answers are simulated with the existing Ktor mock-engine harness
   (`TestHarness.kt`); no network, no device, no emulator. No UI screen
   changes, so no new Roborazzi golden is expected; `verifyRoborazziDebug`
@@ -217,15 +234,15 @@ precedent of adding a member when an existing one would mislead.
 
 **Options.**
 - **A — new `UnexpectedResponse(cause)` (selected).** Honest, carries the
-  cause, no retry; cost: one KDoc/contract entry and one host outcome and
-  string.
+  cause, no retry; cost: one KDoc/contract entry, one sync-error branch,
+  and one host outcome and string.
 - **B — `TryLater` with a synthetic status/code and no retry.** No new API;
   cost: a fudged status, a false "server asked" meaning, and a documented
   exception to `TryLater`'s "after the one permitted retry".
 - **C — `ProviderRejected`.** Rejected: wrong user message (credential error).
 
 **Reason.** A keeps every member truthful for a library meant to lift into
-the real Reader client, at the cost of one additive branch in the one host.
+the real Reader client, at the cost of additive branches in the two in-repo consumers.
 **Blocked if overturned:** directions 1, 5 and 6 change; the no-retry,
 no-clear behaviour and `ReaderApiClient` hardening stay. **Exact reply to
 overturn:** `Choose B` on the planning PR.
