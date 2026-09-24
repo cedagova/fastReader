@@ -133,7 +133,7 @@ errors are `{code, message, category, retryable, request_id}` with
 | Answer | Client behaviour |
 | --- | --- |
 | 401 `auth.expired_token` | One single-flight refresh and one retry; a second expiry is surfaced with its code and `request_id`, session intact. |
-| 401 any other `auth.*` (`auth.invalid_token`, `auth.anonymous_identity_rejected`, `auth.malformed_token`, `auth.missing_sub_claim`, `auth.missing_token`, `auth.unauthorized`) on a protected call | The session is cleared; the device is signed out. (A 401 on a public route such as pre-auth carried no bearer and says nothing about the session: surfaced with its code, session intact.) |
+| 401 any other `auth.*` (`auth.invalid_token`, `auth.anonymous_identity_rejected`, `auth.malformed_token`, `auth.missing_sub_claim`, `auth.missing_token`, `auth.unauthorized`) on a protected call | The session is cleared; the device is signed out. The clear takes the refresh mutex and applies only while the rejected token is still the stored one: a rejection of a token that a refresh or sign-in already replaced is stale, so the call is retried once with the replacement and the newer session is kept. (A 401 on a public route such as pre-auth carried no bearer and says nothing about the session: surfaced with its code, session intact.) |
 | 403 | Surfaced as forbidden; session intact. |
 | 429 | One retry after `Retry-After` (default 10 s), then try later; session intact. |
 | 502 `auth.jwks_dependency_failed` | One retry after `Retry-After` (default 10 s), then try later; session intact. |
@@ -160,6 +160,8 @@ keeping a session the server rejects would only repeat the rejection.
   from reader-web, which restores the session when the provider call fails:
   on a device, local revocation is the user's intent, and the stored refresh
   token is the thing to destroy.
+- **Sign-in saves its session under the same mutex**, so a refresh of the
+  previous session that is still in flight cannot overwrite the new one.
 - **Sign out other devices** uses `scope=others`; the local session is kept.
 - A provider `global` sign-out is not offered.
 

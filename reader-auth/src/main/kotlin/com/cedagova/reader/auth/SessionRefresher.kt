@@ -55,9 +55,25 @@ internal class SessionRefresher(
     }
 
     /**
+     * After reader-api answered 401 with a non-expiry `auth.*` code for
+     * [rejectedAccessToken]: clears the session, but only while that token is
+     * still the stored one, and only once no refresh is in flight — so a
+     * refresh cannot re-save the session afterwards, and a stale rejection
+     * cannot wipe a newer session. `true` when the device is now signed out;
+     * `false` when another caller already replaced the token.
+     */
+    suspend fun clearAfterRejection(rejectedAccessToken: String): Boolean = mutex.withLock {
+        val latest = auth.currentSessionOrNull() ?: return true
+        if (latest.accessToken != rejectedAccessToken) return false
+        auth.clearSession()
+        true
+    }
+
+    /**
      * Runs [block] while no refresh is in flight and holds off any refresh
      * until it returns. Sign-out uses it so a refresh that started a moment
-     * earlier cannot re-save a session after the store was cleared.
+     * earlier cannot re-save a session after the store was cleared, and
+     * sign-in uses it so such a refresh cannot overwrite the new session.
      */
     suspend fun <T> withoutRefresh(block: suspend () -> T): T = mutex.withLock { block() }
 

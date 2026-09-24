@@ -127,10 +127,12 @@ class ReaderAuthClient internal constructor(
     /** Password sign-in. */
     suspend fun signInWithPassword(email: String, password: String): ReaderSessionState.SignedIn {
         ensureBootstrapped()
-        provider {
-            auth.signInWith(Email) {
-                this.email = email
-                this.password = password
+        refresher.withoutRefresh {
+            provider {
+                auth.signInWith(Email) {
+                    this.email = email
+                    this.password = password
+                }
             }
         }
         return signedInOrThrow()
@@ -212,8 +214,12 @@ class ReaderAuthClient internal constructor(
 
     // ---- Internals ---------------------------------------------------------------------------
 
+    // Sign-in saves its session under the refresh mutex (#153): a refresh of
+    // the previous session that is still in flight finishes first and cannot
+    // overwrite the new one afterwards.
+
     private suspend fun verify(type: OtpType.Email, email: String, code: String): ReaderSessionState.SignedIn {
-        val result = provider { auth.verifyEmailOtp(type, email, code) }
+        val result = refresher.withoutRefresh { provider { auth.verifyEmailOtp(type, email, code) } }
         if (result !is OtpVerifyResult.Authenticated) {
             throw ReaderAuthException.ProviderRejected(200, "no_session", "the provider verified the code without issuing a session")
         }
@@ -342,7 +348,7 @@ class ReaderAuthClient internal constructor(
                 }
             }
             val refresher = SessionRefresher(supabase.auth, clock, waiter)
-            val api = ReaderApiClient(config, ReaderApiClient.httpClient(engine), supabase.auth, refresher, waiter, requestIds)
+            val api = ReaderApiClient(config, ReaderApiClient.httpClient(engine), refresher, waiter, requestIds)
             return ReaderAuthClient(config, supabase, store, refresher, api)
         }
 
