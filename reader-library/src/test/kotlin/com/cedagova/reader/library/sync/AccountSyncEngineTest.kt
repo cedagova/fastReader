@@ -1,6 +1,11 @@
 package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.library.Harness
+import com.cedagova.reader.library.LIBRARY
+import com.cedagova.reader.library.apiError
+import com.cedagova.reader.library.json
+import io.ktor.http.HttpStatusCode
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderBookAsset
 import com.cedagova.reader.library.model.ReaderBookAssetKind
@@ -815,6 +820,51 @@ class AccountSyncEngineTest {
         assertEquals(AccountSyncError.NetworkUnavailable, engine.state.value.lastError)
         assertEquals("the queued removal is kept", 1, engine.state.value.queued)
         assertEquals("key-1", document("user-1").outbox.single().idempotencyKey)
+    }
+
+    @Test
+    fun `a retryable 503 from reader-api defers the run as try later, not idle`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        // The failure the real reader-api client produces for this answer (#158).
+        val api = Harness()
+        api.servers.on(LIBRARY) { json(apiError("reader_sync.unavailable", "req-503", retryable = true), HttpStatusCode.ServiceUnavailable) }
+        val outage = runCatching { api.operations().library() }.exceptionOrNull() as ReaderAuthException
+        api.close()
+
+        gateway.nextFailure = outage
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        assertEquals(AccountSyncPhase.DEFERRED, engine.state.value.phase)
+        assertEquals(
+            AccountSyncError.TryLater(status = 503, code = "reader_sync.unavailable", retryAfterSeconds = 10, requestId = "req-503"),
+            engine.state.value.lastError,
+        )
+        assertEquals("the queued removal is kept", 1, engine.state.value.queued)
+    }
+
+    @Test
+    fun `a non-retryable 503 from reader-api stays an error on an idle run`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        val api = Harness()
+        api.servers.on(LIBRARY) { json(apiError("publication_import.admissions_disabled", "req-off", retryable = false), HttpStatusCode.ServiceUnavailable) }
+        val refusal = runCatching { api.operations().library() }.exceptionOrNull() as ReaderAuthException
+        api.close()
+
+        gateway.nextFailure = refusal
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        assertEquals(AccountSyncPhase.IDLE, engine.state.value.phase)
+        assertTrue("${engine.state.value.lastError}", engine.state.value.lastError is AccountSyncError.ApiError)
     }
 
     // -------------------------------------------------------------- D4

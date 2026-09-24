@@ -538,14 +538,14 @@ class ReaderLibraryClientTest {
     }
 
     @Test
-    fun `any other 502 is an ApiError carrying the server's code and request id`() = runTest {
+    fun `a 502 that is not retryable is an ApiError carrying the server's code and request id`() = runTest {
         val h = Harness()
-        h.servers.on(LIBRARY) { json(apiError("db.unavailable", "req-502b", retryable = true), HttpStatusCode.BadGateway) }
+        h.servers.on(LIBRARY) { json(apiError("reader_product.asset_integrity_error", "req-502b", retryable = false), HttpStatusCode.BadGateway) }
 
         val failure = runCatching { h.operations().library() }.exceptionOrNull()
 
         assertTrue("$failure", failure is ReaderAuthException.ApiError)
-        assertEquals("db.unavailable", (failure as ReaderAuthException.ApiError).code)
+        assertEquals("reader_product.asset_integrity_error", (failure as ReaderAuthException.ApiError).code)
         assertEquals("req-502b", failure.requestId)
         assertEquals(1, h.servers.requestsTo(ReaderLibraryClient.LIBRARY_PATH).size)
         h.close()

@@ -22,7 +22,7 @@ import org.junit.Test
 
 /**
  * CONTRACT.md, "reader-api call policy": the headers on every request and
- * the exact request sequence for each 401/403/429/502 branch.
+ * the exact request sequence for each 401/403/429/5xx branch.
  */
 class ReaderApiPolicyTest {
 
@@ -226,6 +226,112 @@ class ReaderApiPolicyTest {
     }
 
     @Test
+    fun `a Retry-After at or below the ceiling is still waited out once`() = runTest {
+        servers.queue(
+            CAPABILITIES,
+            { json(apiError("rate_limit.exceeded", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "5") },
+            { json(CAPABILITIES_BODY) },
+            { json(apiError("rate_limit.exceeded", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "30") },
+            { json(CAPABILITIES_BODY) },
+        )
+        val client = client()
+
+        client.capabilities()
+        client.capabilities()
+
+        assertEquals(listOf(CAPABILITIES, CAPABILITIES, CAPABILITIES, CAPABILITIES), servers.routes())
+        assertEquals(listOf(5.seconds, 30.seconds), waiter.waits)
+        client.close()
+    }
+
+    @Test
+    fun `a Retry-After above the ceiling is surfaced at once with the server's value`() = runTest {
+        servers.on(CAPABILITIES) {
+            json(apiError("publication_import.quota_exhausted", "req-quota", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "3600")
+        }
+        val client = client()
+
+        val failure = runCatching { client.capabilities() }.exceptionOrNull()
+
+        assertTrue("$failure", failure is ReaderAuthException.TryLater)
+        failure as ReaderAuthException.TryLater
+        assertEquals(429, failure.status)
+        assertEquals("publication_import.quota_exhausted", failure.code)
+        assertEquals(3600.seconds, failure.retryAfter)
+        assertEquals("req-quota", failure.requestId)
+        assertEquals("no second request is sent", listOf(CAPABILITIES), servers.routes())
+        assertEquals("nothing is waited out", emptyList<Any>(), waiter.waits)
+        assertNotNull(store.session)
+        client.close()
+    }
+
+    @Test
+    fun `a retryable 503 is retried once and then surfaced as try later`() = runTest {
+        servers.on(CAPABILITIES) {
+            json(apiError("reader_sync.unavailable", "req-503", retryable = true), HttpStatusCode.ServiceUnavailable)
+        }
+        val client = client()
+
+        val failure = runCatching { client.capabilities() }.exceptionOrNull()
+
+        assertTrue("$failure", failure is ReaderAuthException.TryLater)
+        failure as ReaderAuthException.TryLater
+        assertEquals(503, failure.status)
+        assertEquals("reader_sync.unavailable", failure.code)
+        assertEquals(10.seconds, failure.retryAfter)
+        assertEquals("req-503", failure.requestId)
+        assertEquals(listOf(CAPABILITIES, CAPABILITIES), servers.routes())
+        assertEquals(listOf(10.seconds), waiter.waits)
+        assertNotNull("the stored session is kept", store.session)
+        client.close()
+    }
+
+    @Test
+    fun `a retryable 503 that recovers on the retry succeeds, and its long Retry-After is not waited out`() = runTest {
+        servers.queue(
+            CAPABILITIES,
+            { json(apiError("auth.ingress_identity_unavailable", retryable = true), HttpStatusCode.ServiceUnavailable, "Retry-After" to "2") },
+            { json(CAPABILITIES_BODY) },
+            { json(apiError("reader_product.unavailable", "req-long", retryable = true), HttpStatusCode.ServiceUnavailable, "Retry-After" to "120") },
+        )
+        val client = client()
+
+        client.capabilities()
+        val failure = runCatching { client.capabilities() }.exceptionOrNull()
+
+        assertEquals(listOf(2.seconds), waiter.waits)
+        assertTrue("$failure", failure is ReaderAuthException.TryLater)
+        assertEquals(120.seconds, (failure as ReaderAuthException.TryLater).retryAfter)
+        assertEquals(3, servers.requests.size)
+        assertNotNull(store.session)
+        client.close()
+    }
+
+    @Test
+    fun `a 503 that is not retryable, or does not say, is an ApiError with no retry`() = runTest {
+        servers.queue(
+            CAPABILITIES,
+            { json(apiError("publication_import.admissions_disabled", "req-off", retryable = false), HttpStatusCode.ServiceUnavailable) },
+            { json("""{"code":"reader_sync.unavailable","message":"x","retryable":"true","request_id":"req-str"}""", HttpStatusCode.ServiceUnavailable) },
+            { json("""{"code":"reader_sync.unavailable","message":"x","request_id":"req-none"}""", HttpStatusCode.ServiceUnavailable) },
+        )
+        val client = client()
+
+        val failures = List(3) { runCatching { client.capabilities() }.exceptionOrNull() }
+
+        failures.forEach { assertTrue("$it", it is ReaderAuthException.ApiError) }
+        assertEquals(
+            listOf("publication_import.admissions_disabled", "reader_sync.unavailable", "reader_sync.unavailable"),
+            failures.map { (it as ReaderAuthException.ApiError).code },
+        )
+        assertEquals(listOf(503, 503, 503), failures.map { (it as ReaderAuthException.ApiError).status })
+        assertEquals("one request each, no retry", 3, servers.requests.size)
+        assertEquals(emptyList<Any>(), waiter.waits)
+        assertNotNull(store.session)
+        client.close()
+    }
+
+    @Test
     fun `502 jwks_dependency_failed is retried once and other 502s are not`() = runTest {
         servers.queue(
             CAPABILITIES,
@@ -239,13 +345,13 @@ class ReaderApiPolicyTest {
         assertEquals(listOf(10.seconds), waiter.waits)
 
         val plain = FakeServers()
-        plain.on(CAPABILITIES) { json(apiError("db.unavailable", "req-502", retryable = true), HttpStatusCode.BadGateway) }
+        plain.on(CAPABILITIES) { json(apiError("book.integrity_error", "req-502", retryable = false), HttpStatusCode.BadGateway) }
         val other = ReaderAuthClient.build(testConfig, store, plain.engine, clock, waiter)
         other.awaitReady()
         val failure = runCatching { other.capabilities() }.exceptionOrNull()
 
         assertTrue("$failure", failure is ReaderAuthException.ApiError)
-        assertEquals("db.unavailable", (failure as ReaderAuthException.ApiError).code)
+        assertEquals("book.integrity_error", (failure as ReaderAuthException.ApiError).code)
         assertEquals("req-502", failure.requestId)
         assertEquals(1, plain.requests.size)
         assertNotNull(store.session)

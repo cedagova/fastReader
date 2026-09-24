@@ -25,6 +25,8 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -49,8 +51,11 @@ import kotlinx.serialization.json.jsonPrimitive
  *   token is still the stored one; when another caller already replaced it,
  *   the call is retried once with the replacement instead (#153);
  * - 403: [ReaderAuthException.Forbidden], session intact;
- * - 429, and 502 `auth.jwks_dependency_failed`: one retry after `Retry-After`
- *   (default 10 s), then [ReaderAuthException.TryLater];
+ * - 429, 502 `auth.jwks_dependency_failed`, and any 5xx whose body says
+ *   `retryable: true` (#158): one retry after `Retry-After` (default 10 s),
+ *   then [ReaderAuthException.TryLater]. A `Retry-After` above
+ *   [ReaderAuthPolicy.MAX_INLINE_RETRY_AFTER] is not waited out: the call
+ *   ends at once with `TryLater` carrying the server's value (#157);
  * - any other failure: [ReaderAuthException.ApiError] with the server's `code`
  *   and `request_id`; a network failure or timeout is
  *   [ReaderAuthException.NetworkUnavailable]. Nothing else is retried.
@@ -176,9 +181,10 @@ class ReaderApiClient internal constructor(
                 response.status == HttpStatusCode.Forbidden ->
                     throw ReaderAuthException.Forbidden(error.code, error.requestId)
                 response.status == HttpStatusCode.TooManyRequests ||
-                    (response.status == HttpStatusCode.BadGateway && error.code == ReaderAuthPolicy.JWKS_DEPENDENCY_FAILED_CODE) -> {
+                    (response.status == HttpStatusCode.BadGateway && error.code == ReaderAuthPolicy.JWKS_DEPENDENCY_FAILED_CODE) ||
+                    (response.status.value >= SERVER_ERROR && error.retryable) -> {
                     val retryAfter = ReaderAuthPolicy.retryAfter(response.headers[HttpHeaders.RetryAfter])
-                    if (waited < ReaderAuthPolicy.RETRY_LIMIT) {
+                    if (waited < ReaderAuthPolicy.RETRY_LIMIT && ReaderAuthPolicy.retriesInline(retryAfter)) {
                         waited += 1
                         waiter.wait(retryAfter)
                         continue
@@ -199,8 +205,19 @@ class ReaderApiClient internal constructor(
         }
     }
 
-    /** reader-api's `ErrorResponse`: `code`, `message`, `category`, `retryable`, `request_id`. */
-    private class ErrorBody(val code: String?, val message: String, val requestId: String?) {
+    /**
+     * reader-api's `ErrorResponse`: `code`, `message`, `category`, `retryable`,
+     * `request_id`. [retryable] is the server's own verdict and is `false`
+     * when the field is missing or not a boolean; [category] is read for
+     * completeness and drives nothing.
+     */
+    private class ErrorBody(
+        val code: String?,
+        val message: String,
+        val requestId: String?,
+        val category: String? = null,
+        val retryable: Boolean = false,
+    ) {
         companion object {
             suspend fun of(response: HttpResponse): ErrorBody {
                 val text = response.bodyAsText()
@@ -214,6 +231,8 @@ class ReaderApiClient internal constructor(
                     code = body["code"]?.jsonPrimitive?.content,
                     message = body["message"]?.jsonPrimitive?.content ?: text.take(MAX_MESSAGE),
                     requestId = body["request_id"]?.jsonPrimitive?.content ?: fromHeader,
+                    category = (body["category"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
+                    retryable = (body["retryable"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull ?: false,
                 )
             }
         }
@@ -228,6 +247,7 @@ class ReaderApiClient internal constructor(
         const val QUERY_CLIENT_VERSION: String = "clientVersion"
         private const val AUTH_CODE_PREFIX = "auth."
         private const val MAX_MESSAGE = 200
+        private const val SERVER_ERROR = 500
 
         private val json = Json { ignoreUnknownKeys = true }
 

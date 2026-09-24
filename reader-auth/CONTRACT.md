@@ -102,6 +102,7 @@ the upsert creates the actor's row.
 | Request timeout | 10 s |
 | Default `Retry-After` | 10 s |
 | Retry limit | 1 |
+| Max inline `Retry-After` | 30 s |
 
 - **Proactive with a margin.** Before any protected call, and when the app
   returns to the foreground, the session is refreshed when
@@ -124,6 +125,9 @@ the upsert creates the actor's row.
   the device is signed out. A `429`, any `5xx`, or a network failure **keeps
   the session**, is retried **once** after `Retry-After` (integer seconds; 10 s
   when absent), and is then surfaced as try later (or network unavailable).
+  A `Retry-After` above 30 s is never waited out inside a call: the failure is
+  surfaced at once as try later carrying the server's value, with no second
+  request.
   Any other provider error keeps the session and is surfaced. Nothing retries
   in a loop. Only the grant is retried: a grant that succeeded and then could
   not be saved is surfaced as storage unavailable with the new session kept in
@@ -131,7 +135,7 @@ the upsert creates the actor's row.
 - **No background timer.** Refresh happens only on the code paths above;
   nothing runs while the app is not in the foreground.
 
-## reader-api call policy (401 / 403 / 429 / 502)
+## reader-api call policy (401 / 403 / 429 / 5xx)
 
 Every request carries `Authorization: Bearer <access_token>` (protected
 routes), `X-Reader-Client: reader-android`, `Accept: application/json`, a
@@ -147,8 +151,16 @@ errors are `{code, message, category, retryable, request_id}` with
 | 403 | Surfaced as forbidden; session intact. |
 | 429 | One retry after `Retry-After` (default 10 s), then try later; session intact. |
 | 502 `auth.jwks_dependency_failed` | One retry after `Retry-After` (default 10 s), then try later; session intact. |
-| Any other non-2xx | Surfaced with the server's `code` and `request_id`; session intact. No retry. |
+| Any other 5xx whose body says `retryable: true` (e.g. 503 `reader_sync.unavailable`, `auth.ingress_identity_unavailable`, 502 `db.unavailable`) | One retry after `Retry-After` (default 10 s), then try later; session intact. |
+| Any other non-2xx, including a 5xx that says `retryable: false` or omits it (e.g. 503 `publication_import.admissions_disabled`) | Surfaced with the server's `code` and `request_id`; session intact. No retry. |
 | Network failure or timeout | Surfaced as network unavailable; nothing is cleared. |
+
+Every retry above waits inside the call, so the wait is capped: a
+`Retry-After` above 30 s (reader-api's quota answers can run until the quota
+resets) is not waited out. The call ends at once as try later carrying the
+server's `Retry-After`, with no second request, and the host decides when to
+come back. Only `retryable` is read from the error body to decide a retry;
+`category` is parsed but drives nothing.
 
 A device whose clock is skewed beyond the server's leeway is answered 401
 `auth.invalid_token` and is signed out by the rule above; the 300 s margin

@@ -28,8 +28,12 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
     }
 
     /**
-     * The provider or reader-api answered 429 or 5xx (after the one permitted
-     * retry where the contract allows one). The session is intact; the user
+     * The server asked for a later retry: the provider answered 429 or 5xx, or
+     * reader-api answered 429, 502 `auth.jwks_dependency_failed`, or a 5xx
+     * whose body says `retryable: true` (a 5xx that says `retryable: false` is
+     * an [ApiError]). Thrown after the one permitted retry, or at once when
+     * [retryAfter] exceeds `ReaderAuthPolicy.MAX_INLINE_RETRY_AFTER`, in which
+     * case it carries the server's value. The session is intact; the user
      * should try later. Never a credential error.
      */
     class TryLater(val status: Int, val code: String?, val retryAfter: Duration?, val requestId: String? = null) :
