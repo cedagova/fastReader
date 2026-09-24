@@ -8,6 +8,13 @@ import java.io.IOException
 import java.nio.file.Files
 import java.security.GeneralSecurityException
 import java.security.KeyStoreException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -134,6 +141,45 @@ class SessionSaveFailureTest {
         client.signOutOtherDevices()
 
         assertEquals(listOf(PRE_AUTH, PASSWORD_GRANT, LOGOUT_OTHERS), servers.routes())
+        client.close()
+    }
+
+    /**
+     * #183: the save-failure slot is shared, and a refresh resets it, saves,
+     * and reads it back with no suspension in between — so only a caller on
+     * another thread can land in that window. The test puts one there
+     * deterministically: a collector on [Dispatchers.Unconfined] runs inline
+     * the moment the SDK makes the refreshed session current, which is after
+     * the failed save was recorded and before the refresh reads it, and it
+     * starts signOutOtherDevices() undispatched, so that call runs up to its
+     * first network request inside the window.
+     */
+    @Test
+    fun `signOutOtherDevices during a refresh whose save fails leaves the failure to the refresh`() = runTest {
+        servers.on(REFRESH_GRANT) { json(sessionJson("access-2", "refresh-2")) }
+        servers.on(CAPABILITIES) { json(CAPABILITIES_BODY) }
+        servers.on(LOGOUT_OTHERS) { json("{}") }
+        val stored = session(expiresAt = clock.expiring(60))
+        val store = UnwritableStore(stored)
+        val client = clientOver(store)
+        val otherDevices = CompletableDeferred<Deferred<Result<Unit>>>()
+        launch(Dispatchers.Unconfined) {
+            client.sessionState.first { it is ReaderSessionState.SignedIn && it.expiresAt > stored.expiresAt }
+            otherDevices.complete(
+                this@runTest.async(start = CoroutineStart.UNDISPATCHED) { runCatching { client.signOutOtherDevices() } },
+            )
+        }
+
+        val refreshFailure = runCatching { client.capabilities() }.exceptionOrNull()
+        val signOutOthers = otherDevices.await().await()
+
+        assertTrue("$refreshFailure", refreshFailure is ReaderAuthException.StorageUnavailable)
+        assertTrue("${signOutOthers.exceptionOrNull()}", signOutOthers.isSuccess)
+        // The stored copy held the refresh token the grant consumed; the refresh removed it.
+        assertNull(store.session)
+        assertEquals(listOf("access-2"), servers.requestsTo("/auth/v1/logout").map { it.bearer })
+        assertEquals(1, servers.requestsTo("/auth/v1/token").size)
+        assertTrue(servers.requestsTo("/v1/reader/capabilities").isEmpty())
         client.close()
     }
 }
