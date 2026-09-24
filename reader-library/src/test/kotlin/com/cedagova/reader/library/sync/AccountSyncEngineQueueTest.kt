@@ -29,9 +29,11 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -211,6 +213,9 @@ class AccountSyncEngineQueueTest {
      * end, one unbroken tail of the calls — A's before B's, none in both, none
      * missing (the part of A's queue that is gone is D4's discard, all of it
      * earlier than anything kept).
+     *
+     * A stress test, not an interleaving proof: the pinned switch interleavings
+     * are the test-scheduler tests above.
      */
     @Test
     fun `under real threads a switch from A to B never moves a change across accounts`() = runBlocking {
@@ -231,20 +236,40 @@ class AccountSyncEngineQueueTest {
         }
         repeat(500) { call() }
         awaitState(engine) { it.userId == "user-b" }
-        // Wait until every call is somewhere: the queue has gone quiet.
-        var last = -1
-        while (true) {
-            delay(200)
-            val count = document("user-a").outbox.size + document("user-b").outbox.size
-            if (count == last) break
-            last = count
+        // Wait until every call is somewhere: the last call, asked for in B, is
+        // in B's outbox. One consumer takes the calls off in call order, so every
+        // earlier call has been placed by then (#181: a quiet-period guess here
+        // read the outbox while a slow CI disk still had 49 calls to write).
+        // The timeout only guards a hang: each change rewrites the whole
+        // document, so a loaded runner can take tens of seconds to catch up.
+        val lastCall = ids.last()
+        val placed = withTimeoutOrNull(120_000) {
+            while (document("user-b").outbox.lastOrNull()?.resourceId != lastCall) delay(10)
+        }
+        if (placed == null) {
+            fail(
+                "the last call never reached B's outbox; " +
+                    queueDetail(ids, document("user-a").outbox.map { it.resourceId }, document("user-b").outbox.map { it.resourceId }),
+            )
         }
 
         val a = document("user-a").outbox.map { it.resourceId }
         val b = document("user-b").outbox.map { it.resourceId }
-        assertTrue("B got changes after the switch", b.isNotEmpty())
-        assertEquals("A's remainder then B's queue are one unbroken tail of the calls", ids.takeLast(a.size + b.size), a + b)
-        assertTrue("nothing asked for before the switch reached B", ids.indexOf(b.first()) >= 500)
+        val detail = queueDetail(ids, a, b)
+        assertTrue("B got changes after the switch; $detail", b.isNotEmpty())
+        assertTrue("A's remainder then B's queue are one unbroken tail of the calls; $detail", ids.takeLast(a.size + b.size) == a + b)
+        assertTrue("nothing asked for before the switch reached B; $detail", ids.indexOf(b.first()) >= 500)
+    }
+
+    /** What a failure of the switch proof needs, without printing a thousand ids. */
+    private fun queueDetail(ids: List<String>, a: List<String>, b: List<String>): String {
+        fun span(list: List<String>) = if (list.isEmpty()) "empty" else "${list.first()}..${list.last()} (${list.size})"
+        val placed = a + b
+        val missing = ids.drop(ids.indexOf(placed.firstOrNull()).coerceAtLeast(0)).filterNot(placed.toSet()::contains)
+        val duplicated = placed.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        return "calls=${span(ids)} a=${span(a)} b=${span(b)} " +
+            "missing=${missing.take(10)}${if (missing.size > 10) "+${missing.size - 10}" else ""} " +
+            "duplicated=${duplicated.take(10)}"
     }
 
     // -------------------------------------------------------------- #163
