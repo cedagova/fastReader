@@ -175,7 +175,12 @@ internal fun ReaderAuthException.toSyncError(): AccountSyncError = when (this) {
         AccountSyncError.ApiError(status = status, code = code, requestId = null, description = description)
 
     is ReaderAuthException.ApiError -> AccountSyncError.ApiError(status, code, requestId, description)
+    is ReaderAuthException.StorageUnavailable ->
+        AccountSyncError.ApiError(status = 0, code = STORAGE_UNAVAILABLE, requestId = null, description = message.orEmpty())
 }
+
+/** The code a sync error carries when `:reader-auth` could not save a refreshed session (#154); the next sync repeats without a new refresh. */
+internal const val STORAGE_UNAVAILABLE: String = "storage_unavailable"
 
 /** The rejection the contract declares, as the error the shelf shows. */
 internal fun ReaderSyncRejection.toSyncError(resourceId: String): AccountSyncError.Rejected =

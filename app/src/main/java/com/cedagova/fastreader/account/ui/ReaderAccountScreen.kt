@@ -409,6 +409,7 @@ internal fun describe(outcome: AccountOutcome): String = when (outcome) {
         details(http = outcome.status, code = outcome.code, requestId = outcome.requestId),
         outcome.description,
     )
+    AccountOutcome.StorageUnavailable -> stringResource(R.string.account_outcome_storage_unavailable)
 }
 
 /** `HTTP 400 · invalid_credentials · request id …`: only the parts the library reported, in a fixed order. */

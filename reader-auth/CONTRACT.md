@@ -83,6 +83,14 @@ the upsert creates the actor's row.
   out"**, never a crash: a restore onto another device brings the blob
   without its key, and the client simply starts signed out and removes the
   unusable file.
+- **A failed save keeps the session for this process.** When the provider
+  issued a session (sign-in or refresh) but the Keystore or the file refused
+  it, the new session stays current in memory and the operation fails as
+  **storage unavailable**. After a refresh the stored copy, which holds the
+  consumed refresh token, is also removed, so the next start is signed out
+  rather than replaying it. Repeating it
+  works without another provider call. A refresh grant that succeeded is
+  never sent again because its save failed.
 - Rollback: the Keystore key is app-scoped and disappears with the app;
   `pm uninstall` of the host or its sign-out clears everything.
 
@@ -117,7 +125,9 @@ the upsert creates the actor's row.
   the session**, is retried **once** after `Retry-After` (integer seconds; 10 s
   when absent), and is then surfaced as try later (or network unavailable).
   Any other provider error keeps the session and is surfaced. Nothing retries
-  in a loop.
+  in a loop. Only the grant is retried: a grant that succeeded and then could
+  not be saved is surfaced as storage unavailable with the new session kept in
+  memory (see "Session storage"), never retried with the consumed token.
 - **No background timer.** Refresh happens only on the code paths above;
   nothing runs while the app is not in the foreground.
 

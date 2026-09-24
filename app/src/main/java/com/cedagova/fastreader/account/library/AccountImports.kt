@@ -642,6 +642,10 @@ class AccountImports(
 
         is ReaderAuthException.NotConfigured, is ReaderAuthException.ConfigurationMismatch ->
             BookImportState.Refused(ImportProblem.Api(null), retryable = false)
+
+        // The session is kept in memory, so the same import succeeds when repeated (#154).
+        is ReaderAuthException.StorageUnavailable ->
+            BookImportState.Refused(ImportProblem.Api(null), code = "storage_unavailable")
     }
 
     companion object {
