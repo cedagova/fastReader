@@ -162,6 +162,14 @@ class ReservedHostRecordKeyException(
  * deadlock. Compute what the transform needs *before* calling the update, and
  * act on its outcome *after* it returns.
  *
+ * **A `transform` must be pure** (#149): a function of its argument, with no
+ * side effects. The guard is a flag on the transform's thread, so a side effect
+ * that synchronously resumes another coroutine on that thread — completing a
+ * deferred, emitting to a flow collected on `Dispatchers.Unconfined`, a nested
+ * `runBlocking` that drains the thread's event loop — would run that coroutine
+ * inside the flag, and an engine call it makes would throw although it is not
+ * the transform's own.
+ *
  * A key the document reserves — one its schema declares at that level, or
  * `host` — is refused with [ReservedHostRecordKeyException] before anything is
  * written (#149), because a record under it would be stored and then lost.
@@ -931,7 +939,11 @@ class AccountSyncEngine(
         /** This device's own mutation, `applied` or `replayed`: the canonical result is this device's write. */
         ADMITTED_HERE,
 
-        /** Any other mutation result — `superseded` or `conflict` — adopted as it stands. */
+        /**
+         * Any other mutation result — `superseded` or `conflict` — adopted as it
+         * stands. Its mutation kind is this device's request, not the outcome, so
+         * a library item's presence is read from the canonical payload ([present]).
+         */
         RESULT,
 
         /** A change read from the account's change stream, which names no originating client. */
@@ -964,18 +976,13 @@ class AccountSyncEngine(
                 // it is what discards an optimistic row the backend did not keep
                 // (`superseded`, `conflict`).
                 document
+            } else if (present(kind, payload, origin)) {
+                val row = AccountCanonicalPayload.libraryItem(existing, resourceId, payload, revision)
+                document.withBook(row.copy(removed = false))
             } else {
-                when (kind) {
-                    ReaderMutationKind.DELETE ->
-                        existing
-                            ?.let { document.withBook(it.copy(removed = true, revision = revision ?: it.revision)) }
-                            ?: document
-
-                    else -> {
-                        val row = AccountCanonicalPayload.libraryItem(existing, resourceId, payload, revision)
-                        document.withBook(row.copy(removed = false))
-                    }
-                }
+                existing
+                    ?.let { document.withBook(it.copy(removed = true, revision = revision ?: it.revision)) }
+                    ?: document
             }
         }
 
@@ -1050,6 +1057,28 @@ class AccountSyncEngine(
         ReaderResourceType.UNKNOWN,
         -> document
     }
+
+    /**
+     * Whether the canonical state of a library item is a live membership (true)
+     * or the tombstone (false).
+     *
+     * A stream change and this device's own admitted mutation say it with their
+     * kind: the stream's `kind` is the canonical change kind, and an `applied` or
+     * `replayed` result is the backend doing exactly what was asked. A
+     * `superseded` or `conflict` result is the backend's verdict *against* the
+     * mutation, so its kind is this device's request, not the outcome (§7.4,
+     * #149): presence comes from the canonical payload the backend returned. The
+     * backend's canonical state for a removed membership is the empty object
+     * (reader-api `publication_membership.py`, `_structural_conflict` at
+     * `909174af`), and a live one is the item's body — so a queued removal the
+     * backend answered with the live book ends on the shelf, and a queued upsert
+     * answered with a tombstone ends off it.
+     */
+    private fun present(kind: ReaderMutationKind, payload: JsonObject, origin: CanonicalOrigin): Boolean =
+        when (origin) {
+            CanonicalOrigin.RESULT -> payload.isNotEmpty()
+            CanonicalOrigin.ADMITTED_HERE, CanonicalOrigin.STREAM -> kind != ReaderMutationKind.DELETE
+        }
 
     /**
      * Whether a library item's canonical state at [incoming] replaces the one

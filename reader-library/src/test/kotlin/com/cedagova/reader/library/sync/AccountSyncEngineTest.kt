@@ -1461,6 +1461,141 @@ class AccountSyncEngineTest {
     }
 
     /**
+     * #149 review B1: a queued removal the backend answers `conflict` with the
+     * book still live must end on the shelf. Presence is the canonical payload's,
+     * not the mutation kind's — and since the stream's equal-revision echo of the
+     * winning change is no longer re-applied, nothing else would repair it.
+     */
+    @Test
+    fun `a removal answered conflict with the book present ends present, and the equal-revision echo keeps it`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            ReaderSyncMutationResult(
+                idempotencyKey = "key-1",
+                resourceType = ReaderResourceType.LIBRARY_ITEM,
+                resourceId = "book-1",
+                mutationKind = ReaderMutationKind.DELETE,
+                status = ReaderSyncStatus.CONFLICT,
+                canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                conflict = ReaderSyncConflict(
+                    conflictId = "c-1",
+                    code = ReaderSyncConflictCode.REVISION_CONFLICT,
+                    remoteRevision = 9,
+                    canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                ),
+            ),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"))),
+            ),
+        )
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertFalse("the backend kept the book, so it is back on the shelf", row.removed)
+        assertEquals(9L, row.revision)
+        assertEquals(ReaderLibraryStatus.READING, row.status)
+        assertEquals(listOf("book-1"), engine.state.value.books.map { it.bookId })
+        assertEquals("9", document("user-1").cursor)
+    }
+
+    /** #149 review B1: the same for a removal answered `superseded` by a live book. */
+    @Test
+    fun `a removal answered superseded with the book present ends present`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            result(
+                "book-1",
+                ReaderSyncStatus.SUPERSEDED,
+                revision = 9,
+                payload = itemPayload("book-1", "Dune", "finished"),
+                key = "key-1",
+                kind = ReaderMutationKind.DELETE,
+            ),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished"))),
+            ),
+        )
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertFalse("a superseded removal leaves the winner's live book", row.removed)
+        assertEquals(9L, row.revision)
+        assertEquals(ReaderLibraryStatus.FINISHED, row.status)
+        assertEquals(listOf("book-1"), engine.state.value.books.map { it.bookId })
+    }
+
+    /**
+     * #149 review B1, the mirror: a queued upsert the backend answers with the
+     * tombstone (the empty canonical payload of a removed membership) ends off
+     * the shelf, and the equal-revision stream tombstone does not undo that.
+     */
+    @Test
+    fun `an upsert answered conflict with the canonical tombstone ends removed`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            ReaderSyncMutationResult(
+                idempotencyKey = "key-1",
+                resourceType = ReaderResourceType.LIBRARY_ITEM,
+                resourceId = "book-1",
+                mutationKind = ReaderMutationKind.UPSERT,
+                status = ReaderSyncStatus.CONFLICT,
+                conflict = ReaderSyncConflict(
+                    conflictId = "c-1",
+                    code = ReaderSyncConflictCode.TOMBSTONE_REQUIRES_RESTORE,
+                    remoteRevision = 9,
+                ),
+            ),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap()))),
+            ),
+        )
+        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertTrue("the backend removed the book, so the status change does not keep it", row.removed)
+        assertEquals(9L, row.revision)
+        assertTrue(engine.state.value.books.isEmpty())
+    }
+
+    /** #149 review B1, the mirror for `superseded`: an upsert beaten by a later removal ends removed. */
+    @Test
+    fun `an upsert answered superseded by a removal ends removed`() = runTest(dispatcher) {
+        val engine = engineAtRevision8()
+        gateway.answerMutations(
+            result("book-1", ReaderSyncStatus.SUPERSEDED, revision = 9, payload = JsonObject(emptyMap()), key = "key-1"),
+        )
+        gateway.deltaResponses = queueOf(
+            deltas(
+                latestCursor = "9",
+                changes = listOf(change("9", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap()))),
+            ),
+        )
+        engine.recordOpened("book-1")
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals(0, engine.state.value.queued)
+        assertTrue(row.removed)
+        assertEquals(9L, row.revision)
+        assertTrue(engine.state.value.books.isEmpty())
+    }
+
+    /**
      * #149: a host record under a key the document reserves would be written and
      * then lost — a declared key wins over it on the way out, and `host` is dropped
      * on the way in. The write is refused with a typed error, and nothing is written.

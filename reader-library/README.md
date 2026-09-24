@@ -64,7 +64,10 @@ change must be *strictly* newer (#149) — an equal-revision echo is the state
 already held, and applying it would revert a local intent still queued in the
 outbox. A library item's mutation *result* at an equal revision still replaces
 the row: `superseded` and `conflict` are the backend's verdict on this device's
-queued mutation, and they discard the optimistic row.
+queued mutation, and they discard the optimistic row. Such a result's presence
+comes from its canonical payload, not from the mutation kind: a removal answered
+with the live book ends on the shelf, and an upsert answered with the tombstone
+(the empty payload) ends off it.
 
 **Host records (`AccountHostRecords`).**
 
@@ -75,6 +78,12 @@ queued mutation, and they discard the optimistic row.
   thread throws `IllegalStateException` instead of hanging; one handed to another
   thread and awaited cannot be detected and deadlocks. Compute inputs before the
   update and act on its outcome after it returns.
+- **A `transform` must be pure** — a function of its argument with no side
+  effects. The re-entrancy guard is a flag on the transform's thread, so a side
+  effect that synchronously resumes another coroutine there (completing a
+  deferred, emitting to a flow collected on `Dispatchers.Unconfined`, a nested
+  `runBlocking`) would make that coroutine's engine calls throw as if they were
+  the transform's own.
 - **Reserved keys are refused** (#149). A key the schema declares at that level
   (`AccountLibraryCodec.RESERVED_DOCUMENT_KEYS` / `RESERVED_BOOK_KEYS`) or `host`
   itself throws `ReservedHostRecordKeyException` before anything is written: a
