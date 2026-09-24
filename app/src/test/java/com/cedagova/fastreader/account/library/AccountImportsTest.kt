@@ -305,6 +305,21 @@ class AccountImportsTest {
         assertTrue(records.stored.isEmpty())
     }
 
+    @Test
+    fun `an unreadable provider answer at the question is a refusal worth repeating`() = runTest(dispatcher) {
+        givenBook(sizeBytes = 1_000)
+        gateway.policyFailure = ReaderAuthException.UnexpectedResponse(IllegalArgumentException("<html>"))
+
+        imports.requestAdd(FICCIONES_ID)
+        advanceUntilIdle()
+
+        val refused = imports.state.value.byDeviceBookId[FICCIONES_ID] as BookImportState.Refused
+        assertEquals(ImportProblem.Api(null), refused.problem)
+        assertEquals("unexpected_response", refused.code)
+        assertTrue("the session is intact, so trying again may work", refused.retryable)
+        assertTrue(records.stored.isEmpty())
+    }
+
     // ---- the lifecycle -----------------------------------------------------------------------
 
     @Test

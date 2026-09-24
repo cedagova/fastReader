@@ -823,6 +823,27 @@ class AccountSyncEngineTest {
     }
 
     @Test
+    fun `an unreadable provider answer keeps the queue on an idle run`() = runTest(dispatcher) {
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val engine = engine()
+        signIn("user-1")
+
+        // A refresh answered by a captive portal's page (#191).
+        gateway.nextFailure = ReaderAuthException.UnexpectedResponse(kotlinx.serialization.SerializationException("<html>"))
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        assertEquals(AccountSyncPhase.IDLE, engine.state.value.phase)
+        val error = engine.state.value.lastError as AccountSyncError.ApiError
+        assertEquals(0, error.status)
+        assertEquals("unexpected_response", error.code)
+        assertNull(error.requestId)
+        assertEquals("the queued removal is kept", 1, engine.state.value.queued)
+        assertEquals("key-1", document("user-1").outbox.single().idempotencyKey)
+    }
+
+    @Test
     fun `a retryable 503 from reader-api defers the run as try later, not idle`() = runTest(dispatcher) {
         gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
         gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))

@@ -38,7 +38,10 @@ A wrong or expired code, wrong credentials, and a weak password surface as a
 never retried automatically.** A provider `429` on sign-in, verify, or
 recovery — many phones behind one carrier address share the provider's per-IP
 buckets of 30 sign-ins, 30 verifications and 150 refreshes per window — is
-surfaced as **try later**, never as a credential error.
+surfaced as **try later**, never as a credential error. A provider answer the
+client cannot read — a 2xx whose body is not the provider's, such as a captive
+portal's page — is surfaced as **unexpected response** (#191) with nothing
+saved; the user may simply try again.
 
 ## Bootstrap and first calls
 
@@ -151,10 +154,18 @@ the upsert creates the actor's row.
   A `Retry-After` above 30 s is never waited out inside a call: the failure is
   surfaced at once as try later carrying the server's value, with no second
   request.
-  Any other provider error keeps the session and is surfaced. Nothing retries
-  in a loop. Only the grant is retried: a grant that succeeded and then could
-  not be saved is surfaced as storage unavailable with the new session kept in
-  memory (see "Session storage"), never retried with the consumed token.
+  Any other provider error keeps the session and is surfaced. An answer the
+  client cannot read (a 2xx whose body does not decode, such as a captive
+  portal's page, or a provider SDK failure the contract does not name) **keeps
+  the session**, is **never retried**, and is surfaced as unexpected response
+  (#191): a real provider 200 that failed to decode has already rotated the
+  refresh token, so resending it could revoke the family. If the token was
+  unspent, the next refresh succeeds; if it was spent, the next refresh is
+  answered `refresh_token_already_used` and the rule above signs the device
+  out. Nothing retries in a loop. Only the grant is retried: a grant that
+  succeeded and then could not be saved is surfaced as storage unavailable
+  with the new session kept in memory (see "Session storage"), never retried
+  with the consumed token.
 - **No background timer.** Refresh happens only on the code paths above;
   nothing runs while the app is not in the foreground.
 
@@ -177,6 +188,11 @@ errors are `{code, message, category, retryable, request_id}` with
 | Any other 5xx whose body says `retryable: true` (e.g. 503 `reader_sync.unavailable`, `auth.ingress_identity_unavailable`, 502 `db.unavailable`) | One retry after `Retry-After` (default 10 s), then try later; session intact. |
 | Any other non-2xx, including a 5xx that says `retryable: false` or omits it (e.g. 503 `publication_import.admissions_disabled`) | Surfaced with the server's `code` and `request_id`; session intact. No retry. |
 | Network failure or timeout | Surfaced as network unavailable; nothing is cleared. |
+| A 2xx whose body is not a JSON object, or (pre-auth) does not decode as the document | Surfaced with its status and `X-Request-ID`, no code; session intact, and bootstrap keeps no document. No retry. |
+
+An error body that is not JSON, or whose `code`, `message` or `request_id` is
+an object, an array or `null`, is read as if those fields were absent: the
+status rules above still decide the branch (#191).
 
 Every retry above waits inside the call, so the wait is capped: a
 `Retry-After` above 30 s (reader-api's quota answers can run until the quota
@@ -271,10 +287,10 @@ policy. Each host owns:
    process returns to the foreground; the module runs no timer of its own.
    It never throws a `ReaderAuthException` (#159): it returns the session
    state after the refresh outcome above. A revoked session returns
-   `SignedOut`; try later, network unavailable or a provider rejection keeps
-   the still-valid session and returns `SignedIn`; storage unavailable
-   returns `SignedIn` with the refreshed session kept in memory for this
-   process. The host needs no wrapper; the failure itself reaches it on its
+   `SignedOut`; try later, network unavailable, a provider rejection or an
+   unexpected response keeps the still-valid session and returns `SignedIn`;
+   storage unavailable returns `SignedIn` with the refreshed session kept in
+   memory for this process. The host needs no wrapper; the failure itself reaches it on its
    next protected call when that call hits it too.
 
 ## Sources

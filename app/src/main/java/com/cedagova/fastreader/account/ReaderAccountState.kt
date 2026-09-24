@@ -129,6 +129,9 @@ sealed interface AccountOutcome {
 
     /** `ReaderAuthException.StorageUnavailable`: signed in for this run, but the device could not save the session. */
     data object StorageUnavailable : AccountOutcome
+
+    /** `ReaderAuthException.UnexpectedResponse`: the sign-in service's answer could not be read (#191); nothing was changed. */
+    data object UnexpectedResponse : AccountOutcome
 }
 
 /** A `reader.capabilities.v1` document as returned, pretty-printed, and the request id of the call that fetched it (REQ-407). */

@@ -411,6 +411,7 @@ internal fun describe(outcome: AccountOutcome): String = when (outcome) {
         outcome.description,
     )
     AccountOutcome.StorageUnavailable -> stringResource(R.string.account_outcome_storage_unavailable)
+    AccountOutcome.UnexpectedResponse -> stringResource(R.string.account_outcome_unexpected_response)
 }
 
 /** `HTTP 400 · invalid_credentials · request id …`: only the parts the library reported, in a fixed order. */

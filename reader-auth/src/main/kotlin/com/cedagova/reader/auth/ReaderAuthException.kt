@@ -81,6 +81,20 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
         init { initCause(cause) }
     }
 
+    /**
+     * The identity provider's answer could not be read (#191): a 2xx whose
+     * body is not what the provider SDK expects — a captive portal's or a
+     * proxy's page, say — or a provider SDK failure the contract does not
+     * name. [cause] is the original throwable. The session is intact, nothing
+     * was cleared, and nothing was retried: after a refresh the provider may
+     * already have rotated the refresh token, so the grant is never resent.
+     * Never a credential error; the user may try again.
+     */
+    class UnexpectedResponse(cause: Throwable) :
+        ReaderAuthException("unexpected answer from the identity provider: ${cause.javaClass.simpleName}") {
+        init { initCause(cause) }
+    }
+
     /** reader-api 403: the caller is authenticated but not allowed; the session is intact. */
     class Forbidden(val code: String?, val requestId: String?) :
         ReaderAuthException("forbidden${code?.let { ": $it" } ?: ""}")

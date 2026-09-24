@@ -24,11 +24,11 @@ import java.io.IOException
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * The one thin reader-api client (CONTRACT.md, "reader-api call policy").
@@ -68,9 +68,13 @@ class ReaderApiClient internal constructor(
     private val requestIds: () -> String = { UUID.randomUUID().toString().lowercase() },
 ) {
 
-    /** `GET /v1/reader/pre-auth?clientVersion=…`: public, called before any sign-in. */
+    /**
+     * `GET /v1/reader/pre-auth?clientVersion=…`: public, called before any
+     * sign-in. A 2xx whose object does not decode as the document is an
+     * [ReaderAuthException.ApiError] (#191), like a 2xx that is not JSON.
+     */
     suspend fun preAuth(): PreAuthDocument =
-        PreAuthDocument.parse(request(HttpMethod.Get, PRE_AUTH_PATH, authenticated = false, clientVersion = true))
+        send(HttpMethod.Get, PRE_AUTH_PATH, authenticated = false, clientVersion = true, read = PreAuthDocument::parse).value
 
     /** `GET /v1/reader/capabilities?clientVersion=…`: the first authenticated call after sign-in. */
     suspend fun capabilities(): JsonObject = capabilitiesResponse().document
@@ -83,7 +87,8 @@ class ReaderApiClient internal constructor(
      * shape differs.
      */
     suspend fun capabilitiesResponse(): ReaderApiResponse =
-        requestWithId(HttpMethod.Get, CAPABILITIES_PATH, authenticated = true, clientVersion = true)
+        send(HttpMethod.Get, CAPABILITIES_PATH, authenticated = true, clientVersion = true) { it }
+            .let { ReaderApiResponse(it.value, it.requestId) }
 
     /** `PUT /v1/reader/profile`: the upsert that precedes any profile `GET`. */
     suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject =
@@ -115,20 +120,26 @@ class ReaderApiClient internal constructor(
         authenticated: Boolean,
         clientVersion: Boolean = false,
         body: String? = null,
-    ): JsonObject = requestWithId(method, path, authenticated, clientVersion, body).document
+    ): JsonObject = send(method, path, authenticated, clientVersion, body) { it }.value
+
+    /** A successful answer as [send]'s `read` decoded it, with the id the successful attempt sent. */
+    private class Answer<T>(val value: T, val requestId: String)
 
     /**
      * One call under the policy above. Every attempt — the first, the one after
      * a refresh, the one after `Retry-After` — carries a fresh id, and the id
-     * reported is the one the successful attempt sent.
+     * reported is the one the successful attempt sent. [read] decodes the
+     * successful JSON object; a body it cannot decode is an
+     * [ReaderAuthException.ApiError] with the answer's status.
      */
-    private suspend fun requestWithId(
+    private suspend fun <T> send(
         method: HttpMethod,
         path: String,
         authenticated: Boolean,
         clientVersion: Boolean = false,
         body: String? = null,
-    ): ReaderApiResponse {
+        read: (JsonObject) -> T,
+    ): Answer<T> {
         var refreshed = 0
         var waited = 0
         while (true) {
@@ -154,7 +165,7 @@ class ReaderApiClient internal constructor(
             } catch (e: IOException) {
                 throw ReaderAuthException.NetworkUnavailable(e)
             }
-            if (response.status.isSuccess()) return ReaderApiResponse(response.jsonBody(), requestId)
+            if (response.status.isSuccess()) return Answer(response.decoded(read), requestId)
 
             val error = ErrorBody.of(response)
             when {
@@ -196,12 +207,18 @@ class ReaderApiClient internal constructor(
         }
     }
 
-    private suspend fun HttpResponse.jsonBody(): JsonObject {
+    private suspend fun <T> HttpResponse.decoded(read: (JsonObject) -> T): T {
         val text = bodyAsText()
-        return try {
+        val document = try {
             json.parseToJsonElement(text).jsonObject
         } catch (e: Exception) {
             throw ReaderAuthException.ApiError(status.value, null, headers[HEADER_REQUEST_ID], "response is not a JSON object")
+        }
+        return try {
+            read(document)
+        } catch (e: IllegalArgumentException) {
+            // kotlinx.serialization's SerializationException is an IllegalArgumentException.
+            throw ReaderAuthException.ApiError(status.value, null, headers[HEADER_REQUEST_ID], "response is not the expected document")
         }
     }
 
@@ -209,7 +226,9 @@ class ReaderApiClient internal constructor(
      * reader-api's `ErrorResponse`: `code`, `message`, `category`, `retryable`,
      * `request_id`. [retryable] is the server's own verdict and is `false`
      * when the field is missing or not a boolean; [category] is read for
-     * completeness and drives nothing.
+     * completeness and drives nothing. A field that is an object, an array or
+     * `null` counts as absent (#191), so an unexpected error body — a proxy's
+     * own JSON, say — still leaves the status policy to decide the branch.
      */
     private class ErrorBody(
         val code: String?,
@@ -228,9 +247,9 @@ class ReaderApiClient internal constructor(
                     return ErrorBody(null, text.take(MAX_MESSAGE), fromHeader)
                 }
                 return ErrorBody(
-                    code = body["code"]?.jsonPrimitive?.content,
-                    message = body["message"]?.jsonPrimitive?.content ?: text.take(MAX_MESSAGE),
-                    requestId = body["request_id"]?.jsonPrimitive?.content ?: fromHeader,
+                    code = body.text("code"),
+                    message = body.text("message") ?: text.take(MAX_MESSAGE),
+                    requestId = body.text("request_id") ?: fromHeader,
                     category = (body["category"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
                     retryable = (body["retryable"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull ?: false,
                 )
@@ -239,6 +258,10 @@ class ReaderApiClient internal constructor(
     }
 
     companion object {
+        /** [key] as text when it is a JSON scalar; an object, an array, `null` or a missing key is `null`. */
+        private fun JsonObject.text(key: String): String? =
+            (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
+
         const val PRE_AUTH_PATH: String = "/v1/reader/pre-auth"
         const val CAPABILITIES_PATH: String = "/v1/reader/capabilities"
         const val PROFILE_PATH: String = "/v1/reader/profile"

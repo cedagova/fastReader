@@ -218,10 +218,11 @@ class ReaderAuthClient internal constructor(
      * or clears the session exactly as CONTRACT.md's refresh outcomes say, and
      * the returned state is the whole answer: [ReaderAuthException.SignedOut]
      * leaves `SignedOut`; a transient failure ([ReaderAuthException.TryLater],
-     * [ReaderAuthException.NetworkUnavailable], [ReaderAuthException.ProviderRejected])
-     * leaves the still-valid session `SignedIn`, and the next protected call
-     * refreshes again; [ReaderAuthException.StorageUnavailable] leaves the
-     * refreshed session `SignedIn` for this process. A host that needs the
+     * [ReaderAuthException.NetworkUnavailable], [ReaderAuthException.ProviderRejected],
+     * [ReaderAuthException.UnexpectedResponse]) leaves the still-valid session
+     * `SignedIn`, and the next protected call refreshes again;
+     * [ReaderAuthException.StorageUnavailable] leaves the refreshed session
+     * `SignedIn` for this process. A host that needs the
      * failure itself gets it from its next protected call.
      */
     suspend fun onForeground(): ReaderSessionState {
@@ -321,6 +322,9 @@ class ReaderAuthClient internal constructor(
         throw ReaderAuthException.ProviderRejected(e.statusCode, e.error, e.description ?: e.error)
     } catch (e: IOException) {
         throw ReaderAuthException.NetworkUnavailable(e)
+    } catch (e: Exception) {
+        // A provider answer the SDK could not read, or an SDK failure the contract does not name (#191).
+        throw ReaderAuthException.UnexpectedResponse(e)
     }
 
     private fun SessionStatus.toState(): ReaderSessionState = when (this) {

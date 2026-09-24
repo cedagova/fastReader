@@ -350,6 +350,7 @@
     <string name="account_outcome_sign_in_unavailable">El servidor de Reader no permite este inicio de sesión ahora mismo, así que no se ha enviado nada al servicio de inicio de sesión (%1$s).</string>
     <string name="account_outcome_session_gone">El servidor ya no acepta esta sesión (%1$s). Este dispositivo ha cerrado sesión.</string>
     <string name="account_outcome_forbidden">No permitido (%1$s). Sigues con la sesión iniciada.</string>
+    <string name="account_outcome_unexpected_response">El servicio de inicio de sesión ha respondido algo inesperado. No se ha cambiado nada; inténtalo de nuevo.</string>
     <string name="account_outcome_storage_unavailable">Has iniciado sesión, pero este dispositivo no ha podido guardar la sesión, así que tendrás que volver a iniciarla cuando se reinicie la app.</string>
     <string name="account_outcome_api_error">La API de Reader ha respondido con un error (%1$s): %2$s</string>
     <string name="account_detail_http">HTTP %1$d</string>
