@@ -97,6 +97,56 @@ class RefreshPolicyTest {
     }
 
     @Test
+    fun `return to the foreground offline reports the still-valid session and does not throw`() = runTest {
+        servers.on(REFRESH_GRANT) { networkFailure() }
+        val (client, store) = clientWith(session(expiresAt = clock.expiring(120)))
+
+        val state = client.onForeground()
+
+        assertTrue("$state", state is ReaderSessionState.SignedIn)
+        assertEquals(listOf(REFRESH_GRANT, REFRESH_GRANT), servers.routes())
+        assertEquals("access-1", store.session?.accessToken)
+        client.close()
+    }
+
+    @Test
+    fun `return to the foreground during a provider 429 reports the session and does not throw`() = runTest {
+        servers.on(REFRESH_GRANT) { json(providerError("over_request_rate_limit"), HttpStatusCode.TooManyRequests) }
+        val (client, store) = clientWith(session(expiresAt = clock.expiring(120)))
+
+        val state = client.onForeground()
+
+        assertTrue("$state", state is ReaderSessionState.SignedIn)
+        assertEquals(listOf(REFRESH_GRANT, REFRESH_GRANT), servers.routes())
+        assertEquals("access-1", store.session?.accessToken)
+        client.close()
+    }
+
+    @Test
+    fun `return to the foreground after a provider rejection reports the session and does not throw`() = runTest {
+        servers.on(REFRESH_GRANT) { json(providerError("validation_failed"), HttpStatusCode.BadRequest) }
+        val (client, store) = clientWith(session(expiresAt = clock.expiring(120)))
+
+        val state = client.onForeground()
+
+        assertTrue("$state", state is ReaderSessionState.SignedIn)
+        assertEquals("access-1", store.session?.accessToken)
+        client.close()
+    }
+
+    @Test
+    fun `return to the foreground with a revoked refresh token reports signed out and does not throw`() = runTest {
+        servers.on(REFRESH_GRANT) { json(providerError("refresh_token_already_used"), HttpStatusCode.BadRequest) }
+        val (client, store) = clientWith(session(expiresAt = clock.expiring(120)))
+
+        val state = client.onForeground()
+
+        assertEquals(ReaderSessionState.SignedOut, state)
+        assertNull(store.session)
+        client.close()
+    }
+
+    @Test
     fun `a revoked refresh token clears the session`() = runTest {
         servers.on(REFRESH_GRANT) { json(providerError("refresh_token_already_used"), HttpStatusCode.BadRequest) }
         val (client, store) = clientWith(session(expiresAt = clock.expiring(10)))

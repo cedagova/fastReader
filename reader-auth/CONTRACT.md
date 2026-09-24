@@ -257,6 +257,13 @@ policy. Each host owns:
 4. **Its own application id.**
 5. **The foreground hook**: call `ReaderAuthClient.onForeground()` when the
    process returns to the foreground; the module runs no timer of its own.
+   It never throws a `ReaderAuthException` (#159): it returns the session
+   state after the refresh outcome above. A revoked session returns
+   `SignedOut`; try later, network unavailable or a provider rejection keeps
+   the still-valid session and returns `SignedIn`; storage unavailable
+   returns `SignedIn` with the refreshed session kept in memory for this
+   process. The host needs no wrapper; the failure itself reaches it on its
+   next protected call when that call hits it too.
 
 ## Sources
 
