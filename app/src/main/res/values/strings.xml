@@ -394,6 +394,7 @@
     <string name="account_outcome_sign_in_unavailable">The Reader server does not allow this sign-in right now, so nothing was sent to the sign-in service (%1$s).</string>
     <string name="account_outcome_session_gone">The server no longer accepts this session (%1$s). This device is signed out.</string>
     <string name="account_outcome_forbidden">Not allowed (%1$s). You are still signed in.</string>
+    <string name="account_outcome_unexpected_response">The sign-in service answered with something unexpected. Nothing was changed; try again.</string>
     <string name="account_outcome_storage_unavailable">You are signed in, but this device could not save the session, so you will need to sign in again after the app restarts.</string>
     <string name="account_outcome_api_error">The Reader API answered with an error (%1$s): %2$s</string>
     <string name="account_detail_http">HTTP %1$d</string>

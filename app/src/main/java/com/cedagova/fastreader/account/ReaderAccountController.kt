@@ -196,4 +196,5 @@ internal fun ReaderAuthException.toOutcome(): AccountOutcome = when (this) {
     is ReaderAuthException.ProviderRejected -> AccountOutcome.ProviderRejected(status, code, description)
     is ReaderAuthException.ApiError -> AccountOutcome.ApiError(status, code, requestId, description)
     is ReaderAuthException.StorageUnavailable -> AccountOutcome.StorageUnavailable
+    is ReaderAuthException.UnexpectedResponse -> AccountOutcome.UnexpectedResponse
 }

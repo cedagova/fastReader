@@ -147,6 +147,12 @@ internal class SessionRefresher(
                     continue
                 }
                 throw ReaderAuthException.NetworkUnavailable(e)
+            } catch (e: ReaderAuthException) {
+                throw e
+            } catch (e: Exception) {
+                // An answer the SDK could not read (#191). Never resent: a real
+                // provider 200 that failed to decode has already rotated the token.
+                throw ReaderAuthException.UnexpectedResponse(e)
             }
         }
     }

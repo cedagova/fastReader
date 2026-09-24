@@ -204,6 +204,7 @@ class ReaderAccountControllerTest {
         assertEquals(AccountOutcome.ProviderRejected(422, "weak_password", "too short"), ReaderAuthException.ProviderRejected(422, "weak_password", "too short").toOutcome())
         assertEquals(AccountOutcome.ApiError(404, "not_found", "r4", "gone"), ReaderAuthException.ApiError(404, "not_found", "r4", "gone").toOutcome())
         assertEquals(AccountOutcome.ConfigurationMismatch("reader-auth is not configured"), ReaderAuthException.NotConfigured().toOutcome())
+        assertEquals(AccountOutcome.UnexpectedResponse, ReaderAuthException.UnexpectedResponse(IllegalArgumentException("<html>")).toOutcome())
     }
 
     @Test

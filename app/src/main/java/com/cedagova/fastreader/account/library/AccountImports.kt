@@ -647,6 +647,10 @@ class AccountImports(
         // The session is kept in memory, so the same import succeeds when repeated (#154).
         is ReaderAuthException.StorageUnavailable ->
             BookImportState.Refused(ImportProblem.Api(null), code = "storage_unavailable")
+
+        // The provider's answer could not be read; the session is intact, so repeating the import may succeed (#191).
+        is ReaderAuthException.UnexpectedResponse ->
+            BookImportState.Refused(ImportProblem.Api(null), code = "unexpected_response")
     }
 
     companion object {
