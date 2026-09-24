@@ -35,7 +35,6 @@ import com.cedagova.reader.library.downloads.AssetDownloadClient
 import com.cedagova.reader.library.imports.PublicationImportEngine
 import com.cedagova.reader.library.imports.PublicationTransferClient
 import com.cedagova.reader.auth.ReaderAuthConfig
-import com.cedagova.reader.auth.ReaderAuthException
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -289,18 +288,12 @@ class FastReaderApplication : Application() {
     /**
      * Host requirement 5: the module refreshes a stored session inside the
      * margin when the app returns to the foreground, and nothing else runs
-     * it. Its failures are the library's closed set and already reflected in
-     * the session state the account surface renders, so none is rethrown.
+     * it. `onForeground()` never throws a reader-auth failure (#159); the
+     * outcome is already in the session state the account surface renders.
      */
     private fun refreshReaderSessionOnForeground() {
         val client = readerAuth ?: return
-        applicationScope.launch {
-            try {
-                client.onForeground()
-            } catch (e: ReaderAuthException) {
-                // The session state already says what happened.
-            }
-        }
+        applicationScope.launch { client.onForeground() }
     }
 
     override fun onTerminate() {

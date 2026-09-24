@@ -107,6 +107,23 @@ class SessionSaveFailureTest {
     }
 
     @Test
+    fun `a foreground refresh whose save fails reports signed in for the process and does not throw`() = runTest {
+        servers.on(REFRESH_GRANT) { json(sessionJson("access-2", "refresh-2")) }
+        servers.on(CAPABILITIES) { json(CAPABILITIES_BODY) }
+        val store = UnwritableStore(session(expiresAt = clock.expiring(60)))
+        val client = clientOver(store)
+
+        val state = client.onForeground()
+        client.capabilities()
+
+        assertTrue("$state", state is ReaderSessionState.SignedIn)
+        assertEquals(listOf(REFRESH_GRANT, CAPABILITIES), servers.routes())
+        assertEquals("access-2", servers.requestsTo("/v1/reader/capabilities").single().bearer)
+        assertNull(store.session)
+        client.close()
+    }
+
+    @Test
     fun `a sign-in whose save fails is a typed failure and signed in for the process`() = runTest {
         servers.on(PRE_AUTH) { json(preAuthJson()) }
         servers.on(PASSWORD_GRANT) { json(sessionJson("access-9", "refresh-9")) }

@@ -182,12 +182,22 @@ class ReaderAuthClient internal constructor(
      * What a host calls when it returns to the foreground: refreshes the
      * session if it is inside the margin, and reports the resulting state.
      * The module runs no timer of its own.
+     *
+     * Never throws a [ReaderAuthException] (#159). A refresh that fails keeps
+     * or clears the session exactly as CONTRACT.md's refresh outcomes say, and
+     * the returned state is the whole answer: [ReaderAuthException.SignedOut]
+     * leaves `SignedOut`; a transient failure ([ReaderAuthException.TryLater],
+     * [ReaderAuthException.NetworkUnavailable], [ReaderAuthException.ProviderRejected])
+     * leaves the still-valid session `SignedIn`, and the next protected call
+     * refreshes again; [ReaderAuthException.StorageUnavailable] leaves the
+     * refreshed session `SignedIn` for this process. A host that needs the
+     * failure itself gets it from its next protected call.
      */
     suspend fun onForeground(): ReaderSessionState {
         try {
             refresher.sessionForRequest()
-        } catch (e: ReaderAuthException.SignedOut) {
-            // The state already says so.
+        } catch (e: ReaderAuthException) {
+            // The session state already says what happened.
         }
         return currentState()
     }
