@@ -13,6 +13,7 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -85,9 +86,13 @@ class AccountSyncEngineQueueTest {
         }
     }
 
+    /** When set, the next save throws this, consumed once: a failure that is not an [IOException]. */
+    private val storeThrows = AtomicReference<Throwable?>(null)
+
     private fun failing(store: AccountLibraryStore) = object : AccountLibraryStore {
         override fun load() = store.load()
         override fun save(document: AccountLibraryDocument) {
+            storeThrows.getAndSet(null)?.let { throw it }
             if (storeFails.get()) throw IOException("disk full")
             store.save(document)
         }
@@ -309,6 +314,24 @@ class AccountSyncEngineQueueTest {
         delay(200)
 
         assertEquals("queued once, and the guard holds after", 1, document("user-a").outbox.size)
+    }
+
+    // -------------------------------------------------------------- #177
+
+    /** #177: a failure that is not an IOException is reported and does not stop the queue. */
+    @Test
+    fun `a non-IO failure on one change leaves the queue running`() = runBlocking {
+        val engine = threadedEngine()
+        signInAndSettle(engine, "user-a")
+
+        storeThrows.set(IllegalStateException("injected"))
+        engine.recordPosition("book-1", position(40))
+        awaitState(engine) { it.lastError is AccountSyncError.StoreBlocked }
+        assertEquals(emptyList<AccountOutboxEntry>(), document("user-a").outbox)
+
+        engine.recordPosition("book-2", position(10))
+        awaitState(engine) { it.queued == 1 }
+        assertEquals(listOf("book-2"), document("user-a").outbox.map { it.resourceId })
     }
 
     // ---------------------------------------------------------------- helpers

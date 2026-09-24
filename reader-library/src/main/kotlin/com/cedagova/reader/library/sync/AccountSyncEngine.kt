@@ -14,6 +14,7 @@ import com.cedagova.reader.library.model.ReaderSyncMutationResult
 import com.cedagova.reader.library.model.ReaderSyncStatus
 import java.io.IOException
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -998,13 +999,32 @@ class AccountSyncEngine(
      */
     private suspend fun runQueue() {
         while (true) {
-            var queued = queue(changes.receive())
+            var queued = queueSurviving(changes.receive())
             while (true) {
                 val next = changes.tryReceive().getOrNull() ?: break
-                queued = queue(next) || queued
+                queued = queueSurviving(next) || queued
             }
             if (queued) scope.launch { sync(AccountSyncTrigger.OWN_WRITE) }
         }
+    }
+
+    /**
+     * [queue], except that no failure of one change ends [runQueue] (#177).
+     *
+     * [runQueue] is the only consumer, so an escaping exception would leave every
+     * later change accepted by [enqueue] and never queued — silently, in a host
+     * whose scope handles the exception. The change that failed is not kept; the
+     * failure is reported on the current state and the next change goes on.
+     */
+    private suspend fun queueSurviving(change: QueuedChange): Boolean = try {
+        queue(change)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        _state.value = _state.value.copy(
+            lastError = AccountSyncError.StoreBlocked("a change could not be queued: ${e.message ?: e::class.simpleName}"),
+        )
+        false
     }
 
     /**
