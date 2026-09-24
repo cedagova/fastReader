@@ -15,6 +15,7 @@ import com.cedagova.fastreader.settings.ThemeChoice
 import com.cedagova.fastreader.timing.PauseStrength
 import com.cedagova.fastreader.timing.RsvpTiming
 import java.io.File
+import java.io.IOException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -24,6 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -93,6 +95,37 @@ class CatalogStoreTest {
         store.save(Catalog(schemaVersion = 0))
 
         assertTrue(file.readText().contains("\"schemaVersion\":${CatalogSchema.CURRENT_VERSION}"))
+        assertEquals(listOf("catalog.json"), file.parentFile!!.list()!!.sorted())
+    }
+
+    @Test
+    fun `a failed replace throws and the previous catalog survives byte for byte`() {
+        FileCatalogStore(file).save(sampleCatalog())
+        val before = file.readBytes()
+        val failing = FileCatalogStore(file, CatalogCodec(), System::currentTimeMillis) { _, _ ->
+            throw IOException("injected replace failure")
+        }
+
+        val error = assertThrows(IOException::class.java) { failing.save(Catalog()) }
+
+        assertEquals("injected replace failure", error.cause?.message)
+        assertTrue("the previous catalog must not be removed", before.contentEquals(file.readBytes()))
+        assertEquals(sampleCatalog(), (FileCatalogStore(file).load() as CatalogLoad.Loaded).catalog)
+        assertEquals(listOf("catalog.json"), file.parentFile!!.list()!!.sorted())
+    }
+
+    @Test
+    fun `a failed write throws, leaves the previous catalog and no temporary file`() {
+        val store = FileCatalogStore(file)
+        store.save(sampleCatalog())
+        val before = file.readBytes()
+        // A directory where the temporary file goes makes opening it for writing fail.
+        File(file.parentFile, "catalog.json.tmp").mkdir()
+
+        assertThrows(IOException::class.java) { store.save(Catalog()) }
+
+        assertTrue("the previous catalog must not be touched", before.contentEquals(file.readBytes()))
+        assertEquals(sampleCatalog(), (store.load() as CatalogLoad.Loaded).catalog)
         assertEquals(listOf("catalog.json"), file.parentFile!!.list()!!.sorted())
     }
 
