@@ -226,6 +226,23 @@ class RefreshPolicyTest {
     }
 
     @Test
+    fun `a provider Retry-After above the ceiling surfaces try-later at once with the server's value`() = runTest {
+        servers.on(REFRESH_GRANT) {
+            json(providerError("over_request_rate_limit"), HttpStatusCode.TooManyRequests, "Retry-After" to "3600")
+        }
+        val (client, store) = clientWith(session(expiresAt = clock.expiring(10)))
+
+        val failure = runCatching { client.capabilities() }.exceptionOrNull()
+
+        assertTrue("$failure", failure is ReaderAuthException.TryLater)
+        assertEquals(3600.seconds, (failure as ReaderAuthException.TryLater).retryAfter)
+        assertEquals("no second grant is sent", listOf(REFRESH_GRANT), servers.routes())
+        assertEquals("nothing is waited out", emptyList<Any>(), waiter.waits)
+        assertEquals("access-1", store.session?.accessToken)
+        client.close()
+    }
+
+    @Test
     fun `a provider 5xx is treated like a 429`() = runTest {
         servers.on(REFRESH_GRANT) { json("""{"message":"upstream"}""", HttpStatusCode.BadGateway) }
         val (client, store) = clientWith(session(expiresAt = clock.expiring(10)))

@@ -36,6 +36,15 @@ object ReaderAuthPolicy {
     const val RETRY_LIMIT: Int = 1
 
     /**
+     * The longest wait the one retry may spend inside a call (#157). A longer
+     * `Retry-After` — reader-api's quota answers can run until the quota
+     * resets — is not waited out: the call ends at once with
+     * [ReaderAuthException.TryLater] carrying the server's value, so no call
+     * blocks for longer than this plus its requests' timeouts.
+     */
+    val MAX_INLINE_RETRY_AFTER: Duration = 30.seconds
+
+    /**
      * Provider refresh failures that mean the session is gone and the device
      * must sign in again. Every other refresh failure keeps the stored session.
      */
@@ -62,4 +71,7 @@ object ReaderAuthPolicy {
      */
     fun retryAfter(header: String?): Duration =
         header?.trim()?.toLongOrNull()?.takeIf { it > 0 }?.seconds ?: DEFAULT_RETRY_AFTER
+
+    /** Whether a retry that must first wait [retryAfter] may happen inside the call: at or below [MAX_INLINE_RETRY_AFTER]. */
+    fun retriesInline(retryAfter: Duration): Boolean = retryAfter <= MAX_INLINE_RETRY_AFTER
 }

@@ -24,6 +24,7 @@ class ReaderAuthPolicyTest {
         assertEquals(10.seconds, ReaderAuthPolicy.REQUEST_TIMEOUT)
         assertEquals(10.seconds, ReaderAuthPolicy.DEFAULT_RETRY_AFTER)
         assertEquals(1, ReaderAuthPolicy.RETRY_LIMIT)
+        assertEquals(30.seconds, ReaderAuthPolicy.MAX_INLINE_RETRY_AFTER)
         assertEquals("reader-android", ReaderAuthPolicy.CLIENT_ID)
         assertEquals("1.0.0", ReaderAuthPolicy.CLIENT_VERSION)
     }
@@ -35,6 +36,7 @@ class ReaderAuthPolicyTest {
             "| Request timeout | 10 s |",
             "| Default `Retry-After` | 10 s |",
             "| Retry limit | 1 |",
+            "| Max inline `Retry-After` | 30 s |",
             "`X-Reader-Client: reader-android`",
             "clientVersion=1.0.0",
         ).forEach { needle ->
@@ -67,6 +69,15 @@ class ReaderAuthPolicyTest {
         assertEquals(10.seconds, ReaderAuthPolicy.retryAfter(null))
         assertEquals(10.seconds, ReaderAuthPolicy.retryAfter("0"))
         assertEquals(10.seconds, ReaderAuthPolicy.retryAfter("Wed, 21 Oct 2026 07:28:00 GMT"))
+    }
+
+    @Test
+    fun `only a wait at or below the ceiling is spent inside a call`() {
+        assertTrue(ReaderAuthPolicy.retriesInline(ReaderAuthPolicy.retryAfter("5")))
+        assertTrue(ReaderAuthPolicy.retriesInline(ReaderAuthPolicy.retryAfter("30")))
+        assertTrue(ReaderAuthPolicy.retriesInline(ReaderAuthPolicy.retryAfter(null)))
+        assertFalse(ReaderAuthPolicy.retriesInline(ReaderAuthPolicy.retryAfter("31")))
+        assertFalse(ReaderAuthPolicy.retriesInline(ReaderAuthPolicy.retryAfter("3600")))
     }
 
     @Test

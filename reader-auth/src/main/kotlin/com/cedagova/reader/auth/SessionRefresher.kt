@@ -121,7 +121,7 @@ internal class SessionRefresher(
                 }
                 if (e.isTransient()) {
                     val retryAfter = ReaderAuthPolicy.retryAfter(e.response.headers[HttpHeaders.RetryAfter])
-                    if (retried < ReaderAuthPolicy.RETRY_LIMIT) {
+                    if (retried < ReaderAuthPolicy.RETRY_LIMIT && ReaderAuthPolicy.retriesInline(retryAfter)) {
                         retried += 1
                         waiter.wait(retryAfter)
                         continue
@@ -132,7 +132,7 @@ internal class SessionRefresher(
             } catch (e: RestException) {
                 if (e.isTransient()) {
                     val retryAfter = ReaderAuthPolicy.retryAfter(e.response.headers[HttpHeaders.RetryAfter])
-                    if (retried < ReaderAuthPolicy.RETRY_LIMIT) {
+                    if (retried < ReaderAuthPolicy.RETRY_LIMIT && ReaderAuthPolicy.retriesInline(retryAfter)) {
                         retried += 1
                         waiter.wait(retryAfter)
                         continue
