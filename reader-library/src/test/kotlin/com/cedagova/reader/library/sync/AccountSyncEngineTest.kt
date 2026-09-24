@@ -79,11 +79,11 @@ class AccountSyncEngineTest {
     @After
     fun tearDown() = engineScope.cancel()
 
-    private fun engine(): AccountSyncEngine = AccountSyncEngine(
+    private fun engine(scope: TestScope = engineScope): AccountSyncEngine = AccountSyncEngine(
         gateway = gateway,
         stores = stores,
         accountState = session,
-        scope = engineScope,
+        scope = scope,
         ioDispatcher = dispatcher,
         newIdempotencyKey = { "key-${++keys}" },
         now = { CLIENT_TIME },
@@ -681,6 +681,92 @@ class AccountSyncEngineTest {
         assertEquals(listOf("key-2"), document("user-1").outbox.map { it.idempotencyKey })
         assertEquals("the refused status is undone", ReaderLibraryStatus.QUEUED, row.status)
         assertTrue("the queued removal still holds", row.removed)
+    }
+
+    /**
+     * The owed repair is durable (#151, review B1): the repair read fails right
+     * after the refusal, and the next run still restores the backend's row —
+     * host records kept, the other queued change re-applied — then goes back to
+     * the stream, once.
+     */
+    @Test
+    fun `a repair read that fails is retried by the next run`() = runTest(dispatcher) {
+        val engine = signedInEngine()
+        engine.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:x") }
+        // First run: neither change is answered, both stay queued.
+        gateway.mutationResponses = queueOf(ReaderSyncMutationBatchResponse(requestId = REQUEST_ID))
+        engine.recordStatus("book-1", ReaderLibraryStatus.ARCHIVED)
+        engine.removeFromAccount("book-1")
+        advanceUntilIdle()
+
+        // The status is refused for good, and the repair read's first request fails.
+        gateway.answerMutations(rejected("key-1", ReaderMutationKind.UPSERT))
+        gateway.failuresOn["deltas(0, 1)"] = ReaderAuthException.NetworkUnavailable(java.io.IOException("no network"))
+        engine.refresh()
+        advanceUntilIdle()
+        assertEquals(AccountSyncError.NetworkUnavailable, engine.state.value.lastError)
+        assertEquals(listOf("key-2"), document("user-1").outbox.map { it.idempotencyKey })
+        assertNull("the owed repair is in the store, not in memory", document("user-1").cursor)
+
+        gateway.calls.clear()
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "5"))
+        engine.refresh()
+        advanceUntilIdle()
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals("the refused status is undone", ReaderLibraryStatus.QUEUED, row.status)
+        assertTrue("the queued removal still holds", row.removed)
+        assertEquals(JsonPrimitive("7:x"), row.host["resumeOfferSettledFor"])
+        assertEquals("5", document("user-1").cursor)
+        assertEquals(
+            listOf("applyMutations(1)", "deltas(0, 1)", "library()", "progress()"),
+            gateway.calls,
+        )
+
+        // Repaired once: the run after reads the stream again.
+        gateway.calls.clear()
+        engine.refresh()
+        advanceUntilIdle()
+        assertEquals(listOf("applyMutations(1)", "deltas(5, 100)"), gateway.calls)
+    }
+
+    /**
+     * The owed repair survives a process death between the save that drops the
+     * refused entry and the repair read (#151, review B1): a new engine over the
+     * same stored document still restores the backend's row.
+     */
+    @Test
+    fun `a process death before the repair read still repairs on the next start`() = runTest(dispatcher) {
+        val doomed = TestScope(dispatcher)
+        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+        val first = engine(scope = doomed)
+        signIn("user-1")
+        first.updateBookHostRecord("book-1", "resumeOfferSettledFor") { JsonPrimitive("7:x") }
+
+        gateway.answerMutations(rejected("key-1", ReaderMutationKind.UPSERT))
+        gateway.gatesOn["deltas(0, 1)"] = kotlinx.coroutines.CompletableDeferred()
+        first.recordStatus("book-1", ReaderLibraryStatus.ARCHIVED)
+        advanceUntilIdle()
+        // Parked on the repair read: the drop is saved, the row still shows the refusal.
+        assertEquals(emptyList<AccountOutboxEntry>(), document("user-1").outbox)
+        assertEquals(ReaderLibraryStatus.ARCHIVED, document("user-1").book("book-1")!!.status)
+
+        doomed.cancel()
+        session.value = AccountSession.Loading
+        advanceUntilIdle()
+        gateway.calls.clear()
+        gateway.deltaResponses = queueOf(deltas(latestCursor = "5"))
+        val second = engine()
+        signIn("user-1")
+
+        val row = document("user-1").book("book-1")!!
+        assertEquals("the refused status is undone", ReaderLibraryStatus.QUEUED, row.status)
+        assertEquals(JsonPrimitive("7:x"), row.host["resumeOfferSettledFor"])
+        assertEquals(ReaderLibraryStatus.QUEUED, second.state.value.books.single().status)
+        assertEquals("5", document("user-1").cursor)
+        assertEquals(listOf("deltas(0, 1)", "library()", "progress()"), gateway.calls.drop(1))
+        assertEquals(AccountSyncPhase.IDLE, second.state.value.phase)
     }
 
     // ------------------------------------------------------ capability gate

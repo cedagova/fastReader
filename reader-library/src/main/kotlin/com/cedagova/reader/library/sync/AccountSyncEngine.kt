@@ -570,7 +570,7 @@ class AccountSyncEngine(
                     }
                     active = ActiveAccount(userId, store, document)
                     publish(
-                        phase = if (document.bootstrapped) {
+                        phase = if (!document.loadsShelf) {
                             AccountSyncPhase.IDLE
                         } else {
                             AccountSyncPhase.BOOTSTRAPPING
@@ -631,15 +631,18 @@ class AccountSyncEngine(
 
                 publish(AccountSyncPhase.SYNCING, trigger)
                 val drained = drainOutbox(account, gateway)
-                when {
-                    !account.document.bootstrapped -> bootstrap(account, gateway, trigger)
-                    // A refused change left its optimistic row on the shelf, and the
-                    // refusal carries no canonical state to put back (#151). The
-                    // merge-style repair read restores the backend's truth for it
-                    // and re-applies every change still queued; the next trigger
-                    // reads the stream from the new barrier.
-                    drained.repair -> bootstrap(account, gateway, trigger, announce = false)
-                    else -> readDeltas(account, gateway, trigger)
+                if (account.document.bootstrapped) {
+                    readDeltas(account, gateway, trigger)
+                } else {
+                    // Either the first read of the account, or the repair a refused
+                    // change is owed (#151): the drain cleared the cursor in the same
+                    // save that dropped the refused entry, so the owed repair outlives
+                    // a failed read or a process death and runs on the next trigger.
+                    // The merge-style read restores the backend's truth for the
+                    // refused row and re-applies every change still queued. A repair
+                    // over a populated shelf corrects it rather than loading it, so it
+                    // does not announce a bootstrap.
+                    bootstrap(account, gateway, trigger, announce = account.document.loadsShelf)
                 }
                 // A rejection the backend stated outranks a record this app could
                 // not place; both are surfaced, a rejection first.
@@ -686,19 +689,25 @@ class AccountSyncEngine(
      * admission.
      *
      * Returns the last rejection the backend reported, so the caller can
-     * surface its code — a rejection is not a failure of the run — and whether a
-     * refused library change needs the repair read (#151).
+     * surface its code — a rejection is not a failure of the run.
+     *
+     * A non-retryable refusal of a library change clears the cursor in the very
+     * save that drops the entry (#151). The refusal carries `{}`, so only a read
+     * of the account can undo its optimistic row; recording that owed read in
+     * the document rather than in memory is what keeps it owed when the read
+     * fails or the process dies before it — the next run finds no cursor and
+     * bootstraps, whatever happened in between. No schema change: a missing
+     * cursor already means "read the lists".
      */
     private suspend fun drainOutbox(
         account: ActiveAccount,
         gateway: ReaderLibraryGateway,
     ): DrainOutcome {
         val pending = account.document.outbox
-        if (pending.isEmpty()) return DrainOutcome(rejection = null, repair = false)
+        if (pending.isEmpty()) return DrainOutcome(rejection = null)
 
         val kept = mutableListOf<AccountOutboxEntry>()
         var rejection: AccountSyncError.Rejected? = null
-        var repair = false
         var index = 0
         while (index < pending.size) {
             val batch = pending.subList(index, minOf(index + MAX_BATCH, pending.size))
@@ -729,25 +738,32 @@ class AccountSyncEngine(
                     } else if (entry.resourceType.isLibraryItem()) {
                         // Dropped for good, and its optimistic row with it: a
                         // refusal carries `{}`, so nothing here can say what the
-                        // row was before. The repair read does (#151). A refused
-                        // position changed no row, so it needs none.
-                        repair = true
+                        // row was before. The repair read does (#151), and the
+                        // cleared cursor owes it durably, saved with the drop
+                        // below. A refused position changed no row, so it needs none.
+                        document = document.copy(cursor = null)
                     }
                 }
             }
             index += batch.size
             persist(account, document.copy(outbox = kept + pending.drop(index)))
         }
-        return DrainOutcome(rejection = rejection, repair = repair)
+        return DrainOutcome(rejection = rejection)
     }
 
     /** What one drain of the outbox reports to the run that made it. */
     private class DrainOutcome(
         /** The last rejection the backend stated, surfaced with its own code. */
         val rejection: AccountSyncError.Rejected?,
-        /** A non-retryable rejection dropped a library change whose optimistic row must be undone. */
-        val repair: Boolean,
     )
+
+    /**
+     * True when a bootstrap would load the shelf rather than correct it: no row
+     * is held yet. A document without a cursor but with rows is owed the repair
+     * read after a refusal (#151), which keeps the shelf on screen.
+     */
+    private val AccountLibraryDocument.loadsShelf: Boolean
+        get() = !bootstrapped && books.isEmpty()
 
     /**
      * Reads the account's lists and takes the stream's head as the cursor.

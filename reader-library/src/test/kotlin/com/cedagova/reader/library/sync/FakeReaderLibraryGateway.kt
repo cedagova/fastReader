@@ -38,6 +38,12 @@ class FakeReaderLibraryGateway : ReaderLibraryGateway {
     /** When set, the next operation parks here until the test completes it. */
     var gate: CompletableDeferred<Unit>? = null
 
+    /** Failures keyed by the exact call (`deltas(0, 1)`), each thrown once when that call is made. */
+    val failuresOn = mutableMapOf<String, ReaderAuthException>()
+
+    /** Gates keyed by the exact call: that call parks until the test completes it, once. */
+    val gatesOn = mutableMapOf<String, CompletableDeferred<Unit>>()
+
     var libraryResponses: ArrayDeque<ReaderLibraryResponse> =
         ArrayDeque(listOf(ReaderLibraryResponse(requestId = REQUEST_ID)))
     var progressResponses: ArrayDeque<ReaderProgressListResponse> =
@@ -86,6 +92,8 @@ class FakeReaderLibraryGateway : ReaderLibraryGateway {
         calls += call
         gate?.let { gate = null; it.await() }
         nextFailure?.let { nextFailure = null; throw it }
+        gatesOn.remove(call)?.await()
+        failuresOn.remove(call)?.let { throw it }
     }
 
     /** The last queued answer repeats, so a test states only the answers that matter. */

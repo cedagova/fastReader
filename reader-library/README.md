@@ -84,10 +84,14 @@ re-bootstrap merges the library/progress snapshot into the stored rows:
 
 A **non-retryable rejection** of a library change carries `{}`, so nothing in
 the answer says what the row was before the optimistic change. The engine drops
-the entry and, in the same run and under the same lock, runs that merge-style
-bootstrap as a repair read instead of reading the stream: the refused change
-leaves the shelf, every other queued change is re-applied, host records stay. A
-refused position changed no row and triggers no repair.
+the entry and clears the stored cursor **in the same save**, so the owed repair
+is durable: that run — or, if its read fails or the process dies first, the next
+one — finds no cursor and runs the merge-style bootstrap as a repair read
+instead of reading the stream. The refused change leaves the shelf, every other
+queued change is re-applied, host records stay, and the bootstrap stores a fresh
+cursor, so the repair runs once. A repair over a populated shelf does not
+announce `BOOTSTRAPPING`. A refused position changed no row and triggers no
+repair.
 
 **Host records (`AccountHostRecords`).**
 
