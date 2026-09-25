@@ -1,7 +1,7 @@
 # Implementation Plan: A197 outcomes: fastReader as the base for the Reader Android client
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/211
-- Planning PR: PLANNING-TODO
+- Planning PR: https://github.com/cedagova/fastReader/pull/212
 - Status: In progress
 - Root classification: PLANNING-TODO
 - Delivery topology: PLANNING-TODO
@@ -92,12 +92,54 @@ PLANNING-TODO
 
 ## Assumptions and open questions
 
-PLANNING-TODO — state `None` when resolved. For each material owner decision,
-record the same concise Owner decision brief shown to the owner: concrete
-problem and impact; facts versus assumptions; two or three viable options with
-behavior, benefit, risk or cost, reversibility, and execution impact;
-recommended option and reason; blocked nodes or acceptance outcomes; and the
-exact reply needed to continue.
+### Owner decision brief (pending)
+
+**Problem.** Three accepted outcomes cannot be planned without product-level
+choices the audit left to the owner: how the future Reader Android client takes
+the libraries (F010, which also decides how F002 ships test doubles), whether the
+general account logic becomes a library or a documented pattern (F003), and
+whether RSVP is part of the reusable engine (F004).
+
+**Facts (pinned `cedagova/fastReader@7978c71`).** The repository is public, so a
+git-based dependency needs no credential. No Reader Android repository exists
+yet. Both libraries are consumed as `project(...)` and depend on root catalog
+aliases; `:reader-library` has no keep rules of its own. `epub/` (1,392 lines)
+and `content/` (2,181) are Android-free; `timing/` (442) is RSVP only; `content/`
+also holds the RSVP tokenizer. **Assumptions:** the Reader client talks to the
+same Supabase-backed reader-api; the Reader client lives in the Chunipers org.
+
+**D1 — how the Reader client takes the libraries (F010, scopes F002/F011).**
+- A (recommended) Source copy: the Reader client copies the library directories
+  at a tagged version; each library gets a version and CHANGELOG so later fixes
+  can be ported. Cheapest, no cross-org dependency; copies can drift. Reversible
+  (the self-contained build it needs is also B's prerequisite).
+- B Git submodule + included build of this public repo: the client pins a commit
+  and stays byte-identical, but a work repo depends on a personal repo.
+- C Published Maven artifact: real versions, but a registry, signing/credentials
+  and a publish job for two libraries with one consumer.
+
+**D2 — general account logic (F003).**
+- A (recommended) New library module (e.g. `:reader-account`) that FastReader
+  consumes; one tested copy, one error mapping, copied like the other libraries.
+- B Keep it in `:app` and document it as the reference pattern to copy.
+
+**D3 — should the Reader client be able to reuse RSVP (F004)?**
+- A (recommended) Yes: move `epub/`, `content/` and `timing/` unchanged into
+  engine modules. Pure move, lowest risk; a client that skips RSVP ignores it.
+- B Not now: move `epub/` and `content/` unchanged; `timing/` stays in `:app`.
+- C No: also split the tokenizer out of `content/` and keep it in `:app`
+  (pipeline surgery, higher risk, same acceptance).
+
+**Blocks:** F002, F003, F004, F010, F011 leaves and the delivery order.
+**Resuming reply:** e.g. `D1 A, D2 A, D3 A`.
+
+### Planner decisions (reversible, recorded here)
+
+- F001: wrap `UserSession`/`JsonObject`/Ktor types behind library-owned types
+  rather than exposing them as `api`; there is no external consumer yet.
+- F008: no dependency-update automation is added (owner preference not stated).
+- F012: historical evidence is marked historical in place, not deleted
+  (deleting from `main` does not shrink history).
 
 ## Satisfaction proof
 
