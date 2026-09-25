@@ -4,7 +4,6 @@ import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.settings.ThemeChoice
-import com.cedagova.reader.engine.epub.EpubFixtures
 import com.cedagova.reader.engine.timing.PauseStrength
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -21,10 +20,11 @@ import org.junit.rules.TemporaryFolder
  * `catalog.json` is byte-for-byte what it was before the store's concerns were
  * split (#204): no format change, no migration.
  *
- * [GOLDEN] was written by the pre-split `LibraryRepository` running exactly
- * [writeEverything] — every kind of write the catalog takes: a folder and a
- * picked file, a settings change, a coalesced and a direct position, the
- * front-matter record, a removal. The split types must produce the same bytes
+ * [GOLDEN]`/catalog.json` was written by the pre-split `LibraryRepository`
+ * running exactly [writeEverything] over the three committed books beside it:
+ * every kind of write the catalog takes — a folder and a picked file, a
+ * settings change, a coalesced and a direct position, the front-matter record,
+ * a removal. The split types must produce the same bytes
  * from the same writes, and must write a stored document back unchanged.
  *
  * The migration tests in `store/CatalogStoreTest` are the other half of the
@@ -39,11 +39,12 @@ class CatalogBytesTest {
     private val gateway = FakeDocumentGateway()
     private val file: File by lazy { File(File(temporaryFolder.root, "catalog"), "catalog.json") }
 
-    private fun epub(title: String) = EpubFixtures.validEpub(
-        title = title,
-        identifier = "urn:uuid:$title",
-        bodyText = "A book called $title.",
-    )
+    /**
+     * The books, as committed bytes rather than built by `EpubFixtures`: a
+     * built archive's bytes depend on the zip library and the time zone of the
+     * machine running the test, and a book's id is the digest of its bytes.
+     */
+    private fun epub(title: String): ByteArray = resource("${title.lowercase()}.epub").readBytes()
 
     private fun library(scope: CoroutineScope): DeviceLibrary {
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
@@ -100,10 +101,14 @@ class CatalogBytesTest {
         assertEquals(golden(), file.readText())
     }
 
-    private fun golden(): String = javaClass.getResource(GOLDEN)!!.readText()
+    private fun golden(): String = resource("catalog.json").readText()
+
+    private fun resource(name: String) = requireNotNull(javaClass.getResource("$GOLDEN/$name")) {
+        "missing $GOLDEN/$name"
+    }
 
     private companion object {
         const val NOW = 1_700_000_000_000L
-        const val GOLDEN = "/catalog-golden-204.json"
+        const val GOLDEN = "/catalog-golden-204"
     }
 }
