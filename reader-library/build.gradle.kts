@@ -25,8 +25,19 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// The module's own version: a host copies this directory at the tag
+// `reader-library/v<version>` (docs/library-consumption.md); CHANGELOG.md
+// beside this file records what changed between two versions.
+version = "0.1.0"
+
 android {
     namespace = "com.cedagova.reader.library"
+
+    defaultConfig {
+        // What a shrinking host must keep for this module's own serialized
+        // types; see the file for why.
+        consumerProguardFiles("consumer-rules.pro")
+    }
 
     // The shared reader-api contract checker (#208) is :reader-auth's test
     // support; this module's contract test compiles the same source.

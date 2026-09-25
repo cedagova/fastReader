@@ -15,6 +15,11 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// The module's own version: a host copies this directory at the tag
+// `reader-auth/v<version>` (docs/library-consumption.md); CHANGELOG.md beside
+// this file records what changed between two versions.
+version = "0.1.0"
+
 android {
     namespace = "com.cedagova.reader.auth"
 
