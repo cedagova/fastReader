@@ -2,7 +2,7 @@
 
 - Audit ID: `A197`
 - Audit key: `reader-android-base-readiness-20260924`
-- Status: Review
+- Status: Decision ready
 - Dossier PR: https://github.com/cedagova/fastReader/pull/197
 - Started: 2026-09-24
 - Decision owner: cedagova (Cesar Gonzalez)
@@ -117,7 +117,10 @@ None.
 | Repository docs (`README.md`, module READMEs, `CONTRACT.md`, `docs/agent-first-development.md`, `docs/release.md`) | In | Sampled concrete claims against code | Several contradictions; no architecture/module map (F012). |
 | Agent guides (`AGENTS.md`, `CLAUDE.md`) | In | `.gitignore`, local copies | Untracked and stale (F012). |
 | Historical records (`docs/evidence`, `docs/plans`, `docs/product-definitions`, `docs/release-notes`, `docs/audits`) | In | Sizes, file counts, status lines | 61% of the tracked tree is evidence media; #1 plan/definition statuses stale (F012). |
-| Identity tooling (`bin/`, `.githooks/`) | In | File contents, diff against `.github-infra/bin/gh-personal` | Reusable but a divergent second copy (F012). |
+| Identity tooling (`bin/`, `.githooks/`) | In | File contents | Account-pinned and reusable as-is; no finding (GAP-002 closed the comparison with an out-of-scope repository). |
+| Crash reporting (`crash/`, `crash/ui/`) | In | Imports of all 6 files | Self-contained (imports only itself and `R`); shares the duplicated `TouchTarget` of F006; no separate finding. |
+| Debug source set (`app/src/debug`) | In | File list: `AndroidManifest.xml`, `network_security_config.xml`, `PickerHostActivity`, `CrashInducerActivity` | Debug-only test harness and cleartext config; FastReader-specific, no finding. |
+| App manifest and resources (`app/src/main/AndroidManifest.xml`, `res/`) | In | Manifest components, resource directories (`values`, `values-es`, `values-night`, `xml`, `drawable`, `mipmap`) | FastReader-specific product surface a new client replaces; no dimension resources (F006); no finding. |
 | Security of token/session handling | Out | Charter exclusion (A83, #167, #168) | Not re-assessed. |
 | Chunipers backend repositories | Out | Charter exclusion | Pinned OpenAPI copy read only; whether the pin matches reader-api HEAD not checked. |
 | UI/visual design, performance, Play distribution | Out | Charter exclusion | Not assessed. |
@@ -128,26 +131,26 @@ None.
 
 | ID | Title | Decision | Confidence | Review | Planning readiness | Outcome issue | Outcome umbrella |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `A197-F001` | The Reader libraries' public API is accidental: provider and transport types leak and nothing checks the surface | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F002` | A host cannot substitute or test against the libraries without writing its own seams and fakes | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F003` | About 2,070 lines of general Reader-client logic live in `:app`, where a second client must rewrite them | Candidate | Medium | Pending | Pending | Not required | Not required |
-| `A197-F004` | The EPUB and tokenizer engines are Android-free but trapped in `:app` behind a package cycle | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F005` | The app shell has no copyable wiring, state-holder or navigation convention | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F006` | Screen files are god-sized and the design system is colours only, so UI primitives are copied per screen | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F007` | `LibraryRepository` owns about nine unrelated concerns | Candidate | Medium | Pending | Pending | Not required | Not required |
-| `A197-F008` | Build settings are copied into every module and static analysis is thin | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F009` | CI never builds what ships, and the release script runs no gates and hides a failed query | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F010` | The libraries have no recorded consumption mode, version or self-sufficient shrink rules | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F011` | The reader-api contract gate covers `:reader-library` only | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F012` | There is no tracked map of the codebase for a new client, and several docs contradict the code | Candidate | High | Pending | Pending | Not required | Not required |
-| `A197-F013` | `AccountSyncEngine.kt` is one 1,431-line file with about ten responsibilities | Candidate | Medium | Pending | Pending | Not required | Not required |
+| `A197-F001` | The Reader libraries' public API is accidental: provider and transport types leak and nothing checks the surface | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F002` | A host cannot substitute or test against the libraries without writing its own seams and fakes | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F003` | About 2,070 lines of general Reader-client logic live in `:app`, where a second client must rewrite them | Candidate | Medium | Corroborated | Ready | Not required | Not required |
+| `A197-F004` | The EPUB and tokenizer engines are Android-free but trapped in `:app` behind a package cycle | Candidate | High | Challenged | Ready | Not required | Not required |
+| `A197-F005` | The app shell has no copyable wiring, state-holder or navigation convention | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F006` | Screen files are god-sized and the design system is colours only, so UI primitives are copied per screen | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F007` | `LibraryRepository` owns about nine unrelated concerns | Candidate | Medium | Corroborated | Ready | Not required | Not required |
+| `A197-F008` | Build settings are copied into every module and static analysis is thin | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F009` | CI never builds what ships, and the release script runs no gates and hides a failed query | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F010` | The libraries have no recorded consumption mode, version or self-sufficient shrink rules | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F011` | The reader-api contract gate covers `:reader-library` only | Candidate | High | Corroborated | Ready | Not required | Not required |
+| `A197-F012` | There is no tracked map of the codebase for a new client, and several docs contradict the code | Candidate | High | Challenged | Ready | Not required | Not required |
+| `A197-F013` | `AccountSyncEngine.kt` is one 1,431-line file with about ten responsibilities | Candidate | Medium | Corroborated | Ready | Not required | Not required |
 
 ## A197-F001 — The Reader libraries' public API is accidental: provider and transport types leak and nothing checks the surface
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -252,8 +255,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -357,8 +360,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: Medium
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -394,8 +397,11 @@ All paths under `app/src/main/java/com/cedagova/fastreader/account/`.
   is constructed three times (`app/.../FastReaderApplication.kt:108,122,142`)
   and ~100 lines of wiring, foreground hooks (:237-243, :290-297) and the
   session bridge (`ReaderAccountState.kt:62-67`) must be repeated by any host.
-- Direct: the controller's error mapping duplicates the library's own
-  (`reader-library/.../sync/AccountLibraryState.kt:64-130`).
+- Direct: exceptions are mapped to outcomes in four places —
+  `ReaderAccountController.kt:188`, `library/AccountDownloads.kt`,
+  `library/AccountImports.kt`, and the library's own
+  `reader-library/.../sync/AccountLibraryState.kt:64-130` (count corrected
+  from two per review).
 
 ### Cause
 
@@ -405,8 +411,8 @@ the network layer was deliberately placed in libraries (A83-F007).
 ### Effect
 
 The Reader client either rewrites ~2,000 lines already proven against stage or
-copies them and their tests, after which the two copies drift. The duplicated
-error mapping is already a second source of truth inside one repository.
+copies them and their tests, after which the two copies drift. The four
+error mappings are already competing sources of truth inside one repository.
 
 ### Recommended outcome
 
@@ -464,8 +470,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Challenged
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -489,11 +495,18 @@ Paths under `app/src/main/java/com/cedagova/fastreader/`.
   `content/EpubContentPipeline.kt` (6 imports) import `epub`.
 - Direct: `timing/RsvpTimingEngine.kt:3-6` depends on `content` token types;
   `settings/ReaderSettings.kt:3` depends on `timing`.
-- Inference: reading positions are keyed to the tokenizer
-  (`TokenPosition(bookDigest, tokenIndex, pipelineVersion)`,
-  `reader/ui/ReaderRoute.kt:397`, `ContentPipelineVersion`). Any client that
-  must agree on a synced position with FastReader needs this same pipeline, not
-  a copy.
+- Direct: the token index is device-local. What syncs is a chapter `href`
+  plus a book fraction (`account/library/PortableReadingPosition.kt:49-58`),
+  and on the way back the fraction is clamped into the named chapter's range so
+  that "two clients that disagree slightly about how far through the book a
+  chapter starts still land inside the right chapter" (:68-72). Book identity
+  is a digest of the whole file. So a diverging tokenizer copy would shift a
+  resumed position *within* a chapter, not break cross-client agreement.
+- Direct: shared test fixtures for the engines live in
+  `app/src/sharedTest/java/com/cedagova/fastreader/{content/ContentFixtures.kt,epub/EpubFixtures.kt,epub/TestByteChannel.kt}`.
+- Direct: part of `content/` is shaped by RSVP, not only `timing/`:
+  `content/TokenStream.kt:142,204` carries the pivot-cue offsets, and
+  `content/XhtmlExtractor.kt:25` frames its extraction rules around RSVP.
 
 ### Cause
 
@@ -502,21 +515,23 @@ Hypothesis: the engines were written inside the single original `:app` module
 
 ### Effect
 
-The Reader client cannot depend on the engines; copying them risks tokenizer
-drift, which would silently break position agreement across clients. The
-cycle blocks a clean split as-is.
+The Reader client cannot depend on ~3,500 lines of tested, Android-free EPUB
+parsing and text extraction; it must copy them (and then maintain two copies)
+or rewrite them. Two copies would also resume a synced position at slightly
+different points inside a chapter. The cycle blocks a clean split as-is.
 
 ### Recommended outcome
 
 The EPUB archive/inspection engine and the content/tokenizer pipeline live in
 acyclic, Android-free Gradle module(s) with their own tests and a short
-contract README; `:app` consumes them unchanged. `timing` is extracted only if
-the owner wants RSVP reusable.
+contract README; `:app` consumes them unchanged. The RSVP-specific parts
+(`timing/` and the RSVP concerns inside `content/`) are separated or extracted
+only if the owner wants RSVP reusable.
 
 ### Outcome boundary
 
 In: moving and decoupling `epub/` and `content/` (and optionally `timing/`),
-their tests, and the cycle. Out: Kotlin Multiplatform (`javax.xml` DOM is
+their tests and `sharedTest` fixtures, and the cycle. Out: Kotlin Multiplatform (`javax.xml` DOM is
 JVM-only), tokenizer behavior changes, pipeline version bumps.
 
 ### Cohesion rationale
@@ -535,7 +550,9 @@ between them must be cut in the same change that separates them.
 
 ### Planning inputs
 
-- Owner input: does the Reader client offer RSVP? (scopes `timing`).
+- Owner input: does the Reader client offer RSVP? That scopes `timing/` and
+  the RSVP-specific parts of `content/` (`TokenStream`, `XhtmlExtractor`).
+- The `app/src/sharedTest` engine fixtures must move with the engines.
 - `app/src/androidTest/.../ContentPipelineDeviceTest.kt` exercises the
   pipeline on device and must follow it.
 - Where `PortableReadingPosition` lives relative to the content module
@@ -545,6 +562,8 @@ between them must be cut in the same change that separates them.
 ### Limitations
 
 Purity is proven by import scan only; no trial compile outside `:app` was run.
+The earlier candidate overstated the sync effect (GAP-001); position agreement
+is by chapter plus fraction and does not require an identical tokenizer.
 
 ### Decision rationale
 
@@ -554,8 +573,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -591,9 +610,11 @@ Paths under `app/src/main/java/com/cedagova/fastreader/`.
   reset by hand on "Open with" (:172-181); a blocked-resume reason is saved as
   a `.name` string and parsed back (:203, :323-327).
 - Direct: package cycles `library`↔`external`
-  (`external/ExternalOpenController.kt:6-8`), `settings`↔`library`
-  (`settings/ui/SettingsRoute.kt:18`), `account`↔`library`; the account coupling
-  sits only in `*/ui` files.
+  (`external/ExternalOpenController.kt:6-8`), `reader`↔`external` (same file),
+  `settings`↔`library` (`settings/ui/SettingsRoute.kt:18`), `reader`↔`settings`
+  (`settings/ui/SettingsScreen.kt`, `settings/ui/SettingsPreview.kt` import
+  `reader`), `account`↔`library`; the account coupling sits only in `*/ui`
+  files.
 - Direct: no tracked document describes `:app`'s layers or wiring (see F012).
 
 ### Cause
@@ -659,8 +680,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -756,8 +777,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: Medium
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -833,8 +854,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -916,8 +937,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -939,9 +960,11 @@ rather than skipping a guard.
   with no `concurrency` group, so each PR commit runs twice (visible in the run
   list). Actions are pinned to major tags, not SHAs.
 - Direct: `scripts/release.sh` runs no tests or lint and does not check CI
-  status; its forward-only guard queries releases with `2>/dev/null … || true`
-  (:119-120), so a failed `gh` query yields an empty `HIGHEST` and the guard is
-  silently skipped (:121).
+  status. Two state queries fail open: the existing-tag check
+  (`release view … >/dev/null 2>&1`, :112) treats any `gh` failure — auth,
+  network — as "tag does not exist", and the forward-only guard queries
+  releases with `2>/dev/null … || true` (:119-120), so a failed query yields an
+  empty `HIGHEST` and the guard is silently skipped (:121).
 - Direct: `app/build.gradle.kts` enables `isMinifyEnabled` without
   `isShrinkResources` (lint `NotShrinkingResources`), and
   `app/proguard-rules.pro` is empty.
@@ -963,8 +986,9 @@ transient GitHub failure can let a release skip the forward-only version guard
 
 ### Recommended outcome
 
-CI builds the minified release variant (unsigned is fine) and compiles
-instrumented tests on every change, runs once per change, and pins its
+CI proves the release variant's R8 step (for example by running the minify
+task, which needs no signing key) without loosening the build's deliberate
+refusal to package unsigned, and compiles instrumented tests on every change, runs once per change, and pins its
 actions; the release script fails when a state query fails and refuses to
 publish from a commit whose gates have not passed.
 
@@ -985,7 +1009,7 @@ artifact" — across the two files that define it.
   `androidTest` compilation fails CI.
 - Each PR commit triggers one checks run.
 - With `gh` failing, `release.sh` stops with an error instead of skipping the
-  version guard; a test in `scripts/test-release-publish.sh` or equivalent
+  existing-tag check or the version guard; a test in `scripts/test-release-publish.sh` or equivalent
   proves it.
 - Release-script proof (the existing release test) still passes.
 
@@ -995,6 +1019,8 @@ artifact" — across the two files that define it.
   goldens and the release-script manifest checks.
 - The release test `scripts/test-release-publish.sh` exists and is the place
   to prove the fail-loud path.
+- The unsigned-packaging refusal (`app/build.gradle.kts:227-236`) is a
+  control to keep; CI must prove R8 without disabling it (GAP-004).
 
 ### Limitations
 
@@ -1009,8 +1035,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -1095,8 +1121,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -1184,10 +1210,10 @@ Pending.
 
 - Decision: Candidate
 - Confidence: High
-- Review: Pending
-- Planning readiness: Pending
+- Review: Challenged
+- Planning readiness: Ready
 - Cause status: Confirmed
-- Expected implementation repositories: `cedagova/fastReader`, `cedagova/.github-infra`
+- Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
 - Outcome umbrella: Not required
 
@@ -1225,8 +1251,6 @@ or stale status mixed into the template.
 - Direct: `docs/evidence` is 39 directories, 289 files, ~32 MB — about 61% of
   the tracked tree. `docs/plans/cedagova-fastReader-1/plan.md:5` still says
   "Ready for implementation" and `definition.md:6` "Ready for planning".
-- Direct: `bin/gh-personal` differs from `.github-infra/bin/gh-personal`: two
-  copies of the identity tooling.
 
 ### Cause
 
@@ -1245,12 +1269,13 @@ historical evidence along.
 A tracked architecture and "starting a new client from this" document; library
 READMEs that match the code, including a `:reader-library` host-requirements
 section; historical evidence and stale statuses separated from the template
-content; one home for identity tooling.
+content.
 
 ### Outcome boundary
 
 In: tracked docs, module READMEs, doc comments naming FastReader in libraries,
-the evidence/plan layout, identity-tooling location. Out: rewriting history to
+the evidence/plan layout. Out: the identity tooling in `bin/` (reviewed as not
+bearing on the Reader client, GAP-002); rewriting history to
 shrink the packed repository; the personal untracked guides themselves (they
 may stay personal, but the tracked doc must not depend on them); docs for
 structural changes not yet made (each structural outcome updates its own docs).
@@ -1269,12 +1294,9 @@ it can check every claim against code.
   no FastReader naming.
 - Historical evidence and stale plan statuses are either moved out of the
   template path or clearly marked historical.
-- One copy of the identity tooling, or a documented reason for two.
 
 ### Planning inputs
 
-- The identity-tooling home may be `cedagova/.github-infra`; that is why it is
-  in the expected repositories.
 - Sequence last, or re-check after F001–F011 land, because they change what
   the map says.
 - Removing `docs/evidence` from `main` does not shrink history; whether that
@@ -1293,8 +1315,8 @@ Pending.
 
 - Decision: Candidate
 - Confidence: Medium
-- Review: Pending
-- Planning readiness: Pending
+- Review: Corroborated
+- Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
 - Outcome issue: Not required
@@ -1388,6 +1410,23 @@ Pending.
   restructuring).
 - F008 before or with F004 (a new module multiplies duplicated config).
 - F012 last, or re-checked after the others.
+- F003's library assembly and F005's composition root both change
+  `FastReaderApplication` wiring; plan them together (review note).
+
+### Review reconciliation
+
+Independent review:
+https://github.com/cedagova/fastReader/pull/197#pullrequestreview-5311769040
+(exact head `c9339932d44f65e99e416eb5cd7cf71ec76e4c06`, `CHANGES_REQUESTED`).
+
+| Item | Resolution |
+| --- | --- |
+| GAP-001 — F004's sync-agreement effect overstated | Incorporated into F004 and `summary.md`: effect restated as reuse of ~3,500 engine lines; sync agreement is chapter + fraction; RSVP scope covers parts of `content/`; `sharedTest` fixtures move with the engines. Lead verified `PortableReadingPosition.kt:49-58,68-72`. |
+| GAP-002 — F012 identity-tooling item rests on an unpinned out-of-scope repository | Incorporated: item and `cedagova/.github-infra` removed from F012 and the summary. |
+| GAP-003 — coverage rows missing | Incorporated: rows for `crash/`, `app/src/debug`, manifest and resources added; no new finding. |
+| GAP-004 — F009 "unsigned is fine" conflicts with the unsigned-packaging control; `release.sh:112` fails open | Incorporated into F009 condition, recommended outcome, acceptance and planning inputs. Lead verified `release.sh:112`. |
+| F003 count (four error mappings) and F005 cycles (two more) | Incorporated as evidence corrections; acceptance unchanged. |
+| F003/F005 share `FastReaderApplication` wiring | Recorded under Dependencies. |
 
 ### Residual unknowns
 
@@ -1424,8 +1463,8 @@ Pending.
 - [x] Every target has a full baseline commit SHA.
 - [x] The coverage inventory accounts for every in-scope surface.
 - [x] Every claim has proportionate, reproducible evidence.
-- [ ] The independent review is complete.
-- [ ] Every review challenge and gap is reconciled or named as unresolved.
+- [x] The independent review is complete.
+- [x] Every review challenge and gap is reconciled or named as unresolved.
 - [ ] Every finding is accepted, rejected, or deferred.
 - [x] Every finding records the evidence-backed repositories expected to change if its recommendation is accepted.
 - [ ] Every accepted finding has `Planning readiness: Ready` from the independent reviewer.

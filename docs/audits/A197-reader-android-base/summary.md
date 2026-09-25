@@ -2,7 +2,7 @@
 
 - Audit ID: `A197`
 - Audit key: `reader-android-base-readiness-20260924`
-- Status: In progress
+- Status: Decision ready
 - Prepared: 2026-09-24
 - Completed: Not complete
 - Dossier PR: https://github.com/cedagova/fastReader/pull/197
@@ -28,21 +28,20 @@ needs a new feature; all of it is structure, tooling and documentation.
 ## Why it matters
 
 Whatever is not fixed here gets copied into the Reader client, or rewritten
-there. Rewriting the account logic or the tokenizer is worse than copying:
-reading positions are keyed to the tokenizer, so two diverging copies would
-silently disagree on synced positions.
+there. Roughly 5,500 lines — the account logic and the EPUB/text engines —
+are already tested against real books and the stage backend; rewriting them
+throws that away, and copying them leaves two versions to keep in step.
 
 ## What we decided
 
 - **Recommended dispositions:** accept F001–F012; defer F013 (splitting the
   sync engine is a readability gain with real concurrency risk, and its tests
   are strong — revisit when the Reader client needs to change it).
-- **Owner decisions:** Pending.
-- **Decisions planning will need from the owner** (not needed to accept):
-  how the Reader client consumes the libraries — source copy, submodule or
-  published artifact (F010, which also scopes F002 and F003); whether general
-  account logic moves into a library or stays as a documented reference
-  (F003); whether the Reader client offers RSVP (scopes `timing/` in F004).
+- **Owner decisions:** Pending
+- **Planning will need from you** (not needed to accept): how the Reader
+  client consumes the libraries — copy, submodule or published artifact
+  (F010); whether account logic moves into a library or stays a reference
+  (F003); whether the Reader client offers RSVP (F004).
 
 ## What happens next
 
@@ -59,7 +58,7 @@ silently disagree on synced positions.
 | CI builds the minified release; release script fails loud (F009) | cedagova/fastReader | Pending owner decision |
 | Recorded consumption mode, library versions and own keep rules (F010) | cedagova/fastReader | Pending owner decision |
 | One contract gate for both libraries (F011) | cedagova/fastReader | Pending owner decision |
-| Tracked architecture map, docs that match the code, template hygiene (F012) | cedagova/fastReader, cedagova/.github-infra | Pending owner decision |
+| Tracked architecture map, docs that match the code, template hygiene (F012) | cedagova/fastReader | Pending owner decision |
 | Sync engine readable in parts (F013) | cedagova/fastReader | Recommended deferral |
 
 ## Limits and unknowns
