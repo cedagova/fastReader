@@ -12,8 +12,9 @@
 // and no error policy of its own, and every failure it surfaces is one of
 // ReaderAuthException's existing branches, thrown through unchanged.
 //
-// contracts/ holds the pinned OpenAPI document and its sha256;
-// ReaderLibraryContractTest is the drift gate (owner decision P1).
+// The pinned OpenAPI document both libraries share lives in
+// reader-auth/contracts/ (#208); ReaderLibraryContractTest is this module's
+// drift gate against it (owner decision P1).
 //
 // The public surface is recorded in api/reader-library.api and checked by
 // `./gradlew check` (build-logic, #198); each `api` dependency below says why a
@@ -26,15 +27,22 @@ plugins {
 
 android {
     namespace = "com.cedagova.reader.library"
+
+    // The shared reader-api contract checker (#208) is :reader-auth's test
+    // support; this module's contract test compiles the same source.
+    sourceSets {
+        getByName("test").kotlin.directories.add("../reader-auth/src/contractTest/kotlin")
+    }
 }
 
-// ReaderLibraryContractTest reads contracts/ from the filesystem, not from the
-// test classpath, so Gradle does not see the pinned document as an input of
-// the test task on its own. Without this declaration a changed contract file
-// still returns the last green result FROM-CACHE / UP-TO-DATE and the drift
-// gate never runs; the pin only bit under --rerun-tasks --no-build-cache.
+// ReaderLibraryContractTest reads reader-auth/contracts/ from the filesystem,
+// not from the test classpath, so Gradle does not see the pinned document as an
+// input of the test task on its own. Without this declaration a changed
+// contract file still returns the last green result FROM-CACHE / UP-TO-DATE and
+// the drift gate never runs; the pin only bit under --rerun-tasks
+// --no-build-cache.
 tasks.withType<Test>().configureEach {
-    inputs.dir("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(rootProject.file("reader-auth/contracts")).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 dependencies {

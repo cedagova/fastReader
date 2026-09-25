@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * It is the mirror image of `PublicationTransferGrant` in `Imports.kt` and is
  * modelled the same way — one Kotlin type per schema, every wire name spelled
  * out, pinned to the document by `ReaderLibraryContractTest`. Read
- * `contracts/reader-api.openapi.json` (`ReaderAssetGrantResponse`,
+ * `reader-auth/contracts/reader-api.openapi.json` (`ReaderAssetGrantResponse`,
  * `ReaderAssetGrant`) for the authority; this file only says what shape
  * FastReader reads it in.
  *

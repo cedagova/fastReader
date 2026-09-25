@@ -235,11 +235,11 @@ repository:**
 
 | | |
 | --- | --- |
-| Document | [`reader-library/contracts/reader-api.openapi.json`](reader-library/contracts/reader-api.openapi.json) |
+| Document | [`reader-auth/contracts/reader-api.openapi.json`](reader-auth/contracts/reader-api.openapi.json) — the one document both libraries are gated against (#208) |
 | Source | `Chunipers/reader-api@909174aff6a380514da7b81263d69a4e653cfe76`, `contracts/reader-api.openapi.json`, byte for byte |
-| sha256 | `e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90`, recorded in [`reader-library/contracts/reader-api.openapi.json.sha256`](reader-library/contracts/reader-api.openapi.json.sha256) |
-| Gate | `ReaderLibraryContractTest` recomputes that digest on every run, then checks every field name, JSON type, enum member and required flag the module sends or reads against the document's schemas |
-| Updating the pin | [`reader-library/contracts/PINNED.md`](reader-library/contracts/PINNED.md) |
+| sha256 | `e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90`, recorded in [`reader-auth/contracts/reader-api.openapi.json.sha256`](reader-auth/contracts/reader-api.openapi.json.sha256) |
+| Gate | `ReaderLibraryContractTest` and `ReaderAuthContractTest`, through one shared checker, recompute that digest on every run, then check every field name, JSON type, enum member and required flag either library sends or reads against the document's schemas |
+| Updating the pin | [`reader-auth/contracts/PINNED.md`](reader-auth/contracts/PINNED.md) |
 
 Drift between the module and a newer published contract is a proposal to
 Chunipers, never a local workaround: the models move to follow the contract, and

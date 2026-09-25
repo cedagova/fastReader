@@ -21,7 +21,7 @@ import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
  * tests without a mock engine; [ReaderLibraryClient] is the one production
  * implementation. There is deliberately no generic `call(path, body)` here:
  * every request FastReader can send is one of the eleven below, and each is
- * declared by the pinned OpenAPI document in `contracts/`.
+ * declared by the pinned OpenAPI document in `reader-auth/contracts/`.
  *
  * Five of them are the publication-import lifecycle (#116) and the last is the
  * asset download grant (#118). All six carry the
