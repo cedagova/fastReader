@@ -288,7 +288,7 @@ data class ReadingState(
      * position, and the refusal is the point — the file changed underneath it.
      *
      * A write that carries no fingerprint leaves an already-stored one alone
-     * (see `LibraryRepository.writeReadingState`), so a book only ever gains this
+     * (see `ReadingPositions.write`), so a book only ever gains this
      * protection.
      */
     val structuralFingerprint: String? = null,

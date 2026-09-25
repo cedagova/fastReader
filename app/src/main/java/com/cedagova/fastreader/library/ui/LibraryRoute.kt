@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReaderSettingsStore
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
@@ -29,6 +30,8 @@ import com.cedagova.reader.account.library.AccountShelf
 @Composable
 fun LibraryRoute(
     repository: LibraryRepository,
+    /** The library order is a setting (REQ-203); the screen changes it through here. */
+    settingsStore: ReaderSettingsStore,
     /** Where the rows' cover thumbnails are cached. */
     covers: CoverStore,
     /** The signed-in account's library and its operations (#114). */
@@ -181,7 +184,7 @@ fun LibraryRoute(
         coverLoader = coverLoader,
         onDismissResumeNotice = onDismissResumeNotice,
         onOpenSettings = onOpenSettings,
-        onOrderChange = { repository.requestUpdateSettings { settings -> settings.copy(libraryOrder = it) } },
+        onOrderChange = { settingsStore.requestUpdate { settings -> settings.copy(libraryOrder = it) } },
         modifier = modifier,
     )
 }

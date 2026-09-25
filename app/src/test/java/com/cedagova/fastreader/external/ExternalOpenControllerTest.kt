@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.external
 
 import com.cedagova.fastreader.library.CatalogIngestor
+import com.cedagova.fastreader.library.DeviceLibrary
 import com.cedagova.fastreader.library.FakeDocumentGateway
 import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
@@ -213,14 +214,13 @@ class ExternalOpenControllerTest {
     private fun TestScope.controller(): ExternalOpenController {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
-        repository = LibraryRepository(
+        repository = DeviceLibrary(
             store = FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")),
             ingestor = CatalogIngestor(gateway, covers),
             gateway = gateway,
-            covers = covers,
             scope = backgroundScope,
             ioDispatcher = dispatcher,
-        )
+        ).repository
         return ExternalOpenController(repository, gateway, this, dispatcher)
     }
 

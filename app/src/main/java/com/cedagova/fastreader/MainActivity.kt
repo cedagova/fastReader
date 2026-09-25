@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
             // REQ-022's single application point: the reader's theme and text size
             // wrap every destination, so both apply to the library and the reader
             // without either screen knowing the settings exist.
-            val settings by graph.repository.settings.collectAsStateWithLifecycle()
+            val settings by graph.settingsStore.settings.collectAsStateWithLifecycle()
             FastReaderTheme(darkTheme = settings.theme.isDark(), fontSize = settings.fontSize) {
                 FastReaderApp(graph)
             }

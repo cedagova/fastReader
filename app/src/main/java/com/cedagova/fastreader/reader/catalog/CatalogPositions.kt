@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.reader.catalog
 
 import com.cedagova.fastreader.account.library.PortableReadingPosition
-import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReadingPositions
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.ui.accountBookIdForDevice
 import com.cedagova.fastreader.reader.ReaderPosition
@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
  * meet, so neither package has to know the other's shape.
  */
 internal class CatalogPositions(
-    private val repository: LibraryRepository,
+    private val positions: ReadingPositions,
     /**
      * Where a portable position goes, or null when this build has no account
      * surface at all (#120).
@@ -36,10 +36,10 @@ internal class CatalogPositions(
     private val account: AccountShelf? = null,
 ) : ReaderPositions {
 
-    override val failure: StateFlow<String?> get() = repository.persistenceFailure
+    override val failure: StateFlow<String?> get() = positions.persistenceFailure
 
     override fun restore(bookId: String): ReaderPosition? {
-        val stored = repository.readingState(bookId) ?: return null
+        val stored = positions.readingState(bookId) ?: return null
         return ReaderPosition(
             position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
             progressFraction = stored.progressFraction,
@@ -49,7 +49,7 @@ internal class CatalogPositions(
     }
 
     override fun record(bookId: String, position: ReaderPosition) {
-        repository.recordReadingState(
+        positions.record(
             bookId,
             ReadingState(
                 bookDigest = position.position.bookDigest,
@@ -65,7 +65,7 @@ internal class CatalogPositions(
     }
 
     override fun flush() {
-        repository.flushReadingState()
+        positions.flush()
     }
 
     /**

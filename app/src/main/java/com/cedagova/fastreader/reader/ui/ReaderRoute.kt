@@ -28,7 +28,10 @@ import com.cedagova.fastreader.R
 import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import com.cedagova.fastreader.external.ExternalOpen
 import com.cedagova.fastreader.external.ExternalOpenController
+import com.cedagova.fastreader.library.BookBytes
 import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReaderSettingsStore
+import com.cedagova.fastreader.library.ReadingPositions
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.ui.PickPersistableDocuments
 import com.cedagova.fastreader.reader.BookOpenRequest
@@ -51,7 +54,14 @@ import kotlinx.coroutines.flow.first
  */
 @Composable
 fun ReaderRoute(
+    /** The catalog, for the open book's row, and "Add to library" (REQ-103). */
     repository: LibraryRepository,
+    /** The cues, timing and presentation the reader draws with (LEAF302). */
+    settingsStore: ReaderSettingsStore,
+    /** Where each book is read to, and the front-matter record (REQ-016, REQ-202). */
+    positions: ReadingPositions,
+    /** A library book's bytes (#118). */
+    bookBytes: BookBytes,
     /** The book handed over from another app, if any (REQ-103), and its identity work. */
     handover: ExternalOpenController,
     target: ReaderTarget,
@@ -76,10 +86,12 @@ fun ReaderRoute(
     // LEAF202 built. This is the whole of "live preview" outside the settings
     // screen: the reader is drawn from the same value the settings screen writes,
     // so a change made mid-book is on screen as soon as the store accepts it.
-    val settings by repository.settings.collectAsStateWithLifecycle()
+    val settings by settingsStore.settings.collectAsStateWithLifecycle()
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
-            initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository, account)) }
+            initializer {
+                ReaderViewModel(CatalogBooks(repository, bookBytes), CatalogPositions(positions, account))
+            }
         },
     )
     // Keyed on which book, not on the target value: an external target changes
@@ -152,7 +164,7 @@ fun ReaderRoute(
     // Answering settles the offer for this book for good, whichever way it was
     // answered: the requirement is that it is *offered* once (REQ-202).
     val settleFrontMatterOffer = {
-        offer?.positionKey?.let { repository.requestMarkFrontMatterOffered(it) }
+        offer?.positionKey?.let { positions.requestMarkFrontMatterOffered(it) }
         Unit
     }
     // REQ-511. The reader knows the account holds a place ahead of this one and

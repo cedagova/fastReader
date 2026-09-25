@@ -42,16 +42,15 @@ class LibraryRepositoryTest {
         bodyText = "A book called $title.",
     )
 
-    private fun repository(
+    private fun library(
         store: CatalogStore = FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")),
         scope: kotlinx.coroutines.CoroutineScope,
-    ): LibraryRepository {
+    ): DeviceLibrary {
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
-        return LibraryRepository(
+        return DeviceLibrary(
             store = store,
             ingestor = CatalogIngestor(gateway, covers, clock = { now }),
             gateway = gateway,
-            covers = covers,
             scope = scope,
             ioDispatcher = UnconfinedTestDispatcher(
                 scope.coroutineContext[kotlinx.coroutines.test.TestCoroutineScheduler],
@@ -63,12 +62,12 @@ class LibraryRepositoryTest {
     @Test
     fun `adding books publishes the catalog and a completed ingestion state`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(scope = backgroundScope)
+        val library = library(scope = backgroundScope)
 
-        repository.addPickedBooks(listOf("doc://a"))
+        library.repository.addPickedBooks(listOf("doc://a"))
 
-        assertEquals(1, repository.catalog.value.books.size)
-        val state = repository.ingestion.value as IngestionState.Completed
+        assertEquals(1, library.repository.catalog.value.books.size)
+        val state = library.repository.ingestion.value as IngestionState.Completed
         assertEquals(ScanTrigger.ADD_BOOKS, state.trigger)
         assertEquals(1, state.added)
     }
@@ -77,18 +76,18 @@ class LibraryRepositoryTest {
     fun `the catalog survives a restart of the repository`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val first = repository(FileCatalogStore(file), backgroundScope)
-        first.addPickedBooks(listOf("doc://a"))
-        val bookId = first.catalog.value.books.single().id
-        first.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 512))
+        val first = library(FileCatalogStore(file), backgroundScope)
+        first.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = first.repository.catalog.value.books.single().id
+        first.positions.update(bookId, ReadingState(bookDigest = bookId, tokenIndex = 512))
 
-        val second = repository(FileCatalogStore(file), backgroundScope)
-        second.load()
+        val second = library(FileCatalogStore(file), backgroundScope)
+        second.repository.load()
 
-        assertEquals(1, second.catalog.value.books.size)
-        assertEquals(512, second.readingState(bookId)?.tokenIndex)
-        assertEquals(bookId, second.catalog.value.lastReadBookId)
-        assertNotNull(second.coverFile(bookId))
+        assertEquals(1, second.repository.catalog.value.books.size)
+        assertEquals(512, second.positions.readingState(bookId)?.tokenIndex)
+        assertEquals(bookId, second.repository.catalog.value.lastReadBookId)
+        assertNotNull(CoverStore(File(temporaryFolder.root, "covers")).read(bookId))
     }
 
     /**
@@ -101,33 +100,33 @@ class LibraryRepositoryTest {
     @Test
     fun `a position for a book outside the library keeps the position, not the resume`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val ownBook = repository.catalog.value.books.single().id
-        repository.updateReadingState(ownBook, ReadingState(bookDigest = ownBook, tokenIndex = 100))
+        val library = library(scope = backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val ownBook = library.repository.catalog.value.books.single().id
+        library.positions.update(ownBook, ReadingState(bookDigest = ownBook, tokenIndex = 100))
         val external = "sha256:" + "ff".repeat(32)
 
-        repository.updateReadingState(external, ReadingState(bookDigest = external, tokenIndex = 512))
+        library.positions.update(external, ReadingState(bookDigest = external, tokenIndex = 512))
 
-        assertEquals(512, repository.readingState(external)?.tokenIndex)
-        assertEquals(ownBook, repository.catalog.value.lastReadBookId)
+        assertEquals(512, library.positions.readingState(external)?.tokenIndex)
+        assertEquals(ownBook, library.repository.catalog.value.lastReadBookId)
     }
 
     /** Once that same book is added, it resumes like any other (REQ-103). */
     @Test
     fun `adding the book afterwards makes its kept position resumable`() = runTest {
         val bytes = EpubFixtures.validEpub()
-        val repository = repository(scope = backgroundScope)
+        val library = library(scope = backgroundScope)
         val digest = requireNotNull(BookDigest.of(ContentFixtures.source(bytes))).value
-        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 512))
+        library.positions.update(digest, ReadingState(bookDigest = digest, tokenIndex = 512))
 
         gateway.putDocument("doc://shared", bytes, "quiet.epub")
-        repository.addPickedBooks(listOf("doc://shared"))
-        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 600))
+        library.repository.addPickedBooks(listOf("doc://shared"))
+        library.positions.update(digest, ReadingState(bookDigest = digest, tokenIndex = 600))
 
-        assertEquals(digest, repository.catalog.value.books.single().id)
-        assertEquals(600, repository.readingState(digest)?.tokenIndex)
-        assertEquals(digest, repository.catalog.value.lastReadBookId)
+        assertEquals(digest, library.repository.catalog.value.books.single().id)
+        assertEquals(600, library.positions.readingState(digest)?.tokenIndex)
+        assertEquals(digest, library.repository.catalog.value.lastReadBookId)
     }
 
     // --- The write-path rule for the content-change guard (#62, AD-18) ---
@@ -142,72 +141,72 @@ class LibraryRepositoryTest {
      */
     @Test
     fun `a position stored with no fingerprint leaves the recorded one alone`() = runTest {
-        val repository = repository(scope = backgroundScope)
+        val library = library(scope = backgroundScope)
         val digest = "sha256:abc"
-        repository.updateReadingState(
+        library.positions.update(
             digest,
             ReadingState(bookDigest = digest, tokenIndex = 100, structuralFingerprint = "zipdir1:feed"),
         )
 
-        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 200))
+        library.positions.update(digest, ReadingState(bookDigest = digest, tokenIndex = 200))
 
-        assertEquals(200, repository.readingState(digest)?.tokenIndex)
-        assertEquals("zipdir1:feed", repository.readingState(digest)?.structuralFingerprint)
+        assertEquals(200, library.positions.readingState(digest)?.tokenIndex)
+        assertEquals("zipdir1:feed", library.positions.readingState(digest)?.structuralFingerprint)
     }
 
     /** A real fingerprint does replace one: reopening a changed file re-arms the guard. */
     @Test
     fun `a position stored with a fingerprint replaces the recorded one`() = runTest {
-        val repository = repository(scope = backgroundScope)
+        val library = library(scope = backgroundScope)
         val digest = "sha256:abc"
-        repository.updateReadingState(
+        library.positions.update(
             digest,
             ReadingState(bookDigest = digest, tokenIndex = 100, structuralFingerprint = "zipdir1:feed"),
         )
 
-        repository.updateReadingState(
+        library.positions.update(
             digest,
             ReadingState(bookDigest = digest, tokenIndex = 0, structuralFingerprint = "zipdir1:beef"),
         )
 
-        assertEquals("zipdir1:beef", repository.readingState(digest)?.structuralFingerprint)
+        assertEquals("zipdir1:beef", library.positions.readingState(digest)?.structuralFingerprint)
     }
 
     /** The first directory open after the migration is what arms it. */
     @Test
     fun `a book with no recorded fingerprint gains one from the next open that has it`() = runTest {
-        val repository = repository(scope = backgroundScope)
+        val library = library(scope = backgroundScope)
         val digest = "sha256:abc"
-        repository.updateReadingState(digest, ReadingState(bookDigest = digest, tokenIndex = 100))
-        assertNull(repository.readingState(digest)?.structuralFingerprint)
+        library.positions.update(digest, ReadingState(bookDigest = digest, tokenIndex = 100))
+        assertNull(library.positions.readingState(digest)?.structuralFingerprint)
 
-        repository.updateReadingState(
+        library.positions.update(
             digest,
             ReadingState(bookDigest = digest, tokenIndex = 140, structuralFingerprint = "zipdir1:feed"),
         )
 
-        assertEquals("zipdir1:feed", repository.readingState(digest)?.structuralFingerprint)
+        assertEquals("zipdir1:feed", library.positions.readingState(digest)?.structuralFingerprint)
     }
 
     // REQ-002: both the open-rescan and the manual refresh find a newly copied book.
     @Test
     fun `manual refresh finds a new book that the debounced app-open scan skipped`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addFolder("tree://books", "Books")
-        assertEquals(1, repository.catalog.value.books.size)
+        val library = library(scope = backgroundScope)
+        library.repository.addFolder("tree://books", "Books")
+        assertEquals(1, library.repository.catalog.value.books.size)
 
         gateway.putIntoFolder("tree://books", "tree://books/two.epub", EpubFixtures.spanishEpub(), "two.epub")
 
         // Same instant as the add, so the scan is inside REQ-204's interval and is
         // skipped: returning from the picker — or from any app the reader stepped
         // out to — does not re-list the whole tree.
-        repository.rescan(ScanTrigger.APP_OPEN)
-        assertEquals(1, repository.catalog.value.books.size)
+        library.repository.rescan(ScanTrigger.APP_OPEN)
+        assertEquals(1, library.repository.catalog.value.books.size)
 
         // A manual refresh always runs.
-        repository.rescan(ScanTrigger.MANUAL_REFRESH)
-        assertEquals(2, repository.catalog.value.books.size)
+        library.repository.rescan(ScanTrigger.MANUAL_REFRESH)
+        assertEquals(2, library.repository.catalog.value.books.size)
     }
 
     /**
@@ -219,36 +218,36 @@ class LibraryRepositoryTest {
     @Test
     fun `a rescan skipped for recency publishes no scanning state and keeps the catalog`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addFolder("tree://books", "Books")
+        val library = library(scope = backgroundScope)
+        library.repository.addFolder("tree://books", "Books")
 
         val seen = mutableListOf<IngestionState>()
-        val watching = backgroundScope.launch { repository.ingestion.collect { seen += it } }
+        val watching = backgroundScope.launch { library.repository.ingestion.collect { seen += it } }
         runCurrent()
         seen.clear()
 
         // Well inside the interval: a reader who switched away and came straight back.
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS / 2
-        repository.rescan(ScanTrigger.APP_OPEN)
+        library.repository.rescan(ScanTrigger.APP_OPEN)
         runCurrent()
         watching.cancel()
 
         assertTrue("a skipped rescan must not announce a scan: $seen", seen.none { it is IngestionState.Scanning })
-        assertEquals(1, repository.catalog.value.books.size)
+        assertEquals(1, library.repository.catalog.value.books.size)
     }
 
     /** The same instant one tick later is the other side of the same line. */
     @Test
     fun `the app-open scan runs once the debounce window has passed`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addFolder("tree://books", "Books")
+        val library = library(scope = backgroundScope)
+        library.repository.addFolder("tree://books", "Books")
 
         gateway.putIntoFolder("tree://books", "tree://books/two.epub", EpubFixtures.spanishEpub(), "two.epub")
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
-        repository.rescan(ScanTrigger.APP_OPEN)
+        library.repository.rescan(ScanTrigger.APP_OPEN)
 
-        assertEquals(2, repository.catalog.value.books.size)
+        assertEquals(2, library.repository.catalog.value.books.size)
     }
 
     @Test
@@ -261,13 +260,13 @@ class LibraryRepositoryTest {
             }
         }
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(blocking, backgroundScope)
+        val library = library(blocking, backgroundScope)
 
-        repository.addPickedBooks(listOf("doc://a"))
+        library.repository.addPickedBooks(listOf("doc://a"))
 
         assertEquals(0, blocking.saves)
-        assertTrue(repository.catalog.value.books.isEmpty())
-        val failure = repository.ingestion.value as IngestionState.Failed
+        assertTrue(library.repository.catalog.value.books.isEmpty())
+        val failure = library.repository.ingestion.value as IngestionState.Failed
         assertTrue(failure.message.contains("newer version"))
     }
 
@@ -278,57 +277,60 @@ class LibraryRepositoryTest {
             override fun save(catalog: Catalog): Unit = throw IOException("disk is full")
         }
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(failing, backgroundScope)
+        val library = library(failing, backgroundScope)
 
-        repository.addPickedBooks(listOf("doc://a"))
+        library.repository.addPickedBooks(listOf("doc://a"))
 
-        assertEquals("disk is full", (repository.ingestion.value as IngestionState.Failed).message)
-        assertTrue(repository.catalog.value.books.isEmpty())
+        assertEquals("disk is full", (library.repository.ingestion.value as IngestionState.Failed).message)
+        assertTrue(library.repository.catalog.value.books.isEmpty())
     }
 
     @Test
     fun `the reading position survives removing and re-adding a book`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(
+        val library = library(scope = backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
+        library.positions.update(
             bookId,
             ReadingState(bookDigest = bookId, tokenIndex = 900, progressFraction = 0.6f, wpm = 400),
         )
 
-        repository.removeBook(bookId)
-        assertTrue(repository.catalog.value.books.isEmpty())
-        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
+        library.repository.removeBook(bookId)
+        assertTrue(library.repository.catalog.value.books.isEmpty())
+        assertEquals(900, library.positions.readingState(bookId)?.tokenIndex)
 
-        repository.addPickedBooks(listOf("doc://a"))
+        library.repository.addPickedBooks(listOf("doc://a"))
 
-        assertEquals(bookId, repository.catalog.value.books.single().id)
-        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
-        assertEquals(400, repository.readingState(bookId)?.wpm)
+        assertEquals(bookId, library.repository.catalog.value.books.single().id)
+        assertEquals(900, library.positions.readingState(bookId)?.tokenIndex)
+        assertEquals(400, library.positions.readingState(bookId)?.wpm)
     }
 
     @Test
     fun `a removed folder book stays removed across an app-open rescan and a restart`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val repository = repository(FileCatalogStore(file), backgroundScope)
-        repository.addFolder("tree://books", "Books")
-        val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 250))
+        val library = library(FileCatalogStore(file), backgroundScope)
+        library.repository.addFolder("tree://books", "Books")
+        val bookId = library.repository.catalog.value.books.single().id
+        library.positions.update(bookId, ReadingState(bookDigest = bookId, tokenIndex = 250))
 
-        repository.removeBook(bookId)
+        library.repository.removeBook(bookId)
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
-        repository.rescan(ScanTrigger.APP_OPEN)
+        library.repository.rescan(ScanTrigger.APP_OPEN)
 
-        assertTrue("the app-open rescan must not resurrect a removed book", repository.catalog.value.books.isEmpty())
+        assertTrue(
+            "the app-open rescan must not resurrect a removed book",
+            library.repository.catalog.value.books.isEmpty(),
+        )
 
-        val restarted = repository(FileCatalogStore(file), backgroundScope)
+        val restarted = library(FileCatalogStore(file), backgroundScope)
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
-        restarted.rescan(ScanTrigger.APP_OPEN)
+        restarted.repository.rescan(ScanTrigger.APP_OPEN)
 
-        assertTrue("the removal must survive a restart", restarted.catalog.value.books.isEmpty())
-        assertEquals(250, restarted.readingState(bookId)?.tokenIndex)
+        assertTrue("the removal must survive a restart", restarted.repository.catalog.value.books.isEmpty())
+        assertEquals(250, restarted.positions.readingState(bookId)?.tokenIndex)
     }
 
     /**
@@ -346,27 +348,27 @@ class LibraryRepositoryTest {
         // The same book reached from outside the tree, as the document picker
         // hands it over: same content, so the same book (AD-2), second source.
         gateway.putDocument("doc://three", alsoPicked, "three.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addFolder("tree://books", "Books")
-        repository.addPickedBooks(listOf("doc://three"))
-        val byTitle = repository.catalog.value.books.associateBy { it.title }
+        val library = library(scope = backgroundScope)
+        library.repository.addFolder("tree://books", "Books")
+        library.repository.addPickedBooks(listOf("doc://three"))
+        val byTitle = library.repository.catalog.value.books.associateBy { it.title }
         assertEquals(3, byTitle.size)
         byTitle.values.forEachIndexed { index, book ->
-            repository.updateReadingState(book.id, ReadingState(bookDigest = book.id, tokenIndex = 100 + index))
+            library.positions.update(book.id, ReadingState(bookDigest = book.id, tokenIndex = 100 + index))
         }
 
         // The number the confirmation names, taken from the catalog it acts on.
-        assertEquals(2, repository.catalog.value.booksOnlyFrom("tree://books").size)
-        assertEquals(3, repository.catalog.value.booksIn("tree://books").size)
+        assertEquals(2, library.repository.catalog.value.booksOnlyFrom("tree://books").size)
+        assertEquals(3, library.repository.catalog.value.booksIn("tree://books").size)
 
-        repository.removeFolder("tree://books")
+        library.repository.removeFolder("tree://books")
 
-        val remaining = repository.catalog.value.books
+        val remaining = library.repository.catalog.value.books
         assertEquals("only the directly picked book stays", listOf("Three"), remaining.map { it.title })
-        assertTrue("the folder itself is gone", repository.catalog.value.folders.isEmpty())
+        assertTrue("the folder itself is gone", library.repository.catalog.value.folders.isEmpty())
         assertEquals("no file is touched", 4, gateway.documents.size)
         byTitle.values.forEach { book ->
-            assertNotNull("the position of ${book.title} must survive", repository.readingState(book.id))
+            assertNotNull("the position of ${book.title} must survive", library.positions.readingState(book.id))
         }
     }
 
@@ -377,56 +379,56 @@ class LibraryRepositoryTest {
     @Test
     fun `undo puts a removed book back with its position and progress`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(
+        val library = library(scope = backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
+        library.positions.update(
             bookId,
             ReadingState(bookDigest = bookId, tokenIndex = 900, progressFraction = 0.6f, wpm = 400),
         )
 
-        repository.removeBook(bookId)
-        assertTrue(repository.catalog.value.books.isEmpty())
-        assertEquals(bookId, repository.undoableRemoval.value?.bookId)
+        library.repository.removeBook(bookId)
+        assertTrue(library.repository.catalog.value.books.isEmpty())
+        assertEquals(bookId, library.repository.undoableRemoval.value?.bookId)
 
-        repository.undoRemoveBook()
+        library.repository.undoRemoveBook()
 
-        assertEquals(bookId, repository.catalog.value.books.single().id)
-        assertNull("the offer is spent once it is taken", repository.undoableRemoval.value)
-        assertEquals(900, repository.readingState(bookId)?.tokenIndex)
-        assertEquals(0.6f, repository.readingState(bookId)?.progressFraction)
-        assertEquals(400, repository.readingState(bookId)?.wpm)
+        assertEquals(bookId, library.repository.catalog.value.books.single().id)
+        assertNull("the offer is spent once it is taken", library.repository.undoableRemoval.value)
+        assertEquals(900, library.positions.readingState(bookId)?.tokenIndex)
+        assertEquals(0.6f, library.positions.readingState(bookId)?.progressFraction)
+        assertEquals(400, library.positions.readingState(bookId)?.wpm)
         assertTrue(
             "the book must be readable again",
-            repository.catalog.value.books.single().status == BookStatus.READABLE,
+            library.repository.catalog.value.books.single().status == BookStatus.READABLE,
         )
         assertTrue(
             "a grant given back cannot be taken again without the picker, so undo must not release it",
             gateway.releasedGrants.isEmpty(),
         )
-        assertEquals(EpubFixtures.validEpub().size, repository.openBook(bookId).use { it.readBytes() }.size)
+        assertEquals(EpubFixtures.validEpub().size, library.bookBytes.openBook(bookId).use { it.readBytes() }.size)
     }
 
     /** REQ-105's other half: let the window elapse and the removal stands. */
     @Test
     fun `the undo window elapsing makes the removal final and gives the grant back`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(scope = backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
 
-        repository.removeBook(bookId)
-        assertNotNull(repository.undoableRemoval.value)
+        library.repository.removeBook(bookId)
+        assertNotNull(library.repository.undoableRemoval.value)
 
         advanceTimeBy(LibraryRepository.DEFAULT_UNDO_WINDOW_MS + 1)
         runCurrent()
 
-        assertNull("the offer must expire", repository.undoableRemoval.value)
+        assertNull("the offer must expire", library.repository.undoableRemoval.value)
         assertEquals(listOf("doc://a"), gateway.releasedGrants)
 
-        repository.undoRemoveBook()
+        library.repository.undoRemoveBook()
 
-        assertTrue("undo after the window must do nothing", repository.catalog.value.books.isEmpty())
+        assertTrue("undo after the window must do nothing", library.repository.catalog.value.books.isEmpty())
     }
 
     /**
@@ -439,26 +441,29 @@ class LibraryRepositoryTest {
     @Test
     fun `undo restores exactly one row even when a rescan runs inside the window`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addFolder("tree://books", "Books")
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(scope = backgroundScope)
+        library.repository.addFolder("tree://books", "Books")
+        val bookId = library.repository.catalog.value.books.single().id
 
-        repository.removeBook(bookId)
+        library.repository.removeBook(bookId)
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
-        repository.rescan(ScanTrigger.APP_OPEN)
-        assertTrue("the rescan must honour the removal while it stands", repository.catalog.value.books.isEmpty())
+        library.repository.rescan(ScanTrigger.APP_OPEN)
+        assertTrue(
+            "the rescan must honour the removal while it stands",
+            library.repository.catalog.value.books.isEmpty(),
+        )
 
-        repository.undoRemoveBook()
+        library.repository.undoRemoveBook()
 
-        assertEquals(listOf(bookId), repository.catalog.value.books.map { it.id })
-        assertEquals(1, repository.catalog.value.books.single().sources.size)
+        assertEquals(listOf(bookId), library.repository.catalog.value.books.map { it.id })
+        assertEquals(1, library.repository.catalog.value.books.single().sources.size)
 
         // And the row stays exactly one row once scanning resumes.
         now += LibraryRepository.DEFAULT_MINIMUM_RESCAN_INTERVAL_MS + 1
-        repository.rescan(ScanTrigger.APP_OPEN)
+        library.repository.rescan(ScanTrigger.APP_OPEN)
 
-        assertEquals(listOf(bookId), repository.catalog.value.books.map { it.id })
-        assertEquals(1, repository.catalog.value.books.single().sources.size)
+        assertEquals(listOf(bookId), library.repository.catalog.value.books.map { it.id })
+        assertEquals(1, library.repository.catalog.value.books.single().sources.size)
     }
 
     /**
@@ -469,17 +474,21 @@ class LibraryRepositoryTest {
     @Test
     fun `undo brings back nothing when the folder the book came from is gone too`() = runTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addFolder("tree://books", "Books")
-        val bookId = repository.catalog.value.books.single().id
-        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 640))
+        val library = library(scope = backgroundScope)
+        library.repository.addFolder("tree://books", "Books")
+        val bookId = library.repository.catalog.value.books.single().id
+        library.positions.update(bookId, ReadingState(bookDigest = bookId, tokenIndex = 640))
 
-        repository.removeBook(bookId)
-        repository.removeFolder("tree://books")
-        repository.undoRemoveBook()
+        library.repository.removeBook(bookId)
+        library.repository.removeFolder("tree://books")
+        library.repository.undoRemoveBook()
 
-        assertTrue("no orphaned row may come back", repository.catalog.value.books.isEmpty())
-        assertEquals("the position still outlives it (REQ-004)", 640, repository.readingState(bookId)?.tokenIndex)
+        assertTrue("no orphaned row may come back", library.repository.catalog.value.books.isEmpty())
+        assertEquals(
+            "the position still outlives it (REQ-004)",
+            640,
+            library.positions.readingState(bookId)?.tokenIndex,
+        )
     }
 
     /**
@@ -493,17 +502,17 @@ class LibraryRepositoryTest {
     fun `a grant orphaned by a process that died inside the undo window is released at the next load`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val first = repository(FileCatalogStore(file), backgroundScope)
-        first.addPickedBooks(listOf("doc://a"))
-        val bookId = first.catalog.value.books.single().id
+        val first = library(FileCatalogStore(file), backgroundScope)
+        first.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = first.repository.catalog.value.books.single().id
 
-        first.removeBook(bookId)
+        first.repository.removeBook(bookId)
         // The window is still open: nothing has given the grant back yet.
         assertTrue(gateway.releasedGrants.isEmpty())
         assertTrue("doc://a" in gateway.persistedGrants)
 
         // A new process over the same store, as after the app was swiped away.
-        repository(FileCatalogStore(file), backgroundScope).load()
+        library(FileCatalogStore(file), backgroundScope).repository.load()
 
         assertEquals(listOf("doc://a"), gateway.releasedGrants)
         assertTrue("doc://a" !in gateway.persistedGrants)
@@ -515,11 +524,11 @@ class LibraryRepositoryTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.spanishEpub(), "one.epub")
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val first = repository(FileCatalogStore(file), backgroundScope)
-        first.addPickedBooks(listOf("doc://a"))
-        first.addFolder("tree://books", "Books")
+        val first = library(FileCatalogStore(file), backgroundScope)
+        first.repository.addPickedBooks(listOf("doc://a"))
+        first.repository.addFolder("tree://books", "Books")
 
-        repository(FileCatalogStore(file), backgroundScope).load()
+        library(FileCatalogStore(file), backgroundScope).repository.load()
 
         assertTrue("nothing in use may be released, got ${gateway.releasedGrants}", gateway.releasedGrants.isEmpty())
     }
@@ -537,7 +546,7 @@ class LibraryRepositoryTest {
             override fun save(catalog: Catalog) = Unit
         }
 
-        repository(blocking, backgroundScope).load()
+        library(blocking, backgroundScope).repository.load()
 
         assertTrue("a blocked load must not release anything", gateway.releasedGrants.isEmpty())
         assertTrue("doc://a" in gateway.persistedGrants)
@@ -554,18 +563,18 @@ class LibraryRepositoryTest {
     fun `a recovered catalog never triggers the grant sweep`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val first = repository(FileCatalogStore(file), backgroundScope)
-        first.addFolder("tree://books", "Books")
-        first.addPickedBooks(listOf("doc://a"))
+        val first = library(FileCatalogStore(file), backgroundScope)
+        first.repository.addFolder("tree://books", "Books")
+        first.repository.addPickedBooks(listOf("doc://a"))
         assertTrue("doc://a" in gateway.persistedGrants)
 
         // The stored document is corrupted, as an interrupted write would leave it.
         file.writeText("{ this is not a catalog")
         val store = FileCatalogStore(file)
-        val recovered = repository(store, backgroundScope)
-        recovered.load()
+        val recovered = library(store, backgroundScope)
+        recovered.repository.load()
 
-        assertTrue("the catalog is empty after recovery", recovered.catalog.value.books.isEmpty())
+        assertTrue("the catalog is empty after recovery", recovered.repository.catalog.value.books.isEmpty())
         assertTrue(
             "a recovery must keep every grant, got ${gateway.releasedGrants}",
             gateway.releasedGrants.isEmpty(),
@@ -585,16 +594,16 @@ class LibraryRepositoryTest {
     @Test
     fun `a book re-added inside the undo window keeps its grant when the window closes`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(scope = backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
 
-        repository.removeBook(bookId)
-        repository.addPickedBooks(listOf("doc://a"))
+        library.repository.removeBook(bookId)
+        library.repository.addPickedBooks(listOf("doc://a"))
         advanceTimeBy(LibraryRepository.DEFAULT_UNDO_WINDOW_MS + 1)
         runCurrent()
 
-        assertEquals(bookId, repository.catalog.value.books.single().id)
+        assertEquals(bookId, library.repository.catalog.value.books.single().id)
         assertTrue("the grant is still in use", gateway.releasedGrants.isEmpty())
         assertTrue("doc://a" in gateway.persistedGrants)
     }
@@ -603,11 +612,11 @@ class LibraryRepositoryTest {
     fun `a book can be opened for reading in place`() = runTest {
         val bytes = EpubFixtures.validEpub()
         gateway.putDocument("doc://a", bytes, "quiet.epub")
-        val repository = repository(scope = backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(scope = backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
 
-        val read = repository.openBook(bookId).use { it.readBytes() }
+        val read = library.bookBytes.openBook(bookId).use { it.readBytes() }
 
         assertTrue(bytes.contentEquals(read))
     }
@@ -616,11 +625,11 @@ class LibraryRepositoryTest {
     fun `the folder name comes from the platform when the caller does not supply one`() = runTest {
         gateway.putDocument("tree://books", ByteArray(0), "My Books")
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
-        val repository = repository(scope = backgroundScope)
+        val library = library(scope = backgroundScope)
 
-        repository.addFolder("tree://books")
+        library.repository.addFolder("tree://books")
 
-        assertEquals("My Books", repository.catalog.value.folders.single().displayName)
+        assertEquals("My Books", library.repository.catalog.value.folders.single().displayName)
     }
 
     /**
@@ -633,22 +642,22 @@ class LibraryRepositoryTest {
     fun `a write failure is loud on both surfaces and clears when writing works again`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
         val store = FailableStore(FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")))
-        val repository = repository(store, backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(store, backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
 
         store.failing = true
-        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 120))
+        library.positions.update(bookId, ReadingState(bookDigest = bookId, tokenIndex = 120))
 
-        assertEquals("the disk is full", repository.persistenceFailure.value)
-        assertEquals("the disk is full", (repository.ingestion.value as IngestionState.Failed).message)
+        assertEquals("the disk is full", library.positions.persistenceFailure.value)
+        assertEquals("the disk is full", (library.repository.ingestion.value as IngestionState.Failed).message)
 
         store.failing = false
-        repository.updateReadingState(bookId, ReadingState(bookDigest = bookId, tokenIndex = 121))
+        library.positions.update(bookId, ReadingState(bookDigest = bookId, tokenIndex = 121))
 
-        assertNull(repository.persistenceFailure.value)
-        assertTrue(repository.ingestion.value !is IngestionState.Failed)
-        assertEquals(121, repository.readingState(bookId)?.tokenIndex)
+        assertNull(library.positions.persistenceFailure.value)
+        assertTrue(library.repository.ingestion.value !is IngestionState.Failed)
+        assertEquals(121, library.positions.readingState(bookId)?.tokenIndex)
     }
 
     // --- Settings (LEAF302) -------------------------------------------------
@@ -656,17 +665,17 @@ class LibraryRepositoryTest {
     @Test
     fun `a settings change is stored and survives a restart of the repository`() = runTest {
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val first = repository(FileCatalogStore(file), backgroundScope)
-        first.load()
+        val first = library(FileCatalogStore(file), backgroundScope)
+        first.repository.load()
 
-        first.updateSettings { it.copy(theme = ThemeChoice.DARK, pauseStrength = PauseStrength.OFF) }
+        first.settingsStore.update { it.copy(theme = ThemeChoice.DARK, pauseStrength = PauseStrength.OFF) }
 
-        val second = repository(FileCatalogStore(file), backgroundScope)
-        second.load()
+        val second = library(FileCatalogStore(file), backgroundScope)
+        second.repository.load()
 
-        assertEquals(ThemeChoice.DARK, second.settings.value.theme)
-        assertEquals(PauseStrength.OFF, second.settings.value.pauseStrength)
-        assertEquals(FontSize.MEDIUM, second.settings.value.fontSize)
+        assertEquals(ThemeChoice.DARK, second.settingsStore.settings.value.theme)
+        assertEquals(PauseStrength.OFF, second.settingsStore.settings.value.pauseStrength)
+        assertEquals(FontSize.MEDIUM, second.settingsStore.settings.value.fontSize)
     }
 
     /**
@@ -676,15 +685,15 @@ class LibraryRepositoryTest {
     @Test
     fun `the chapter pause setting is stored and survives a restart`() = runTest {
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val first = repository(FileCatalogStore(file), backgroundScope)
-        first.load()
-        assertTrue("it ships on", first.settings.value.chapterPauseEnabled)
+        val first = library(FileCatalogStore(file), backgroundScope)
+        first.repository.load()
+        assertTrue("it ships on", first.settingsStore.settings.value.chapterPauseEnabled)
 
-        first.updateSettings { it.copy(chapterPauseEnabled = false) }
+        first.settingsStore.update { it.copy(chapterPauseEnabled = false) }
 
-        val second = repository(FileCatalogStore(file), backgroundScope)
-        second.load()
-        assertFalse(second.settings.value.chapterPauseEnabled)
+        val second = library(FileCatalogStore(file), backgroundScope)
+        second.repository.load()
+        assertFalse(second.settingsStore.settings.value.chapterPauseEnabled)
     }
 
     /**
@@ -694,25 +703,25 @@ class LibraryRepositoryTest {
     @Test
     fun `a book offered the front-matter skip stays offered across a restart`() = runTest {
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
-        val first = repository(FileCatalogStore(file), backgroundScope)
-        first.load()
-        assertTrue(first.catalog.value.frontMatterOfferedBookIds.isEmpty())
+        val first = library(FileCatalogStore(file), backgroundScope)
+        first.repository.load()
+        assertTrue(first.repository.catalog.value.frontMatterOfferedBookIds.isEmpty())
 
-        first.markFrontMatterOffered("sha256:abc")
+        first.positions.markFrontMatterOffered("sha256:abc")
         // Answering twice must cost one record, not two.
-        first.markFrontMatterOffered("sha256:abc")
+        first.positions.markFrontMatterOffered("sha256:abc")
 
-        val second = repository(FileCatalogStore(file), backgroundScope)
-        second.load()
-        assertEquals(setOf("sha256:abc"), second.catalog.value.frontMatterOfferedBookIds)
+        val second = library(FileCatalogStore(file), backgroundScope)
+        second.repository.load()
+        assertEquals(setOf("sha256:abc"), second.repository.catalog.value.frontMatterOfferedBookIds)
     }
 
     /** REQ-023: reset restores exactly the documented defaults, not "most of" them. */
     @Test
     fun `reset to defaults restores every documented default`() = runTest {
-        val repository = repository(scope = backgroundScope)
-        repository.load()
-        repository.updateSettings {
+        val library = library(scope = backgroundScope)
+        library.repository.load()
+        library.settingsStore.update {
             it.copy(
                 theme = ThemeChoice.LIGHT,
                 fontSize = FontSize.EXTRA_LARGE,
@@ -724,10 +733,10 @@ class LibraryRepositoryTest {
             )
         }
 
-        repository.updateSettings { ReaderSettings.DEFAULTS }
+        library.settingsStore.update { ReaderSettings.DEFAULTS }
 
-        assertEquals(ReaderSettings.DEFAULTS, repository.settings.value)
-        assertTrue(repository.settings.value.isDefault)
+        assertEquals(ReaderSettings.DEFAULTS, library.settingsStore.settings.value)
+        assertTrue(library.settingsStore.settings.value.isDefault)
     }
 
     /**
@@ -738,20 +747,20 @@ class LibraryRepositoryTest {
     @Test
     fun `a settings write that fails is loud and does not pretend to have taken`() = runTest {
         val store = FailableStore(FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")))
-        val repository = repository(store, backgroundScope)
-        repository.load()
+        val library = library(store, backgroundScope)
+        library.repository.load()
 
         store.failing = true
-        repository.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+        library.settingsStore.update { it.copy(theme = ThemeChoice.DARK) }
 
-        assertEquals(ThemeChoice.SYSTEM, repository.settings.value.theme)
-        assertEquals("the disk is full", repository.persistenceFailure.value)
+        assertEquals(ThemeChoice.SYSTEM, library.settingsStore.settings.value.theme)
+        assertEquals("the disk is full", library.positions.persistenceFailure.value)
 
         store.failing = false
-        repository.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+        library.settingsStore.update { it.copy(theme = ThemeChoice.DARK) }
 
-        assertEquals(ThemeChoice.DARK, repository.settings.value.theme)
-        assertNull(repository.persistenceFailure.value)
+        assertEquals(ThemeChoice.DARK, library.settingsStore.settings.value.theme)
+        assertNull(library.positions.persistenceFailure.value)
     }
 
     /** Wraps a real store so a write can be made to fail and then recover. */

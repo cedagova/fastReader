@@ -55,9 +55,9 @@ interface ThemeMirror {
         /**
          * A mirror that stores nothing and always reads the default.
          *
-         * The default for [com.cedagova.fastreader.library.LibraryRepository], so
-         * a JVM test that does not care about the launch frame constructs the
-         * repository exactly as it did before this leaf.
+         * The default for [com.cedagova.fastreader.library.DeviceLibrary], so a
+         * JVM test that does not care about the launch frame constructs the
+         * library exactly as it did before this leaf.
          */
         val None: ThemeMirror = object : ThemeMirror {
             override fun read(): ThemeChoice = ReaderSettings.DEFAULTS.theme

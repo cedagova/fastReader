@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReaderSettingsStore
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.RELEASES_URL
 import com.cedagova.fastreader.settings.ReaderSettings
@@ -26,7 +26,7 @@ import com.cedagova.reader.account.summary
  * ## One source of truth, on purpose
  *
  * The screen renders the value the *store* holds, and every control writes
- * through the repository. There is no local draft the screen edits and syncs
+ * through the settings store. There is no local draft the screen edits and syncs
  * later, which is what makes the live preview (REQ-023) show what a reader will
  * actually get rather than what the screen hopes to save: the preview, the theme
  * around it, and the reader behind it all move together when — and only when —
@@ -50,14 +50,14 @@ import com.cedagova.reader.account.summary
  */
 @Composable
 fun SettingsRoute(
-    repository: LibraryRepository,
+    settingsStore: ReaderSettingsStore,
     readerAccount: ReaderAccountController,
     onBack: () -> Unit,
     onOpenReaderAccount: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val settings by repository.settings.collectAsStateWithLifecycle()
-    val persistenceFailure by repository.persistenceFailure.collectAsStateWithLifecycle()
+    val settings by settingsStore.settings.collectAsStateWithLifecycle()
+    val persistenceFailure by settingsStore.persistenceFailure.collectAsStateWithLifecycle()
     val accountState by readerAccount.state.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
@@ -68,8 +68,8 @@ fun SettingsRoute(
 
     SettingsScreen(
         settings = settings,
-        onSettingsChange = { next -> repository.requestUpdateSettings { next } },
-        onReset = { repository.requestUpdateSettings { ReaderSettings.DEFAULTS } },
+        onSettingsChange = { next -> settingsStore.requestUpdate { next } },
+        onReset = { settingsStore.requestUpdate { ReaderSettings.DEFAULTS } },
         onBack = onBack,
         version = version,
         onCheckForUpdates = {
