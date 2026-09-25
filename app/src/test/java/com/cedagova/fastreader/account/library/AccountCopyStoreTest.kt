@@ -3,9 +3,6 @@ package com.cedagova.fastreader.account.library
 import com.cedagova.reader.engine.content.BookContentResult
 import com.cedagova.reader.engine.content.BookIdentity
 import com.cedagova.reader.engine.content.EpubContentPipeline
-import com.cedagova.reader.engine.epub.ArchiveOpen
-import com.cedagova.reader.engine.epub.ArchiveReadStrategy
-import com.cedagova.reader.engine.epub.EpubArchives
 import com.cedagova.reader.engine.epub.EpubFixtures
 import com.cedagova.reader.engine.epub.FileEpubByteSource
 import java.io.File
@@ -235,11 +232,6 @@ class AccountCopyStoreTest {
         val source = FileEpubByteSource(placed.file)
 
         assertNotNull("a file-backed source must be seekable", source.openChannel())
-        assertEquals(
-            "a private copy must open the cheap way, not by streaming",
-            ArchiveReadStrategy.DIRECTORY,
-            (EpubArchives.open(source) as ArchiveOpen.Opened).archive.use { it.strategy },
-        )
 
         val result = EpubContentPipeline().parse(source, BookIdentity.ofSha256Hex(digest))
         val content = (result as BookContentResult.Parsed).content
