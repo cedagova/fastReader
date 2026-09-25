@@ -8,11 +8,15 @@ import com.cedagova.fastreader.account.library.DeviceBookSources
 import com.cedagova.fastreader.account.library.LibraryAccountCopyCatalog
 import com.cedagova.fastreader.crash.CrashReportStore
 import com.cedagova.fastreader.external.ExternalOpenController
+import com.cedagova.fastreader.library.BookBytes
 import com.cedagova.fastreader.library.CatalogCodec
 import com.cedagova.fastreader.library.CatalogIngestor
+import com.cedagova.fastreader.library.DeviceLibrary
 import com.cedagova.fastreader.library.DocumentGateway
 import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReaderSettingsStore
+import com.cedagova.fastreader.library.ReadingPositions
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.store.CoverStore
@@ -48,7 +52,7 @@ class AppGraph(context: Context, val crashReports: CrashReportStore, scope: Coro
 
     /**
      * The one-key theme copy the launch path reads before the catalog can answer
-     * (AD-10). The repository writes it on every theme change; `MainActivity`
+     * (AD-10). The catalog writes it on every theme change; `MainActivity`
      * reads it before `super.onCreate`.
      */
     val themeMirror: ThemeMirror = SharedPreferencesThemeMirror(applicationContext)
@@ -58,19 +62,34 @@ class AppGraph(context: Context, val crashReports: CrashReportStore, scope: Coro
     /** Cover thumbnails, read by the library screen. */
     val covers = CoverStore(File(applicationContext.filesDir, "covers"))
 
-    /** The device catalog: books, folders, positions and settings (AD-3). */
-    val repository = LibraryRepository(
+    /**
+     * The device catalog (AD-3): one `catalog.json`, one writer, and a narrow
+     * type per concern that shares it (#204). Only the four `val`s below are
+     * handed on.
+     */
+    private val deviceLibrary = DeviceLibrary(
         store = FileCatalogStore(
             file = File(File(applicationContext.filesDir, "catalog"), "catalog.json"),
             codec = CatalogCodec(),
         ),
         ingestor = CatalogIngestor(gateway, covers),
         gateway = gateway,
-        covers = covers,
         scope = scope,
         ioDispatcher = Dispatchers.IO,
         themeMirror = themeMirror,
     )
+
+    /** Books, folders, removal with undo, and account copies. */
+    val repository: LibraryRepository = deviceLibrary.repository
+
+    /** The reader's settings, stored in `catalog.json` (AD-8). */
+    val settingsStore: ReaderSettingsStore = deviceLibrary.settingsStore
+
+    /** Reading positions and the front-matter record. */
+    val readingPositions: ReadingPositions = deviceLibrary.positions
+
+    /** A library book's bytes, wherever they are. */
+    val bookBytes: BookBytes = deviceLibrary.bookBytes
 
     /**
      * The one book handed over from outside the app, if any (REQ-103).

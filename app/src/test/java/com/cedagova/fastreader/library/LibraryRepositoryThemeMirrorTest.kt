@@ -45,13 +45,12 @@ class LibraryRepositoryThemeMirrorTest {
 
     private val gateway = FakeDocumentGateway()
 
-    private fun repository(store: CatalogStore, mirror: ThemeMirror, scope: CoroutineScope): LibraryRepository {
+    private fun library(store: CatalogStore, mirror: ThemeMirror, scope: CoroutineScope): DeviceLibrary {
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
-        return LibraryRepository(
+        return DeviceLibrary(
             store = store,
             ingestor = CatalogIngestor(gateway, covers),
             gateway = gateway,
-            covers = covers,
             scope = scope,
             ioDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
             themeMirror = mirror,
@@ -63,21 +62,21 @@ class LibraryRepositoryThemeMirrorTest {
     @Test
     fun `choosing a theme mirrors it for the next cold start`() = runTest {
         val mirror = RecordingThemeMirror()
-        val repository = repository(fileStore(), mirror, backgroundScope)
+        val library = library(fileStore(), mirror, backgroundScope)
 
-        repository.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+        library.settingsStore.update { it.copy(theme = ThemeChoice.DARK) }
 
         assertEquals(ThemeChoice.DARK, mirror.read())
-        assertEquals(ThemeChoice.DARK, repository.settings.value.theme)
+        assertEquals(ThemeChoice.DARK, library.settingsStore.settings.value.theme)
     }
 
     @Test
     fun `a settings change that is not the theme still leaves the two agreeing`() = runTest {
         val mirror = RecordingThemeMirror()
-        val repository = repository(fileStore(), mirror, backgroundScope)
-        repository.updateSettings { it.copy(theme = ThemeChoice.LIGHT) }
+        val library = library(fileStore(), mirror, backgroundScope)
+        library.settingsStore.update { it.copy(theme = ThemeChoice.LIGHT) }
 
-        repository.updateSettings { it.copy(highlightEnabled = false) }
+        library.settingsStore.update { it.copy(highlightEnabled = false) }
 
         assertEquals(ThemeChoice.LIGHT, mirror.read())
         // The first entry is the load-time re-sync; then every catalog write
@@ -96,9 +95,9 @@ class LibraryRepositoryThemeMirrorTest {
             override fun save(catalog: Catalog): Unit = throw IOException("the disk is full")
         }
         val mirror = RecordingThemeMirror()
-        val repository = repository(failing, mirror, backgroundScope)
+        val library = library(failing, mirror, backgroundScope)
 
-        repository.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+        library.settingsStore.update { it.copy(theme = ThemeChoice.DARK) }
 
         // The catalog still says SYSTEM, so the first frame must too: a mirror
         // written before the catalog would have promised a dark launch for a
@@ -106,22 +105,22 @@ class LibraryRepositoryThemeMirrorTest {
         assertEquals(ThemeChoice.SYSTEM, mirror.read())
         // Only the load-time re-sync; the failed write contributed nothing.
         assertEquals(listOf(ThemeChoice.SYSTEM), mirror.writes)
-        assertEquals(ThemeChoice.SYSTEM, repository.settings.value.theme)
+        assertEquals(ThemeChoice.SYSTEM, library.settingsStore.settings.value.theme)
     }
 
     @Test
     fun `loading a stored catalog re-syncs a mirror that was left stale`() = runTest {
         val store = fileStore()
         run {
-            val seeded = repository(store, RecordingThemeMirror(), backgroundScope)
-            seeded.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+            val seeded = library(store, RecordingThemeMirror(), backgroundScope)
+            seeded.settingsStore.update { it.copy(theme = ThemeChoice.DARK) }
         }
         // A fresh process whose mirror never received that write: the install
         // predates the mirror, or its write failed.
         val stale = RecordingThemeMirror(stored = ThemeChoice.SYSTEM)
-        val repository = repository(store, stale, backgroundScope)
+        val library = library(store, stale, backgroundScope)
 
-        repository.load()
+        library.repository.load()
 
         assertEquals(ThemeChoice.DARK, stale.read())
     }
@@ -143,17 +142,17 @@ class LibraryRepositoryThemeMirrorTest {
     fun `recovering from a damaged catalog still re-syncs the mirror to the default theme`() = runTest {
         val file = File(File(temporaryFolder.root, "catalog"), "catalog.json")
         run {
-            val seeded = repository(FileCatalogStore(file), RecordingThemeMirror(), backgroundScope)
-            seeded.updateSettings { it.copy(theme = ThemeChoice.DARK) }
+            val seeded = library(FileCatalogStore(file), RecordingThemeMirror(), backgroundScope)
+            seeded.settingsStore.update { it.copy(theme = ThemeChoice.DARK) }
         }
         // The stored document is corrupted, as an interrupted write would leave it.
         file.writeText("{ this is not a catalog")
         val mirror = RecordingThemeMirror(stored = ThemeChoice.DARK)
-        val repository = repository(FileCatalogStore(file), mirror, backgroundScope)
+        val library = library(FileCatalogStore(file), mirror, backgroundScope)
 
-        repository.load()
+        library.repository.load()
 
-        assertEquals(ReaderSettings.DEFAULTS.theme, repository.catalog.value.settings.theme)
+        assertEquals(ReaderSettings.DEFAULTS.theme, library.repository.catalog.value.settings.theme)
         assertEquals(
             "the mirror must follow the catalog the app actually loaded",
             listOf(ReaderSettings.DEFAULTS.theme),

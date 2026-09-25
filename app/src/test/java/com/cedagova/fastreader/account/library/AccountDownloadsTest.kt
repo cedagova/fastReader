@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.account.library
 
 import com.cedagova.fastreader.library.CatalogIngestor
+import com.cedagova.fastreader.library.DeviceLibrary
 import com.cedagova.fastreader.library.FakeDocumentGateway
 import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
@@ -109,8 +110,8 @@ class AccountDownloadsTest {
 
         val opened = downloads.opened.value
         assertEquals("the copy is opened under the catalog's own id", "sha256:$digest", opened)
-        assertNotNull("and that id really is a row", library.catalog.value.book(opened!!))
-        assertTrue("which reads from a private copy", library.openBook(opened).readBytes().isNotEmpty())
+        assertNotNull("and that id really is a row", library.repository.catalog.value.book(opened!!))
+        assertTrue("which reads from a private copy", library.bookBytes.openBook(opened).readBytes().isNotEmpty())
         assertEquals("exactly one grant for one download", 1, transport.grants.size)
         assertEquals(
             "a finished download leaves nothing on the row: it is a device book now",
@@ -178,7 +179,7 @@ class AccountDownloadsTest {
         assertEquals(
             "and nothing was added to the library",
             emptyList<String>(),
-            library.catalog.value.books.map {
+            library.repository.catalog.value.books.map {
                 it.id
             },
         )
@@ -303,7 +304,7 @@ class AccountDownloadsTest {
 
         assertEquals(emptyMap<String, BookDownloadState>(), downloads.state.value.byAccountBookId)
         assertNull(downloads.opened.value)
-        assertEquals("no row", emptyList<String>(), library.catalog.value.books.map { it.id })
+        assertEquals("no row", emptyList<String>(), library.repository.catalog.value.books.map { it.id })
         assertEquals("no copy", emptySet<String>(), store.contents())
         assertEquals("not even a partial", emptyList<String>(), partialFiles())
     }
@@ -321,13 +322,13 @@ class AccountDownloadsTest {
         advanceUntilIdle()
 
         assertEquals("the bytes are gone", emptySet<String>(), store.contents())
-        assertEquals("and the row with them", emptyList<String>(), library.catalog.value.books.map { it.id })
+        assertEquals("and the row with them", emptyList<String>(), library.repository.catalog.value.books.map { it.id })
         assertEquals("the account still holds the book", booksBefore, account.value.books)
         assertEquals("only this device's reference to the copy went", 0, references.stored.size)
         assertTrue(
             "the position is kept, so fetching it again resumes",
-            library.catalog.value.readingStates.keys.none { it == "sha256:$digest" } ||
-                library.catalog.value.readingStates.containsKey("sha256:$digest"),
+            library.repository.catalog.value.readingStates.keys.none { it == "sha256:$digest" } ||
+                library.repository.catalog.value.readingStates.containsKey("sha256:$digest"),
         )
     }
 
@@ -360,10 +361,13 @@ class AccountDownloadsTest {
         account.value = AccountLibraryState.SIGNED_OUT
         advanceUntilIdle()
 
-        val row = library.catalog.value.book(bookId)
+        val row = library.repository.catalog.value.book(bookId)
         assertNotNull("D4: the copy is a device book and sign-out does not touch it", row)
         assertTrue("its bytes are still there", store.has(digest))
-        assertTrue("and it still opens, with no network at all", library.openBook(bookId).readBytes().isNotEmpty())
+        assertTrue(
+            "and it still opens, with no network at all",
+            library.bookBytes.openBook(bookId).readBytes().isNotEmpty(),
+        )
     }
 
     // ------------------------------------------------------------- fixtures
@@ -379,25 +383,24 @@ class AccountDownloadsTest {
     private fun TestScope.appScope(): CoroutineScope =
         CoroutineScope(UnconfinedTestDispatcher(testScheduler)).also { scopes += it }
 
-    private fun repository(scope: CoroutineScope): LibraryRepository {
+    private fun repository(scope: CoroutineScope): DeviceLibrary {
         val covers = CoverStore(File(temporary.root, "covers"))
-        return LibraryRepository(
+        return DeviceLibrary(
             store = FileCatalogStore(File(File(temporary.root, "catalog"), "catalog.json")),
             ingestor = CatalogIngestor(gateway, covers),
             gateway = gateway,
-            covers = covers,
             scope = scope,
             ioDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
         )
     }
 
-    private fun downloads(transport: AssetDownloadGateway, library: LibraryRepository, scope: CoroutineScope) =
+    private fun downloads(transport: AssetDownloadGateway, library: DeviceLibrary, scope: CoroutineScope) =
         AccountDownloads(
             copies = AccountBookCopies(
                 gateway = transport,
                 store = store,
                 references = references,
-                catalog = LibraryAccountCopyCatalog(library),
+                catalog = LibraryAccountCopyCatalog(library.repository),
                 clock = { 1_700_000_000_000 },
             ),
             accountState = account,

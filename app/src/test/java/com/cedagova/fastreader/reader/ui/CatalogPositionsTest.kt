@@ -2,6 +2,7 @@ package com.cedagova.fastreader.reader.ui
 
 import com.cedagova.fastreader.account.library.AccountResumeOffers
 import com.cedagova.fastreader.library.CatalogIngestor
+import com.cedagova.fastreader.library.DeviceLibrary
 import com.cedagova.fastreader.library.FakeDocumentGateway
 import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
@@ -47,13 +48,12 @@ class CatalogPositionsTest {
 
     private val gateway = FakeDocumentGateway()
 
-    private fun repository(scope: CoroutineScope): LibraryRepository {
+    private fun library(scope: CoroutineScope): DeviceLibrary {
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
-        return LibraryRepository(
+        return DeviceLibrary(
             store = FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")),
             ingestor = CatalogIngestor(gateway, covers),
             gateway = gateway,
-            covers = covers,
             scope = scope,
             ioDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
         )
@@ -73,15 +73,15 @@ class CatalogPositionsTest {
     @Test
     fun `a real book recorded through the same store still keeps its position`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
-        val positions = CatalogPositions(repository)
+        val library = library(backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
+        val positions = CatalogPositions(library.positions)
 
         positions.record(bookId, position(42, bookId))
-        repository.flushReadingState().join()
+        library.positions.flush().join()
 
-        val catalog = repository.catalog.value
+        val catalog = library.repository.catalog.value
         assertEquals(bookId, catalog.lastReadBookId)
         val stored = requireNotNull(catalog.readingStates[bookId])
         assertEquals(42, stored.tokenIndex)
@@ -100,9 +100,9 @@ class CatalogPositionsTest {
     @Test
     fun `a device-only book publishes no position, though the account is signed in`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
         val actions = RecordingAccountLibraryActions()
         val shelf = AccountShelf(
             resumeOffers = AccountResumeOffers(RecordingHostRecords()),
@@ -117,7 +117,7 @@ class CatalogPositionsTest {
             scope = backgroundScope,
         )
 
-        CatalogPositions(repository, shelf)
+        CatalogPositions(library.positions, shelf)
             .publishPortable(bookId, ReaderFixtures.englishNovel, tokenIndex = 40)
 
         assertEquals("a device-only book tells the account nothing", emptyList<String>(), actions.positions)
@@ -127,9 +127,9 @@ class CatalogPositionsTest {
     @Test
     fun `an account book publishes its portable position under the account's book id`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
         val actions = RecordingAccountLibraryActions()
         val shelf = AccountShelf(
             resumeOffers = AccountResumeOffers(RecordingHostRecords()),
@@ -148,7 +148,7 @@ class CatalogPositionsTest {
         val book = ReaderFixtures.englishNovel
         val chapter = book.chapters.first { !it.isEmpty }
 
-        CatalogPositions(repository, shelf)
+        CatalogPositions(library.positions, shelf)
             .publishPortable(bookId, book, tokenIndex = chapter.startTokenIndex)
 
         assertEquals(1, actions.positions.size)
@@ -161,9 +161,9 @@ class CatalogPositionsTest {
     @Test
     fun `nothing is published while signed out`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
         val actions = RecordingAccountLibraryActions()
         val shelf = AccountShelf(
             resumeOffers = AccountResumeOffers(RecordingHostRecords()),
@@ -172,7 +172,7 @@ class CatalogPositionsTest {
             scope = backgroundScope,
         )
 
-        CatalogPositions(repository, shelf)
+        CatalogPositions(library.positions, shelf)
             .publishPortable(bookId, ReaderFixtures.englishNovel, tokenIndex = 40)
 
         assertEquals(emptyList<String>(), actions.positions)
@@ -379,12 +379,12 @@ class CatalogPositionsTest {
     @Test
     fun `a build with no account surface offers nothing`() = runTest {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        val bookId = repository.catalog.value.books.single().id
+        val library = library(backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val bookId = library.repository.catalog.value.books.single().id
 
         assertNull(
-            CatalogPositions(repository).remoteOffer(bookId, ReaderFixtures.englishNovel, 0),
+            CatalogPositions(library.positions).remoteOffer(bookId, ReaderFixtures.englishNovel, 0),
         )
     }
 
@@ -402,9 +402,9 @@ class CatalogPositionsTest {
         signedOut: Boolean = false,
     ): CatalogPositions {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet.epub")
-        val repository = repository(backgroundScope)
-        repository.addPickedBooks(listOf("doc://a"))
-        deviceBookId = repository.catalog.value.books.single().id
+        val library = library(backgroundScope)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        deviceBookId = library.repository.catalog.value.books.single().id
         val state = if (signedOut) {
             AccountLibraryState.SIGNED_OUT
         } else {
@@ -422,7 +422,7 @@ class CatalogPositionsTest {
             )
         }
         return CatalogPositions(
-            repository,
+            library.positions,
             AccountShelf(
                 resumeOffers = AccountResumeOffers(RecordingHostRecords()),
                 actions = RecordingAccountLibraryActions(),

@@ -2,6 +2,7 @@ package com.cedagova.fastreader.account.library
 
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.CatalogIngestor
+import com.cedagova.fastreader.library.DeviceLibrary
 import com.cedagova.fastreader.library.FakeDocumentGateway
 import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
@@ -82,7 +83,7 @@ class AccountBookCopiesTest {
         assertEquals(book.assetId, downloads.grants.single())
         assertEquals(bytes.size.toLong() to bytes.size.toLong(), progress.last())
 
-        val row = library.catalog.value.book(ready.bookId)!!
+        val row = library.repository.catalog.value.book(ready.bookId)!!
         assertEquals("The Quiet Machine", row.title)
         val source = row.sources.single()
         assertEquals(SourceOrigin.ACCOUNT_COPY, source.origin)
@@ -95,9 +96,12 @@ class AccountBookCopiesTest {
         // reader asks for a book and gets one (REQ-510).
         assertEquals(
             bytes.toList(),
-            library.byteSource(ready.bookId).open().use { it.readBytes() }.toList(),
+            library.bookBytes.byteSource(ready.bookId).open().use { it.readBytes() }.toList(),
         )
-        assertNotNull("a copy is seekable, so the reader opens it the cheap way", library.openBookChannel(ready.bookId))
+        assertNotNull(
+            "a copy is seekable, so the reader opens it the cheap way",
+            library.bookBytes.openBookChannel(ready.bookId),
+        )
 
         assertEquals(
             "the account remembers that it has this book here",
@@ -115,13 +119,13 @@ class AccountBookCopiesTest {
     fun `a copy of a book already on the device joins its row`() = runTest {
         gateway.putDocument("doc://a", bytes, "quiet.epub")
         val library = repository(backgroundScope)
-        library.addPickedBooks(listOf("doc://a"))
-        assertEquals(1, library.catalog.value.books.size)
+        library.repository.addPickedBooks(listOf("doc://a"))
+        assertEquals(1, library.repository.catalog.value.books.size)
 
         val ready = copies(FakeAssetDownloadGateway(bytes), library).download(book) as CopyOutcome.Ready
 
-        assertEquals("one book, not two", 1, library.catalog.value.books.size)
-        val sources = library.catalog.value.book(ready.bookId)!!.sources
+        assertEquals("one book, not two", 1, library.repository.catalog.value.books.size)
+        val sources = library.repository.catalog.value.book(ready.bookId)!!.sources
         assertEquals(2, sources.size)
         assertEquals(setOf(SourceOrigin.DIRECT_PICK, SourceOrigin.ACCOUNT_COPY), sources.map { it.origin }.toSet())
     }
@@ -141,7 +145,11 @@ class AccountBookCopiesTest {
         assertEquals(digest, refused.expected)
         assertEquals(sha256(tampered), refused.actual)
         assertFalse("nothing may be placed", store.has(digest))
-        assertEquals("no row may be written for bytes that were refused", 0, library.catalog.value.books.size)
+        assertEquals(
+            "no row may be written for bytes that were refused",
+            0,
+            library.repository.catalog.value.books.size,
+        )
         assertEquals("and the account must not think it has the book", 0, references.stored.size)
     }
 
@@ -158,7 +166,7 @@ class AccountBookCopiesTest {
         assertTrue(outcome is CopyOutcome.GrantFailed)
         assertTrue((outcome as CopyOutcome.GrantFailed).error is ReaderAuthException.NetworkUnavailable)
         assertFalse(store.has(digest))
-        assertEquals(0, library.catalog.value.books.size)
+        assertEquals(0, library.repository.catalog.value.books.size)
     }
 
     @Test
@@ -173,7 +181,7 @@ class AccountBookCopiesTest {
 
         assertTrue(outcome is CopyOutcome.NoStorage)
         assertFalse(store.has(digest))
-        assertEquals(0, library.catalog.value.books.size)
+        assertEquals(0, library.repository.catalog.value.books.size)
     }
 
     @Test
@@ -208,7 +216,7 @@ class AccountBookCopiesTest {
         assertEquals("and exactly one more fetch", 2, downloads.fetches)
         assertTrue(store.has(digest))
         assertEquals(bytes.toList(), ready.file.readBytes().toList())
-        assertEquals(1, library.catalog.value.books.size)
+        assertEquals(1, library.repository.catalog.value.books.size)
     }
 
     /** Two rejections is the asset, not the signature: reported, not retried forever. */
@@ -224,7 +232,7 @@ class AccountBookCopiesTest {
         assertTrue((outcome as CopyOutcome.DownloadFailed).error is AssetDownloadException.GrantRejected)
         assertEquals("two attempts, and then the answer", 2, downloads.grants.size)
         assertFalse(store.has(digest))
-        assertEquals(0, library.catalog.value.books.size)
+        assertEquals(0, library.repository.catalog.value.books.size)
     }
 
     // ------------------------------------------------------------- freeing a copy
@@ -240,7 +248,7 @@ class AccountBookCopiesTest {
 
         assertFalse("the bytes are gone", ready.file.exists())
         assertFalse(store.has(digest))
-        assertEquals("the row goes with its only source", 0, library.catalog.value.books.size)
+        assertEquals("the row goes with its only source", 0, library.repository.catalog.value.books.size)
         assertEquals("and the account no longer claims it", 0, references.stored.size)
         assertFalse("removing a copy that is gone is not a failure", copies.remove(digest))
     }
@@ -250,7 +258,7 @@ class AccountBookCopiesTest {
     fun `removing a copy of a book that is also on the device keeps the book`() = runTest {
         gateway.putDocument("doc://a", bytes, "quiet.epub")
         val library = repository(backgroundScope)
-        library.addPickedBooks(listOf("doc://a"))
+        library.repository.addPickedBooks(listOf("doc://a"))
         val store = store()
         val copies = copies(FakeAssetDownloadGateway(bytes), library, store)
         val ready = copies.download(book) as CopyOutcome.Ready
@@ -258,10 +266,10 @@ class AccountBookCopiesTest {
         copies.remove(digest)
 
         assertFalse(ready.file.exists())
-        val row = library.catalog.value.book(ready.bookId)
+        val row = library.repository.catalog.value.book(ready.bookId)
         assertNotNull("the book stays: it is still a device book", row)
         assertEquals(SourceOrigin.DIRECT_PICK, row!!.sources.single().origin)
-        assertEquals(bytes.toList(), library.byteSource(row.id).open().use { it.readBytes() }.toList())
+        assertEquals(bytes.toList(), library.bookBytes.byteSource(row.id).open().use { it.readBytes() }.toList())
     }
 
     /**
@@ -273,14 +281,14 @@ class AccountBookCopiesTest {
         val library = repository(backgroundScope)
         val copies = copies(FakeAssetDownloadGateway(bytes), library)
         val ready = copies.download(book) as CopyOutcome.Ready
-        library.updateReadingState(
+        library.positions.update(
             ready.bookId,
             com.cedagova.fastreader.library.ReadingState(bookDigest = ready.bookId, tokenIndex = 42),
         )
 
         copies.remove(digest)
 
-        assertEquals(42, library.readingState(ready.bookId)?.tokenIndex)
+        assertEquals(42, library.positions.readingState(ready.bookId)?.tokenIndex)
     }
 
     // ------------------------------------------------------------- the start-up sweep
@@ -302,9 +310,9 @@ class AccountBookCopiesTest {
         assertEquals(
             "a row whose bytes are gone says so rather than claiming to be readable",
             SourceAvailability.MISSING,
-            library.catalog.value.book(ready.bookId)!!.sources.single().availability,
+            library.repository.catalog.value.book(ready.bookId)!!.sources.single().availability,
         )
-        assertNull("and it no longer opens", library.catalog.value.book(ready.bookId)!!.readableSource)
+        assertNull("and it no longer opens", library.repository.catalog.value.book(ready.bookId)!!.readableSource)
         assertEquals("the account's reference goes with the bytes", 0, references.stored.size)
     }
 
@@ -312,41 +320,37 @@ class AccountBookCopiesTest {
     fun `a device with no copies sweeps nothing and changes nothing`() = runTest {
         gateway.putDocument("doc://a", bytes, "quiet.epub")
         val library = repository(backgroundScope)
-        library.addPickedBooks(listOf("doc://a"))
-        val before = library.catalog.value
+        library.repository.addPickedBooks(listOf("doc://a"))
+        val before = library.repository.catalog.value
 
         assertEquals(0, copies(FakeAssetDownloadGateway(bytes), library).reconcile())
 
-        assertEquals(before, library.catalog.value)
+        assertEquals(before, library.repository.catalog.value)
     }
 
     // ------------------------------------------------------------- fixtures
 
     private fun store() = AccountCopyStore(File(temporary.root, AccountCopyStore.DIRECTORY_NAME))
 
-    private fun repository(scope: CoroutineScope): LibraryRepository {
+    private fun repository(scope: CoroutineScope): DeviceLibrary {
         val covers = CoverStore(File(temporary.root, "covers"))
-        return LibraryRepository(
+        return DeviceLibrary(
             store = FileCatalogStore(File(File(temporary.root, "catalog"), "catalog.json")),
             ingestor = CatalogIngestor(gateway, covers),
             gateway = gateway,
-            covers = covers,
             scope = scope,
             ioDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
         )
     }
 
-    private fun copies(
-        downloads: AssetDownloadGateway,
-        library: LibraryRepository,
-        store: AccountCopyStore = store(),
-    ) = AccountBookCopies(
-        gateway = downloads,
-        store = store,
-        references = references,
-        catalog = LibraryAccountCopyCatalog(library),
-        clock = { 1_700_000_000_000 },
-    )
+    private fun copies(downloads: AssetDownloadGateway, library: DeviceLibrary, store: AccountCopyStore = store()) =
+        AccountBookCopies(
+            gateway = downloads,
+            store = store,
+            references = references,
+            catalog = LibraryAccountCopyCatalog(library.repository),
+            clock = { 1_700_000_000_000 },
+        )
 
     private fun sha256(value: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(value).joinToString("") { "%02x".format(it) }

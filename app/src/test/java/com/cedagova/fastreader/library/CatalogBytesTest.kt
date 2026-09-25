@@ -45,29 +45,28 @@ class CatalogBytesTest {
         bodyText = "A book called $title.",
     )
 
-    private fun repository(scope: CoroutineScope): LibraryRepository {
+    private fun library(scope: CoroutineScope): DeviceLibrary {
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
-        return LibraryRepository(
+        return DeviceLibrary(
             store = FileCatalogStore(file),
             ingestor = CatalogIngestor(gateway, covers, clock = { NOW }),
             gateway = gateway,
-            covers = covers,
             scope = scope,
             ioDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[TestCoroutineScheduler]),
             clock = { NOW },
         )
     }
 
-    private suspend fun writeEverything(repository: LibraryRepository) {
+    private suspend fun writeEverything(library: DeviceLibrary) {
         gateway.putIntoFolder("tree://shelf", "doc://shelf/one", epub("One"), "one.epub")
         gateway.putIntoFolder("tree://shelf", "doc://shelf/two", epub("Two"), "two.epub")
         gateway.putDocument("doc://three", epub("Three"), "three.epub")
-        repository.addFolder("tree://shelf", "Shelf")
-        repository.addPickedBooks(listOf("doc://three"))
-        val ids = repository.catalog.value.books.associate { it.title to it.id }
+        library.repository.addFolder("tree://shelf", "Shelf")
+        library.repository.addPickedBooks(listOf("doc://three"))
+        val ids = library.repository.catalog.value.books.associate { it.title to it.id }
         val (one, two, three) = listOf("One", "Two", "Three").map(ids::getValue)
 
-        repository.updateSettings {
+        library.settingsStore.update {
             it.copy(
                 theme = ThemeChoice.DARK,
                 fontSize = FontSize.LARGE,
@@ -75,16 +74,16 @@ class CatalogBytesTest {
                 libraryOrder = LibraryOrder.TITLE,
             )
         }
-        repository.updateReadingState(one, ReadingState(bookDigest = one, tokenIndex = 42, wpm = 420))
-        repository.recordReadingState(three, ReadingState(bookDigest = three, tokenIndex = 7, progressFraction = 0.25f))
-        repository.flushReadingState().join()
-        repository.markFrontMatterOffered(two)
-        repository.removeBook(two)
+        library.positions.update(one, ReadingState(bookDigest = one, tokenIndex = 42, wpm = 420))
+        library.positions.record(three, ReadingState(bookDigest = three, tokenIndex = 7, progressFraction = 0.25f))
+        library.positions.flush().join()
+        library.positions.markFrontMatterOffered(two)
+        library.repository.removeBook(two)
     }
 
     @Test
     fun `the split writes the same catalog bytes the single repository wrote`() = runTest {
-        writeEverything(repository(backgroundScope))
+        writeEverything(library(backgroundScope))
 
         assertEquals(golden(), file.readText())
     }
@@ -93,10 +92,10 @@ class CatalogBytesTest {
     fun `a stored catalog is written back byte for byte`() = runTest {
         file.parentFile!!.mkdirs()
         file.writeText(golden())
-        val repository = repository(backgroundScope)
+        val library = library(backgroundScope)
 
         // A write that changes nothing still rewrites the whole document.
-        repository.updateSettings { it }
+        library.settingsStore.update { it }
 
         assertEquals(golden(), file.readText())
     }

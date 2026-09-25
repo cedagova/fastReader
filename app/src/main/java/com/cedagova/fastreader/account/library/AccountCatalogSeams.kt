@@ -12,8 +12,9 @@ import java.io.File
  * written by [LibraryRepository].
  *
  * Each method is exactly what `AccountBookCopies` did with the repository
- * before it moved out of `:app`; #204 later splits the repository behind
- * narrower types, and only this adapter follows it.
+ * before it moved out of `:app`. Account copies are catalog rows, so they
+ * stayed on [LibraryRepository] when #204 moved settings, positions and book
+ * bytes out of it; this adapter is still the only coupling.
  */
 class LibraryAccountCopyCatalog(private val repository: LibraryRepository) : AccountCopyCatalog {
 

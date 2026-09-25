@@ -93,6 +93,9 @@ internal fun FastReaderApp(graph: AppGraph) {
 
         handedOver != null && top.showsHandedOverBook -> ReaderRoute(
             repository = repository,
+            settingsStore = graph.settingsStore,
+            positions = graph.readingPositions,
+            bookBytes = graph.bookBytes,
             handover = graph.external,
             target = ReaderTarget.External(handedOver),
             // There is no row to go back to and nothing of this book is kept but
@@ -112,7 +115,7 @@ internal fun FastReaderApp(graph: AppGraph) {
             )
 
             Destination.Settings -> SettingsRoute(
-                repository = repository,
+                settingsStore = graph.settingsStore,
                 readerAccount = account.account,
                 onBack = { stack = stack.pop() },
                 onOpenReaderAccount = { stack = stack.push(Destination.ReaderAccount) },
@@ -120,6 +123,9 @@ internal fun FastReaderApp(graph: AppGraph) {
 
             is Destination.Reader -> ReaderRoute(
                 repository = repository,
+                settingsStore = graph.settingsStore,
+                positions = graph.readingPositions,
+                bookBytes = graph.bookBytes,
                 handover = graph.external,
                 target = ReaderTarget.Library(top.bookId),
                 onBack = { stack = stack.pop() },
@@ -152,6 +158,7 @@ internal fun FastReaderApp(graph: AppGraph) {
                 }
                 LibraryRoute(
                     repository = repository,
+                    settingsStore = graph.settingsStore,
                     covers = graph.covers,
                     account = account.shelf,
                     imports = account.imports,

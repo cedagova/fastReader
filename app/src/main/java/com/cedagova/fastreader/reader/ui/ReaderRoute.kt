@@ -29,7 +29,10 @@ import com.cedagova.fastreader.account.library.PortableReadingPosition
 import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import com.cedagova.fastreader.external.ExternalOpen
 import com.cedagova.fastreader.external.ExternalOpenController
+import com.cedagova.fastreader.library.BookBytes
 import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReaderSettingsStore
+import com.cedagova.fastreader.library.ReadingPositions
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.ui.PickPersistableDocuments
@@ -61,7 +64,14 @@ import kotlinx.coroutines.flow.first
  */
 @Composable
 fun ReaderRoute(
+    /** The catalog, for the open book's row, and "Add to library" (REQ-103). */
     repository: LibraryRepository,
+    /** The cues, timing and presentation the reader draws with (LEAF302). */
+    settingsStore: ReaderSettingsStore,
+    /** Where each book is read to, and the front-matter record (REQ-016, REQ-202). */
+    positions: ReadingPositions,
+    /** A library book's bytes (#118). */
+    bookBytes: BookBytes,
     /** The book handed over from another app, if any (REQ-103), and its identity work. */
     handover: ExternalOpenController,
     target: ReaderTarget,
@@ -86,10 +96,12 @@ fun ReaderRoute(
     // LEAF202 built. This is the whole of "live preview" outside the settings
     // screen: the reader is drawn from the same value the settings screen writes,
     // so a change made mid-book is on screen as soon as the store accepts it.
-    val settings by repository.settings.collectAsStateWithLifecycle()
+    val settings by settingsStore.settings.collectAsStateWithLifecycle()
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
-            initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository, account)) }
+            initializer {
+                ReaderViewModel(CatalogBooks(repository, bookBytes), CatalogPositions(positions, account))
+            }
         },
     )
     // Keyed on which book, not on the target value: an external target changes
@@ -162,7 +174,7 @@ fun ReaderRoute(
     // Answering settles the offer for this book for good, whichever way it was
     // answered: the requirement is that it is *offered* once (REQ-202).
     val settleFrontMatterOffer = {
-        offer?.positionKey?.let { repository.requestMarkFrontMatterOffered(it) }
+        offer?.positionKey?.let { positions.requestMarkFrontMatterOffered(it) }
         Unit
     }
     // REQ-511. The reader knows the account holds a place ahead of this one and
@@ -353,15 +365,15 @@ private const val SPEED_NOTICE_MILLIS = 1_400L
  * The catalog id it hands over *is* the book's whole-file SHA-256 (AD-2), which
  * is exactly why the reader never has to compute one (AD-8).
  */
-private class CatalogBooks(private val repository: LibraryRepository) : ReaderBooks {
+private class CatalogBooks(private val repository: LibraryRepository, private val bookBytes: BookBytes) : ReaderBooks {
 
     override fun libraryBook(bookId: String) = BookOpenRequest.library(
         bookId = bookId,
         title = repository.catalog.value.book(bookId)?.title.orEmpty(),
         // Whether those bytes are a picked file, a folder's file or a verified
-        // private copy of an account book is the repository's business alone
+        // private copy of an account book is [BookBytes]' business alone
         // (#118): this asks for the book and gets the book.
-        bytes = repository.byteSource(bookId),
+        bytes = bookBytes.byteSource(bookId),
     )
 }
 
@@ -372,7 +384,7 @@ private class CatalogBooks(private val repository: LibraryRepository) : ReaderBo
  * meet, so neither package has to know the other's shape.
  */
 internal class CatalogPositions(
-    private val repository: LibraryRepository,
+    private val positions: ReadingPositions,
     /**
      * Where a portable position goes, or null when this build has no account
      * surface at all (#120).
@@ -387,10 +399,10 @@ internal class CatalogPositions(
     private val account: AccountShelf? = null,
 ) : ReaderPositions {
 
-    override val failure: StateFlow<String?> get() = repository.persistenceFailure
+    override val failure: StateFlow<String?> get() = positions.persistenceFailure
 
     override fun restore(bookId: String): ReaderPosition? {
-        val stored = repository.readingState(bookId) ?: return null
+        val stored = positions.readingState(bookId) ?: return null
         return ReaderPosition(
             position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
             progressFraction = stored.progressFraction,
@@ -400,7 +412,7 @@ internal class CatalogPositions(
     }
 
     override fun record(bookId: String, position: ReaderPosition) {
-        repository.recordReadingState(
+        positions.record(
             bookId,
             ReadingState(
                 bookDigest = position.position.bookDigest,
@@ -416,7 +428,7 @@ internal class CatalogPositions(
     }
 
     override fun flush() {
-        repository.flushReadingState()
+        positions.flush()
     }
 
     /**

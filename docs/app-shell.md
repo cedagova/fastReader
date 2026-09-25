@@ -18,9 +18,17 @@ are checked by tests, named below.
   for the application type.
 - **The `:reader-account` assembly** is one `ReaderAccountGraph(...)` call
   inside `AppGraph`, over FastReader's host seams (#200).
+- **The device library assembly** is one `DeviceLibrary(...)` call inside
+  `AppGraph` (#204). It builds one narrow type per concern — `LibraryRepository`
+  (books, folders, removal, account copies), `ReaderSettingsStore`,
+  `ReadingPositions` and `BookBytes` — over one `CatalogDocument`, the single
+  writer of `catalog.json`. Every write is a transform of the current document
+  under that one lock, so no concern can overwrite another's change. Never
+  build a second `CatalogDocument` over the same file.
 - **Routes receive only what they use.** The shell (`FastReaderApp`) hands each
-  Route the objects it needs — `LibraryRepository`, `CoverStore`, the account
-  shelf, the `ExternalOpenController` — never the graph. A feature package
+  Route the objects it needs — `LibraryRepository`, `ReaderSettingsStore`,
+  `ReadingPositions`, `BookBytes`, `CoverStore`, the account shelf, the
+  `ExternalOpenController` — never the graph. A feature package
   cannot import `AppGraph` anyway: that would be a cycle with the root package
   (see "Packages").
 
@@ -43,7 +51,7 @@ Every screen has the same four parts:
 
 | Part | Lives in | Job |
 |---|---|---|
-| **Store** | `AppGraph` (process-scoped) | Owns data. Exposes `StateFlow`s and `request…` functions. Examples: `LibraryRepository`, `ReaderAccountController`, `AccountShelf`. |
+| **Store** | `AppGraph` (process-scoped) | Owns data. Exposes `StateFlow`s and `request…` functions. Examples: `LibraryRepository`, `ReaderSettingsStore`, `ReaderAccountController`, `AccountShelf`. |
 | **Route** — the state holder | `<feature>/ui/<Screen>Route.kt` | Collects the stores with `collectAsStateWithLifecycle()`, keeps screen-only state (a query, an open dialog) in `rememberSaveable`, builds the screen state, and turns taps into store calls. |
 | **UI state** | `<feature>/ui/<Screen>UiState.kt` | A plain data type plus a pure builder, such as `buildLibraryUiState(...)`. The Route calls the builder inside `remember(inputs)`. |
 | **Screen** | `<feature>/ui/<Screen>Screen.kt` | Stateless: state in, callbacks out. This is what the Roborazzi goldens render, so every state is drawable without a device. |
