@@ -314,7 +314,8 @@ public class ReaderApiClient internal constructor(
         private const val MAX_MESSAGE = 200
         private const val SERVER_ERROR = 500
 
-        private val json = Json { ignoreUnknownKeys = true }
+        /** The JSON every reader-api body is read and sent with; the contract test pins sent models to it. */
+        internal val json = Json { ignoreUnknownKeys = true }
 
         /** The Ktor client every reader-api request goes through: the contract's timeout, nothing else. */
         internal fun httpClient(engine: HttpClientEngine): HttpClient = HttpClient(engine) {

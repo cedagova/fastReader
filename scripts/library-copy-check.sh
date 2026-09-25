@@ -18,7 +18,9 @@
 #   4. reads R8's mapping and fails unless every @Serializable type of each
 #      self-keeping module still has the members kotlinx.serialization looks up
 #      at run time (`Companion` + its `serializer()`, or `INSTANCE` +
-#      `serializer()`), under their own names.
+#      `serializer()`), under their own names — and fails if the host's
+#      unreferenced isolation canary kept its serializer lookup, which means
+#      some rule keeps every package's and step 4 would prove nothing.
 #
 # A missing file or catalog entry fails step 3's build or tests; a missing
 # keep rule fails step 4. Nothing outside the temp dir is written, and the script deletes
@@ -34,6 +36,8 @@ set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 doc="$repo/docs/library-consumption.md"
 template="$repo/scripts/library-copy-check"
+# The host's isolation canary (consumer/.../canary/IsolationCanary.kt; step 4).
+canary="example.librarycopycheck.canary.IsolationCanary"
 
 die() {
   printf 'library-copy-check: %s\n' "$*" >&2
@@ -171,6 +175,8 @@ printf '%s\n' ${fixture_modules[@]+"${fixture_modules[@]}"} >"$work/fixture-modu
   for entry in "${self_kept[@]}"; do
     echo "-keep,allowobfuscation @kotlinx.serialization.Serializable class ${entry#*=}.**"
   done
+  # The isolation canary: its class is kept, its serializer lookup is not (step 4).
+  echo "-keep,allowobfuscation class $canary"
 } >"$work/consumer/host-rules.pro"
 
 # A module listed without a package keeps serialized types it does not own
@@ -202,10 +208,24 @@ say "building the throwaway host in $work"
 outputs="$work/consumer/build/outputs/mapping/release"
 [[ -f "$outputs/mapping.txt" && -f "$outputs/seeds.txt" && -f "$outputs/configuration.txt" ]] ||
   die "R8 wrote no mapping.txt/seeds.txt/configuration.txt in $outputs"
-# The isolation itself: no rule R8 received may keep @Serializable classes of
+# The isolation itself: no rule R8 received may keep the serializer lookup of
 # every package, or a self-keeping module's missing rule would go unnoticed.
+# The common shape is named directly; the canary catches every other shape.
 if grep -nE '@kotlinx\.serialization\.Serializable class \*\*([^.]|$)' "$outputs/configuration.txt"; then
   die "a keep rule above reaches every package's @Serializable classes, so this check cannot tell whether a module keeps its own; find its source in $outputs/configuration.txt and ignore it"
+fi
+grep -q "^$canary -> " "$outputs/mapping.txt" ||
+  die "the isolation canary $canary did not reach R8, so the isolation cannot be proven; check the host rule in $work/consumer/host-rules.pro"
+if awk -v companion="$canary\$Companion" '
+  /^[^ #]/ { class = $1; next }
+  /^    / && class == companion {
+    line = $0; sub(/^ +/, "", line); sub(/^[0-9]+:[0-9]+:/, "", line)
+    n = split(line, tok, " ")
+    if (n >= 4 && tok[n - 1] == "->" && tok[2] ~ /^serializer\(/ && tok[n] == "serializer") found = 1
+  }
+  END { exit found ? 0 : 1 }
+' "$outputs/mapping.txt"; then
+  die "a rule R8 received keeps $canary's serializer() although nothing asks for it, so some rule keeps every package's serializer lookup and this check cannot tell whether a module keeps its own; find it in $outputs/configuration.txt and ignore it"
 fi
 for entry in "${self_kept[@]}"; do
   module="${entry%%=*}"

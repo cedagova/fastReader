@@ -63,8 +63,13 @@ class ReaderApiContract private constructor(val document: JsonObject) {
         READ_SUBSET,
     }
 
-    /** A model pinned to the component schema that declares it. */
-    class Pin(val serializer: KSerializer<*>, val schema: String, val fit: Fit = Fit.WHOLE)
+    /**
+     * A model pinned to the component schema that declares it. [sentWith] is the
+     * JSON configuration the module encodes the model with when it sends it
+     * (null for a model the module only reads): a field the schema requires must
+     * survive that encoding.
+     */
+    class Pin(val serializer: KSerializer<*>, val schema: String, val fit: Fit = Fit.WHOLE, val sentWith: Json? = null)
 
     /** A checker over one module's [pins]; a `$ref` must land on a schema one of them is pinned to. */
     fun checker(pins: List<Pin>): Checker = Checker(pins)
@@ -76,9 +81,15 @@ class ReaderApiContract private constructor(val document: JsonObject) {
             pins.associate { it.serializer.descriptor.serialName to it.schema }
 
         /** Every disagreement between the pinned models and the document, each naming the schema and field. */
-        fun violations(): List<String> = pins.flatMap { violations(it.serializer.descriptor, it.schema, it.fit) }
+        fun violations(): List<String> =
+            pins.flatMap { violations(it.serializer.descriptor, it.schema, it.fit, it.sentWith) }
 
-        fun violations(descriptor: SerialDescriptor, schemaName: String, fit: Fit = Fit.WHOLE): List<String> {
+        fun violations(
+            descriptor: SerialDescriptor,
+            schemaName: String,
+            fit: Fit = Fit.WHOLE,
+            sentWith: Json? = null,
+        ): List<String> {
             val schema = schemas[schemaName]?.jsonObject
                 ?: return listOf("$schemaName: the pinned document declares no such schema")
             val properties = schema["properties"]?.jsonObject ?: JsonObject(emptyMap())
@@ -104,6 +115,16 @@ class ReaderApiContract private constructor(val document: JsonObject) {
                 }
                 if (fit == Fit.READ_SUBSET && field !in required && !descriptor.isElementOptional(index)) {
                     problems += "$schemaName.$field: the schema may omit it but the model has no default"
+                }
+                // A JSON that leaves defaults out drops a defaulted field whenever it
+                // holds its default, so a field the schema requires would go missing.
+                // (`@EncodeDefault` is applied by the compiler plugin and is not visible
+                // in the descriptor, so it cannot excuse the field here.)
+                if (sentWith != null && field in required && descriptor.isElementOptional(index) &&
+                    !sentWith.configuration.encodeDefaults
+                ) {
+                    problems += "$schemaName.$field: the schema requires it but the model's default is left out " +
+                        "when sent (encodeDefaults = false); drop the default or send with encodeDefaults = true"
                 }
                 problems += checkShape(element, resolved, "$schemaName.$field")
             }

@@ -102,8 +102,11 @@ has the detail; this is the checklist.
   build file ([library-consumption.md](library-consumption.md#copying-and-updating-into-a-host)).
 - **`gradle.properties`:** `android.useAndroidX=true` and
   `android.experimental.enableTestFixturesKotlinSupport=true`. AGP still
-  gates Kotlin in `src/testFixtures` behind that flag; without it the
-  libraries' test fixtures do not compile.
+  gates Kotlin in `src/testFixtures` behind that flag. The library build
+  convention (`build-logic/src/main/kotlin/TestFixturesSupport.kt`) fails the
+  configuration with this fix named when the flag is missing; if an AGP upgrade
+  ever stops honouring it, move the Android libraries' fixtures into a
+  dedicated fixtures module.
 - **Keep rules come with the module.** Each Android library ships
   `consumer-rules.pro` (wired with `consumerProguardFiles`); `:reader-engine`
   ships its rules inside its jar (`src/main/resources/META-INF/proguard/`). A
@@ -181,15 +184,15 @@ FastReader makes the call in `AppGraph` (`AppGraph.readerAccount`), which
 - **Own persistence.** The engine keeps no state; the host stores positions
   and must treat a change of `ContentPipelineVersion.CURRENT` as "stored token
   indices may have moved".
-- **Compose note.** The engine has no Compose compiler, so Compose infers its
-  types as unstable. A host's UI state that holds them (in FastReader, the
-  reader's state types in `reader/ui/ReaderUiState.kt`, which carry
-  `BookContent`, tokens and a `RemainingTimeIndex`) cannot skip recomposition
-  on equal inputs. Nothing visible depends on it
-  today; the remedy, if profiling ever shows it, is a Compose stability
-  configuration file in the host (`composeCompiler {
-  stabilityConfigurationFiles }`) listing the engine's immutable types — not a
-  Compose dependency in the engine.
+- **Compose note.** The engine has no Compose compiler, so Compose would infer
+  its types as unstable. FastReader declares the engine's immutable value
+  types stable in `app/compose-stability.conf` (wired with `composeCompiler {
+  stabilityConfigurationFiles }` in `app/build.gradle.kts`), so the reader's
+  UI state that carries `BookContent`, tokens, positions, timing and a
+  `RemainingTimeIndex` can skip recomposition on equal inputs. A host copies
+  that file and lists only types with no mutable state — never the pipeline,
+  inspector, byte sources or timing engine — rather than adding a Compose
+  dependency to the engine.
 
 ## The reader-api contract pin
 

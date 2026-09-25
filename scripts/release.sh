@@ -116,8 +116,9 @@ if [ "$PUBLISH" -eq 1 ]; then
   [ -n "$TARGET" ] || TARGET="HEAD"
   # A full SHA: the CI lookup below matches on it, and the tag must name exactly
   # the commit whose checks were read.
-  TARGET="$(git rev-parse --verify --quiet "$TARGET^{commit}")" \
-    || die "target $TARGET is not a commit in this repository"
+  TARGET_ARG="$TARGET"
+  TARGET="$(git rev-parse --verify --quiet "$TARGET_ARG^{commit}")" \
+    || die "target $TARGET_ARG is not a commit in this repository"
   printf 'target commit: %s\n' "$TARGET"
 
   # Existing-tag check. `gh release view` exits non-zero both for "no such

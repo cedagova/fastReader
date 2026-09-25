@@ -63,6 +63,12 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// :reader-engine has no Compose compiler; its immutable value types are declared
+// stable here so the reader's UI state can skip recomposition on equal inputs.
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
+}
+
 android {
     namespace = "com.cedagova.fastreader"
 
