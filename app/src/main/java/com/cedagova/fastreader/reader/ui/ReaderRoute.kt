@@ -7,7 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +20,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -28,7 +28,7 @@ import com.cedagova.fastreader.R
 import com.cedagova.fastreader.account.library.PortableReadingPosition
 import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import com.cedagova.fastreader.external.ExternalOpen
-import com.cedagova.fastreader.library.LibraryGraph
+import com.cedagova.fastreader.external.ExternalOpenController
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
@@ -40,8 +40,6 @@ import com.cedagova.fastreader.reader.ReaderBooks
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.fastreader.reader.ReaderPositions
-import com.cedagova.fastreader.reader.ReaderTarget
-import com.cedagova.fastreader.reader.ReaderViewModel
 import com.cedagova.fastreader.reader.ResumeOffer
 import com.cedagova.reader.account.library.AccountShelf
 import com.cedagova.reader.engine.content.BookContent
@@ -63,7 +61,9 @@ import kotlinx.coroutines.flow.first
  */
 @Composable
 fun ReaderRoute(
-    graph: LibraryGraph,
+    repository: LibraryRepository,
+    /** The book handed over from another app, if any (REQ-103), and its identity work. */
+    handover: ExternalOpenController,
     target: ReaderTarget,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -82,12 +82,11 @@ fun ReaderRoute(
      */
     account: AccountShelf? = null,
 ) {
-    val repository = graph.repository
     // The stored settings drive the cue layer LEAF301 built and the timing engine
     // LEAF202 built. This is the whole of "live preview" outside the settings
     // screen: the reader is drawn from the same value the settings screen writes,
     // so a change made mid-book is on screen as soon as the store accepts it.
-    val settings by repository.settings.collectAsState()
+    val settings by repository.settings.collectAsStateWithLifecycle()
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
             initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository, account)) }
@@ -111,7 +110,7 @@ fun ReaderRoute(
                     title = target.open.title,
                     identity = target.open.identity,
                     origin = target.open.origin,
-                    bytes = graph.external.byteSource(target.open.uri),
+                    bytes = handover.byteSource(target.open.uri),
                 ),
             )
         }
@@ -132,7 +131,7 @@ fun ReaderRoute(
         reader.setParagraphAlwaysShown(settings.paragraphAlwaysShown)
     }
 
-    val state by reader.state.collectAsState()
+    val state by reader.state.collectAsStateWithLifecycle()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
 
     val unavailable = state as? ReaderUiState.Unavailable
@@ -142,12 +141,12 @@ fun ReaderRoute(
     }
 
     val external = (target as? ReaderTarget.External)?.open
-    ExternalIdentity(graph, external, reader)
+    ExternalIdentity(handover, external, reader)
 
     // Live, because the answer changes under this screen: the keepable half of
     // REQ-103 adds the row itself, and "Add to library" adds it through the
     // picker. Either way the notice has to go the moment the book has a row.
-    val catalog by repository.catalog.collectAsState()
+    val catalog by repository.catalog.collectAsStateWithLifecycle()
     val inLibrary = external?.identity?.let { catalog.book(it.value) != null } == true
 
     // REQ-202. The reader knows this book opens on front matter and that the
@@ -157,7 +156,7 @@ fun ReaderRoute(
     // A book with no identity yet — an "Open with" whose digest is still being
     // computed — has no key to look up, so it is offered: nothing durable was
     // ever written about it, and answering is what writes the record.
-    val offer by reader.frontMatterOffer.collectAsState()
+    val offer by reader.frontMatterOffer.collectAsStateWithLifecycle()
     val offeredBefore = offer?.positionKey?.let { it in catalog.frontMatterOfferedBookIds } == true
     val frontMatterOffer = offer?.takeIf { !offeredBefore }
     // Answering settles the offer for this book for good, whichever way it was
@@ -176,8 +175,8 @@ fun ReaderRoute(
     // call that appears and disappears with `account`.
     val accountLibrary by remember(account) {
         account?.state ?: MutableStateFlow(AccountLibraryState.SIGNED_OUT)
-    }.collectAsState()
-    val offered by reader.resumeOffer.collectAsState()
+    }.collectAsStateWithLifecycle()
+    val offered by reader.resumeOffer.collectAsStateWithLifecycle()
     val resumeSettledBefore = offered?.let { offer ->
         accountLibrary.books.firstOrNull { it.bookId == offer.accountBookId }
             ?.resumeOfferSettledFor == offer.changeKey
@@ -281,7 +280,7 @@ fun ReaderRoute(
         onOpenSettings = onOpenSettings,
         externalNotice = external != null && external.resolved && !external.noticeDismissed && !inLibrary,
         onAddToLibrary = { addToLibrary.launch(SafDocumentGateway.PICKER_MIME_TYPES) },
-        onDismissExternalNotice = { graph.external.dismissNotice() },
+        onDismissExternalNotice = { handover.dismissNotice() },
         frontMatterOffer = frontMatterOffer?.chapterTitle,
         onSkipFrontMatter = {
             settleFrontMatterOffer()
@@ -316,7 +315,7 @@ fun ReaderRoute(
  * other's.
  */
 @Composable
-private fun ExternalIdentity(graph: LibraryGraph, external: ExternalOpen?, reader: ReaderViewModel) {
+private fun ExternalIdentity(controller: ExternalOpenController, external: ExternalOpen?, reader: ReaderViewModel) {
     LaunchedEffect(reader, external?.uri) {
         val uri = external?.uri ?: return@LaunchedEffect
         // Waits for *this* book's stream, not for "a" stream. A state value read
@@ -327,7 +326,7 @@ private fun ExternalIdentity(graph: LibraryGraph, external: ExternalOpen?, reade
         // which is both the wrong REQ-110 claim and the window in which
         // [ReaderViewModel.identityResolved] has no session to stamp.
         reader.state.first { it is ReaderUiState.Reading && reader.openKey == uri }
-        graph.external.resolveIdentity(uri)
+        controller.resolveIdentity(uri)
     }
     LaunchedEffect(reader, external?.uri, external?.identity) {
         val identity = external?.identity ?: return@LaunchedEffect

@@ -1,11 +1,11 @@
-package com.cedagova.fastreader.reader
+package com.cedagova.fastreader.reader.ui
 
 import com.cedagova.fastreader.external.ExternalOpen
 
 /**
  * What the app asked the reader to open.
  *
- * [BookOpenRequest] is the reader's *entry contract* — bytes, identity, origin —
+ * [com.cedagova.fastreader.reader.BookOpenRequest] is the reader's *entry contract* — bytes, identity, origin —
  * and building one needs the catalog, the asset manager or a document grant.
  * This is the thin thing that travels through navigation instead: a name for the
  * book that [com.cedagova.fastreader.reader.ui.ReaderRoute] turns into a request.
@@ -17,7 +17,7 @@ import com.cedagova.fastreader.external.ExternalOpen
 sealed interface ReaderTarget {
 
     /**
-     * What "the same book" means here — the value [BookOpenRequest.openKey]
+     * What "the same book" means here — the value [com.cedagova.fastreader.reader.BookOpenRequest.openKey]
      * carries.
      *
      * The reader's open effect is keyed on this rather than on the target value,

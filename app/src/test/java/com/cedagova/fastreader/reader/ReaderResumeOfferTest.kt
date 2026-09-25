@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.reader
 
 import com.cedagova.fastreader.reader.ui.ReaderUiState
+import com.cedagova.fastreader.reader.ui.ReaderViewModel
 import com.cedagova.reader.engine.content.BookContent
 import com.cedagova.reader.engine.content.BookIdentity
 import com.cedagova.reader.engine.content.ContentFixtures

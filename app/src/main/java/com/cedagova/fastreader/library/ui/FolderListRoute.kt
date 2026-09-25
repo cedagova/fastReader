@@ -2,14 +2,14 @@ package com.cedagova.fastreader.library.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.cedagova.fastreader.library.LibraryGraph
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cedagova.fastreader.library.LibraryRepository
 
 /**
  * The folder list wired to the real catalog (REQ-104).
@@ -23,9 +23,8 @@ import com.cedagova.fastreader.library.LibraryGraph
  * showing the folder's *current* count, not the one it opened with.
  */
 @Composable
-fun FolderListRoute(graph: LibraryGraph, onBack: () -> Unit, modifier: Modifier = Modifier) {
-    val repository = graph.repository
-    val catalog by repository.catalog.collectAsState()
+fun FolderListRoute(repository: LibraryRepository, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val catalog by repository.catalog.collectAsStateWithLifecycle()
     var confirmingId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val folders = remember(catalog) { buildFolderItems(catalog) }

@@ -1,9 +1,16 @@
-package com.cedagova.fastreader.reader
+package com.cedagova.fastreader.reader.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cedagova.fastreader.reader.ui.ReaderBookView
-import com.cedagova.fastreader.reader.ui.ReaderUiState
+import com.cedagova.fastreader.reader.BookOpenRequest
+import com.cedagova.fastreader.reader.FrontMatterOffer
+import com.cedagova.fastreader.reader.ReaderBooks
+import com.cedagova.fastreader.reader.ReaderMode
+import com.cedagova.fastreader.reader.ReaderPosition
+import com.cedagova.fastreader.reader.ReaderPositions
+import com.cedagova.fastreader.reader.ReaderSession
+import com.cedagova.fastreader.reader.ResumeOffer
+import com.cedagova.fastreader.reader.toPosition
 import com.cedagova.reader.engine.content.BookContent
 import com.cedagova.reader.engine.content.BookContentResult
 import com.cedagova.reader.engine.content.BookIdentity
@@ -19,17 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/** How the reader gets at a book, so the ViewModel does not need the catalog's whole API. */
-interface ReaderBooks {
-
-    /**
-     * The open request for a catalog book: its title, its bytes read in place
-     * (AD-1), and its catalog id as the identity the reader must not recompute
-     * (AD-8).
-     */
-    fun libraryBook(bookId: String): BookOpenRequest
-}
 
 /**
  * Holds the open book for as long as the reader is on screen.

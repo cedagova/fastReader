@@ -1,7 +1,5 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.library.store.CatalogLoad
-import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeMirror

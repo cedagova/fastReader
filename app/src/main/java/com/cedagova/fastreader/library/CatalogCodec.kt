@@ -1,6 +1,7 @@
-package com.cedagova.fastreader.library.store
+package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.library.Catalog
+import com.cedagova.fastreader.library.store.CatalogMigration
+import com.cedagova.fastreader.library.store.CatalogSchema
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

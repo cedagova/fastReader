@@ -31,7 +31,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * default is "no book has been offered yet" — which is what an absent key already
  * decodes to. The step is total: a `settings` value that is not an object falls
  * through untouched rather than throwing, because a throw here escapes
- * [CatalogCodec.decode]'s guard and would set aside the reader's whole library.
+ * [com.cedagova.fastreader.library.CatalogCodec.decode]'s guard and would set aside the reader's whole library.
  */
 internal object ChapterPauseV5Migration : CatalogMigration {
 

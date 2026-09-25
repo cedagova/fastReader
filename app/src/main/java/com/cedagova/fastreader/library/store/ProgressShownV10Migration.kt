@@ -21,7 +21,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * every field of that document already reads back as its documented default, and
  * `progressShown` defaults to the same `true` this step would have written. A
  * `settings` value that is not an object falls through untouched rather than
- * throwing, because a throw here escapes [CatalogCodec.decode]'s guard and would
+ * throwing, because a throw here escapes [com.cedagova.fastreader.library.CatalogCodec.decode]'s guard and would
  * set aside the reader's whole library.
  */
 internal object ProgressShownV10Migration : CatalogMigration {

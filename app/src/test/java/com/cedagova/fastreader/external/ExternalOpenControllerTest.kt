@@ -2,9 +2,9 @@ package com.cedagova.fastreader.external
 
 import com.cedagova.fastreader.library.CatalogIngestor
 import com.cedagova.fastreader.library.FakeDocumentGateway
+import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.store.CoverStore
-import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.fastreader.reader.BookOrigin
 import com.cedagova.reader.engine.content.BookIdentity
 import com.cedagova.reader.engine.content.ContentFixtures

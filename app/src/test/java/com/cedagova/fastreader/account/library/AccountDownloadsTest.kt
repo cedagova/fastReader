@@ -2,9 +2,9 @@ package com.cedagova.fastreader.account.library
 
 import com.cedagova.fastreader.library.CatalogIngestor
 import com.cedagova.fastreader.library.FakeDocumentGateway
+import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.store.CoverStore
-import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.reader.account.library.AccountBookCopies
 import com.cedagova.reader.account.library.AccountCopyStore
 import com.cedagova.reader.account.library.AccountDownloads

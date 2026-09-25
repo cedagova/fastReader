@@ -137,9 +137,16 @@ android {
 // golden edit invalidate the task locally and invalidate the build-cache key on
 // CI, so the regression gate always actually runs. This tightens the gate; it
 // changes no tolerance.
+//
+// The same holds for PackageGraphTest (#202), which reads the main sources'
+// `import` lines: an import that changes no bytecode would otherwise leave the
+// task UP-TO-DATE over a new package cycle.
 tasks.withType<Test>().configureEach {
     inputs.dir(layout.projectDirectory.dir("screenshots"))
         .withPropertyName("roborazziGoldens")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(layout.projectDirectory.dir("src/main/java"))
+        .withPropertyName("mainSourcesForPackageGraph")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
