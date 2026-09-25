@@ -8,7 +8,7 @@ import android.Manifest
  * The runtime entry point is [ReaderAuthClient]; the rules it implements are
  * written in `CONTRACT.md` beside this module's README.
  */
-object ReaderAuth {
+public object ReaderAuth {
 
     /**
      * The permission this library declares in its own manifest and therefore
@@ -17,5 +17,5 @@ object ReaderAuth {
      * install-time permission, so a granted result is what a correctly merged
      * manifest yields and a denied one means the library manifest was dropped.
      */
-    const val REQUIRED_PERMISSION: String = Manifest.permission.INTERNET
+    public const val REQUIRED_PERMISSION: String = Manifest.permission.INTERNET
 }

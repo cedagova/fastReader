@@ -60,7 +60,7 @@ import kotlinx.serialization.json.jsonObject
  *   and `request_id`; a network failure or timeout is
  *   [ReaderAuthException.NetworkUnavailable]. Nothing else is retried.
  */
-class ReaderApiClient internal constructor(
+public class ReaderApiClient internal constructor(
     private val config: ReaderAuthConfig,
     private val http: HttpClient,
     private val refresher: SessionRefresher,
@@ -73,7 +73,7 @@ class ReaderApiClient internal constructor(
      * sign-in. A 2xx whose object does not decode as the document is an
      * [ReaderAuthException.ApiError] (#191), like a 2xx that is not JSON.
      */
-    suspend fun preAuth(): PreAuthDocument = send(
+    public suspend fun preAuth(): PreAuthDocument = send(
         HttpMethod.Get,
         PRE_AUTH_PATH,
         authenticated = false,
@@ -82,7 +82,7 @@ class ReaderApiClient internal constructor(
     ).value
 
     /** `GET /v1/reader/capabilities?clientVersion=…`: the first authenticated call after sign-in. */
-    suspend fun capabilities(): JsonObject = capabilitiesResponse().document
+    public suspend fun capabilities(): JsonObject = capabilitiesResponse().document
 
     /**
      * The same call, with the `X-Request-ID` the successful attempt carried
@@ -91,12 +91,12 @@ class ReaderApiClient internal constructor(
      * request, same headers, same policy as [capabilities]; only the return
      * shape differs.
      */
-    suspend fun capabilitiesResponse(): ReaderApiResponse =
+    public suspend fun capabilitiesResponse(): ReaderApiResponse =
         send(HttpMethod.Get, CAPABILITIES_PATH, authenticated = true, clientVersion = true) { it }
             .let { ReaderApiResponse(it.value, it.requestId) }
 
     /** `PUT /v1/reader/profile`: the upsert that precedes any profile `GET`. */
-    suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = request(
+    public suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = request(
         HttpMethod.Put,
         PROFILE_PATH,
         authenticated = true,
@@ -104,10 +104,10 @@ class ReaderApiClient internal constructor(
     )
 
     /** Any further protected `GET` a host needs, under the same policy. */
-    suspend fun get(path: String): JsonObject = request(HttpMethod.Get, path, authenticated = true)
+    public suspend fun get(path: String): JsonObject = request(HttpMethod.Get, path, authenticated = true)
 
     /** Any further protected `PUT` a host needs, under the same policy. */
-    suspend fun put(path: String, body: JsonObject): JsonObject =
+    public suspend fun put(path: String, body: JsonObject): JsonObject =
         request(HttpMethod.Put, path, authenticated = true, body = body.toString())
 
     /**
@@ -120,7 +120,7 @@ class ReaderApiClient internal constructor(
      * it is unchanged. [path] may carry a query string; the caller is
      * responsible for it being a route the published contract declares.
      */
-    suspend fun post(path: String, body: JsonObject): JsonObject =
+    public suspend fun post(path: String, body: JsonObject): JsonObject =
         request(HttpMethod.Post, path, authenticated = true, body = body.toString())
 
     private suspend fun request(
@@ -299,17 +299,17 @@ class ReaderApiClient internal constructor(
         }
     }
 
-    companion object {
+    public companion object {
         /** [key] as text when it is a JSON scalar; an object, an array, `null` or a missing key is `null`. */
         private fun JsonObject.text(key: String): String? =
             (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
 
-        const val PRE_AUTH_PATH: String = "/v1/reader/pre-auth"
-        const val CAPABILITIES_PATH: String = "/v1/reader/capabilities"
-        const val PROFILE_PATH: String = "/v1/reader/profile"
-        const val HEADER_CLIENT: String = "X-Reader-Client"
-        const val HEADER_REQUEST_ID: String = "X-Request-ID"
-        const val QUERY_CLIENT_VERSION: String = "clientVersion"
+        public const val PRE_AUTH_PATH: String = "/v1/reader/pre-auth"
+        public const val CAPABILITIES_PATH: String = "/v1/reader/capabilities"
+        public const val PROFILE_PATH: String = "/v1/reader/profile"
+        public const val HEADER_CLIENT: String = "X-Reader-Client"
+        public const val HEADER_REQUEST_ID: String = "X-Request-ID"
+        public const val QUERY_CLIENT_VERSION: String = "clientVersion"
         private const val AUTH_CODE_PREFIX = "auth."
         private const val MAX_MESSAGE = 200
         private const val SERVER_ERROR = 500

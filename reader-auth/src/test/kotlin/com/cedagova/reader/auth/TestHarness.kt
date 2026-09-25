@@ -2,6 +2,7 @@ package com.cedagova.reader.auth
 
 import com.cedagova.reader.auth.session.SessionCipher
 import com.cedagova.reader.auth.session.SessionStore
+import com.cedagova.reader.auth.session.StoredSession
 import io.github.jan.supabase.auth.user.UserInfo
 import io.github.jan.supabase.auth.user.UserSession
 import io.ktor.client.engine.mock.MockEngine
@@ -63,11 +64,11 @@ class RecordingWaiter : RetryWaiter {
 class InMemorySessionStore(initial: UserSession? = null) : SessionStore {
     @Volatile var session: UserSession? = initial
     val saves = mutableListOf<UserSession>()
-    override suspend fun save(session: UserSession) {
-        this.session = session
-        saves += session
+    override suspend fun save(session: StoredSession) {
+        this.session = session.value
+        saves += session.value
     }
-    override suspend fun load(): UserSession? = session
+    override suspend fun load(): StoredSession? = session?.let(::StoredSession)
     override suspend fun clear() {
         session = null
     }

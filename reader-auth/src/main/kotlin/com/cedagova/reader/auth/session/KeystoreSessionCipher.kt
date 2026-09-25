@@ -29,8 +29,7 @@ import kotlin.concurrent.withLock
  *
  * Blob layout: one version byte, the 12-byte IV, then ciphertext and tag.
  */
-class KeystoreSessionCipher internal constructor(private val alias: String, private val keys: SessionKeyStore) :
-    SessionCipher {
+internal class KeystoreSessionCipher(private val alias: String, private val keys: SessionKeyStore) : SessionCipher {
 
     constructor(alias: String = DEFAULT_ALIAS) : this(alias, AndroidSessionKeyStore)
 

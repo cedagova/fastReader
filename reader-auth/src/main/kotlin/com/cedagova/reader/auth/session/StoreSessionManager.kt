@@ -26,13 +26,13 @@ import kotlin.coroutines.cancellation.CancellationException
  * overlap between a caller's reset and its read. Callers that save nothing
  * never reset or read it (#183), so none can take a refresh's failure.
  */
-class StoreSessionManager(val store: SessionStore) : SessionManager {
+internal class StoreSessionManager(val store: SessionStore) : SessionManager {
 
     private val saveFailure = AtomicReference<Exception?>(null)
 
     override suspend fun saveSession(session: UserSession) {
         try {
-            store.save(session)
+            store.save(StoredSession(session))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -40,8 +40,8 @@ class StoreSessionManager(val store: SessionStore) : SessionManager {
         }
     }
 
-    override suspend fun loadSession(): UserSession = store.load() ?: throw NoSessionFoundException()
-    override suspend fun deleteSession() = store.clear()
+    override suspend fun loadSession(): UserSession = store.load()?.value ?: throw NoSessionFoundException()
+    override suspend fun deleteSession(): Unit = store.clear()
 
     /** The failure of the last save since the previous call, if any; reading it resets it. */
     fun takeSaveFailure(): Exception? = saveFailure.getAndSet(null)

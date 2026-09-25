@@ -39,13 +39,13 @@ import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
  * that is well-formed HTTP but does not match the pinned contract is an
  * `ApiError`, because that is what it is: an answer this client cannot use.
  */
-interface ReaderLibraryOperations {
+public interface ReaderLibraryOperations {
 
     /** `GET /v1/reader/library`: the account's library rows. */
-    suspend fun library(): ReaderLibraryResponse
+    public suspend fun library(): ReaderLibraryResponse
 
     /** `GET /v1/reader/progress`: every reading position the account holds. */
-    suspend fun progress(): ReaderProgressListResponse
+    public suspend fun progress(): ReaderProgressListResponse
 
     /**
      * `POST /v1/reader/sync/mutations`: admit a batch of 1 to 50 envelopes.
@@ -57,7 +57,7 @@ interface ReaderLibraryOperations {
      *   50 — a caller bug the module refuses locally instead of learning from
      *   a 422.
      */
-    suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse
+    public suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse
 
     /**
      * `GET /v1/reader/sync/deltas`: the account's changes after [afterCursor].
@@ -68,7 +68,7 @@ interface ReaderLibraryOperations {
      * @throws IllegalArgumentException when [afterCursor] is not a decimal
      *   cursor or [limit] is outside 1..500.
      */
-    suspend fun deltas(
+    public suspend fun deltas(
         afterCursor: String = ReaderLibraryClient.FIRST_CURSOR,
         limit: Int = ReaderLibraryClient.DEFAULT_DELTA_LIMIT,
     ): ReaderSyncDeltaResponse
@@ -79,14 +79,14 @@ interface ReaderLibraryOperations {
      * A document without that entry reads as
      * [ReaderSyncCapability.UNDECLARED] — unavailable, reason unknown.
      */
-    suspend fun syncCapability(): ReaderSyncCapability
+    public suspend fun syncCapability(): ReaderSyncCapability
 
     /**
      * `GET /v1/reader/capabilities?clientVersion=…`: the
      * `reader.publication-import.v1` entry, under the contract's exactly-one
      * rule ([ReaderPublicationImportCapability]).
      */
-    suspend fun publicationImportCapability(): ReaderPublicationImportCapability
+    public suspend fun publicationImportCapability(): ReaderPublicationImportCapability
 
     // ---- Publication imports (#116) ---------------------------------------------------------
 
@@ -97,7 +97,7 @@ interface ReaderLibraryOperations {
      * per format, the active-import limits — is read from here on each attempt
      * and never remembered as a constant (REQ-506).
      */
-    suspend fun importPolicy(): PublicationImportPolicyResponse
+    public suspend fun importPolicy(): PublicationImportPolicyResponse
 
     /**
      * `POST /reader/v1/imports`: admit one device-only publication into the
@@ -114,10 +114,10 @@ interface ReaderLibraryOperations {
      *   module is willing to make: bytes leave the device only on the owner's
      *   word (REQ-505).
      */
-    suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse
+    public suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse
 
     /** `GET /reader/v1/imports/{id}`: the durable lifecycle state of one import. */
-    suspend fun importRecord(importId: String): PublicationImportResponse
+    public suspend fun importRecord(importId: String): PublicationImportResponse
 
     /**
      * `POST /reader/v1/imports/{id}/complete`: the bytes are all at Storage.
@@ -125,10 +125,10 @@ interface ReaderLibraryOperations {
      * The backend observes the stored object itself and enters verification; it
      * never takes a digest from the uploader, so there is nothing to send.
      */
-    suspend fun completeImport(importId: String): PublicationImportResponse
+    public suspend fun completeImport(importId: String): PublicationImportResponse
 
     /** `POST /reader/v1/imports/{id}/cancel`: stop an import; idempotent. */
-    suspend fun cancelImport(
+    public suspend fun cancelImport(
         importId: String,
         reason: String = CancelPublicationImportRequest.DEFAULT_REASON,
     ): PublicationImportResponse
@@ -151,5 +151,5 @@ interface ReaderLibraryOperations {
      *   bug refused before a request exists, rather than a path segment built
      *   from something else.
      */
-    suspend fun assetDownloadGrant(assetId: String): ReaderAssetGrantResponse
+    public suspend fun assetDownloadGrant(assetId: String): ReaderAssetGrantResponse
 }

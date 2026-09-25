@@ -33,7 +33,7 @@ import kotlinx.serialization.json.JsonObject
  * a document written before #147 byte-compatible: FastReader's `copies` and
  * `resumeOfferSettledFor` keys are where they always were.
  */
-object AccountLibrarySchema {
+internal object AccountLibrarySchema {
 
     /**
      * Version history:
@@ -90,7 +90,7 @@ object AccountLibrarySchema {
 }
 
 /** One forward step of the account-library schema. */
-fun interface AccountLibraryMigration {
+internal fun interface AccountLibraryMigration {
     fun migrate(document: JsonObject): JsonObject
 }
 
@@ -106,7 +106,7 @@ fun interface AccountLibraryMigration {
  * the engine read the lists instead of the stream.
  */
 @Serializable
-data class AccountLibraryDocument(
+public data class AccountLibraryDocument(
     @SerialName("schemaVersion") val schemaVersion: Int = AccountLibrarySchema.CURRENT_VERSION,
     @SerialName("userId") val userId: String = "",
     @SerialName("cursor") val cursor: String? = null,
@@ -143,14 +143,14 @@ data class AccountLibraryDocument(
     /** True once the account's library has been read at least once on this device. */
     val bootstrapped: Boolean get() = cursor != null
 
-    fun book(bookId: String): AccountBook? = books.firstOrNull { it.bookId == bookId }
+    public fun book(bookId: String): AccountBook? = books.firstOrNull { it.bookId == bookId }
 
     /** The stored import for [clientImportId], or null when there is none. */
-    fun import(clientImportId: String): PublicationImportRecord? =
+    public fun import(clientImportId: String): PublicationImportRecord? =
         imports.firstOrNull { it.clientImportId == clientImportId }
 
     /** Replaces [record]'s entry, or appends it when this account has none for that file. */
-    fun withImport(record: PublicationImportRecord): AccountLibraryDocument {
+    public fun withImport(record: PublicationImportRecord): AccountLibraryDocument {
         val index = imports.indexOfFirst { it.clientImportId == record.clientImportId }
         return if (index < 0) {
             copy(imports = imports + record)
@@ -160,11 +160,11 @@ data class AccountLibraryDocument(
     }
 
     /** Drops the import [clientImportId] names; nothing happens when there is none. */
-    fun withoutImport(clientImportId: String): AccountLibraryDocument =
+    public fun withoutImport(clientImportId: String): AccountLibraryDocument =
         copy(imports = imports.filterNot { it.clientImportId == clientImportId })
 
     /** Replaces [book]'s row, or appends it when the account has no row for that book yet. */
-    fun withBook(book: AccountBook): AccountLibraryDocument {
+    public fun withBook(book: AccountBook): AccountLibraryDocument {
         val index = books.indexOfFirst { it.bookId == book.bookId }
         return if (index < 0) {
             copy(books = books + book)
@@ -188,7 +188,7 @@ data class AccountLibraryDocument(
  * payload is not guaranteed to carry the metadata again.
  */
 @Serializable
-data class AccountBook(
+public data class AccountBook(
     @SerialName("bookId") val bookId: String,
     @SerialName("title") val title: String = "",
     @SerialName("author") val author: String? = null,
@@ -256,7 +256,7 @@ data class AccountBook(
      */
     @SerialName(HOST_RECORDS_KEY) val host: JsonObject = EMPTY_JSON_OBJECT,
 ) {
-    companion object {
+    public companion object {
 
         /**
          * The row a `GET /v1/reader/library` item describes, merged into [held] —
@@ -278,7 +278,7 @@ data class AccountBook(
          * [removed] is false: a book the list returns is a live membership. A
          * still-queued removal is re-applied on top by the engine, not here.
          */
-        fun of(item: ReaderLibraryItem, held: AccountBook? = null): AccountBook {
+        public fun of(item: ReaderLibraryItem, held: AccountBook? = null): AccountBook {
             val asset = item.assets.firstOrNull { it.checksum != null }
             return AccountBook(
                 bookId = item.book.id,
@@ -312,7 +312,7 @@ data class AccountBook(
  * record from a client that named no section is still a usable percentage.
  */
 @Serializable
-data class AccountRemotePosition(
+public data class AccountRemotePosition(
     /** The section the other client named — a spine path, when it named one. */
     @SerialName("href") val href: String? = null,
     @SerialName("chapterTitle") val chapterTitle: String? = null,
@@ -356,7 +356,7 @@ data class AccountRemotePosition(
  * engine never mints a new key for an entry that already has one.
  */
 @Serializable
-data class AccountOutboxEntry(
+public data class AccountOutboxEntry(
     @SerialName("idempotencyKey") val idempotencyKey: String,
     @SerialName("resourceType") val resourceType: ReaderResourceType = ReaderResourceType.LIBRARY_ITEM,
     @SerialName("resourceId") val resourceId: String,
@@ -365,7 +365,7 @@ data class AccountOutboxEntry(
     @SerialName("payload") val payload: JsonObject = EMPTY_JSON_OBJECT,
     @SerialName("clientCreatedAt") val clientCreatedAt: String? = null,
 ) {
-    fun toEnvelope(): ReaderSyncMutationEnvelope = ReaderSyncMutationEnvelope(
+    public fun toEnvelope(): ReaderSyncMutationEnvelope = ReaderSyncMutationEnvelope(
         idempotencyKey = idempotencyKey,
         resourceType = resourceType,
         resourceId = resourceId,

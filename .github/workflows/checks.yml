@@ -66,9 +66,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: ./gradlew --no-daemon verifyRoborazziDebug
 
-      - name: Lint and formatting
+      # checkKotlinAbi compares each Reader library's compiled public surface
+      # with its committed api/<module>.api dump (build-logic, #198), so an
+      # unintended public change is a red run until the dump is updated.
+      - name: Lint, formatting and library API surface
         if: ${{ !cancelled() }}
-        run: ./gradlew --no-daemon lint spotlessCheck
+        run: ./gradlew --no-daemon lint spotlessCheck checkKotlinAbi
 
       # The shipped APK's code path: R8 shrinks and optimizes the release
       # variant with the same rules release.sh builds with. The task stops

@@ -11,6 +11,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
             extensions.configure<LibraryExtension> {
                 configureAndroidModule(this)
             }
+            configureLibraryApiSurface()
         }
     }
 }

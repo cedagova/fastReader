@@ -28,7 +28,7 @@ import kotlinx.serialization.Serializable
  * download for one asset the signed-in actor may read.
  */
 @Serializable
-data class ReaderAssetGrantResponse(
+public data class ReaderAssetGrantResponse(
     /** Echoed `X-Request-ID`; the id to quote when reading a server log. */
     @SerialName("request_id") val requestId: String,
     @SerialName("grant") val grant: ReaderAssetGrant,
@@ -52,7 +52,7 @@ data class ReaderAssetGrantResponse(
  * carry. The account bearer is not in it and cannot be: see `AssetDownloadClient`.
  */
 @Serializable
-data class ReaderAssetGrant(
+public data class ReaderAssetGrant(
     @SerialName("asset_id") val assetId: String,
     @SerialName("book_id") val bookId: String,
     @SerialName("direction") val direction: ReaderAssetDirection = ReaderAssetDirection.UNKNOWN,
@@ -76,8 +76,8 @@ data class ReaderAssetGrant(
     val isDownload: Boolean
         get() = direction == ReaderAssetDirection.DOWNLOAD && method == ReaderAssetMethod.GET
 
-    companion object {
+    public companion object {
         /** The prefix the contract's own `sha256` pattern makes optional. */
-        const val SHA256_PREFIX: String = "sha256:"
+        public const val SHA256_PREFIX: String = "sha256:"
     }
 }

@@ -18,11 +18,11 @@ import kotlinx.serialization.Serializable
  * side ([ReaderMutationKind] inside [ReaderSyncMutationEnvelope]) is chosen by
  * the caller from the contract's own values.
  */
-const val UNKNOWN_VALUE: String = "__unknown__"
+internal const val UNKNOWN_VALUE: String = "__unknown__"
 
 /** `ReaderLibraryItem.status`: where a book sits in the account's library. */
 @Serializable
-enum class ReaderLibraryStatus {
+public enum class ReaderLibraryStatus {
     @SerialName("queued")
     QUEUED,
 
@@ -45,7 +45,7 @@ enum class ReaderLibraryStatus {
  * coverless.
  */
 @Serializable
-enum class ReaderCoverStatus {
+public enum class ReaderCoverStatus {
     @SerialName("pending")
     PENDING,
 
@@ -61,7 +61,7 @@ enum class ReaderCoverStatus {
 
 /** `ReaderBook.source_type`: how the account acquired the book. */
 @Serializable
-enum class ReaderBookSourceType {
+public enum class ReaderBookSourceType {
     @SerialName("upload")
     UPLOAD,
 
@@ -80,7 +80,7 @@ enum class ReaderBookSourceType {
 
 /** `ReaderBookAsset.kind`: which file of a book an asset is. */
 @Serializable
-enum class ReaderBookAssetKind {
+public enum class ReaderBookAssetKind {
     @SerialName("epub")
     EPUB,
 
@@ -102,7 +102,7 @@ enum class ReaderBookAssetKind {
 
 /** The resource a sync envelope, result or change is about. */
 @Serializable
-enum class ReaderResourceType {
+public enum class ReaderResourceType {
     @SerialName("profile")
     PROFILE,
 
@@ -130,7 +130,7 @@ enum class ReaderResourceType {
 
 /** What a sync envelope, result or change does to its resource. */
 @Serializable
-enum class ReaderMutationKind {
+public enum class ReaderMutationKind {
     @SerialName("upsert")
     UPSERT,
 
@@ -153,7 +153,7 @@ enum class ReaderMutationKind {
  * carry [ReaderSyncConflict] and [ReaderSyncRejection] instead of a revision.
  */
 @Serializable
-enum class ReaderSyncStatus {
+public enum class ReaderSyncStatus {
     @SerialName("applied")
     APPLIED,
 
@@ -175,7 +175,7 @@ enum class ReaderSyncStatus {
 
 /** `ReaderSyncMutationResult.server_admission`: null for a conflict or rejection. */
 @Serializable
-enum class ReaderServerAdmission {
+public enum class ReaderServerAdmission {
     @SerialName("accepted")
     ACCEPTED,
 
@@ -188,7 +188,7 @@ enum class ReaderServerAdmission {
 
 /** `ReaderSyncConflict.code`. */
 @Serializable
-enum class ReaderSyncConflictCode {
+public enum class ReaderSyncConflictCode {
     @SerialName("revision_conflict")
     REVISION_CONFLICT,
 
@@ -213,7 +213,7 @@ enum class ReaderSyncConflictCode {
 
 /** `ReaderSyncRejection.code`: why the server refused one envelope outright. */
 @Serializable
-enum class ReaderSyncRejectionCode {
+public enum class ReaderSyncRejectionCode {
     @SerialName("invalid_payload")
     INVALID_PAYLOAD,
 
@@ -235,7 +235,7 @@ enum class ReaderSyncRejectionCode {
 
 /** `ReaderPublicationMembershipOutcome.state`. */
 @Serializable
-enum class ReaderMembershipState {
+public enum class ReaderMembershipState {
     @SerialName("present")
     PRESENT,
 
@@ -248,7 +248,7 @@ enum class ReaderMembershipState {
 
 /** `ReaderPublicationMembershipOutcome.action`. */
 @Serializable
-enum class ReaderMembershipAction {
+public enum class ReaderMembershipAction {
     @SerialName("add")
     ADD,
 
@@ -264,7 +264,7 @@ enum class ReaderMembershipAction {
 
 /** `ReaderPublicationMembershipOutcome.open_session_behavior`. */
 @Serializable
-enum class ReaderOpenSessionBehavior {
+public enum class ReaderOpenSessionBehavior {
     @SerialName("unchanged")
     UNCHANGED,
 
@@ -281,7 +281,7 @@ enum class ReaderOpenSessionBehavior {
  * treating them as a failure.
  */
 @Serializable
-enum class ReaderDeltaStatus {
+public enum class ReaderDeltaStatus {
     @SerialName("ok")
     OK,
 
@@ -297,7 +297,7 @@ enum class ReaderDeltaStatus {
 
 /** `ReaderCapabilityEntry.key`: the capability keys the document declares. */
 @Serializable
-enum class ReaderCapabilityKey {
+internal enum class ReaderCapabilityKey {
     @SerialName("reader.sync.v1")
     SYNC_V1,
 
@@ -322,7 +322,7 @@ enum class ReaderCapabilityKey {
  * client must not spend, and `AssetDownloadClient` refuses one.
  */
 @Serializable
-enum class ReaderAssetDirection {
+public enum class ReaderAssetDirection {
     @SerialName("upload")
     UPLOAD,
 
@@ -335,7 +335,7 @@ enum class ReaderAssetDirection {
 
 /** `ReaderAssetGrant.method`: the HTTP method the provider signed the URL for. */
 @Serializable
-enum class ReaderAssetMethod {
+public enum class ReaderAssetMethod {
     @SerialName("GET")
     GET,
 
@@ -348,7 +348,7 @@ enum class ReaderAssetMethod {
 
 /** `ReaderCapabilityEntry.availability`. */
 @Serializable
-enum class ReaderCapabilityAvailability {
+public enum class ReaderCapabilityAvailability {
     @SerialName("available")
     AVAILABLE,
 
@@ -361,7 +361,7 @@ enum class ReaderCapabilityAvailability {
 
 /** `ReaderCapabilityEntry.reason`: why a capability is or is not available. */
 @Serializable
-enum class ReaderCapabilityReason {
+public enum class ReaderCapabilityReason {
     @SerialName("available")
     AVAILABLE,
 

@@ -14,6 +14,10 @@
 //
 // contracts/ holds the pinned OpenAPI document and its sha256;
 // ReaderLibraryContractTest is the drift gate (owner decision P1).
+//
+// The public surface is recorded in api/reader-library.api and checked by
+// `./gradlew check` (build-logic, #198); each `api` dependency below says why a
+// type of it is in that surface.
 plugins {
     // Shared SDK, JVM, lint, test and formatter settings (build-logic, #205).
     id("conventions.android.library")
@@ -38,7 +42,11 @@ dependencies {
     // and every failure they raise is a ReaderAuthException, so a host that
     // depends on :reader-library must see :reader-auth's types.
     api(project(":reader-auth"))
-    implementation(libs.kotlinx.serialization.json)
+    // api: the contract models are @Serializable (their generated serializers
+    // are public), and a host's own records in the account document
+    // (AccountHostRecords) are the JsonElement values the engine stores
+    // verbatim. :reader-auth exposes it for the same reason.
+    api(libs.kotlinx.serialization.json)
     // The account sync engine (#147) is process-scoped and flow-driven: its
     // public API takes a CoroutineScope and a Flow and publishes a StateFlow, so
     // a host must see the coroutine types.
@@ -47,14 +55,13 @@ dependencies {
     // provider under the grant's signed headers. It is a SECOND, plain client on
     // purpose — it holds no session and cannot reach a token — so it brings its
     // own engine rather than borrowing :reader-auth's authenticated one.
+    // AssetDownloadClient.createForTests and PublicationTransferClient.createForTests
+    // take a Ktor HttpClientEngine; that type reaches a host through
+    // :reader-auth's `api` Ktor core, for the same reason and until the same
+    // change (#199, A197-F002).
     implementation(libs.ktor.client.okhttp)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.mock)
-    // The mock-engine harness builds a real ReaderAuthClient over a mock
-    // engine (ReaderAuthClient.createForTests), so the tests need the session
-    // type its store holds.
-    testImplementation(platform(libs.supabase.bom))
-    testImplementation(libs.supabase.auth)
 }

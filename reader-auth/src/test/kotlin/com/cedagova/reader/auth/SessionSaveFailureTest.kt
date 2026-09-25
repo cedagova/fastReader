@@ -3,6 +3,7 @@ package com.cedagova.reader.auth
 import com.cedagova.reader.auth.session.FileSessionStore
 import com.cedagova.reader.auth.session.SessionCipher
 import com.cedagova.reader.auth.session.SessionStore
+import com.cedagova.reader.auth.session.StoredSession
 import io.github.jan.supabase.auth.user.UserSession
 import java.io.IOException
 import java.nio.file.Files
@@ -50,11 +51,11 @@ class SessionSaveFailureTest {
     private class UnwritableStore(initial: UserSession?) : SessionStore {
         @Volatile var session: UserSession? = initial
         var failedSaves = 0
-        override suspend fun save(session: UserSession) {
+        override suspend fun save(session: StoredSession) {
             failedSaves += 1
             throw IOException("no space left on device")
         }
-        override suspend fun load(): UserSession? = session
+        override suspend fun load(): StoredSession? = session?.let(::StoredSession)
         override suspend fun clear() {
             session = null
         }
@@ -70,7 +71,7 @@ class SessionSaveFailureTest {
         val directory = Files.createTempDirectory("reader-auth").toFile()
         val cipher = RefusingCipher()
         val store = FileSessionStore(directory, cipher, StandardTestDispatcher(testScheduler))
-        store.save(session(expiresAt = clock.expiring(60)))
+        store.save(StoredSession(session(expiresAt = clock.expiring(60))))
         cipher.failEncrypt = true
         val client = clientOver(store)
 

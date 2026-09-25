@@ -11,7 +11,7 @@ import com.cedagova.reader.library.model.ReaderSyncRejection
  * later increment: signed out (explicit or session gone), bootstrapping,
  * offline, capability unavailable, and the ordinary settled state.
  */
-enum class AccountSyncPhase {
+public enum class AccountSyncPhase {
 
     /** No account is signed in on this device (D4), or this build carries no stage values. */
     SIGNED_OUT,
@@ -39,7 +39,7 @@ enum class AccountSyncPhase {
 }
 
 /** Why an account-library trigger ran. Recorded so a state a trigger produced can be read back. */
-enum class AccountSyncTrigger {
+public enum class AccountSyncTrigger {
     /** A session appeared for an account. */
     SIGN_IN,
 
@@ -61,34 +61,38 @@ enum class AccountSyncTrigger {
  * message: the codes and request ids are the server's own, so the shelf can
  * quote them and a server log can be found from them.
  */
-sealed interface AccountSyncError {
+public sealed interface AccountSyncError {
 
     /** The device has no usable network. The queue is kept and the next trigger retries. */
-    data object NetworkUnavailable : AccountSyncError
+    public data object NetworkUnavailable : AccountSyncError
 
     /** The backend asked for a retry later; [retryAfterSeconds] is its own hint when it gave one. */
-    data class TryLater(val status: Int, val code: String?, val retryAfterSeconds: Long?, val requestId: String?) :
-        AccountSyncError
+    public data class TryLater(
+        val status: Int,
+        val code: String?,
+        val retryAfterSeconds: Long?,
+        val requestId: String?,
+    ) : AccountSyncError
 
     /** The session is gone; D4's signed-out state, with the backend's reason shown once. */
-    data class SessionGone(val code: String?, val requestId: String?) : AccountSyncError
+    public data class SessionGone(val code: String?, val requestId: String?) : AccountSyncError
 
     /** The backend refused this account the operation. */
-    data class Forbidden(val code: String?, val requestId: String?) : AccountSyncError
+    public data class Forbidden(val code: String?, val requestId: String?) : AccountSyncError
 
     /** Anything else the backend answered, including a body that does not match the pinned contract. */
-    data class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String?) :
+    public data class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String?) :
         AccountSyncError
 
     /**
      * The backend refused one queued mutation outright. [code] is the
      * contract's own rejection code — surfaced, never re-interpreted.
      */
-    data class Rejected(val resourceId: String, val code: String, val detail: String, val retryable: Boolean) :
+    public data class Rejected(val resourceId: String, val code: String, val detail: String, val retryable: Boolean) :
         AccountSyncError
 
     /** The stored account document cannot be used, and must not be overwritten. */
-    data class StoreBlocked(val message: String) : AccountSyncError
+    public data class StoreBlocked(val message: String) : AccountSyncError
 
     /**
      * A `reading_progress` record arrived that this app cannot place on a book
@@ -108,11 +112,14 @@ sealed interface AccountSyncError {
      * It is not a sign-out, not a rejection and not retryable. The position is
      * simply not adopted, and the rest of the stream is read as normal.
      */
-    data class UnrecognizedProgressRecord(val resourceId: String, val payloadBookId: String?, val reason: String) :
-        AccountSyncError
+    public data class UnrecognizedProgressRecord(
+        val resourceId: String,
+        val payloadBookId: String?,
+        val reason: String,
+    ) : AccountSyncError
 
     /** The build carries no stage values, so there is nothing to call. */
-    data object NotConfigured : AccountSyncError
+    public data object NotConfigured : AccountSyncError
 }
 
 /**
@@ -121,7 +128,7 @@ sealed interface AccountSyncError {
  * [books] excludes tombstoned rows: a removed book leaves the shelf, and the
  * tombstone exists only so an Undo can bring the row back with its metadata.
  */
-data class AccountLibraryState(
+public data class AccountLibraryState(
     val phase: AccountSyncPhase = AccountSyncPhase.SIGNED_OUT,
     val userId: String? = null,
     val books: List<AccountBook> = emptyList(),
@@ -133,9 +140,9 @@ data class AccountLibraryState(
     /** The trigger that produced this state, for a shelf that distinguishes a manual refresh. */
     val lastTrigger: AccountSyncTrigger? = null,
 ) {
-    companion object {
+    public companion object {
         /** Nobody is signed in: no account rows at all (D4). */
-        val SIGNED_OUT: AccountLibraryState = AccountLibraryState()
+        public val SIGNED_OUT: AccountLibraryState = AccountLibraryState()
     }
 }
 

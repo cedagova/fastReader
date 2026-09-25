@@ -49,7 +49,7 @@ import kotlinx.serialization.json.jsonObject
  * percentage never selects — so a backward move is published exactly like a
  * forward one, and a remote position is consumed exactly as it arrived.
  */
-object PortableProgress {
+public object PortableProgress {
 
     /**
      * How an outbound position is encoded.
@@ -77,7 +77,7 @@ object PortableProgress {
      * envelope's `resource_id`: reader-api rejects a location whose
      * `publication_id` differs from it.
      */
-    fun payloadFor(bookId: String, position: LocalReadingPosition): JsonObject {
+    public fun payloadFor(bookId: String, position: LocalReadingPosition): JsonObject {
         val body = PutReaderProgressRequest(
             progressPercent = position.percent.toDouble(),
             location = ReaderPortableLocationV1(
@@ -91,7 +91,7 @@ object PortableProgress {
     }
 
     /** The portable locator object [position] publishes. */
-    fun locatorFor(position: LocalReadingPosition): JsonObject {
+    public fun locatorFor(position: LocalReadingPosition): JsonObject {
         val locator = ReaderEpubLocatorV1(
             format = LOCATOR_FORMAT_EPUB,
             href = position.href,
@@ -121,7 +121,7 @@ object PortableProgress {
      * book id after all" is *detected* on stage instead of producing a position
      * filed under a book that does not exist.
      */
-    fun recordFor(resourceId: String, payload: JsonObject, knownBook: (String) -> Boolean): ProgressRecord {
+    internal fun recordFor(resourceId: String, payload: JsonObject, knownBook: (String) -> Boolean): ProgressRecord {
         val fromPayload = payload.string("book_id")
         if (fromPayload != null && knownBook(fromPayload)) {
             return ProgressRecord.Recognized(fromPayload, positionOf(payload))
@@ -151,7 +151,7 @@ object PortableProgress {
      * documented fallback, not an error: a malformed locator must not cost the
      * reader the percentage that came with it.
      */
-    fun positionOf(payload: JsonObject): RemoteReadingPosition {
+    public fun positionOf(payload: JsonObject): RemoteReadingPosition {
         val locator = (payload["location"] as? JsonObject)?.get("locator") as? JsonObject
         val format = locator?.string("format")
         // A pdf locator, or a format this build does not know, states nothing
@@ -179,7 +179,7 @@ object PortableProgress {
  * precise fraction. Both describe the same place — the percent is what a person
  * reads on another client, the fraction is what a resume maps back through.
  */
-data class LocalReadingPosition(
+public data class LocalReadingPosition(
     /** The spine path of the chapter the reader is in, or null for a book with no chapters. */
     val href: String?,
     val chapterTitle: String?,
@@ -209,7 +209,7 @@ data class LocalReadingPosition(
  * `reader.activity-convergence.v1` decides who wins, and this app's job is to
  * carry the answer rather than to reach it.
  */
-data class RemoteReadingPosition(
+public data class RemoteReadingPosition(
     /** The section the other client named, when it named one this parse can use. */
     val href: String?,
     val chapterTitle: String?,
@@ -228,7 +228,7 @@ data class RemoteReadingPosition(
  * *visible*. The alternative — dropping the record — is how an assumption stays
  * unfalsified for as long as nobody happens to look.
  */
-sealed interface ProgressRecord {
+internal sealed interface ProgressRecord {
 
     /** The record is about a book this account holds, and states this position. */
     data class Recognized(val bookId: String, val position: RemoteReadingPosition) : ProgressRecord

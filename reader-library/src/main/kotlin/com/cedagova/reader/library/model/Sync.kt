@@ -12,7 +12,9 @@ import kotlinx.serialization.json.JsonObject
  * from a 422.
  */
 @Serializable
-data class ReaderSyncMutationBatchRequest(@SerialName("mutations") val mutations: List<ReaderSyncMutationEnvelope>) {
+internal data class ReaderSyncMutationBatchRequest(
+    @SerialName("mutations") val mutations: List<ReaderSyncMutationEnvelope>,
+) {
     companion object {
         const val MIN_MUTATIONS: Int = 1
         const val MAX_MUTATIONS: Int = 50
@@ -31,7 +33,7 @@ data class ReaderSyncMutationBatchRequest(@SerialName("mutations") val mutations
  * becomes canonical time and never selects a winner.
  */
 @Serializable
-data class ReaderSyncMutationEnvelope(
+public data class ReaderSyncMutationEnvelope(
     @SerialName("idempotency_key") val idempotencyKey: String,
     @SerialName("resource_type") val resourceType: ReaderResourceType,
     @SerialName("resource_id") val resourceId: String,
@@ -50,7 +52,7 @@ data class ReaderSyncMutationEnvelope(
  * never treats the batch as one outcome.
  */
 @Serializable
-data class ReaderSyncMutationBatchResponse(
+public data class ReaderSyncMutationBatchResponse(
     @SerialName("request_id") val requestId: String,
     @SerialName("results") val results: List<ReaderSyncMutationResult> = emptyList(),
     @SerialName("contract_version") val contractVersion: String = SYNC_CONTRACT_VERSION,
@@ -59,13 +61,13 @@ data class ReaderSyncMutationBatchResponse(
 )
 
 /** The `reader.sync.v1` contract constant the batch and delta documents carry. */
-const val SYNC_CONTRACT_VERSION: String = "reader.sync.v1"
+internal const val SYNC_CONTRACT_VERSION: String = "reader.sync.v1"
 
 /** The publication-membership contract constant. */
-const val MEMBERSHIP_VERSION: String = "reader.publication-membership.v1"
+internal const val MEMBERSHIP_VERSION: String = "reader.publication-membership.v1"
 
 /** The activity-convergence contract constant. */
-const val ACTIVITY_CONVERGENCE_VERSION: String = "reader.activity-convergence.v1"
+internal const val ACTIVITY_CONVERGENCE_VERSION: String = "reader.activity-convergence.v1"
 
 /**
  * What the server did with one envelope.
@@ -80,7 +82,7 @@ const val ACTIVITY_CONVERGENCE_VERSION: String = "reader.activity-convergence.v1
  * as a conditional requirement, which is why they are nullable here.
  */
 @Serializable
-data class ReaderSyncMutationResult(
+public data class ReaderSyncMutationResult(
     @SerialName("idempotency_key") val idempotencyKey: String,
     @SerialName("resource_type") val resourceType: ReaderResourceType = ReaderResourceType.UNKNOWN,
     @SerialName("resource_id") val resourceId: String,
@@ -110,7 +112,7 @@ data class ReaderSyncMutationResult(
  * adopts [canonicalPayload] and logs it, and never prompts (AD-22).
  */
 @Serializable
-data class ReaderSyncConflict(
+public data class ReaderSyncConflict(
     @SerialName("conflict_id") val conflictId: String,
     @SerialName("code") val code: ReaderSyncConflictCode = ReaderSyncConflictCode.UNKNOWN,
     @SerialName("remote_revision") val remoteRevision: Long,
@@ -120,7 +122,7 @@ data class ReaderSyncConflict(
 
 /** Why the server refused one envelope outright. [retryable] false means re-sending it changes nothing. */
 @Serializable
-data class ReaderSyncRejection(
+public data class ReaderSyncRejection(
     @SerialName("code") val code: ReaderSyncRejectionCode = ReaderSyncRejectionCode.UNKNOWN,
     @SerialName("detail") val detail: String,
     @SerialName("retryable") val retryable: Boolean = false,
@@ -134,7 +136,7 @@ data class ReaderSyncRejection(
  * test pins them; the module never sends this shape.
  */
 @Serializable
-data class ReaderPublicationMembershipOutcome(
+public data class ReaderPublicationMembershipOutcome(
     @SerialName("state") val state: ReaderMembershipState = ReaderMembershipState.UNKNOWN,
     @SerialName("action") val action: ReaderMembershipAction = ReaderMembershipAction.UNKNOWN,
     @SerialName(
@@ -158,7 +160,7 @@ data class ReaderPublicationMembershipOutcome(
  * cursor the stream can still serve.
  */
 @Serializable
-data class ReaderSyncDeltaResponse(
+public data class ReaderSyncDeltaResponse(
     @SerialName("request_id") val requestId: String,
     @SerialName("status") val status: ReaderDeltaStatus = ReaderDeltaStatus.UNKNOWN,
     @SerialName("minimum_valid_cursor") val minimumValidCursor: String,
@@ -173,7 +175,7 @@ data class ReaderSyncDeltaResponse(
 
 /** One change in the account's stream, in canonical order by [cursor]. */
 @Serializable
-data class ReaderSyncChange(
+public data class ReaderSyncChange(
     @SerialName("cursor") val cursor: String,
     @SerialName("resource_type") val resourceType: ReaderResourceType = ReaderResourceType.UNKNOWN,
     @SerialName("resource_id") val resourceId: String,
