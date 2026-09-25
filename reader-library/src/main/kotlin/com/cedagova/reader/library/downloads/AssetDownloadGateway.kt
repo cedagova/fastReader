@@ -1,20 +1,20 @@
-package com.cedagova.fastreader.account
+package com.cedagova.reader.library.downloads
 
 import com.cedagova.reader.library.ReaderLibraryOperations
-import com.cedagova.reader.library.downloads.AssetDownloadClient
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import java.io.OutputStream
 
 /**
  * The asset-download seam, beside `ReaderLibraryGateway` and
- * [PublicationImportGateway] and for the same reason (#118).
+ * `PublicationImportGateway` and for the same reason (#118; library-owned
+ * since #199, A197-F002).
  *
- * `:reader-library` owns the grant and the transport; this app owns *when* a
- * book is fetched, and the unit tests that prove "when" have to run with no
- * network, no SDK and no Keystore. [AssetDownloadClient] is a concrete class
- * over an internal constructor, so the app could not build a double of it —
- * [ReaderApiAssetDownloadGateway] is the one production implementation and
- * tests substitute a scripted fake.
+ * This module owns the grant and the transport; a host owns *when* a book is
+ * fetched, and the unit tests that prove "when" have to run with no network,
+ * no SDK and no Keystore. [ReaderApiAssetDownloadGateway] is the one
+ * production implementation; a host's tests substitute the scripted
+ * `com.cedagova.reader.library.testing.FakeAssetDownloadGateway` from this
+ * module's test fixtures.
  *
  * ## The two halves are separate on purpose
  *
@@ -28,10 +28,10 @@ import java.io.OutputStream
  * The address, the length, the checksum and the TTL all come from the grant.
  * Nothing here is a constant.
  */
-interface AssetDownloadGateway {
+public interface AssetDownloadGateway {
 
     /** `POST /v1/reader/assets/{asset_id}/download-grant`: a short-lived signed fetch. */
-    suspend fun downloadGrant(assetId: String): ReaderAssetGrant
+    public suspend fun downloadGrant(assetId: String): ReaderAssetGrant
 
     /**
      * Fetch the grant's object into [sink], reporting progress as it goes.
@@ -40,7 +40,7 @@ interface AssetDownloadGateway {
      * owns it, because the caller is the one that deletes the file behind it
      * when this throws.
      */
-    suspend fun download(
+    public suspend fun download(
         grant: ReaderAssetGrant,
         sink: OutputStream,
         onProgress: (written: Long, total: Long) -> Unit = { _, _ -> },
@@ -48,10 +48,10 @@ interface AssetDownloadGateway {
 }
 
 /**
- * The production gateway: the grant from the one authenticated client the app
+ * The production gateway: the grant from the one authenticated client the host
  * owns, the bytes from the one session-less transport beside it.
  */
-class ReaderApiAssetDownloadGateway(
+public class ReaderApiAssetDownloadGateway(
     private val operations: ReaderLibraryOperations,
     private val transport: AssetDownloadClient,
 ) : AssetDownloadGateway {

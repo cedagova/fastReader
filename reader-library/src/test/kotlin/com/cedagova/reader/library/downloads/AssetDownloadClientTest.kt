@@ -3,6 +3,7 @@ package com.cedagova.reader.library.downloads
 import com.cedagova.reader.library.imports.assertRaises
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetMethod
+import com.cedagova.reader.library.testing.assetDownloadClientOver
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
@@ -27,7 +28,7 @@ class AssetDownloadClientTest {
 
     private val bytes = bookBytes(SIZE)
     private val storage = FakeObjectStorage(bytes)
-    private val client = AssetDownloadClient.createForTests(storage.engine)
+    private val client = assetDownloadClientOver(storage.engine)
 
     @Test
     fun `the whole object arrives, byte for byte, without being buffered whole`() = runTest {

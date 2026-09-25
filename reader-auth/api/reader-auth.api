@@ -3,35 +3,32 @@ public final class com/cedagova/reader/auth/ReaderAuth {
 	public static final field REQUIRED_PERMISSION Ljava/lang/String;
 }
 
-public final class com/cedagova/reader/auth/ReaderAuthClient {
+public final class com/cedagova/reader/auth/ReaderAuthClient : com/cedagova/reader/auth/ReaderAuthOperations {
 	public static final field Companion Lcom/cedagova/reader/auth/ReaderAuthClient$Companion;
 	public static final field METHOD_DISABLED Ljava/lang/String;
-	public final fun awaitReady (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun bootstrap (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun awaitReady (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun bootstrap (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun currentState ()Lcom/cedagova/reader/auth/ReaderSessionState;
+	public fun currentState ()Lcom/cedagova/reader/auth/ReaderSessionState;
 	public final fun getApi ()Lcom/cedagova/reader/auth/api/ReaderApiClient;
 	public final fun getConfig ()Lcom/cedagova/reader/auth/ReaderAuthConfig;
-	public final fun getSessionState ()Lkotlinx/coroutines/flow/Flow;
-	public final fun onForeground (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun requestEmailCode (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun requestRecoveryCode (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun setPassword (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun signInWithPassword (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun signOut (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun signOutOtherDevices (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun verifyEmailCode (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun verifyEmailCode$default (Lcom/cedagova/reader/auth/ReaderAuthClient;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun verifyRecoveryCode (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getSessionState ()Lkotlinx/coroutines/flow/Flow;
+	public fun onForeground (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun requestEmailCode (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun requestRecoveryCode (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setPassword (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun signInWithPassword (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun signOut (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun signOutOtherDevices (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun verifyEmailCode (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun verifyRecoveryCode (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/cedagova/reader/auth/ReaderAuthClient$Companion {
 	public final fun create (Landroid/content/Context;Lcom/cedagova/reader/auth/ReaderAuthConfig;)Lcom/cedagova/reader/auth/ReaderAuthClient;
-	public final fun createForTests (Lcom/cedagova/reader/auth/ReaderAuthConfig;Lcom/cedagova/reader/auth/session/SessionStore;Lio/ktor/client/engine/HttpClientEngine;Lcom/cedagova/reader/auth/ReaderClock;Lcom/cedagova/reader/auth/RetryWaiter;Lkotlin/jvm/functions/Function0;)Lcom/cedagova/reader/auth/ReaderAuthClient;
-	public static synthetic fun createForTests$default (Lcom/cedagova/reader/auth/ReaderAuthClient$Companion;Lcom/cedagova/reader/auth/ReaderAuthConfig;Lcom/cedagova/reader/auth/session/SessionStore;Lio/ktor/client/engine/HttpClientEngine;Lcom/cedagova/reader/auth/ReaderClock;Lcom/cedagova/reader/auth/RetryWaiter;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/cedagova/reader/auth/ReaderAuthClient;
 }
 
 public final class com/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose : java/lang/Enum {
@@ -132,6 +129,30 @@ public final class com/cedagova/reader/auth/ReaderAuthException$TryLater : com/c
 
 public final class com/cedagova/reader/auth/ReaderAuthException$UnexpectedResponse : com/cedagova/reader/auth/ReaderAuthException {
 	public fun <init> (Ljava/lang/Throwable;)V
+}
+
+public abstract interface class com/cedagova/reader/auth/ReaderAuthOperations {
+	public abstract fun awaitReady (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun bootstrap (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun currentState ()Lcom/cedagova/reader/auth/ReaderSessionState;
+	public abstract fun getSessionState ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun onForeground (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun requestEmailCode (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun requestRecoveryCode (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setPassword (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun signInWithPassword (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun signOut (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun signOutOtherDevices (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun verifyEmailCode (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun verifyEmailCode$default (Lcom/cedagova/reader/auth/ReaderAuthOperations;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun verifyRecoveryCode (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthOperations$DefaultImpls {
+	public static synthetic fun verifyEmailCode$default (Lcom/cedagova/reader/auth/ReaderAuthOperations;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/cedagova/reader/auth/ReaderAuthPolicy {
@@ -446,7 +467,7 @@ public final class com/cedagova/reader/auth/api/PreAuthDocument$PostAuth$Compani
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public final class com/cedagova/reader/auth/api/ReaderApiClient {
+public final class com/cedagova/reader/auth/api/ReaderApiClient : com/cedagova/reader/auth/api/ReaderApiOperations {
 	public static final field CAPABILITIES_PATH Ljava/lang/String;
 	public static final field Companion Lcom/cedagova/reader/auth/api/ReaderApiClient$Companion;
 	public static final field HEADER_CLIENT Ljava/lang/String;
@@ -454,16 +475,26 @@ public final class com/cedagova/reader/auth/api/ReaderApiClient {
 	public static final field PRE_AUTH_PATH Ljava/lang/String;
 	public static final field PROFILE_PATH Ljava/lang/String;
 	public static final field QUERY_CLIENT_VERSION Ljava/lang/String;
-	public final fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun get (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun post (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun preAuth (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun put (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun get (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun post (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun preAuth (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun put (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/cedagova/reader/auth/api/ReaderApiClient$Companion {
+}
+
+public abstract interface class com/cedagova/reader/auth/api/ReaderApiOperations {
+	public abstract fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun get (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun post (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun preAuth (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun put (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/cedagova/reader/auth/api/ReaderApiResponse {
@@ -522,22 +553,5 @@ public final class com/cedagova/reader/auth/api/SignInMethod : java/lang/Enum {
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/auth/api/SignInMethod;
 	public static fun values ()[Lcom/cedagova/reader/auth/api/SignInMethod;
-}
-
-public abstract interface class com/cedagova/reader/auth/session/SessionStore {
-	public abstract fun clear (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun load (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public abstract fun save (Lcom/cedagova/reader/auth/session/StoredSession;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class com/cedagova/reader/auth/session/StoredSession {
-	public static final field Companion Lcom/cedagova/reader/auth/session/StoredSession$Companion;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/cedagova/reader/auth/session/StoredSession$Companion {
-	public final fun forTests (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/auth/session/StoredSession;
 }
 

@@ -181,10 +181,6 @@ public class AssetDownloadClient internal constructor(private val http: HttpClie
         /** More same-origin hops than this is a loop, not a CDN. */
         private const val MAX_REDIRECTS = 10
 
-        /** The client tests drive: the real client over a mock engine, same code path. */
-        public fun createForTests(engine: HttpClientEngine): AssetDownloadClient =
-            AssetDownloadClient(httpClient(engine))
-
         /**
          * The transport. Its timeouts are deliberately not `:reader-auth`'s 10 s:
          * that is a bound for a small JSON round trip, and this receives

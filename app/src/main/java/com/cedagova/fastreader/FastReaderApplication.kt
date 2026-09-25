@@ -4,13 +4,8 @@ import android.app.Application
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import com.cedagova.fastreader.account.AssetDownloadGateway
-import com.cedagova.fastreader.account.LibraryReaderAccountGateway
-import com.cedagova.fastreader.account.PublicationImportGateway
 import com.cedagova.fastreader.account.ReaderAccountConfiguration
 import com.cedagova.fastreader.account.ReaderAccountController
-import com.cedagova.fastreader.account.ReaderApiAssetDownloadGateway
-import com.cedagova.fastreader.account.ReaderApiPublicationImportGateway
 import com.cedagova.fastreader.account.library.AccountBookCopies
 import com.cedagova.fastreader.account.library.AccountCopyStore
 import com.cedagova.fastreader.account.library.AccountDocumentCopyReferences
@@ -28,8 +23,12 @@ import com.cedagova.reader.auth.ReaderAuthClient
 import com.cedagova.reader.auth.ReaderAuthConfig
 import com.cedagova.reader.library.ReaderLibraryClient
 import com.cedagova.reader.library.downloads.AssetDownloadClient
+import com.cedagova.reader.library.downloads.AssetDownloadGateway
+import com.cedagova.reader.library.downloads.ReaderApiAssetDownloadGateway
 import com.cedagova.reader.library.imports.PublicationImportEngine
+import com.cedagova.reader.library.imports.PublicationImportGateway
 import com.cedagova.reader.library.imports.PublicationTransferClient
+import com.cedagova.reader.library.imports.ReaderApiPublicationImportGateway
 import com.cedagova.reader.library.sync.AccountSyncEngine
 import com.cedagova.reader.library.sync.AccountSyncTrigger
 import com.cedagova.reader.library.sync.FileAccountLibraryStores
@@ -63,7 +62,7 @@ import kotlinx.coroutines.launch
  * library rescan uses, which is the contract's fifth host obligation. That
  * call happens only when a session is stored and inside the refresh margin.
  * Everything the account surface does goes through [readerAccount], which
- * reaches the client through the app-owned gateway.
+ * reaches the client through the library-owned `ReaderAuthOperations` (#199).
  *
  * ## The account library (#113)
  *
@@ -208,7 +207,7 @@ class FastReaderApplication : Application() {
         crashReports = installCrashReporting(this)
         library = LibraryGraph(this, applicationScope)
         readerAccount = ReaderAccountController(
-            gateway = readerAuth?.let(::LibraryReaderAccountGateway),
+            gateway = readerAuth,
             missingValues = ReaderAccountConfiguration.missingValues(readerAccountConfig),
             scope = applicationScope,
         )

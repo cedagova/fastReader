@@ -167,6 +167,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
+    // The libraries' test fixtures (#199): the scripted doubles of their
+    // host-facing interfaces the account tests and goldens run against, so
+    // this app defines no fake of a library type.
+    testImplementation(testFixtures(project(":reader-auth")))
+    testImplementation(testFixtures(project(":reader-library")))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)

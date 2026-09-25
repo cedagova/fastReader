@@ -1,8 +1,9 @@
-package com.cedagova.fastreader.account
+package com.cedagova.reader.library.testing
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.ReaderLibraryOperations
 import com.cedagova.reader.library.imports.PublicationImportEngine
+import com.cedagova.reader.library.imports.PublicationImportGateway
 import com.cedagova.reader.library.imports.PublicationImportRecord
 import com.cedagova.reader.library.imports.PublicationImportRefusal
 import com.cedagova.reader.library.imports.PublicationImportStep
@@ -31,15 +32,16 @@ import kotlinx.coroutines.CompletableDeferred
 
 /**
  * A scripted stand-in for the publication-import seam, the same shape as
- * `FakeReaderLibraryGateway` (in `:reader-library`'s tests) and for the same reason: the add-to-account flow
- * has to be provable with no network, no storage provider and no Keystore.
+ * [FakeReaderLibraryGateway] and for the same reason: a host's add-to-account
+ * flow has to be provable with no network, no storage provider and no
+ * Keystore. Part of this module's test fixtures (#199).
  *
  * Two things are **not** scripted, on purpose.
  *
  * [refuse] delegates to a real [PublicationImportEngine]. The policy check is
  * the thing REQ-506 is about — the cap and the accepted formats come from the
  * deployment and never from a constant — and a hand-written imitation of it
- * here would let the app and the module drift apart while every test stayed
+ * here would let the host and the module drift apart while every test stayed
  * green. The engine's transfer client is never reached by `refuse`; it is
  * constructed and never used.
  *
@@ -47,25 +49,25 @@ import kotlinx.coroutines.CompletableDeferred
  * nothing was sent before the tap asserts this list is empty, which is a claim
  * about the *only* way bytes can leave.
  */
-class FakePublicationImportGateway : PublicationImportGateway {
+public class FakePublicationImportGateway : PublicationImportGateway {
 
-    val calls = mutableListOf<String>()
+    public val calls: MutableList<String> = mutableListOf()
 
     /** Every consent that reached a call that could send bytes. */
-    val consents = mutableListOf<UploadConsent>()
+    public val consents: MutableList<UploadConsent> = mutableListOf()
 
     /** Import ids the flow asked to cancel. */
-    val cancelled = mutableListOf<String>()
+    public val cancelled: MutableList<String> = mutableListOf()
 
-    var policy: PublicationImportPolicyResponse = accepting()
-    var policyFailure: ReaderAuthException? = null
+    public var policy: PublicationImportPolicyResponse = accepting()
+    public var policyFailure: ReaderAuthException? = null
 
     /**
      * What `reader.publication-import.v1` answers (#139). Available by default,
      * so every test about the flow itself starts from an offered action.
      */
-    var capability: ReaderPublicationImportCapability = IMPORT_AVAILABLE
-    var capabilityFailure: ReaderAuthException? = null
+    public var capability: ReaderPublicationImportCapability = IMPORT_AVAILABLE
+    public var capabilityFailure: ReaderAuthException? = null
 
     /**
      * Capability reads, counted apart from [calls] on purpose: [calls] is the
@@ -73,17 +75,17 @@ class FakePublicationImportGateway : PublicationImportGateway {
      * "nothing about the book was sent" assert it on that list. A capabilities
      * read names no book and is counted here instead.
      */
-    var capabilityReads: Int = 0
+    public var capabilityReads: Int = 0
 
     /** When set, a capability read waits for it — a read still on the wire. */
-    var capabilityGate: CompletableDeferred<Unit>? = null
+    public var capabilityGate: CompletableDeferred<Unit>? = null
 
     /** Answers for `start`/`resume`, in order; the last one repeats. */
-    val steps = ArrayDeque<PublicationImportStep>()
-    var stepFailure: ReaderAuthException? = null
+    public val steps: ArrayDeque<PublicationImportStep> = ArrayDeque()
+    public var stepFailure: ReaderAuthException? = null
 
     /** Answers for `refresh`, in order; running out means "unchanged". */
-    val refreshes = ArrayDeque<PublicationImportRecord>()
+    public val refreshes: ArrayDeque<PublicationImportRecord> = ArrayDeque()
 
     private val engine = PublicationImportEngine(UnusedOperations, PublicationTransferClient())
 
@@ -143,22 +145,22 @@ class FakePublicationImportGateway : PublicationImportGateway {
     private fun nextStep(): PublicationImportStep =
         if (steps.size > 1) steps.removeFirst() else steps.firstOrNull() ?: error("no scripted import step")
 
-    companion object {
+    public companion object {
 
-        /** reader-api's echo, the same shape the account gateway's fake uses. */
-        const val REQUEST_ID: String = "0f1e2d3c-4b5a-4697-8877-665544332211"
+        /** reader-api's echo, the same one the other fixtures' fakes use. */
+        public const val REQUEST_ID: String = "0f1e2d3c-4b5a-4697-8877-665544332211"
 
-        const val EPUB_MIME: String = "application/epub+zip"
+        public const val EPUB_MIME: String = "application/epub+zip"
 
         /** Exactly one `reader.publication-import.v1` entry, available. */
-        val IMPORT_AVAILABLE: ReaderPublicationImportCapability = ReaderPublicationImportCapability(
+        public val IMPORT_AVAILABLE: ReaderPublicationImportCapability = ReaderPublicationImportCapability(
             availability = ReaderCapabilityAvailability.AVAILABLE,
             reason = ReaderCapabilityReason.AVAILABLE,
             entries = 1,
         )
 
         /** A deployment that takes EPUBs up to [cap] bytes and says so. */
-        fun accepting(cap: Long = 52_428_800, enabled: Boolean = true): PublicationImportPolicyResponse =
+        public fun accepting(cap: Long = 52_428_800, enabled: Boolean = true): PublicationImportPolicyResponse =
             PublicationImportPolicyResponse(
                 requestId = REQUEST_ID,
                 enabled = enabled,

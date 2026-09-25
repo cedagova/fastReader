@@ -1,6 +1,7 @@
 package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.auth.testing.recorded
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderLibraryItem
 import com.cedagova.reader.library.model.ReaderLibraryResponse
@@ -9,6 +10,7 @@ import com.cedagova.reader.library.model.ReaderMutationKind
 import com.cedagova.reader.library.model.ReaderResourceType
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
+import com.cedagova.reader.library.testing.FakeReaderLibraryGateway
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean

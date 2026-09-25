@@ -1,25 +1,19 @@
-package com.cedagova.fastreader.account
+package com.cedagova.reader.library.imports
 
 import com.cedagova.reader.library.ReaderLibraryOperations
-import com.cedagova.reader.library.imports.PublicationImportEngine
-import com.cedagova.reader.library.imports.PublicationImportRecord
-import com.cedagova.reader.library.imports.PublicationImportRefusal
-import com.cedagova.reader.library.imports.PublicationImportStep
-import com.cedagova.reader.library.imports.PublicationSource
-import com.cedagova.reader.library.imports.UploadConsent
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 
 /**
  * The publication-import seam, beside `ReaderLibraryGateway` and for the same
- * reason (#117).
+ * reason (#117; library-owned since #199, A197-F002).
  *
- * `:reader-library` owns the lifecycle; this app owns *when* it runs, and the
- * unit tests that prove "when" have to run with no network, no SDK and no
- * Keystore. `PublicationImportEngine` is a concrete class over a client whose
- * constructor is internal, so the app could not build a double of it —
- * [ReaderApiPublicationImportGateway] is the one production implementation and
- * tests substitute a scripted fake.
+ * This module owns the lifecycle and the transfer; a host owns *when* it runs,
+ * and the unit tests that prove "when" have to run with no network, no SDK and
+ * no Keystore. [ReaderApiPublicationImportGateway] is the one production
+ * implementation; a host's tests substitute the scripted
+ * `com.cedagova.reader.library.testing.FakePublicationImportGateway` from this
+ * module's test fixtures.
  *
  * ## Consent survives the seam
  *
@@ -33,10 +27,10 @@ import com.cedagova.reader.library.model.ReaderPublicationImportCapability
  * Every bound — what is accepted, how large, how big a chunk — comes from
  * [importPolicy] and the grant inside an admission. Nothing here is a constant.
  */
-interface PublicationImportGateway {
+public interface PublicationImportGateway {
 
     /** `GET /reader/v1/imports/policy`: what this deployment will admit today. */
-    suspend fun importPolicy(): PublicationImportPolicyResponse
+    public suspend fun importPolicy(): PublicationImportPolicyResponse
 
     /**
      * The account's `reader.publication-import.v1` capability under the
@@ -44,7 +38,7 @@ interface PublicationImportGateway {
      * offered at all (#139). A read of the capabilities document; it names no
      * book and reserves nothing.
      */
-    suspend fun importCapability(): ReaderPublicationImportCapability
+    public suspend fun importCapability(): ReaderPublicationImportCapability
 
     /**
      * What [policy] alone already refuses about [source], or null when it could
@@ -52,10 +46,10 @@ interface PublicationImportGateway {
      * shelf shows the refusal before the owner is ever asked for consent, and
      * before one byte or one admission exists.
      */
-    fun refuse(policy: PublicationImportPolicyResponse, source: PublicationSource): PublicationImportRefusal?
+    public fun refuse(policy: PublicationImportPolicyResponse, source: PublicationSource): PublicationImportRefusal?
 
     /** Start an add: admit with [consent], then transfer and complete. */
-    suspend fun start(
+    public suspend fun start(
         accountId: String,
         source: PublicationSource,
         consent: UploadConsent,
@@ -63,7 +57,7 @@ interface PublicationImportGateway {
     ): PublicationImportStep
 
     /** Carry on a stored [record] after app death, a lost network or a spent grant. */
-    suspend fun resume(
+    public suspend fun resume(
         record: PublicationImportRecord,
         source: PublicationSource,
         consent: UploadConsent,
@@ -71,14 +65,14 @@ interface PublicationImportGateway {
     ): PublicationImportStep
 
     /** One status read of a non-terminal import. */
-    suspend fun refresh(record: PublicationImportRecord): PublicationImportRecord
+    public suspend fun refresh(record: PublicationImportRecord): PublicationImportRecord
 
     /** Stop an import the owner changed their mind about; idempotent. */
-    suspend fun cancel(record: PublicationImportRecord): PublicationImportRecord
+    public suspend fun cancel(record: PublicationImportRecord): PublicationImportRecord
 }
 
 /**
- * The production gateway: a pass-through over the one engine the app owns.
+ * The production gateway: a pass-through over the one engine the host owns.
  *
  * It holds [operations] as well, for the policy read alone. The engine reads
  * the policy itself on every [start] — that is the enforcement — and does not
@@ -86,7 +80,7 @@ interface PublicationImportGateway {
  * the refusal shown before any admission) comes from the same route through
  * the same client. Two readers, one source; no cached constant anywhere.
  */
-class ReaderApiPublicationImportGateway(
+public class ReaderApiPublicationImportGateway(
     private val operations: ReaderLibraryOperations,
     private val engine: PublicationImportEngine,
 ) : PublicationImportGateway {

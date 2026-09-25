@@ -45,6 +45,11 @@ path reader-auth/src/contractTest
 test reader-auth *ContractTest
 test reader-library *ContractTest
 
+# fixtures <module>...
+#   Listed modules whose test fixtures (src/testFixtures, copied with the
+#   module) a host's unit tests use (#199); the check runs a host test on them.
+fixtures reader-auth reader-library reader-engine
+
 # versions | libraries | plugins <keys...>
 #   The gradle/libs.versions.toml entries the copied build files and
 #   build-logic read. A host merges these lines into its own catalog.
@@ -69,6 +74,7 @@ What each piece is for:
 | `reader-auth/src/contractTest/` | The shared contract checker. `:reader-auth`'s test source set includes it, and `:reader-library`'s build adds `../reader-auth/src/contractTest/kotlin` to its own, so the two module directories stay siblings. |
 | `reader-library/` | The account-library client and sync engine. |
 | `reader-engine/` | The EPUB, content and RSVP timing engines: a plain Kotlin/JVM module, no Android dependency (#201). |
+| Test fixtures (`src/testFixtures/` of the listed modules) | The one test-fixture surface (#199): the scripted doubles of the modules' interfaces, the one mock reader-api/identity-provider server and a real client over it. A host's tests take them with `testImplementation(testFixtures(project(":reader-auth")))` (and `":reader-library"`); a host writes no fake of a library type. `:reader-engine`'s are its EPUB and content fixture books (#201). |
 | `build-logic/` | The convention plugins every module applies (`conventions.android.library`, `conventions.kotlin.library` for the JVM `reader-engine`; the app and root conventions come along in the same build). |
 | `.editorconfig` | The ktlint rules the conventions' formatter reads from the root. |
 | Catalog entries | SDK levels, JVM target and tool versions build-logic reads, the Gradle plugins it compiles against, and every dependency the two build files declare. |
@@ -100,7 +106,9 @@ What each piece is for:
    `pluginManagement` and `include(":reader-auth", ":reader-library", ":reader-engine")`; in the
    host's root build file, declare the four listed plugins `apply false` so
    build-logic runs against those plugin classes.
-5. Set `android.useAndroidX=true` in the host's `gradle.properties`, and meet
+5. Set `android.useAndroidX=true` in the host's `gradle.properties` — and
+   `android.experimental.enableTestFixturesKotlinSupport=true`, which Kotlin
+   in the modules' test fixtures needs — and meet
    the host obligations in [reader-auth/README.md](../reader-auth/README.md)
    (backup exclusion, no cleartext in release, its own application id).
 6. Read each module's `CHANGELOG.md` between the old and new versions for
@@ -145,7 +153,8 @@ It copies the set into a fresh temp directory with a catalog of only the listed
 entries, adds the throwaway host in `scripts/library-copy-check/` (an app that
 applies the copied app convention and depends on every copied module), runs
 its `:consumer:minifyReleaseWithR8` together with the `test` entries' copied
-tests, and reads R8's mapping. It fails when:
+tests and — for the `fixtures` entries — the host's own unit test against the
+modules' test fixtures, and reads R8's mapping. It fails when:
 
 - a module has no version, or no `CHANGELOG.md` entry for it;
 - a listed path or catalog key does not exist;
@@ -153,6 +162,8 @@ tests, and reads R8's mapping. It fails when:
   Gradle build fails);
 - a listed copied test fails in the copy (for the contract tests: the pinned
   document or the shared checker is missing or not where the builds read it);
+- a `fixtures` module has no test fixtures, or the host's test cannot build or
+  pass against them;
 - after R8, a `@Serializable` type of a module named with a package in the
   block has lost the members above. The host build ignores the serialization
   jar's embedded rules, and the script empties the copied `consumer-rules.pro`
@@ -168,13 +179,14 @@ writes nothing else.
 
 ## Adding a module
 
-A new reusable module (the fixtures of #199 if they become a module,
-`:reader-account` of #200, the engine modules of #201) joins in the same change
+A new reusable module (`:reader-account` of #200, the engine modules of
+#201) joins in the same change
 that creates it:
 
 1. Give it `version = "0.1.0"`, a `CHANGELOG.md` and, if it has
    `@Serializable` types, a `consumer-rules.pro` scoped to its own package
    like `reader-library/consumer-rules.pro`.
 2. Add a `module <dir> [<package>]` line to the block above, plus any catalog
-   keys its build file reads that the block does not list yet.
+   keys its build file reads that the block does not list yet; if it ships
+   test fixtures, add it to the `fixtures` line.
 3. Run `scripts/library-copy-check.sh`.

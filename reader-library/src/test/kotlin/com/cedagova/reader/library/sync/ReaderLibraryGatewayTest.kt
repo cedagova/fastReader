@@ -17,6 +17,7 @@ import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
+import com.cedagova.reader.library.testing.FakeReaderLibraryGateway
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame

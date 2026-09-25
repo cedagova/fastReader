@@ -33,7 +33,11 @@ android {
     }
 }
 
-// Every copied module, as the host's app depends on them.
+// Every copied module, as the host's app depends on them, and the test
+// fixtures the copy set lists, as the host's unit tests depend on them (#199).
 dependencies {
     listed("copied-modules.txt").forEach { implementation(project(":$it")) }
+    listed("fixture-modules.txt").forEach { testImplementation(testFixtures(project(":$it"))) }
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -1,5 +1,7 @@
 package com.cedagova.reader.auth
 
+import com.cedagova.reader.auth.testing.session
+import com.cedagova.reader.auth.testing.testConfig
 import java.io.File
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds

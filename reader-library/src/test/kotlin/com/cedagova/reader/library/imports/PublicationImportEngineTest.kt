@@ -1,15 +1,16 @@
 package com.cedagova.reader.library.imports
 
-import com.cedagova.reader.library.FakeClock
-import com.cedagova.reader.library.FakeServers
-import com.cedagova.reader.library.Harness
+import com.cedagova.reader.auth.testing.FakeClock
+import com.cedagova.reader.auth.testing.FakeServers
+import com.cedagova.reader.auth.testing.TestSession
+import com.cedagova.reader.auth.testing.json
 import com.cedagova.reader.library.ReaderLibraryClient
-import com.cedagova.reader.library.json
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.PublicationFormat
 import com.cedagova.reader.library.model.PublicationImportStatus
-import com.cedagova.reader.library.session
+import com.cedagova.reader.library.testing.ReaderLibraryHarness
+import com.cedagova.reader.library.testing.publicationTransferClientOver
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
@@ -51,14 +52,14 @@ class PublicationImportEngineTest {
     // path once the fixture date passed — the suite would go from proving the
     // HEAD resume to proving nothing, without a line changing.
     private val clock = FakeClock(Instant.parse(NOW))
-    private val harness = Harness(api, clock)
-    private val transfer = PublicationTransferClient.createForTests(storage.engine)
+    private val harness = ReaderLibraryHarness(api, clock)
+    private val transfer = publicationTransferClientOver(storage.engine)
 
     private val bytes = publicationBytes(SIZE)
     private val source = InMemoryPublication(bytes)
 
     private suspend fun engine(): PublicationImportEngine {
-        harness.store.session = session(accessToken = SESSION_TOKEN, expiresAt = clock.now + 3600.seconds)
+        harness.storedSession = TestSession(accessToken = SESSION_TOKEN, expiresAt = clock.now + 3600.seconds)
         return PublicationImportEngine(harness.operations(), transfer, clock)
     }
 

@@ -1,8 +1,8 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.account.PublicationImportGateway
 import com.cedagova.fastreader.library.Book
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.library.imports.PublicationImportGateway
 import com.cedagova.reader.library.imports.PublicationImportRecord
 import com.cedagova.reader.library.imports.PublicationImportRefusal
 import com.cedagova.reader.library.imports.PublicationImportStep

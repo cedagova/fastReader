@@ -1,7 +1,9 @@
 package com.cedagova.fastreader.account
 
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.auth.ReaderAuthOperations
 import com.cedagova.reader.auth.ReaderSessionState
+import com.cedagova.reader.auth.testing.FakeReaderAuthOperations
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -25,10 +27,10 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReaderAccountControllerTest {
 
-    private val gateway = FakeReaderAccountGateway()
+    private val gateway = FakeReaderAuthOperations()
     private val email = "reader@example.test"
 
-    private fun TestScope.controller(gateway: ReaderAccountGateway? = this@ReaderAccountControllerTest.gateway) =
+    private fun TestScope.controller(gateway: ReaderAuthOperations? = this@ReaderAccountControllerTest.gateway) =
         ReaderAccountController(gateway, ReaderAccountConfiguration.PROPERTY_KEYS, backgroundScope)
 
     private fun runUnconfined(block: suspend TestScope.() -> Unit) =
@@ -49,13 +51,11 @@ class ReaderAccountControllerTest {
 
     @Test
     fun `the session is loading until it has been read, never signed out for a frame`() = runUnconfined {
-        val stored = FakeReaderAccountGateway(
-            initial = ReaderSessionState.SignedIn("user-9", "kept@example.test", Instant.fromEpochSeconds(0) + 1.hours),
-        )
         val wait = CompletableDeferred<Unit>()
-        val slowToRead = object : ReaderAccountGateway by stored {
-            override suspend fun awaitReady() = wait.await()
-        }
+        val slowToRead = FakeReaderAuthOperations(
+            initial = ReaderSessionState.SignedIn("user-9", "kept@example.test", Instant.fromEpochSeconds(0) + 1.hours),
+            ready = wait,
+        )
 
         val controller = controller(slowToRead)
 
@@ -69,7 +69,7 @@ class ReaderAccountControllerTest {
 
     @Test
     fun `an initializing library state is still loading`() = runUnconfined {
-        val controller = controller(FakeReaderAccountGateway(initial = ReaderSessionState.Initializing))
+        val controller = controller(FakeReaderAuthOperations(initial = ReaderSessionState.Initializing))
 
         assertEquals(ReaderAccountState.Loading, controller.state.value)
     }

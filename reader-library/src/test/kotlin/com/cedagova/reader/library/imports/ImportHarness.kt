@@ -1,6 +1,7 @@
 package com.cedagova.reader.library.imports
 
-import com.cedagova.reader.library.Recorded
+import com.cedagova.reader.auth.testing.Recorded
+import com.cedagova.reader.auth.testing.recorded
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
@@ -154,7 +155,7 @@ class FakeStorage(private val requiredHeaders: Map<String, String> = GRANT_HEADE
     fun countOf(method: String): Int = requests.count { it.method == method }
 
     val engine = MockEngine { data ->
-        val recorded = data.record()
+        val recorded = data.recorded(withBody = false)
         requests += recorded
         rejectWith?.let { return@MockEngine respond("", HttpStatusCode.fromValue(it)) }
         missingHeader(recorded)?.let { name ->
@@ -217,14 +218,4 @@ class FakeStorage(private val requiredHeaders: Map<String, String> = GRANT_HEADE
     private fun missingHeader(recorded: Recorded): String? = requiredHeaders.keys.firstOrNull { name ->
         recorded.headers.none { it.key.equals(name, ignoreCase = true) }
     }
-
-    private suspend fun HttpRequestData.record(): Recorded = Recorded(
-        method = method.value,
-        host = url.host,
-        path = url.encodedPath,
-        query = url.encodedQuery,
-        headers = headers.entries().associate { (k, v) -> k to v.joinToString(",") } +
-            (body.contentType?.let { mapOf(HttpHeaders.ContentType to it.toString()) } ?: emptyMap()),
-        body = "",
-    )
 }

@@ -33,6 +33,14 @@ version = "0.1.0"
 android {
     namespace = "com.cedagova.reader.library"
 
+    // src/testFixtures: the module's reusable test fixtures (#199) — scripted
+    // doubles of its host-facing interfaces and a signed-in client over
+    // :reader-auth's mock server. A host takes them with
+    // testImplementation(testFixtures(project(":reader-library"))).
+    testFixtures {
+        enable = true
+    }
+
     defaultConfig {
         // What a shrinking host must keep for this module's own serialized
         // types; see the file for why.
@@ -57,7 +65,7 @@ tasks.withType<Test>().configureEach {
 }
 
 dependencies {
-    // api, not implementation: this module's operations take a ReaderApiClient
+    // api, not implementation: this module's operations take a ReaderApiOperations
     // and every failure they raise is a ReaderAuthException, so a host that
     // depends on :reader-library must see :reader-auth's types.
     api(project(":reader-auth"))
@@ -74,11 +82,12 @@ dependencies {
     // provider under the grant's signed headers. It is a SECOND, plain client on
     // purpose — it holds no session and cannot reach a token — so it brings its
     // own engine rather than borrowing :reader-auth's authenticated one.
-    // AssetDownloadClient.createForTests and PublicationTransferClient.createForTests
-    // take a Ktor HttpClientEngine; that type reaches a host through
-    // :reader-auth's `api` Ktor core, for the same reason and until the same
-    // change (#199, A197-F002).
     implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.core)
+
+    // The fixtures build on :reader-auth's (the one mock server, #199).
+    testFixturesApi(testFixtures(project(":reader-auth")))
+    testFixturesImplementation(libs.ktor.client.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

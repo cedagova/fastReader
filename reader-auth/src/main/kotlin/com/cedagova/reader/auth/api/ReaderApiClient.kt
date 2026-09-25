@@ -66,14 +66,14 @@ public class ReaderApiClient internal constructor(
     private val refresher: SessionRefresher,
     private val waiter: RetryWaiter,
     private val requestIds: () -> String = { UUID.randomUUID().toString().lowercase() },
-) {
+) : ReaderApiOperations {
 
     /**
      * `GET /v1/reader/pre-auth?clientVersion=…`: public, called before any
      * sign-in. A 2xx whose object does not decode as the document is an
      * [ReaderAuthException.ApiError] (#191), like a 2xx that is not JSON.
      */
-    public suspend fun preAuth(): PreAuthDocument = send(
+    override suspend fun preAuth(): PreAuthDocument = send(
         HttpMethod.Get,
         PRE_AUTH_PATH,
         authenticated = false,
@@ -82,7 +82,7 @@ public class ReaderApiClient internal constructor(
     ).value
 
     /** `GET /v1/reader/capabilities?clientVersion=…`: the first authenticated call after sign-in. */
-    public suspend fun capabilities(): JsonObject = capabilitiesResponse().document
+    override suspend fun capabilities(): JsonObject = capabilitiesResponse().document
 
     /**
      * The same call, with the `X-Request-ID` the successful attempt carried
@@ -91,12 +91,12 @@ public class ReaderApiClient internal constructor(
      * request, same headers, same policy as [capabilities]; only the return
      * shape differs.
      */
-    public suspend fun capabilitiesResponse(): ReaderApiResponse =
+    override suspend fun capabilitiesResponse(): ReaderApiResponse =
         send(HttpMethod.Get, CAPABILITIES_PATH, authenticated = true, clientVersion = true) { it }
             .let { ReaderApiResponse(it.value, it.requestId) }
 
     /** `PUT /v1/reader/profile`: the upsert that precedes any profile `GET`. */
-    public suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = request(
+    override suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = request(
         HttpMethod.Put,
         PROFILE_PATH,
         authenticated = true,
@@ -104,10 +104,10 @@ public class ReaderApiClient internal constructor(
     )
 
     /** Any further protected `GET` a host needs, under the same policy. */
-    public suspend fun get(path: String): JsonObject = request(HttpMethod.Get, path, authenticated = true)
+    override suspend fun get(path: String): JsonObject = request(HttpMethod.Get, path, authenticated = true)
 
     /** Any further protected `PUT` a host needs, under the same policy. */
-    public suspend fun put(path: String, body: JsonObject): JsonObject =
+    override suspend fun put(path: String, body: JsonObject): JsonObject =
         request(HttpMethod.Put, path, authenticated = true, body = body.toString())
 
     /**
@@ -120,7 +120,7 @@ public class ReaderApiClient internal constructor(
      * it is unchanged. [path] may carry a query string; the caller is
      * responsible for it being a route the published contract declares.
      */
-    public suspend fun post(path: String, body: JsonObject): JsonObject =
+    override suspend fun post(path: String, body: JsonObject): JsonObject =
         request(HttpMethod.Post, path, authenticated = true, body = body.toString())
 
     private suspend fun request(
