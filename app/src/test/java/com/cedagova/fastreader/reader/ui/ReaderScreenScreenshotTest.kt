@@ -8,8 +8,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.content.ContentFailureReason
-import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderSession
 import com.cedagova.fastreader.reader.ResumeOffer
@@ -17,6 +15,8 @@ import com.cedagova.fastreader.settings.CueSettings
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.engine.content.ContentFailureReason
+import com.cedagova.reader.engine.content.WordToken
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -77,7 +77,10 @@ class ReaderScreenScreenshotTest {
      */
     @Test
     fun theParagraphStaysUnderTheRunningWordWhenAlwaysShown() {
-        capture("reader_playing_paragraph", view.present(ReaderSession(book).jumpTo(12).play(), paragraphAlwaysShown = true))
+        capture(
+            "reader_playing_paragraph",
+            view.present(ReaderSession(book).jumpTo(12).play(), paragraphAlwaysShown = true),
+        )
     }
 
     // --- REQ-206, the Spanish interface --------------------------------------
@@ -404,7 +407,11 @@ class ReaderScreenScreenshotTest {
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)
     fun theShownLinesFollowTheRunningWordDownALongParagraphAtALargeFontScale() {
-        capture("reader_playing_long_paragraph_compact_large_font", longParagraphAt(120, playing = true), fontScale = 1.3f)
+        capture(
+            "reader_playing_long_paragraph_compact_large_font",
+            longParagraphAt(120, playing = true),
+            fontScale = 1.3f,
+        )
     }
 
     private fun longParagraphAt(index: Int, playing: Boolean = false): ReaderUiState.Reading {

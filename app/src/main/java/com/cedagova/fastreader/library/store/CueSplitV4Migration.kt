@@ -29,7 +29,7 @@ import kotlinx.serialization.json.booleanOrNull
  * a document with no `settings` block is returned exactly as it arrived. The step
  * is also total — a `settings` value that is not an object, or a `pivotEnabled`
  * that is not a boolean, falls through to the documented defaults rather than
- * throwing, because a throw here escapes [CatalogCodec.decode]'s decode guard.
+ * throwing, because a throw here escapes [com.cedagova.fastreader.library.CatalogCodec.decode]'s decode guard.
  */
 internal object CueSplitV4Migration : CatalogMigration {
 

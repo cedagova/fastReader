@@ -1,6 +1,13 @@
 package com.cedagova.reader.library
 
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.auth.testing.CAPABILITIES
+import com.cedagova.reader.auth.testing.REFRESH_GRANT
+import com.cedagova.reader.auth.testing.apiError
+import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.auth.testing.networkFailure
+import com.cedagova.reader.auth.testing.recorded
+import com.cedagova.reader.auth.testing.sessionJson
 import com.cedagova.reader.library.model.ReaderCapabilityAvailability
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderCoverStatus
@@ -15,6 +22,7 @@ import com.cedagova.reader.library.model.ReaderSyncConflictCode
 import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
 import com.cedagova.reader.library.model.ReaderSyncRejectionCode
 import com.cedagova.reader.library.model.ReaderSyncStatus
+import com.cedagova.reader.library.testing.ReaderLibraryHarness
 import io.ktor.http.HttpStatusCode
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.test.runTest
@@ -48,7 +56,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `library returns the account rows and carries the authenticated headers`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(LIBRARY) { json(LIBRARY_BODY) }
 
         val response = h.operations().library()
@@ -80,7 +88,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `progress returns every position the account holds, locator untouched`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(PROGRESS) { json(PROGRESS_BODY) }
 
         val response = h.operations().progress()
@@ -91,7 +99,7 @@ class ReaderLibraryClientTest {
         assertEquals("Preface", row.chapterTitle)
         assertEquals(BOOK_ID, row.location.publication.publicationId)
         assertEquals("epub", row.location.publication.format)
-        // The locator is carried through whole, including a field FastReader never writes.
+        // The locator is carried through whole, including a field this module never writes.
         assertEquals(JsonPrimitive("epubcfi(/6/14!/4/2/2)"), row.location.locator["epub_cfi"])
         assertEquals(JsonPrimitive("OEBPS/preface.xhtml"), row.location.locator["href"])
         assertEquals("access-1", h.servers.requestsTo(ReaderLibraryClient.PROGRESS_PATH).single().bearer)
@@ -102,7 +110,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `a mutation batch sends the contract's envelope and reads an applied result`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) { json(mutationsBody(mutationResult())) }
 
         val response = h.operations().applyMutations(listOf(envelope()))
@@ -134,7 +142,7 @@ class ReaderLibraryClientTest {
     /** A re-sent key is not admitted twice: the server returns the same admission as `replayed`. */
     @Test
     fun `a replayed result reports the original admission`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) { json(mutationsBody(mutationResult(status = "replayed", admission = "replayed"))) }
 
         val result = h.operations().applyMutations(listOf(envelope())).results.single()
@@ -148,7 +156,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `a superseded result is admitted and carries the canonical payload to adopt`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) { json(mutationsBody(mutationResult(status = "superseded"))) }
 
         val result = h.operations().applyMutations(listOf(envelope())).results.single()
@@ -164,7 +172,7 @@ class ReaderLibraryClientTest {
     fun `a conflict result carries the server's canonical resolution`() = runTest {
         val conflict = """, "conflict": {"conflict_id": "c-1", "code": "revision_conflict", "remote_revision": 9,
             "conflicting_fields": ["status"], "canonical_payload": {"status": "archived"}}"""
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) {
             json(mutationsBody(mutationResult(status = "conflict", admission = null, extra = conflict)))
         }
@@ -195,7 +203,7 @@ class ReaderLibraryClientTest {
             "related_resource_missing" to ReaderSyncRejectionCode.RELATED_RESOURCE_MISSING,
             "unsupported_mutation" to ReaderSyncRejectionCode.UNSUPPORTED_MUTATION,
         )
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) { recorded ->
             val code = codes.keys.first { recorded.body.contains("\"$it\"") }
             json(
@@ -228,7 +236,7 @@ class ReaderLibraryClientTest {
         val membership = """, "membership": {"state": "absent", "action": "remove", "open_session_behavior": "keep_readable_until_close",
             "reopen_allowed": false, "identity_restored": false, "undo_available": true, "undo_scope": "immediate_confirmation",
             "activity_identity_preserved": true, "download_bytes_changed": false, "durable_recovery_available": false}"""
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) { json(mutationsBody(mutationResult(extra = membership))) }
 
         val outcome = h.operations().applyMutations(listOf(envelope())).results.single().membership!!
@@ -246,7 +254,7 @@ class ReaderLibraryClientTest {
     /** Partial results are the contract: one accepted sibling is not rolled back by another's rejection. */
     @Test
     fun `a batch reports each envelope independently`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) {
             json(
                 mutationsBody(
@@ -272,11 +280,13 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `a batch outside the contract's bounds is refused before any request`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         val operations = h.operations()
 
         val empty = runCatching { operations.applyMutations(emptyList()) }.exceptionOrNull()
-        val tooMany = runCatching { operations.applyMutations(List(51) { envelope(key = "key-$it") }) }.exceptionOrNull()
+        val tooMany = runCatching {
+            operations.applyMutations(List(51) { envelope(key = "key-$it") })
+        }.exceptionOrNull()
 
         assertTrue("$empty", empty is IllegalArgumentException)
         assertTrue("$tooMany", tooMany is IllegalArgumentException)
@@ -288,7 +298,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `deltas sends the cursor and limit the contract declares and reads the stream`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(DELTAS) { json(deltasBody(changes = DELTA_CHANGE)) }
 
         val response = h.operations().deltas(afterCursor = "900", limit = 250)
@@ -311,7 +321,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `deltas defaults to the first cursor and the document's own page size`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(DELTAS) { json(deltasBody()) }
 
         h.operations().deltas()
@@ -323,7 +333,7 @@ class ReaderLibraryClientTest {
     /** `cursor_expired` is an answer, not a failure: the caller re-bootstraps. */
     @Test
     fun `an expired cursor is a typed result asking for a rebootstrap`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(DELTAS) { json(deltasBody(status = "cursor_expired", rebootstrap = true, nextCursor = null)) }
 
         val response = h.operations().deltas(afterCursor = "1")
@@ -337,7 +347,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `an invalid cursor is a typed result too`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(DELTAS) { json(deltasBody(status = "cursor_invalid", rebootstrap = true, nextCursor = null)) }
 
         assertEquals(ReaderDeltaStatus.CURSOR_INVALID, h.operations().deltas().status)
@@ -346,7 +356,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `a cursor or limit the contract forbids is refused before any request`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         val operations = h.operations()
 
         val badCursor = runCatching { operations.deltas(afterCursor = "not-a-cursor") }.exceptionOrNull()
@@ -362,7 +372,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `the sync capability is read from the entry the document declares`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(CAPABILITIES) { json(capabilitiesBody(syncEntry())) }
 
         val capability = h.operations().syncCapability()
@@ -378,7 +388,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `an unavailable sync capability reports the server's reason`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(CAPABILITIES) { json(capabilitiesBody(syncEntry("unavailable", "client_version_too_old"))) }
 
         val capability = h.operations().syncCapability()
@@ -392,7 +402,7 @@ class ReaderLibraryClientTest {
     /** A document that does not offer the capability at all reads as unavailable, reason unknown. */
     @Test
     fun `a document without a sync entry reads as undeclared, never as available`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(CAPABILITIES) { json(capabilitiesBody(null)) }
 
         val capability = h.operations().syncCapability()
@@ -408,7 +418,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `exactly one available import entry is permission to offer import`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(CAPABILITIES) { json(capabilitiesBody(syncEntry() + ",\n    " + importEntry())) }
 
         val capability = h.operations().publicationImportCapability()
@@ -421,7 +431,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `an unavailable import entry carries the server's typed reason`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(CAPABILITIES) { json(capabilitiesBody(importEntry("unavailable", "quota_exhausted"))) }
 
         val capability = h.operations().publicationImportCapability()
@@ -435,7 +445,7 @@ class ReaderLibraryClientTest {
     /** core.md §6: a missing or duplicated entry is not permission to import. */
     @Test
     fun `a missing or duplicated import entry is never permission`() = runTest {
-        val missing = Harness()
+        val missing = ReaderLibraryHarness()
         missing.servers.on(CAPABILITIES) { json(capabilitiesBody(syncEntry())) }
         val none = missing.operations().publicationImportCapability()
         assertFalse(none.isAvailable)
@@ -443,7 +453,7 @@ class ReaderLibraryClientTest {
         assertEquals(ReaderCapabilityReason.UNKNOWN, none.reason)
         missing.close()
 
-        val doubled = Harness()
+        val doubled = ReaderLibraryHarness()
         doubled.servers.on(CAPABILITIES) { json(capabilitiesBody(importEntry() + ",\n    " + importEntry())) }
         val two = doubled.operations().publicationImportCapability()
         assertFalse("two available entries are still not permission", two.isAvailable)
@@ -460,7 +470,7 @@ class ReaderLibraryClientTest {
      */
     @Test
     fun `an expired token is refreshed once and the operation retries`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.queue(
             LIBRARY,
             { json(apiError("auth.expired_token"), HttpStatusCode.Unauthorized) },
@@ -475,13 +485,13 @@ class ReaderLibraryClientTest {
         val attempts = h.servers.requestsTo(ReaderLibraryClient.LIBRARY_PATH)
         assertEquals("access-1", attempts[0].bearer)
         assertEquals("access-2", attempts[1].bearer)
-        assertNotNull(h.store.session)
+        assertNotNull(h.storedSession)
         h.close()
     }
 
     @Test
     fun `any other 401 signs the client out and clears the session`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(MUTATIONS) { json(apiError("auth.revoked_session", "req-401"), HttpStatusCode.Unauthorized) }
 
         val failure = runCatching { h.operations().applyMutations(listOf(envelope())) }.exceptionOrNull()
@@ -489,28 +499,32 @@ class ReaderLibraryClientTest {
         assertTrue("$failure", failure is ReaderAuthException.SignedOut)
         assertEquals("auth.revoked_session", (failure as ReaderAuthException.SignedOut).code)
         assertEquals("req-401", failure.requestId)
-        assertNull(h.store.session)
+        assertNull(h.storedSession)
         h.close()
     }
 
     @Test
     fun `403 is Forbidden with the session intact`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(DELTAS) { json(apiError("reader.forbidden", "req-403"), HttpStatusCode.Forbidden) }
 
         val failure = runCatching { h.operations().deltas() }.exceptionOrNull()
 
         assertTrue("$failure", failure is ReaderAuthException.Forbidden)
         assertEquals("req-403", (failure as ReaderAuthException.Forbidden).requestId)
-        assertNotNull(h.store.session)
+        assertNotNull(h.storedSession)
         h.close()
     }
 
     @Test
     fun `429 waits once and then reports try later`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(PROGRESS) {
-            json(apiError("rate.limited", "req-429", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "7")
+            json(
+                apiError("rate.limited", "req-429", retryable = true),
+                HttpStatusCode.TooManyRequests,
+                "Retry-After" to "7",
+            )
         }
 
         val failure = runCatching { h.operations().progress() }.exceptionOrNull()
@@ -525,7 +539,7 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `a 502 jwks dependency failure waits once and then reports try later`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(LIBRARY) { json(apiError("auth.jwks_dependency_failed", "req-502"), HttpStatusCode.BadGateway) }
 
         val failure = runCatching { h.operations().library() }.exceptionOrNull()
@@ -533,14 +547,19 @@ class ReaderLibraryClientTest {
         assertTrue("$failure", failure is ReaderAuthException.TryLater)
         assertEquals(502, (failure as ReaderAuthException.TryLater).status)
         assertEquals(2, h.servers.requestsTo(ReaderLibraryClient.LIBRARY_PATH).size)
-        assertNotNull(h.store.session)
+        assertNotNull(h.storedSession)
         h.close()
     }
 
     @Test
     fun `a 502 that is not retryable is an ApiError carrying the server's code and request id`() = runTest {
-        val h = Harness()
-        h.servers.on(LIBRARY) { json(apiError("reader_product.asset_integrity_error", "req-502b", retryable = false), HttpStatusCode.BadGateway) }
+        val h = ReaderLibraryHarness()
+        h.servers.on(LIBRARY) {
+            json(
+                apiError("reader_product.asset_integrity_error", "req-502b", retryable = false),
+                HttpStatusCode.BadGateway,
+            )
+        }
 
         val failure = runCatching { h.operations().library() }.exceptionOrNull()
 
@@ -553,19 +572,19 @@ class ReaderLibraryClientTest {
 
     @Test
     fun `a network failure clears nothing and never becomes a new exception type`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(LIBRARY) { networkFailure() }
 
         val failure = runCatching { h.operations().library() }.exceptionOrNull()
 
         assertTrue("$failure", failure is ReaderAuthException.NetworkUnavailable)
-        assertNotNull(h.store.session)
+        assertNotNull(h.storedSession)
         h.close()
     }
 
     @Test
     fun `a signed-out client never reaches the network`() = runTest {
-        val h = Harness(signedIn = false)
+        val h = ReaderLibraryHarness(session = null)
 
         val failure = runCatching { h.operations().library() }.exceptionOrNull()
 
@@ -577,7 +596,7 @@ class ReaderLibraryClientTest {
     /** A 200 the module cannot read is reported as what it is: an unusable answer. */
     @Test
     fun `a body that does not match the pinned contract is an ApiError, not a crash`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(LIBRARY) { json("""{"request_id":"req-bad","items":[{"book":{"id":"x"}}]}""") }
 
         val failure = runCatching { h.operations().library() }.exceptionOrNull()
@@ -594,7 +613,7 @@ class ReaderLibraryClientTest {
     /** A value reader-api adds later must not stop an older client from reading the rest. */
     @Test
     fun `an enum member this client does not know decodes as unknown`() = runTest {
-        val h = Harness()
+        val h = ReaderLibraryHarness()
         h.servers.on(LIBRARY) { json(LIBRARY_BODY.replace("\"status\": \"reading\"", "\"status\": \"lending\"")) }
 
         val item = h.operations().library().items.single()

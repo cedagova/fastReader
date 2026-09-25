@@ -1,0 +1,557 @@
+public final class com/cedagova/reader/auth/ReaderAuth {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/ReaderAuth;
+	public static final field REQUIRED_PERMISSION Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthClient : com/cedagova/reader/auth/ReaderAuthOperations {
+	public static final field Companion Lcom/cedagova/reader/auth/ReaderAuthClient$Companion;
+	public static final field METHOD_DISABLED Ljava/lang/String;
+	public fun awaitReady (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun bootstrap (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun currentState ()Lcom/cedagova/reader/auth/ReaderSessionState;
+	public final fun getApi ()Lcom/cedagova/reader/auth/api/ReaderApiClient;
+	public final fun getConfig ()Lcom/cedagova/reader/auth/ReaderAuthConfig;
+	public fun getSessionState ()Lkotlinx/coroutines/flow/Flow;
+	public fun onForeground (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun requestEmailCode (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun requestRecoveryCode (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun setPassword (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun signInWithPassword (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun signOut (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun signOutOtherDevices (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun verifyEmailCode (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun verifyRecoveryCode (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthClient$Companion {
+	public final fun create (Landroid/content/Context;Lcom/cedagova/reader/auth/ReaderAuthConfig;)Lcom/cedagova/reader/auth/ReaderAuthClient;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose : java/lang/Enum {
+	public static final field SIGN_IN Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;
+	public static final field SIGN_UP Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;
+	public static fun values ()[Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthConfig {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/auth/ReaderAuthConfig;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/ReaderAuthConfig;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/auth/ReaderAuthConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getClientVersion ()Ljava/lang/String;
+	public final fun getPublishableKey ()Ljava/lang/String;
+	public final fun getReaderApiBaseUrl ()Ljava/lang/String;
+	public final fun getReaderApiOrigin ()Ljava/lang/String;
+	public final fun getSupabaseUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isConfigured ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class com/cedagova/reader/auth/ReaderAuthException : java/lang/Exception {
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$ApiError : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getStatus ()I
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$ConfigurationMismatch : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun getReason ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$Forbidden : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$NetworkUnavailable : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (Ljava/lang/Throwable;)V
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$NotConfigured : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> ()V
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$ProviderRejected : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (ILjava/lang/String;Ljava/lang/String;)V
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getStatus ()I
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$SignInUnavailable : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (Ljava/lang/String;ZLcom/cedagova/reader/auth/api/SignInMethod;)V
+	public synthetic fun <init> (Ljava/lang/String;ZLcom/cedagova/reader/auth/api/SignInMethod;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getMethod ()Lcom/cedagova/reader/auth/api/SignInMethod;
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getRetryable ()Z
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$SignedOut : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$StorageUnavailable : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (Ljava/lang/Throwable;)V
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$TryLater : com/cedagova/reader/auth/ReaderAuthException {
+	public synthetic fun <init> (ILjava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ILjava/lang/String;Lkotlin/time/Duration;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getRetryAfter-FghU774 ()Lkotlin/time/Duration;
+	public final fun getStatus ()I
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthException$UnexpectedResponse : com/cedagova/reader/auth/ReaderAuthException {
+	public fun <init> (Ljava/lang/Throwable;)V
+}
+
+public abstract interface class com/cedagova/reader/auth/ReaderAuthOperations {
+	public abstract fun awaitReady (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun bootstrap (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun currentState ()Lcom/cedagova/reader/auth/ReaderSessionState;
+	public abstract fun getSessionState ()Lkotlinx/coroutines/flow/Flow;
+	public abstract fun onForeground (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun requestEmailCode (Ljava/lang/String;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun requestRecoveryCode (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun setPassword (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun signInWithPassword (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun signOut (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun signOutOtherDevices (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun verifyEmailCode (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun verifyEmailCode$default (Lcom/cedagova/reader/auth/ReaderAuthOperations;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun verifyRecoveryCode (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthOperations$DefaultImpls {
+	public static synthetic fun verifyEmailCode$default (Lcom/cedagova/reader/auth/ReaderAuthOperations;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/ReaderAuthClient$EmailCodePurpose;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/auth/ReaderAuthPolicy {
+	public static final field CLIENT_ID Ljava/lang/String;
+	public static final field CLIENT_VERSION Ljava/lang/String;
+	public static final field EXPIRED_TOKEN_CODE Ljava/lang/String;
+	public static final field INSTANCE Lcom/cedagova/reader/auth/ReaderAuthPolicy;
+	public static final field JWKS_DEPENDENCY_FAILED_CODE Ljava/lang/String;
+	public static final field RETRY_LIMIT I
+	public final fun getDEFAULT_RETRY_AFTER-UwyO8pc ()J
+	public final fun getMAX_INLINE_RETRY_AFTER-UwyO8pc ()J
+	public final fun getREFRESH_MARGIN-UwyO8pc ()J
+	public final fun getREQUEST_TIMEOUT-UwyO8pc ()J
+}
+
+public abstract interface class com/cedagova/reader/auth/ReaderClock {
+	public static final field Companion Lcom/cedagova/reader/auth/ReaderClock$Companion;
+	public abstract fun now ()Lkotlin/time/Instant;
+}
+
+public final class com/cedagova/reader/auth/ReaderClock$Companion {
+	public final fun getSystem ()Lcom/cedagova/reader/auth/ReaderClock;
+}
+
+public abstract interface class com/cedagova/reader/auth/ReaderSessionState {
+}
+
+public final class com/cedagova/reader/auth/ReaderSessionState$Initializing : com/cedagova/reader/auth/ReaderSessionState {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/ReaderSessionState$Initializing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/auth/ReaderSessionState$SignedIn : com/cedagova/reader/auth/ReaderSessionState {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lkotlin/time/Instant;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;)Lcom/cedagova/reader/auth/ReaderSessionState$SignedIn;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/ReaderSessionState$SignedIn;Ljava/lang/String;Ljava/lang/String;Lkotlin/time/Instant;ILjava/lang/Object;)Lcom/cedagova/reader/auth/ReaderSessionState$SignedIn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEmail ()Ljava/lang/String;
+	public final fun getExpiresAt ()Lkotlin/time/Instant;
+	public final fun getUserId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/auth/ReaderSessionState$SignedOut : com/cedagova/reader/auth/ReaderSessionState {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/ReaderSessionState$SignedOut;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/auth/RetryWaiter {
+	public static final field Companion Lcom/cedagova/reader/auth/RetryWaiter$Companion;
+	public abstract fun wait-VtjQ1oo (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/auth/RetryWaiter$Companion {
+	public final fun getDelay ()Lcom/cedagova/reader/auth/RetryWaiter;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument {
+	public static final field AVAILABLE Ljava/lang/String;
+	public static final field COMPATIBLE Ljava/lang/String;
+	public static final field Companion Lcom/cedagova/reader/auth/api/PreAuthDocument$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;
+	public final fun component6 ()Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;
+	public final fun component7 ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;
+	public final fun component8 ()Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;)Lcom/cedagova/reader/auth/api/PreAuthDocument;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/PreAuthDocument;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;ILjava/lang/Object;)Lcom/cedagova/reader/auth/api/PreAuthDocument;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccountEntry ()Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;
+	public final fun getAccountEntryAvailable ()Z
+	public final fun getCompatibility ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;
+	public final fun getConfiguration ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;
+	public final fun getEnabledMethods ()Ljava/util/Set;
+	public final fun getFreshUntil ()Ljava/lang/String;
+	public final fun getGeneratedAt ()Ljava/lang/String;
+	public final fun getPostAuth ()Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;
+	public final fun getSchemaVersion ()Ljava/lang/String;
+	public final fun getStaleUntil ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun mismatch (Lcom/cedagova/reader/auth/ReaderAuthConfig;)Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/PreAuthDocument$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/PreAuthDocument$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/PreAuthDocument;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/PreAuthDocument;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$AccountEntry {
+	public static final field Companion Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Z)Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailability ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getRetryable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/PreAuthDocument$AccountEntry$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/PreAuthDocument$AccountEntry;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$AccountEntry$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Authentication {
+	public static final field Companion Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Z)Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ZILjava/lang/Object;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthorityOrigin ()Ljava/lang/String;
+	public final fun getEmailOtp ()Z
+	public final fun getEnabledProviders ()Ljava/util/List;
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getPublicClientId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/PreAuthDocument$Authentication$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Authentication$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Client {
+	public static final field Companion Lcom/cedagova/reader/auth/api/PreAuthDocument$Client$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApplicationId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/PreAuthDocument$Client$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/PreAuthDocument$Client$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Client$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Companion {
+	public final fun parse (Lkotlinx/serialization/json/JsonObject;)Lcom/cedagova/reader/auth/api/PreAuthDocument;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Compatibility {
+	public static final field Companion Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMinimumVersion ()Ljava/lang/String;
+	public final fun getRequestedVersion ()Ljava/lang/String;
+	public final fun getStatus ()Ljava/lang/String;
+	public final fun getSupportedMajor ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/PreAuthDocument$Compatibility$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/PreAuthDocument$Compatibility;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Compatibility$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Configuration {
+	public static final field Companion Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;
+	public final fun component4 ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;ILjava/lang/Object;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthentication ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Authentication;
+	public final fun getClient ()Lcom/cedagova/reader/auth/api/PreAuthDocument$Client;
+	public final fun getRevision ()Ljava/lang/String;
+	public final fun getValidUntil ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/PreAuthDocument$Configuration$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/PreAuthDocument$Configuration;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$Configuration$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$PostAuth {
+	public static final field Companion Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getSchemaVersion ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/PreAuthDocument$PostAuth$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/PreAuthDocument$PostAuth;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/PreAuthDocument$PostAuth$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/ReaderApiClient : com/cedagova/reader/auth/api/ReaderApiOperations {
+	public static final field CAPABILITIES_PATH Ljava/lang/String;
+	public static final field Companion Lcom/cedagova/reader/auth/api/ReaderApiClient$Companion;
+	public static final field HEADER_CLIENT Ljava/lang/String;
+	public static final field HEADER_REQUEST_ID Ljava/lang/String;
+	public static final field PRE_AUTH_PATH Ljava/lang/String;
+	public static final field PROFILE_PATH Ljava/lang/String;
+	public static final field QUERY_CLIENT_VERSION Ljava/lang/String;
+	public fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun get (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun post (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun preAuth (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun put (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/auth/api/ReaderApiClient$Companion {
+}
+
+public abstract interface class com/cedagova/reader/auth/api/ReaderApiOperations {
+	public abstract fun capabilities (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun capabilitiesResponse (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun get (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun post (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun preAuth (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun put (Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun upsertProfile (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/auth/api/ReaderApiResponse {
+	public fun <init> (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;)V
+	public final fun component1 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;)Lcom/cedagova/reader/auth/api/ReaderApiResponse;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/ReaderApiResponse;Lkotlinx/serialization/json/JsonObject;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/auth/api/ReaderApiResponse;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDocument ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/auth/api/ReaderProfileUpdate {
+	public static final field Companion Lcom/cedagova/reader/auth/api/ReaderProfileUpdate$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lkotlinx/serialization/json/JsonObject;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;ILjava/lang/Object;)Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvatarUrl ()Ljava/lang/String;
+	public final fun getDisplayName ()Ljava/lang/String;
+	public final fun getMetadata ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getNativeLanguage ()Ljava/lang/String;
+	public final fun getTargetLanguage ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/auth/api/ReaderProfileUpdate$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/auth/api/ReaderProfileUpdate$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/auth/api/ReaderProfileUpdate;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/ReaderProfileUpdate$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/auth/api/SignInMethod : java/lang/Enum {
+	public static final field EMAIL_CODE Lcom/cedagova/reader/auth/api/SignInMethod;
+	public static final field PASSWORD Lcom/cedagova/reader/auth/api/SignInMethod;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/auth/api/SignInMethod;
+	public static fun values ()[Lcom/cedagova/reader/auth/api/SignInMethod;
+}
+

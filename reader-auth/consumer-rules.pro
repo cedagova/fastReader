@@ -1,7 +1,8 @@
 # Keep rules every host of :reader-auth needs when it shrinks with R8 (#100).
 #
-# FastReader's release build is minified, and it is the first host of this
-# library that is: the retired proving-ground host never shrank. The library's
+# A host's release build may be minified; the first host of this library to
+# shrink was the app it is developed beside (the retired proving-ground host
+# never shrank). The library's
 # own code needs nothing kept, but two of its dependencies are reached through
 # reflection R8 cannot see:
 #

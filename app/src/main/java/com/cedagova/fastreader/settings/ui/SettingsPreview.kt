@@ -25,17 +25,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ui.CueWord
 import com.cedagova.fastreader.reader.ui.ReaderWord
 import com.cedagova.fastreader.settings.CueSettings
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RsvpTiming
-import com.cedagova.fastreader.timing.RsvpTimingEngine
-import com.cedagova.fastreader.timing.TimingSettings
-import com.cedagova.fastreader.timing.TimingState
+import com.cedagova.fastreader.ui.theme.Spacing
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.content.WordToken
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RsvpTiming
+import com.cedagova.reader.engine.timing.RsvpTimingEngine
+import com.cedagova.reader.engine.timing.TimingSettings
+import com.cedagova.reader.engine.timing.TimingState
 import kotlinx.coroutines.delay
 
 /**
@@ -124,7 +125,7 @@ fun SettingsPreview(
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp)
+                .padding(top = Spacing.XSmall)
                 .testTag("settings_preview_rhythm"),
         )
     }
@@ -177,6 +178,7 @@ private fun Token.toReaderWord(): ReaderWord = when (this) {
         coreStart = coreStart,
         coreEnd = coreEnd,
     )
+
     else -> ReaderWord(text = displayText)
 }
 

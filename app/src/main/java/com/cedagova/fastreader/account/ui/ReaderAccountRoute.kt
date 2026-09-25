@@ -2,10 +2,10 @@ package com.cedagova.fastreader.account.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import com.cedagova.fastreader.account.ReaderAccountController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cedagova.reader.account.ReaderAccountController
 
 /**
  * The account screen wired to the process-scoped [ReaderAccountController]:
@@ -13,12 +13,8 @@ import com.cedagova.fastreader.account.ReaderAccountController
  * where this surface was opened from and which stays underneath it.
  */
 @Composable
-fun ReaderAccountRoute(
-    controller: ReaderAccountController,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val state by controller.state.collectAsState()
+fun ReaderAccountRoute(controller: ReaderAccountController, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val state by controller.state.collectAsStateWithLifecycle()
     BackHandler(onBack = onBack)
     ReaderAccountScreen(
         state = state,

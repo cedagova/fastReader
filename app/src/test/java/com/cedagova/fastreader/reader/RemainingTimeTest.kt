@@ -1,17 +1,18 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.WordClass
-import com.cedagova.fastreader.content.WordToken
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RsvpTimingEngine
-import com.cedagova.fastreader.timing.TimingSettings
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.WordClass
+import com.cedagova.reader.engine.content.WordToken
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RemainingTimeIndex
+import com.cedagova.reader.engine.timing.RsvpTimingEngine
+import com.cedagova.reader.engine.timing.TimingSettings
+import kotlin.math.abs
+import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
-import kotlin.random.Random
 
 /**
  * Time remaining (REQ-017).
@@ -53,7 +54,8 @@ class RemainingTimeTest {
                 val index = RemainingTimeIndex.build(content, strength)
                 assertTrue("mean ${index.meanMultiplier}", index.meanMultiplier > 1.0)
                 for (wpm in listOf(100, 250, 1000)) {
-                    val settings = TimingSettings(wpm = wpm, pauseStrength = strength, meanMultiplier = index.meanMultiplier)
+                    val settings =
+                        TimingSettings(wpm = wpm, pauseStrength = strength, meanMultiplier = index.meanMultiplier)
                     val budget = content.totalTokens * 60_000.0 / wpm
                     val whole = index.millisAfter(-1, settings)
                     val error = abs(whole - budget) / budget

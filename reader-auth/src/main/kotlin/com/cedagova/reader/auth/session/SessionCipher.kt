@@ -6,7 +6,7 @@ package com.cedagova.reader.auth.session
  * fake so the store's rules are proven on the JVM while the real key path is
  * proven on a device.
  */
-interface SessionCipher {
+internal interface SessionCipher {
     /** Encrypts [plaintext] into a self-contained blob (the IV travels with the ciphertext). */
     fun encrypt(plaintext: ByteArray): ByteArray
 

@@ -1,15 +1,16 @@
 package com.cedagova.fastreader.external
 
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.epub.EpubFixtures
-import com.cedagova.fastreader.epub.EpubInspector
 import com.cedagova.fastreader.library.CatalogIngestor
+import com.cedagova.fastreader.library.DeviceLibrary
 import com.cedagova.fastreader.library.FakeDocumentGateway
+import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.library.store.CoverStore
-import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.fastreader.reader.BookOrigin
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.epub.EpubFixtures
+import com.cedagova.reader.engine.epub.EpubInspector
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -213,14 +214,13 @@ class ExternalOpenControllerTest {
     private fun TestScope.controller(): ExternalOpenController {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
-        repository = LibraryRepository(
+        repository = DeviceLibrary(
             store = FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json")),
             ingestor = CatalogIngestor(gateway, covers),
             gateway = gateway,
-            covers = covers,
             scope = backgroundScope,
             ioDispatcher = dispatcher,
-        )
+        ).repository
         return ExternalOpenController(repository, gateway, this, dispatcher)
     }
 

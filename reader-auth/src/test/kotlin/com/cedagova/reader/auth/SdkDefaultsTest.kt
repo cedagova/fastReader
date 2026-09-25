@@ -1,6 +1,12 @@
 package com.cedagova.reader.auth
 
 import com.cedagova.reader.auth.session.StoreSessionManager
+import com.cedagova.reader.auth.testing.FakeClock
+import com.cedagova.reader.auth.testing.FakeServers
+import com.cedagova.reader.auth.testing.InMemorySessionStore
+import com.cedagova.reader.auth.testing.session
+import com.cedagova.reader.auth.testing.testConfig
+import com.cedagova.reader.auth.testing.user
 import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.auth.MemoryCodeVerifierCache
 import io.github.jan.supabase.auth.auth
@@ -29,7 +35,10 @@ class SdkDefaultsTest {
         val manager = config.sessionManager
         assertTrue("session manager is ${manager?.javaClass}", manager is StoreSessionManager)
         assertSame(store, (manager as StoreSessionManager).store)
-        assertTrue("code verifier cache is ${config.codeVerifierCache?.javaClass}", config.codeVerifierCache is MemoryCodeVerifierCache)
+        assertTrue(
+            "code verifier cache is ${config.codeVerifierCache?.javaClass}",
+            config.codeVerifierCache is MemoryCodeVerifierCache,
+        )
         assertFalse("the SDK's background auto-refresh must stay off", config.alwaysAutoRefresh)
         assertFalse("the SDK's lifecycle-driven refresh must stay off", config.enableLifecycleCallbacks)
         assertTrue(config.autoLoadFromStorage)
@@ -56,7 +65,10 @@ class SdkDefaultsTest {
         val stored = session(expiresAt = clock.expiring(3600))
         val signedIn = ReaderAuthClient.build(testConfig, InMemorySessionStore(stored), FakeServers().engine, clock)
         signedIn.awaitReady()
-        assertEquals(ReaderSessionState.SignedIn("user-1", "reader@example.test", stored.expiresAt), signedIn.currentState())
+        assertEquals(
+            ReaderSessionState.SignedIn("user-1", "reader@example.test", stored.expiresAt),
+            signedIn.currentState(),
+        )
         signedIn.close()
 
         val signedOut = ReaderAuthClient.build(testConfig, InMemorySessionStore(), FakeServers().engine, clock)

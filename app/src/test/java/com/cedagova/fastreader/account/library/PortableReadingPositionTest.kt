@@ -1,21 +1,21 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.reader.library.sync.LocalReadingPosition
-import com.cedagova.reader.library.sync.RemoteReadingPosition
-import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.reader.ReaderFixtures
-import com.cedagova.reader.library.sync.PortableProgress
+import com.cedagova.reader.engine.content.BookContent
 import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
 import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
 import com.cedagova.reader.library.model.PORTABLE_SEMANTICS_VERSION
 import com.cedagova.reader.library.model.PUBLICATION_SOURCE_ACCOUNT
+import com.cedagova.reader.library.sync.LocalReadingPosition
+import com.cedagova.reader.library.sync.PortableProgress
+import com.cedagova.reader.library.sync.RemoteReadingPosition
+import kotlin.math.roundToInt
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -323,5 +323,4 @@ class PortableReadingPositionTest {
         /** An account book id, the envelope's `resource_id` and so the publication's id. */
         const val BOOK_ID: String = "7f1c7a0e-0b8e-4d8a-9a52-3f0f7c1d2e11"
     }
-
 }

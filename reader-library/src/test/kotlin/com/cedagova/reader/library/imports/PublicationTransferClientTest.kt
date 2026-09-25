@@ -1,6 +1,7 @@
 package com.cedagova.reader.library.imports
 
 import com.cedagova.reader.library.model.PublicationTransferGrant
+import com.cedagova.reader.library.testing.publicationTransferClientOver
 import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
@@ -24,7 +25,7 @@ class PublicationTransferClientTest {
 
     private val bytes = publicationBytes(SIZE)
     private val storage = FakeStorage()
-    private val client = PublicationTransferClient.createForTests(storage.engine)
+    private val client = publicationTransferClientOver(storage.engine)
 
     private fun grant(
         chunkSizeBytes: Long = CHUNK,
@@ -48,7 +49,10 @@ class PublicationTransferClientTest {
 
         assertEquals(SIZE.toLong(), end)
         assertArrayEquals("the provider holds exactly the file", bytes, storage.received)
-        assertTrue("a full transfer of $SIZE bytes in $CHUNK-byte chunks is more than one PATCH", storage.patchSizes.size >= 2)
+        assertTrue(
+            "a full transfer of $SIZE bytes in $CHUNK-byte chunks is more than one PATCH",
+            storage.patchSizes.size >= 2,
+        )
         assertEquals(listOf(CHUNK.toInt(), CHUNK.toInt(), (SIZE - 2 * CHUNK).toInt()), storage.patchSizes.toList())
         assertTrue(
             "no chunk may exceed the grant's published size",
@@ -100,7 +104,9 @@ class PublicationTransferClientTest {
             }
             assertEquals(
                 PublicationTransferClient.TUS_VERSION,
-                request.headers.entries.first { it.key.equals(PublicationTransferClient.HEADER_TUS_RESUMABLE, true) }.value,
+                request.headers.entries.first {
+                    it.key.equals(PublicationTransferClient.HEADER_TUS_RESUMABLE, true)
+                }.value,
             )
         }
     }
@@ -127,7 +133,7 @@ class PublicationTransferClientTest {
 
         // A new process, a new client, the same location: exactly what a resume
         // after app death has to work with.
-        val resumed = PublicationTransferClient.createForTests(storage.engine)
+        val resumed = publicationTransferClientOver(storage.engine)
         val from = resumed.offset(grant, location)
         assertEquals(KEPT.toLong(), from)
 
@@ -293,11 +299,11 @@ class PublicationTransferClientTest {
         const val CHUNK = 2_048L
 
         /**
-     * Bytes the provider keeps of the chunk it was reading when the connection
-     * died. Deliberately not a multiple of [CHUNK]: a client that resumed from
-     * "chunks I sent" rather than from the provider's offset would get this
-     * case wrong, and the byte-for-byte assertion would catch it.
-     */
+         * Bytes the provider keeps of the chunk it was reading when the connection
+         * died. Deliberately not a multiple of [CHUNK]: a client that resumed from
+         * "chunks I sent" rather than from the provider's offset would get this
+         * case wrong, and the byte-for-byte assertion would catch it.
+         */
         const val KEPT = 700
     }
 }

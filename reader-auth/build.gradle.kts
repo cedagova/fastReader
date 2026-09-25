@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 // The reusable Reader authentication library (#92, A83-F007; contract and
 // implementation #93, A83-F008).
 //
@@ -8,53 +6,86 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // FastReader naming anywhere. It owns the one thing every host needs merged in
 // from it — the INTERNET permission in src/main/AndroidManifest.xml — and it
 // documents in README.md the host obligations a library cannot enforce through
-// manifest merging. CONTRACT.md is the client contract this module implements.
+// manifest merging. CONTRACT.md is the client contract this module implements;
+// contracts/ holds the one pinned reader-api document both libraries are gated
+// against (#208), and ReaderAuthContractTest is this module's drift gate.
 plugins {
-    alias(libs.plugins.android.library)
+    // Shared SDK, JVM, lint, test and formatter settings (build-logic, #205).
+    id("conventions.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 
+// The module's own version: a host copies this directory at the tag
+// `reader-auth/v<version>` (docs/library-consumption.md); CHANGELOG.md beside
+// this file records what changed between two versions.
+version = "0.1.0"
+
 android {
     namespace = "com.cedagova.reader.auth"
-    compileSdk = 37
+
+    // src/testFixtures: the module's reusable test fixtures (#199). A host
+    // takes them as a testFixtures dependency on this module (README.md).
+    // Kotlin in test fixtures needs the gradle.properties flag
+    // android.experimental.enableTestFixturesKotlinSupport (docs/library-consumption.md).
+    testFixtures {
+        enable = true
+    }
 
     defaultConfig {
-        minSdk = 26
         // What a shrinking host must keep for this module's dependencies; see
         // the file for why.
         consumerProguardFiles("consumer-rules.pro")
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    testOptions {
-        unitTests {
-            // The manifest test reads the library's *merged* manifest back
-            // through the package manager, and the store test writes under the
-            // application's real no-backup directory; both need Android
-            // resources packaged.
-            isIncludeAndroidResources = true
-        }
+    // The reader-api contract checker (#208): test support, shared with
+    // :reader-library's contract test, which compiles the same source.
+    sourceSets {
+        getByName("test").kotlin.directories.add("src/contractTest/kotlin")
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
+// ReaderAuthContractTest reads contracts/ from the filesystem, not from the
+// test classpath, so the pinned document is declared an input of the test task;
+// otherwise a changed contract file returns the last green result from the
+// build cache and the drift gate never runs.
+tasks.withType<Test>().configureEach {
+    inputs.dir("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
+// The public surface is recorded in api/reader-auth.api and checked by
+// `./gradlew check` (build-logic, #198). A dependency is `api` only when a
+// type of it is in that surface on purpose, and the reason is written beside
+// it; everything else stays `implementation`, invisible to a host.
 dependencies {
     // The identity provider's own Kotlin SDK (reader-auth/CONTRACT.md records
     // the three defaults this module overrides) over Ktor's OkHttp engine.
+    // Implementation only: no provider type is in the surface — a stored
+    // session is the module's own opaque StoredSession (#198).
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.auth)
     implementation(libs.ktor.client.okhttp)
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.kotlinx.coroutines.android)
+    // api: reader-api speaks JSON and the surface says so. PreAuthDocument and
+    // ReaderProfileUpdate are @Serializable (their generated serializers are
+    // public), ReaderProfileUpdate.metadata is a JsonObject, and
+    // ReaderApiClient.get/put/post hand a host the reader-api document as the
+    // JsonObject it is, so a host can reach any further route.
+    api(libs.kotlinx.serialization.json)
+    // api: ReaderAuthClient.sessionState is a Flow.
+    api(libs.kotlinx.coroutines.android)
+    // Implementation: since #199 no Ktor type is in the surface. The mock
+    // engine the tests drive the client over is handed to the internal wiring
+    // by the test fixtures below, which see the module's internals.
+    implementation(libs.ktor.client.core)
+
+    // The test fixtures (#199, A197-F002): what a host, :reader-library and
+    // this module's own tests use to test against the client — one mock
+    // reader-api and identity-provider server, a real client over it, and a
+    // scripted double of ReaderAuthOperations. The mock engine is `api` there
+    // because the server's responders are written against it.
+    testFixturesApi(libs.ktor.client.mock)
+    testFixturesImplementation(platform(libs.supabase.bom))
+    testFixturesImplementation(libs.supabase.auth)
+    testFixturesImplementation(libs.ktor.client.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

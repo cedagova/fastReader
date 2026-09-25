@@ -1,6 +1,7 @@
 package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.auth.testing.recorded
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderLibraryItem
 import com.cedagova.reader.library.model.ReaderLibraryResponse
@@ -9,6 +10,7 @@ import com.cedagova.reader.library.model.ReaderMutationKind
 import com.cedagova.reader.library.model.ReaderResourceType
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
+import com.cedagova.reader.library.testing.FakeReaderLibraryGateway
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -45,7 +47,7 @@ import org.junit.rules.TemporaryFolder
  * before it is on disk.
  *
  * The order and the lost-position proofs run the engine on
- * [Dispatchers.Default], the multi-threaded scope FastReader itself passes —
+ * [Dispatchers.Default], the multi-threaded scope a real host passes —
  * the ordering bug only exists there. The session-switch proofs that need the
  * switch to land at one exact point use the test scheduler instead, with the
  * lock held by a parked sync, so the interleaving is the one the issue names
@@ -230,7 +232,10 @@ class AccountSyncEngineQueueTest {
         // Calls keep coming from this thread while the collector switches on
         // another one, until B is signed in and then for 500 more.
         val ids = mutableListOf<String>()
-        fun call() = "x-${ids.size}".also { ids += it; engine.removeFromAccount(it) }
+        fun call() = "x-${ids.size}".also {
+            ids += it
+            engine.removeFromAccount(it)
+        }
         repeat(500) { call() }
         session.value = AccountSession.SignedIn("user-b")
         withTimeout(20_000) {
@@ -254,7 +259,13 @@ class AccountSyncEngineQueueTest {
         if (placed == null) {
             fail(
                 "the last call never reached B's outbox; " +
-                    queueDetail(ids, document("user-a").outbox.map { it.resourceId }, document("user-b").outbox.map { it.resourceId }),
+                    queueDetail(
+                        ids,
+                        document("user-a").outbox.map {
+                            it.resourceId
+                        },
+                        document("user-b").outbox.map { it.resourceId },
+                    ),
             )
         }
 
@@ -262,7 +273,10 @@ class AccountSyncEngineQueueTest {
         val b = document("user-b").outbox.map { it.resourceId }
         val detail = queueDetail(ids, a, b)
         assertTrue("B got changes after the switch; $detail", b.isNotEmpty())
-        assertTrue("A's remainder then B's queue are one unbroken tail of the calls; $detail", ids.takeLast(a.size + b.size) == a + b)
+        assertTrue(
+            "A's remainder then B's queue are one unbroken tail of the calls; $detail",
+            ids.takeLast(a.size + b.size) == a + b,
+        )
         assertTrue("nothing asked for before the switch reached B; $detail", ids.indexOf(b.first()) >= 500)
     }
 

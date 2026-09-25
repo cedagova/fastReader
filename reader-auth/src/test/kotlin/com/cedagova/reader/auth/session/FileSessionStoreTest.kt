@@ -4,7 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.reader.auth.FakeCipher
-import com.cedagova.reader.auth.session
+import com.cedagova.reader.auth.testing.session
+import io.github.jan.supabase.auth.user.UserSession
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -44,7 +45,12 @@ class FileSessionStoreTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val cipher = FakeCipher()
     private lateinit var store: FileSessionStore
-    private val stored = session(accessToken = "access-token-bytes", refreshToken = "refresh-token-bytes", expiresAt = Clock.System.now() + 3600.seconds)
+    private val stored = session(
+        accessToken = "access-token-bytes",
+        refreshToken = "refresh-token-bytes",
+        expiresAt =
+            Clock.System.now() + 3600.seconds,
+    )
 
     @Before
     fun freshStore() {
@@ -63,7 +69,10 @@ class FileSessionStoreTest {
         )
         assertEquals("session.bin", store.file.name)
         val sharedPrefs = File(context.applicationInfo.dataDir, "shared_prefs")
-        assertTrue("a shared_prefs directory appeared: ${sharedPrefs.list()?.toList()}", !sharedPrefs.exists() || sharedPrefs.list().isNullOrEmpty())
+        assertTrue(
+            "a shared_prefs directory appeared: ${sharedPrefs.list()?.toList()}",
+            !sharedPrefs.exists() || sharedPrefs.list().isNullOrEmpty(),
+        )
         val filesDir = context.filesDir.listFiles().orEmpty().map { it.name }
         assertTrue("the ordinary files directory gained $filesDir", filesDir.isEmpty())
     }
@@ -83,7 +92,7 @@ class FileSessionStoreTest {
     fun `a saved session loads back intact`() = runTest {
         store.save(stored)
 
-        val loaded = store.load()
+        val loaded = store.load()?.value
 
         assertNotNull(loaded)
         assertEquals(stored.accessToken, loaded!!.accessToken)
@@ -142,13 +151,24 @@ class FileSessionStoreTest {
         val temporaries = Collections.synchronizedList(mutableListOf<File>())
         // Every save has fully written its temp file before any of them renames.
         val allWritten = CyclicBarrier(saves)
-        val racing = FileSessionStore(store.file.parentFile!!, cipher, pool.asCoroutineDispatcher()) { temporary, target ->
-            temporaries += temporary
-            allWritten.await(10, TimeUnit.SECONDS)
-            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        }
+        val racing =
+            FileSessionStore(store.file.parentFile!!, cipher, pool.asCoroutineDispatcher()) { temporary, target ->
+                temporaries += temporary
+                allWritten.await(10, TimeUnit.SECONDS)
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            }
         val sessions = (1..saves).map { n ->
-            session(accessToken = "access-$n-" + "x".repeat(n * 97), refreshToken = "refresh-$n", expiresAt = Clock.System.now() + 3600.seconds)
+            session(
+                accessToken = "access-$n-" + "x".repeat(n * 97),
+                refreshToken = "refresh-$n",
+                expiresAt =
+                    Clock.System.now() + 3600.seconds,
+            )
         }
         try {
             runBlocking { sessions.map { async(pool.asCoroutineDispatcher()) { racing.save(it) } }.awaitAll() }
@@ -157,7 +177,7 @@ class FileSessionStoreTest {
         }
 
         assertEquals("two saves shared a temp file: $temporaries", saves, temporaries.map { it.name }.toSet().size)
-        val loaded = runBlocking { store.load() }
+        val loaded = runBlocking { store.load()?.value }
         assertNotNull("the raced file did not load", loaded)
         assertTrue(loaded!!.accessToken in sessions.map { it.accessToken })
         assertEquals(listOf(FileSessionStore.FILE_NAME), store.file.parentFile!!.list()!!.toList())
@@ -172,12 +192,25 @@ class FileSessionStoreTest {
         }
 
         assertThrows(IOException::class.java) {
-            runBlocking { failing.save(session(accessToken = "replacement", refreshToken = "r", expiresAt = Clock.System.now() + 60.seconds)) }
+            runBlocking {
+                failing.save(
+                    session(
+                        accessToken = "replacement",
+                        refreshToken = "r",
+                        expiresAt =
+                            Clock.System.now() + 60.seconds,
+                    ),
+                )
+            }
         }
 
         assertTrue(before.contentEquals(store.file.readBytes()))
-        assertEquals(stored.accessToken, store.load()?.accessToken)
-        assertEquals("the failed save left a temp file", listOf(FileSessionStore.FILE_NAME), store.file.parentFile!!.list()!!.toList())
+        assertEquals(stored.accessToken, store.load()?.value?.accessToken)
+        assertEquals(
+            "the failed save left a temp file",
+            listOf(FileSessionStore.FILE_NAME),
+            store.file.parentFile!!.list()!!.toList(),
+        )
     }
 
     @Test
@@ -190,6 +223,9 @@ class FileSessionStoreTest {
 
         assertEquals(emptyList<String>(), store.file.parentFile!!.list()!!.toList())
     }
+
+    /** The store holds the module's opaque [StoredSession]; these tests speak the provider record it wraps. */
+    private suspend fun SessionStore.save(session: UserSession) = save(StoredSession(session))
 
     private fun ByteArray.containsSlice(needle: ByteArray): Boolean {
         if (needle.isEmpty() || needle.size > size) return false

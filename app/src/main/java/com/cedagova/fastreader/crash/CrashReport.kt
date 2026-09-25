@@ -1,6 +1,6 @@
 package com.cedagova.fastreader.crash
 
-/**
+/*
  * The plain-text crash report, and the redaction that makes it shareable
  * (REQ-207, REQ-303, AD-14).
  *

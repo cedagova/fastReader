@@ -1,9 +1,5 @@
 package com.cedagova.fastreader.library.ui
 
-import com.cedagova.fastreader.account.library.AccountDownloadsState
-import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
@@ -16,6 +12,10 @@ import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.LibraryOrder
+import com.cedagova.reader.account.library.AccountDownloadsState
+import com.cedagova.reader.account.library.AccountImportsState
+import com.cedagova.reader.account.library.BookDownloadState
+import com.cedagova.reader.library.sync.AccountLibraryState
 import java.text.Collator
 import java.text.Normalizer
 import kotlin.math.roundToInt
@@ -332,6 +332,7 @@ private fun Catalog.comparatorFor(order: LibraryOrder): Comparator<LibraryBookIt
     val byTitle = compareBy<LibraryBookItem, String>(collator) { it.sortKey }.thenBy { it.id }
     return when (order) {
         LibraryOrder.TITLE -> byTitle
+
         LibraryOrder.RECENTLY_READ -> {
             // The position writer stamps this on every write, so "read two words
             // of it" is exactly what moves a book to the top (REQ-203's
@@ -363,7 +364,6 @@ fun buildFolderItems(catalog: Catalog): List<LibraryFolderItem> = catalog.folder
         removedBookCount = catalog.booksOnlyFrom(folder.id).size,
     )
 }
-
 
 private fun Book.toItem(progressFraction: Float): LibraryBookItem = LibraryBookItem(
     id = id,

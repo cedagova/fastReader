@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonObject
  * failed call reports its id on the [com.cedagova.reader.auth.ReaderAuthException]
  * branch instead, as it always has.
  */
-data class ReaderApiResponse(
+public data class ReaderApiResponse(
     /** The response body, as returned. */
     val document: JsonObject,
     /** The lowercase-UUID `X-Request-ID` header the successful attempt sent. */

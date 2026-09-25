@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.epub.EpubByteSource
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.epub.EpubByteSource
 
 /**
  * Where the book being opened came from, and therefore what the app may do with
@@ -120,19 +120,14 @@ class BookOpenRequest(
          * rotation re-enter the same open book rather than re-parse it, and what
          * makes a second "Open with" of a *different* file replace it.
          */
-        fun external(
-            uri: String,
-            title: String,
-            identity: BookIdentity?,
-            origin: BookOrigin,
-            bytes: EpubByteSource,
-        ) = BookOpenRequest(
-            bytes = bytes,
-            identity = identity,
-            origin = origin,
-            title = title,
-            openKey = uri,
-        )
+        fun external(uri: String, title: String, identity: BookIdentity?, origin: BookOrigin, bytes: EpubByteSource) =
+            BookOpenRequest(
+                bytes = bytes,
+                identity = identity,
+                origin = origin,
+                title = title,
+                openKey = uri,
+            )
     }
 
     /**

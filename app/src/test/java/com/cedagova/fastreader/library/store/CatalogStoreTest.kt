@@ -5,6 +5,10 @@ import com.cedagova.fastreader.library.BookContentStatus
 import com.cedagova.fastreader.library.BookFolder
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.Catalog
+import com.cedagova.fastreader.library.CatalogCodec
+import com.cedagova.fastreader.library.CatalogDecoding
+import com.cedagova.fastreader.library.CatalogLoad
+import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.FontSize
@@ -12,8 +16,8 @@ import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RsvpTiming
 import java.io.File
 import java.io.IOException
 import kotlinx.serialization.json.JsonObject
@@ -61,7 +65,9 @@ class CatalogStoreTest {
                 lastSeenEpochMs = 2,
             ),
         ),
-        folders = listOf(BookFolder(id = "content://tree/books", treeUri = "content://tree/books", displayName = "Books")),
+        folders = listOf(
+            BookFolder(id = "content://tree/books", treeUri = "content://tree/books", displayName = "Books"),
+        ),
         readingStates = mapOf(
             "sha256:abc" to ReadingState(
                 bookDigest = "sha256:abc",
@@ -679,7 +685,6 @@ class CatalogStoreTest {
         assertTrue(CatalogCodec().decode(wrongShape) !is CatalogDecoding.Newer)
     }
 
-    /** The choice, once made, survives a round trip through the store. */
     /**
      * Schema 10 makes the progress readouts a choice. The updating reader keeps
      * the percent and time they had: `progressShown` comes forward as `true`,
@@ -772,6 +777,7 @@ class CatalogStoreTest {
         assertTrue(loaded.books.single().sources.single().isAccountCopy)
     }
 
+    /** The choice, once made, survives a round trip through the store. */
     @Test
     fun `hidden progress readouts round trip through the store`() {
         val store = FileCatalogStore(file)
@@ -814,7 +820,8 @@ class CatalogStoreTest {
     @Test
     fun `a version 7 document without a usable font size still migrates`() {
         val noSettings = """{"schemaVersion":7,"books":[],"folders":[],"readingStates":{}}"""
-        val noFontSize = """{"schemaVersion":7,"books":[],"folders":[],"readingStates":{},"settings":{"theme":"DARK"}}"""
+        val noFontSize =
+            """{"schemaVersion":7,"books":[],"folders":[],"readingStates":{},"settings":{"theme":"DARK"}}"""
         val wrongShape = """{"schemaVersion":7,"books":[],"folders":[],"readingStates":{},"settings":{"fontSize":7}}"""
 
         val a = CatalogCodec().decode(noSettings) as CatalogDecoding.Decoded

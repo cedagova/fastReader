@@ -3,16 +3,16 @@ package com.cedagova.reader.library.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
+/*
  * The asset download grant as reader-api publishes it (#118, LEAF811 of #104):
  * the one way a book's bytes may come *onto* this device.
  *
  * It is the mirror image of `PublicationTransferGrant` in `Imports.kt` and is
  * modelled the same way — one Kotlin type per schema, every wire name spelled
  * out, pinned to the document by `ReaderLibraryContractTest`. Read
- * `contracts/reader-api.openapi.json` (`ReaderAssetGrantResponse`,
+ * `reader-auth/contracts/reader-api.openapi.json` (`ReaderAssetGrantResponse`,
  * `ReaderAssetGrant`) for the authority; this file only says what shape
- * FastReader reads it in.
+ * this module reads it in.
  *
  * The two grants differ in one way that matters to this module's design: the
  * upload grant carries a `chunk_size_bytes` because TUS sends the file in
@@ -28,7 +28,7 @@ import kotlinx.serialization.Serializable
  * download for one asset the signed-in actor may read.
  */
 @Serializable
-data class ReaderAssetGrantResponse(
+public data class ReaderAssetGrantResponse(
     /** Echoed `X-Request-ID`; the id to quote when reading a server log. */
     @SerialName("request_id") val requestId: String,
     @SerialName("grant") val grant: ReaderAssetGrant,
@@ -39,7 +39,7 @@ data class ReaderAssetGrantResponse(
  * One signed transfer of one asset, in one direction, until it expires.
  *
  * [url] is the storage provider's own signed URL. It is the *only* address this
- * client may fetch a book from: nothing in FastReader composes a download URL,
+ * client may fetch a book from: nothing in this module composes a download URL,
  * which is why `AssetDownloadClient` takes a whole grant rather than a string.
  *
  * [checksum] is the content SHA-256 the server holds for the stored object. It
@@ -52,7 +52,7 @@ data class ReaderAssetGrantResponse(
  * carry. The account bearer is not in it and cannot be: see `AssetDownloadClient`.
  */
 @Serializable
-data class ReaderAssetGrant(
+public data class ReaderAssetGrant(
     @SerialName("asset_id") val assetId: String,
     @SerialName("book_id") val bookId: String,
     @SerialName("direction") val direction: ReaderAssetDirection = ReaderAssetDirection.UNKNOWN,
@@ -76,8 +76,8 @@ data class ReaderAssetGrant(
     val isDownload: Boolean
         get() = direction == ReaderAssetDirection.DOWNLOAD && method == ReaderAssetMethod.GET
 
-    companion object {
+    public companion object {
         /** The prefix the contract's own `sha256` pattern makes optional. */
-        const val SHA256_PREFIX: String = "sha256:"
+        public const val SHA256_PREFIX: String = "sha256:"
     }
 }

@@ -31,25 +31,25 @@ import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
  * through unchanged. This gateway maps nothing, retries nothing and classifies
  * nothing.
  */
-interface ReaderLibraryGateway {
+public interface ReaderLibraryGateway {
 
     /** The account's library rows, as the server holds them. */
-    suspend fun library(): ReaderLibraryResponse
+    public suspend fun library(): ReaderLibraryResponse
 
     /** Every reading position the account holds. */
-    suspend fun progress(): ReaderProgressListResponse
+    public suspend fun progress(): ReaderProgressListResponse
 
     /** Admit a batch of 1 to 50 mutations; results are per envelope. */
-    suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse
+    public suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse
 
     /** The account's changes after [afterCursor]; cursor expiry is a status, not a failure. */
-    suspend fun deltas(
+    public suspend fun deltas(
         afterCursor: String = ReaderLibraryClient.FIRST_CURSOR,
         limit: Int = ReaderLibraryClient.DEFAULT_DELTA_LIMIT,
     ): ReaderSyncDeltaResponse
 
     /** Whether `reader.sync.v1` is available to this client right now. */
-    suspend fun syncCapability(): ReaderSyncCapability
+    public suspend fun syncCapability(): ReaderSyncCapability
 }
 
 /**
@@ -57,15 +57,14 @@ interface ReaderLibraryGateway {
  * [ReaderLibraryOperations] the application owns, itself built on the one
  * authenticated client. Each method is exactly one library call.
  */
-class ReaderApiLibraryGateway(private val operations: ReaderLibraryOperations) : ReaderLibraryGateway {
+public class ReaderApiLibraryGateway(private val operations: ReaderLibraryOperations) : ReaderLibraryGateway {
 
     override suspend fun library(): ReaderLibraryResponse = operations.library()
 
     override suspend fun progress(): ReaderProgressListResponse = operations.progress()
 
-    override suspend fun applyMutations(
-        mutations: List<ReaderSyncMutationEnvelope>,
-    ): ReaderSyncMutationBatchResponse = operations.applyMutations(mutations)
+    override suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse =
+        operations.applyMutations(mutations)
 
     override suspend fun deltas(afterCursor: String, limit: Int): ReaderSyncDeltaResponse =
         operations.deltas(afterCursor, limit)

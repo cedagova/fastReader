@@ -11,9 +11,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
-import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.store.CoverStore
+import com.cedagova.reader.engine.epub.EpubFixtures
 import java.io.File
 import java.util.regex.Pattern
 import org.junit.After
@@ -149,7 +149,11 @@ class SafIngestionTest {
     private fun writeFixtures() {
         write("english.epub", EpubFixtures.validEpub(), FIXTURE_RELATIVE_PATH)
         write("spanish.epub", EpubFixtures.spanishEpub(), FIXTURE_RELATIVE_PATH)
-        write("no-cover.epub", EpubFixtures.validEpub(withCover = false, identifier = "urn:uuid:nc"), FIXTURE_RELATIVE_PATH)
+        write(
+            "no-cover.epub",
+            EpubFixtures.validEpub(withCover = false, identifier = "urn:uuid:nc"),
+            FIXTURE_RELATIVE_PATH,
+        )
         write("locked.epub", EpubFixtures.drmProtectedEpub(), FIXTURE_RELATIVE_PATH)
         write("broken.epub", EpubFixtures.notAZip(), FIXTURE_RELATIVE_PATH)
         write("notabook.txt", "ignore me".toByteArray(), FIXTURE_RELATIVE_PATH)

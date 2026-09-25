@@ -1,0 +1,936 @@
+public final class com/cedagova/reader/account/AccountActivity : java/lang/Enum {
+	public static final field LOADING_CAPABILITIES Lcom/cedagova/reader/account/AccountActivity;
+	public static final field REQUESTING_CODE Lcom/cedagova/reader/account/AccountActivity;
+	public static final field REQUESTING_RECOVERY_CODE Lcom/cedagova/reader/account/AccountActivity;
+	public static final field SETTING_PASSWORD Lcom/cedagova/reader/account/AccountActivity;
+	public static final field SIGNING_IN_WITH_PASSWORD Lcom/cedagova/reader/account/AccountActivity;
+	public static final field SIGNING_OUT Lcom/cedagova/reader/account/AccountActivity;
+	public static final field SIGNING_OUT_OTHER_DEVICES Lcom/cedagova/reader/account/AccountActivity;
+	public static final field VERIFYING_CODE Lcom/cedagova/reader/account/AccountActivity;
+	public static final field VERIFYING_RECOVERY_CODE Lcom/cedagova/reader/account/AccountActivity;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/account/AccountActivity;
+	public static fun values ()[Lcom/cedagova/reader/account/AccountActivity;
+}
+
+public abstract interface class com/cedagova/reader/account/AccountOutcome {
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$ApiError : com/cedagova/reader/account/AccountOutcome$Failure {
+	public fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/AccountOutcome$ApiError;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/AccountOutcome$ApiError;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/AccountOutcome$ApiError;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getStatus ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$CodeSent : com/cedagova/reader/account/AccountOutcome {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$CodeSent;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$ConfigurationMismatch : com/cedagova/reader/account/AccountOutcome$Failure {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/AccountOutcome$ConfigurationMismatch;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/AccountOutcome$ConfigurationMismatch;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/AccountOutcome$ConfigurationMismatch;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/AccountOutcome$Failure : com/cedagova/reader/account/AccountOutcome {
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$Forbidden : com/cedagova/reader/account/AccountOutcome$Failure {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/AccountOutcome$Forbidden;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/AccountOutcome$Forbidden;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/AccountOutcome$Forbidden;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$NetworkUnavailable : com/cedagova/reader/account/AccountOutcome$Failure {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$NetworkUnavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$OtherDevicesSignedOut : com/cedagova/reader/account/AccountOutcome {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$OtherDevicesSignedOut;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$PasswordSet : com/cedagova/reader/account/AccountOutcome {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$PasswordSet;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$ProviderRejected : com/cedagova/reader/account/AccountOutcome$Failure {
+	public fun <init> (ILjava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (ILjava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/AccountOutcome$ProviderRejected;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/AccountOutcome$ProviderRejected;ILjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/AccountOutcome$ProviderRejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getStatus ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$RecoveryCodeSent : com/cedagova/reader/account/AccountOutcome {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$RecoveryCodeSent;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$SessionGone : com/cedagova/reader/account/AccountOutcome$Failure {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/AccountOutcome$SessionGone;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/AccountOutcome$SessionGone;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/AccountOutcome$SessionGone;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$SignInUnavailable : com/cedagova/reader/account/AccountOutcome$Failure {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/AccountOutcome$SignInUnavailable;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/AccountOutcome$SignInUnavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/AccountOutcome$SignInUnavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$SignedOutLocally : com/cedagova/reader/account/AccountOutcome {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$SignedOutLocally;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$StorageUnavailable : com/cedagova/reader/account/AccountOutcome$Failure {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$StorageUnavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$TryLater : com/cedagova/reader/account/AccountOutcome$Failure {
+	public fun <init> (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/String;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (ILjava/lang/String;Ljava/lang/Long;Ljava/lang/String;)Lcom/cedagova/reader/account/AccountOutcome$TryLater;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/AccountOutcome$TryLater;ILjava/lang/String;Ljava/lang/Long;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/AccountOutcome$TryLater;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getRetryAfterSeconds ()Ljava/lang/Long;
+	public final fun getStatus ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/AccountOutcome$UnexpectedResponse : com/cedagova/reader/account/AccountOutcome$Failure {
+	public static final field INSTANCE Lcom/cedagova/reader/account/AccountOutcome$UnexpectedResponse;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/LoadedCapabilities {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/LoadedCapabilities;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/LoadedCapabilities;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/LoadedCapabilities;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDocument ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/ReaderAccountActions {
+	public abstract fun dismissOutcome ()V
+	public abstract fun loadCapabilities ()V
+	public abstract fun requestEmailCode (Ljava/lang/String;Z)V
+	public abstract fun requestRecoveryCode (Ljava/lang/String;)V
+	public abstract fun setPassword (Ljava/lang/String;)V
+	public abstract fun signInWithPassword (Ljava/lang/String;Ljava/lang/String;)V
+	public abstract fun signOut ()V
+	public abstract fun signOutOtherDevices ()V
+	public abstract fun verifyEmailCode (Ljava/lang/String;Ljava/lang/String;)V
+	public abstract fun verifyRecoveryCode (Ljava/lang/String;Ljava/lang/String;)V
+}
+
+public final class com/cedagova/reader/account/ReaderAccountController : com/cedagova/reader/account/ReaderAccountActions {
+	public fun <init> (Lcom/cedagova/reader/auth/ReaderAuthOperations;Ljava/util/List;Lkotlinx/coroutines/CoroutineScope;)V
+	public fun dismissOutcome ()V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public fun loadCapabilities ()V
+	public fun requestEmailCode (Ljava/lang/String;Z)V
+	public fun requestRecoveryCode (Ljava/lang/String;)V
+	public fun setPassword (Ljava/lang/String;)V
+	public fun signInWithPassword (Ljava/lang/String;Ljava/lang/String;)V
+	public fun signOut ()V
+	public fun signOutOtherDevices ()V
+	public fun verifyEmailCode (Ljava/lang/String;Ljava/lang/String;)V
+	public fun verifyRecoveryCode (Ljava/lang/String;Ljava/lang/String;)V
+}
+
+public final class com/cedagova/reader/account/ReaderAccountGateways {
+	public static final field Companion Lcom/cedagova/reader/account/ReaderAccountGateways$Companion;
+	public fun <init> (Lcom/cedagova/reader/auth/ReaderAuthOperations;Lcom/cedagova/reader/library/sync/ReaderLibraryGateway;Lcom/cedagova/reader/library/imports/PublicationImportGateway;Lcom/cedagova/reader/library/downloads/AssetDownloadGateway;)V
+	public final fun getAuth ()Lcom/cedagova/reader/auth/ReaderAuthOperations;
+	public final fun getDownloads ()Lcom/cedagova/reader/library/downloads/AssetDownloadGateway;
+	public final fun getImports ()Lcom/cedagova/reader/library/imports/PublicationImportGateway;
+	public final fun getLibrary ()Lcom/cedagova/reader/library/sync/ReaderLibraryGateway;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountGateways$Companion {
+	public final fun over (Lcom/cedagova/reader/auth/ReaderAuthClient;)Lcom/cedagova/reader/account/ReaderAccountGateways;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountGraph {
+	public fun <init> (Lcom/cedagova/reader/account/ReaderAccountGateways;Ljava/util/List;Ljava/io/File;Lcom/cedagova/reader/account/library/AccountCopyCatalog;Lcom/cedagova/reader/account/library/DevicePublicationSources;Lcom/cedagova/reader/account/library/DeviceBookIdentity;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/CoroutineScope;J)V
+	public synthetic fun <init> (Lcom/cedagova/reader/account/ReaderAccountGateways;Ljava/util/List;Ljava/io/File;Lcom/cedagova/reader/account/library/AccountCopyCatalog;Lcom/cedagova/reader/account/library/DevicePublicationSources;Lcom/cedagova/reader/account/library/DeviceBookIdentity;Lkotlin/jvm/functions/Function1;Lkotlinx/coroutines/CoroutineScope;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAccount ()Lcom/cedagova/reader/account/ReaderAccountController;
+	public final fun getCopies ()Lcom/cedagova/reader/account/library/AccountBookCopies;
+	public final fun getDownloads ()Lcom/cedagova/reader/account/library/AccountDownloads;
+	public final fun getImports ()Lcom/cedagova/reader/account/library/AccountImports;
+	public final fun getShelf ()Lcom/cedagova/reader/account/library/AccountShelf;
+	public final fun getSync ()Lcom/cedagova/reader/library/sync/AccountSyncEngine;
+	public final fun onBackground ()V
+	public final fun onForeground ()V
+}
+
+public abstract interface class com/cedagova/reader/account/ReaderAccountState {
+	public abstract fun getActivity ()Lcom/cedagova/reader/account/AccountActivity;
+	public abstract fun getOutcome ()Lcom/cedagova/reader/account/AccountOutcome;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountState$Loading : com/cedagova/reader/account/ReaderAccountState {
+	public static final field INSTANCE Lcom/cedagova/reader/account/ReaderAccountState$Loading;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getActivity ()Lcom/cedagova/reader/account/AccountActivity;
+	public fun getOutcome ()Lcom/cedagova/reader/account/AccountOutcome;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountState$NotConfigured : com/cedagova/reader/account/ReaderAccountState {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/cedagova/reader/account/ReaderAccountState$NotConfigured;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/ReaderAccountState$NotConfigured;Ljava/util/List;ILjava/lang/Object;)Lcom/cedagova/reader/account/ReaderAccountState$NotConfigured;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getActivity ()Lcom/cedagova/reader/account/AccountActivity;
+	public final fun getMissingValues ()Ljava/util/List;
+	public fun getOutcome ()Lcom/cedagova/reader/account/AccountOutcome;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountState$SignedIn : com/cedagova/reader/account/ReaderAccountState {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;Lcom/cedagova/reader/account/LoadedCapabilities;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;Lcom/cedagova/reader/account/LoadedCapabilities;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/cedagova/reader/account/AccountActivity;
+	public final fun component4 ()Lcom/cedagova/reader/account/AccountOutcome;
+	public final fun component5 ()Lcom/cedagova/reader/account/LoadedCapabilities;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;Lcom/cedagova/reader/account/LoadedCapabilities;)Lcom/cedagova/reader/account/ReaderAccountState$SignedIn;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/ReaderAccountState$SignedIn;Ljava/lang/String;Ljava/lang/String;Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;Lcom/cedagova/reader/account/LoadedCapabilities;ILjava/lang/Object;)Lcom/cedagova/reader/account/ReaderAccountState$SignedIn;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getActivity ()Lcom/cedagova/reader/account/AccountActivity;
+	public final fun getCapabilities ()Lcom/cedagova/reader/account/LoadedCapabilities;
+	public final fun getEmail ()Ljava/lang/String;
+	public fun getOutcome ()Lcom/cedagova/reader/account/AccountOutcome;
+	public final fun getUserId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountState$SignedOut : com/cedagova/reader/account/ReaderAccountState {
+	public fun <init> ()V
+	public fun <init> (Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;)V
+	public synthetic fun <init> (Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/cedagova/reader/account/AccountActivity;
+	public final fun component2 ()Lcom/cedagova/reader/account/AccountOutcome;
+	public final fun copy (Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;)Lcom/cedagova/reader/account/ReaderAccountState$SignedOut;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/ReaderAccountState$SignedOut;Lcom/cedagova/reader/account/AccountActivity;Lcom/cedagova/reader/account/AccountOutcome;ILjava/lang/Object;)Lcom/cedagova/reader/account/ReaderAccountState$SignedOut;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getActivity ()Lcom/cedagova/reader/account/AccountActivity;
+	public fun getOutcome ()Lcom/cedagova/reader/account/AccountOutcome;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountStateKt {
+	public static final fun summary (Lcom/cedagova/reader/account/ReaderAccountState;)Lcom/cedagova/reader/account/ReaderAccountSummary;
+	public static final fun toAccountSession (Lcom/cedagova/reader/account/ReaderAccountState;)Lcom/cedagova/reader/library/sync/AccountSession;
+}
+
+public abstract interface class com/cedagova/reader/account/ReaderAccountSummary {
+}
+
+public final class com/cedagova/reader/account/ReaderAccountSummary$Loading : com/cedagova/reader/account/ReaderAccountSummary {
+	public static final field INSTANCE Lcom/cedagova/reader/account/ReaderAccountSummary$Loading;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountSummary$NotConfigured : com/cedagova/reader/account/ReaderAccountSummary {
+	public static final field INSTANCE Lcom/cedagova/reader/account/ReaderAccountSummary$NotConfigured;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountSummary$SignedIn : com/cedagova/reader/account/ReaderAccountSummary {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/ReaderAccountSummary$SignedIn;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/ReaderAccountSummary$SignedIn;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/ReaderAccountSummary$SignedIn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEmail ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/ReaderAccountSummary$SignedOut : com/cedagova/reader/account/ReaderAccountSummary {
+	public static final field INSTANCE Lcom/cedagova/reader/account/ReaderAccountSummary$SignedOut;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/AccountBookCopies {
+	public fun <init> (Lcom/cedagova/reader/library/downloads/AssetDownloadGateway;Lcom/cedagova/reader/account/library/AccountCopyStore;Lcom/cedagova/reader/account/library/AccountCopyReferences;Lcom/cedagova/reader/account/library/AccountCopyCatalog;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Lcom/cedagova/reader/library/downloads/AssetDownloadGateway;Lcom/cedagova/reader/account/library/AccountCopyStore;Lcom/cedagova/reader/account/library/AccountCopyReferences;Lcom/cedagova/reader/account/library/AccountCopyCatalog;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun copy (Ljava/lang/String;)Ljava/io/File;
+	public final fun download (Lcom/cedagova/reader/library/sync/AccountBook;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun download$default (Lcom/cedagova/reader/account/library/AccountBookCopies;Lcom/cedagova/reader/library/sync/AccountBook;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun has (Ljava/lang/String;)Z
+	public final fun reconcile (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun remove (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/account/library/AccountCopy {
+	public static final field Companion Lcom/cedagova/reader/account/library/AccountCopy$Companion;
+	public fun <init> (Ljava/lang/String;JJ)V
+	public synthetic fun <init> (Ljava/lang/String;JJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun component3 ()J
+	public final fun copy (Ljava/lang/String;JJ)Lcom/cedagova/reader/account/library/AccountCopy;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/AccountCopy;Ljava/lang/String;JJILjava/lang/Object;)Lcom/cedagova/reader/account/library/AccountCopy;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContentSha256 ()Ljava/lang/String;
+	public final fun getPlacedAtEpochMs ()J
+	public final fun getSizeBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class com/cedagova/reader/account/library/AccountCopy$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lcom/cedagova/reader/account/library/AccountCopy$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lcom/cedagova/reader/account/library/AccountCopy;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lcom/cedagova/reader/account/library/AccountCopy;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/account/library/AccountCopy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class com/cedagova/reader/account/library/AccountCopyCatalog {
+	public abstract fun addAccountCopy (Ljava/lang/String;Ljava/io/File;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun reconcileAccountCopies (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun removeAccountCopy (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class com/cedagova/reader/account/library/AccountCopyReferences {
+	public abstract fun accountId ()Ljava/lang/String;
+	public abstract fun copyReferences (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun dropCopyReference (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun putCopyReference (Lcom/cedagova/reader/account/library/AccountCopy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun retainCopyReferences (Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/account/library/AccountCopyStore {
+	public static final field Companion Lcom/cedagova/reader/account/library/AccountCopyStore$Companion;
+	public static final field DIRECTORY_NAME Ljava/lang/String;
+	public static final field PARTIAL_SUFFIX Ljava/lang/String;
+	public static final field PREFIX Ljava/lang/String;
+	public static final field SUFFIX Ljava/lang/String;
+	public fun <init> (Ljava/io/File;)V
+	public final fun contents ()Ljava/util/Set;
+	public final fun copy (Ljava/lang/String;)Ljava/io/File;
+	public final fun delete (Ljava/lang/String;)Z
+	public final fun discardPartials ()I
+	public final fun has (Ljava/lang/String;)Z
+	public final fun place (Ljava/lang/String;JLkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun sizeBytes (Ljava/lang/String;)J
+}
+
+public final class com/cedagova/reader/account/library/AccountCopyStore$Companion {
+}
+
+public final class com/cedagova/reader/account/library/AccountDocumentCopyReferences : com/cedagova/reader/account/library/AccountCopyReferences {
+	public static final field Companion Lcom/cedagova/reader/account/library/AccountDocumentCopyReferences$Companion;
+	public static final field KEY Ljava/lang/String;
+	public fun <init> (Lcom/cedagova/reader/library/sync/AccountHostRecords;)V
+	public fun accountId ()Ljava/lang/String;
+	public fun copyReferences (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun dropCopyReference (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun putCopyReference (Lcom/cedagova/reader/account/library/AccountCopy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun retainCopyReferences (Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/account/library/AccountDocumentCopyReferences$Companion {
+}
+
+public final class com/cedagova/reader/account/library/AccountDownloads {
+	public fun <init> (Lcom/cedagova/reader/account/library/AccountBookCopies;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/CoroutineScope;)V
+	public final fun cancel (Ljava/lang/String;)V
+	public final fun dismiss (Ljava/lang/String;)V
+	public final fun getOpened ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun open (Ljava/lang/String;)V
+	public final fun opened (Ljava/lang/String;)V
+	public final fun removeCopy (Ljava/lang/String;)V
+}
+
+public final class com/cedagova/reader/account/library/AccountDownloadsState {
+	public static final field Companion Lcom/cedagova/reader/account/library/AccountDownloadsState$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/Map;)Lcom/cedagova/reader/account/library/AccountDownloadsState;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/AccountDownloadsState;Ljava/util/Map;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/AccountDownloadsState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getByAccountBookId ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/AccountDownloadsState$Companion {
+	public final fun getNONE ()Lcom/cedagova/reader/account/library/AccountDownloadsState;
+}
+
+public final class com/cedagova/reader/account/library/AccountImports {
+	public static final field Companion Lcom/cedagova/reader/account/library/AccountImports$Companion;
+	public static final field DEFAULT_POLL_ATTEMPTS I
+	public fun <init> (Lcom/cedagova/reader/library/imports/PublicationImportGateway;Lcom/cedagova/reader/library/sync/AccountImportRecords;Lcom/cedagova/reader/account/library/DevicePublicationSources;Lcom/cedagova/reader/account/library/DeviceBookIdentity;Lkotlin/jvm/functions/Function0;Lkotlinx/coroutines/flow/Flow;Lkotlinx/coroutines/CoroutineScope;Ljava/util/List;I)V
+	public synthetic fun <init> (Lcom/cedagova/reader/library/imports/PublicationImportGateway;Lcom/cedagova/reader/library/sync/AccountImportRecords;Lcom/cedagova/reader/account/library/DevicePublicationSources;Lcom/cedagova/reader/account/library/DeviceBookIdentity;Lkotlin/jvm/functions/Function0;Lkotlinx/coroutines/flow/Flow;Lkotlinx/coroutines/CoroutineScope;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun cancelAdd (Ljava/lang/String;)V
+	public final fun confirmAdd (Ljava/lang/String;)V
+	public final fun dismiss (Ljava/lang/String;)V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun onBackground ()V
+	public final fun onForeground ()V
+	public final fun requestAdd (Ljava/lang/String;)V
+	public final fun resumeStoredImports ()V
+}
+
+public final class com/cedagova/reader/account/library/AccountImports$Companion {
+	public final fun getDEFAULT_POLL_DELAYS_MS ()Ljava/util/List;
+}
+
+public final class com/cedagova/reader/account/library/AccountImportsState {
+	public static final field Companion Lcom/cedagova/reader/account/library/AccountImportsState$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/cedagova/reader/account/library/ImportsOff;Lcom/cedagova/reader/account/library/ImportOffer;Ljava/util/Map;)V
+	public synthetic fun <init> (Lcom/cedagova/reader/account/library/ImportsOff;Lcom/cedagova/reader/account/library/ImportOffer;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/cedagova/reader/account/library/ImportsOff;
+	public final fun component2 ()Lcom/cedagova/reader/account/library/ImportOffer;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun copy (Lcom/cedagova/reader/account/library/ImportsOff;Lcom/cedagova/reader/account/library/ImportOffer;Ljava/util/Map;)Lcom/cedagova/reader/account/library/AccountImportsState;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/AccountImportsState;Lcom/cedagova/reader/account/library/ImportsOff;Lcom/cedagova/reader/account/library/ImportOffer;Ljava/util/Map;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/AccountImportsState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getByDeviceBookId ()Ljava/util/Map;
+	public final fun getDisabled ()Lcom/cedagova/reader/account/library/ImportsOff;
+	public final fun getOffer ()Lcom/cedagova/reader/account/library/ImportOffer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/AccountImportsState$Companion {
+	public final fun getNONE ()Lcom/cedagova/reader/account/library/AccountImportsState;
+}
+
+public final class com/cedagova/reader/account/library/AccountRemoval {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/library/AccountRemoval;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/AccountRemoval;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/AccountRemoval;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBookId ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/AccountShelf {
+	public static final field Companion Lcom/cedagova/reader/account/library/AccountShelf$Companion;
+	public static final field DEFAULT_UNDO_WINDOW_MS J
+	public fun <init> (Lcom/cedagova/reader/library/sync/AccountLibraryActions;Lcom/cedagova/reader/account/library/ResumeOfferRecords;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/CoroutineScope;J)V
+	public synthetic fun <init> (Lcom/cedagova/reader/library/sync/AccountLibraryActions;Lcom/cedagova/reader/account/library/ResumeOfferRecords;Lkotlinx/coroutines/flow/StateFlow;Lkotlinx/coroutines/CoroutineScope;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun getUndo ()Lkotlinx/coroutines/flow/StateFlow;
+	public final fun recordFinished (Ljava/lang/String;)V
+	public final fun recordOpened (Ljava/lang/String;)V
+	public final fun recordPosition (Ljava/lang/String;Lcom/cedagova/reader/library/sync/LocalReadingPosition;)V
+	public final fun refresh ()V
+	public final fun removeFromAccount (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun settleResumeOffer (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun undoRemove ()V
+}
+
+public final class com/cedagova/reader/account/library/AccountShelf$Companion {
+}
+
+public abstract interface class com/cedagova/reader/account/library/BookDownloadState {
+}
+
+public final class com/cedagova/reader/account/library/BookDownloadState$Downloading : com/cedagova/reader/account/library/BookDownloadState {
+	public fun <init> ()V
+	public fun <init> (JJ)V
+	public synthetic fun <init> (JJILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lcom/cedagova/reader/account/library/BookDownloadState$Downloading;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/BookDownloadState$Downloading;JJILjava/lang/Object;)Lcom/cedagova/reader/account/library/BookDownloadState$Downloading;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFraction ()Ljava/lang/Float;
+	public final fun getReceived ()J
+	public final fun getTotal ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/BookDownloadState$Refused : com/cedagova/reader/account/library/BookDownloadState {
+	public fun <init> (Lcom/cedagova/reader/account/library/DownloadProblem;Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Lcom/cedagova/reader/account/library/DownloadProblem;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/cedagova/reader/account/library/DownloadProblem;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun copy (Lcom/cedagova/reader/account/library/DownloadProblem;Ljava/lang/String;Ljava/lang/String;Z)Lcom/cedagova/reader/account/library/BookDownloadState$Refused;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/BookDownloadState$Refused;Lcom/cedagova/reader/account/library/DownloadProblem;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lcom/cedagova/reader/account/library/BookDownloadState$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getProblem ()Lcom/cedagova/reader/account/library/DownloadProblem;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getRetryable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/library/BookImportState {
+	public fun getCancellable ()Z
+}
+
+public final class com/cedagova/reader/account/library/BookImportState$Checking : com/cedagova/reader/account/library/BookImportState {
+	public static final field INSTANCE Lcom/cedagova/reader/account/library/BookImportState$Checking;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCancellable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/BookImportState$Consent : com/cedagova/reader/account/library/BookImportState {
+	public fun <init> (JJ)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun copy (JJ)Lcom/cedagova/reader/account/library/BookImportState$Consent;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/BookImportState$Consent;JJILjava/lang/Object;)Lcom/cedagova/reader/account/library/BookImportState$Consent;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCancellable ()Z
+	public final fun getMaxSourceBytes ()J
+	public final fun getSizeBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/BookImportState$DefaultImpls {
+	public static fun getCancellable (Lcom/cedagova/reader/account/library/BookImportState;)Z
+}
+
+public final class com/cedagova/reader/account/library/BookImportState$Finishing : com/cedagova/reader/account/library/BookImportState {
+	public static final field INSTANCE Lcom/cedagova/reader/account/library/BookImportState$Finishing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCancellable ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/BookImportState$Refused : com/cedagova/reader/account/library/BookImportState {
+	public fun <init> (Lcom/cedagova/reader/account/library/ImportProblem;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Z)V
+	public synthetic fun <init> (Lcom/cedagova/reader/account/library/ImportProblem;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/cedagova/reader/account/library/ImportProblem;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/Long;
+	public final fun component5 ()Ljava/lang/Long;
+	public final fun component6 ()Z
+	public final fun copy (Lcom/cedagova/reader/account/library/ImportProblem;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;Z)Lcom/cedagova/reader/account/library/BookImportState$Refused;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/BookImportState$Refused;Lcom/cedagova/reader/account/library/ImportProblem;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Long;Ljava/lang/Long;ZILjava/lang/Object;)Lcom/cedagova/reader/account/library/BookImportState$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCancellable ()Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getMaxSourceBytes ()Ljava/lang/Long;
+	public final fun getProblem ()Lcom/cedagova/reader/account/library/ImportProblem;
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun getRetryable ()Z
+	public final fun getSizeBytes ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/BookImportState$Sending : com/cedagova/reader/account/library/BookImportState {
+	public fun <init> (F)V
+	public final fun component1 ()F
+	public final fun copy (F)Lcom/cedagova/reader/account/library/BookImportState$Sending;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/BookImportState$Sending;FILjava/lang/Object;)Lcom/cedagova/reader/account/library/BookImportState$Sending;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCancellable ()Z
+	public final fun getFraction ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/library/CopyOutcome {
+}
+
+public final class com/cedagova/reader/account/library/CopyOutcome$DownloadFailed : com/cedagova/reader/account/library/CopyOutcome {
+	public fun <init> (Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lcom/cedagova/reader/account/library/CopyOutcome$DownloadFailed;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyOutcome$DownloadFailed;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyOutcome$DownloadFailed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyOutcome$GrantFailed : com/cedagova/reader/account/library/CopyOutcome {
+	public fun <init> (Lcom/cedagova/reader/auth/ReaderAuthException;)V
+	public final fun component1 ()Lcom/cedagova/reader/auth/ReaderAuthException;
+	public final fun copy (Lcom/cedagova/reader/auth/ReaderAuthException;)Lcom/cedagova/reader/account/library/CopyOutcome$GrantFailed;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyOutcome$GrantFailed;Lcom/cedagova/reader/auth/ReaderAuthException;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyOutcome$GrantFailed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Lcom/cedagova/reader/auth/ReaderAuthException;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyOutcome$NoStorage : com/cedagova/reader/account/library/CopyOutcome {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/library/CopyOutcome$NoStorage;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyOutcome$NoStorage;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyOutcome$NoStorage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyOutcome$Ready : com/cedagova/reader/account/library/CopyOutcome {
+	public fun <init> (Ljava/lang/String;Ljava/io/File;J)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/io/File;
+	public final fun component3 ()J
+	public final fun copy (Ljava/lang/String;Ljava/io/File;J)Lcom/cedagova/reader/account/library/CopyOutcome$Ready;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyOutcome$Ready;Ljava/lang/String;Ljava/io/File;JILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyOutcome$Ready;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBookId ()Ljava/lang/String;
+	public final fun getFile ()Ljava/io/File;
+	public final fun getSizeBytes ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyOutcome$Tampered : com/cedagova/reader/account/library/CopyOutcome {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/library/CopyOutcome$Tampered;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyOutcome$Tampered;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyOutcome$Tampered;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActual ()Ljava/lang/String;
+	public final fun getExpected ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyOutcome$Unavailable : com/cedagova/reader/account/library/CopyOutcome {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/library/CopyOutcome$Unavailable;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyOutcome$Unavailable;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyOutcome$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyOutcome$Unreadable : com/cedagova/reader/account/library/CopyOutcome {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/library/CopyOutcome$Unreadable;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyOutcome$Unreadable;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyOutcome$Unreadable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContentSha256 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/library/CopyPlacement {
+}
+
+public final class com/cedagova/reader/account/library/CopyPlacement$Failed : com/cedagova/reader/account/library/CopyPlacement {
+	public fun <init> (Ljava/lang/Throwable;)V
+	public final fun component1 ()Ljava/lang/Throwable;
+	public final fun copy (Ljava/lang/Throwable;)Lcom/cedagova/reader/account/library/CopyPlacement$Failed;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyPlacement$Failed;Ljava/lang/Throwable;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyPlacement$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getError ()Ljava/lang/Throwable;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyPlacement$Mismatched : com/cedagova/reader/account/library/CopyPlacement {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/account/library/CopyPlacement$Mismatched;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyPlacement$Mismatched;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyPlacement$Mismatched;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getActual ()Ljava/lang/String;
+	public final fun getExpected ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyPlacement$NoStorage : com/cedagova/reader/account/library/CopyPlacement {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/library/CopyPlacement$NoStorage;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyPlacement$NoStorage;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyPlacement$NoStorage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyPlacement$Placed : com/cedagova/reader/account/library/CopyPlacement {
+	public fun <init> (Ljava/io/File;)V
+	public final fun component1 ()Ljava/io/File;
+	public final fun copy (Ljava/io/File;)Lcom/cedagova/reader/account/library/CopyPlacement$Placed;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyPlacement$Placed;Ljava/io/File;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyPlacement$Placed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFile ()Ljava/io/File;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/CopyPlacement$Refused : com/cedagova/reader/account/library/CopyPlacement {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lcom/cedagova/reader/account/library/CopyPlacement$Refused;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/CopyPlacement$Refused;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/CopyPlacement$Refused;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/library/DeviceBookIdentity {
+	public abstract fun contentSha256 (Ljava/lang/String;)Ljava/lang/String;
+	public abstract fun deviceBookId (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/library/DevicePublicationSources {
+	public abstract fun sourceFor (Ljava/lang/String;)Lcom/cedagova/reader/account/library/PublicationSourceResult;
+}
+
+public final class com/cedagova/reader/account/library/DownloadProblem : java/lang/Enum {
+	public static final field FAILED Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static final field NO_STORAGE Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static final field OFFLINE Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static final field REDIRECTED Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static final field REFUSED Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static final field TAMPERED Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static final field UNAVAILABLE Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static final field UNREADABLE Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/account/library/DownloadProblem;
+	public static fun values ()[Lcom/cedagova/reader/account/library/DownloadProblem;
+}
+
+public abstract interface class com/cedagova/reader/account/library/ImportOffer {
+}
+
+public final class com/cedagova/reader/account/library/ImportOffer$Available : com/cedagova/reader/account/library/ImportOffer {
+	public static final field INSTANCE Lcom/cedagova/reader/account/library/ImportOffer$Available;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/ImportOffer$Unavailable : com/cedagova/reader/account/library/ImportOffer {
+	public fun <init> (Lcom/cedagova/reader/library/model/ReaderCapabilityReason;)V
+	public final fun component1 ()Lcom/cedagova/reader/library/model/ReaderCapabilityReason;
+	public final fun copy (Lcom/cedagova/reader/library/model/ReaderCapabilityReason;)Lcom/cedagova/reader/account/library/ImportOffer$Unavailable;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/ImportOffer$Unavailable;Lcom/cedagova/reader/library/model/ReaderCapabilityReason;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/ImportOffer$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/cedagova/reader/library/model/ReaderCapabilityReason;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/ImportOffer$Unknown : com/cedagova/reader/account/library/ImportOffer {
+	public static final field INSTANCE Lcom/cedagova/reader/account/library/ImportOffer$Unknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/library/ImportProblem {
+}
+
+public final class com/cedagova/reader/account/library/ImportProblem$Api : com/cedagova/reader/account/library/ImportProblem {
+	public fun <init> (Ljava/lang/Integer;)V
+	public final fun component1 ()Ljava/lang/Integer;
+	public final fun copy (Ljava/lang/Integer;)Lcom/cedagova/reader/account/library/ImportProblem$Api;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/ImportProblem$Api;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/ImportProblem$Api;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStatus ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/ImportProblem$Category : com/cedagova/reader/account/library/ImportProblem {
+	public fun <init> (Lcom/cedagova/reader/library/model/PublicationFailureCategory;)V
+	public final fun component1 ()Lcom/cedagova/reader/library/model/PublicationFailureCategory;
+	public final fun copy (Lcom/cedagova/reader/library/model/PublicationFailureCategory;)Lcom/cedagova/reader/account/library/ImportProblem$Category;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/ImportProblem$Category;Lcom/cedagova/reader/library/model/PublicationFailureCategory;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/ImportProblem$Category;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCategory ()Lcom/cedagova/reader/library/model/PublicationFailureCategory;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/ImportProblem$NeedsConnection : com/cedagova/reader/account/library/ImportProblem {
+	public static final field INSTANCE Lcom/cedagova/reader/account/library/ImportProblem$NeedsConnection;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/ImportProblem$SourceUnavailable : com/cedagova/reader/account/library/ImportProblem {
+	public fun <init> (Lcom/cedagova/reader/account/library/PublicationSourceProblem;)V
+	public final fun component1 ()Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+	public final fun copy (Lcom/cedagova/reader/account/library/PublicationSourceProblem;)Lcom/cedagova/reader/account/library/ImportProblem$SourceUnavailable;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/ImportProblem$SourceUnavailable;Lcom/cedagova/reader/account/library/PublicationSourceProblem;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/ImportProblem$SourceUnavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProblem ()Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/ImportsOff {
+	public fun <init> (Ljava/lang/String;Lcom/cedagova/reader/library/model/ReaderCapabilityReason;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/cedagova/reader/library/model/ReaderCapabilityReason;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/cedagova/reader/library/model/ReaderCapabilityReason;
+	public final fun copy (Ljava/lang/String;Lcom/cedagova/reader/library/model/ReaderCapabilityReason;)Lcom/cedagova/reader/account/library/ImportsOff;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/ImportsOff;Ljava/lang/String;Lcom/cedagova/reader/library/model/ReaderCapabilityReason;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/ImportsOff;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/cedagova/reader/library/model/ReaderCapabilityReason;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/PublicationSourceProblem : java/lang/Enum {
+	public static final field SIZE_UNKNOWN Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+	public static final field UNREACHABLE Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+	public static fun values ()[Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+}
+
+public abstract interface class com/cedagova/reader/account/library/PublicationSourceResult {
+}
+
+public final class com/cedagova/reader/account/library/PublicationSourceResult$Ready : com/cedagova/reader/account/library/PublicationSourceResult {
+	public fun <init> (Lcom/cedagova/reader/library/imports/PublicationSource;)V
+	public final fun component1 ()Lcom/cedagova/reader/library/imports/PublicationSource;
+	public final fun copy (Lcom/cedagova/reader/library/imports/PublicationSource;)Lcom/cedagova/reader/account/library/PublicationSourceResult$Ready;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/PublicationSourceResult$Ready;Lcom/cedagova/reader/library/imports/PublicationSource;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/PublicationSourceResult$Ready;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSource ()Lcom/cedagova/reader/library/imports/PublicationSource;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/account/library/PublicationSourceResult$Unavailable : com/cedagova/reader/account/library/PublicationSourceResult {
+	public fun <init> (Lcom/cedagova/reader/account/library/PublicationSourceProblem;)V
+	public final fun component1 ()Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+	public final fun copy (Lcom/cedagova/reader/account/library/PublicationSourceProblem;)Lcom/cedagova/reader/account/library/PublicationSourceResult$Unavailable;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/account/library/PublicationSourceResult$Unavailable;Lcom/cedagova/reader/account/library/PublicationSourceProblem;ILjava/lang/Object;)Lcom/cedagova/reader/account/library/PublicationSourceResult$Unavailable;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProblem ()Lcom/cedagova/reader/account/library/PublicationSourceProblem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/account/library/ResumeOfferRecords {
+	public abstract fun settle (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+

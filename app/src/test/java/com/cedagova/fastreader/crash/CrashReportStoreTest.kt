@@ -18,8 +18,7 @@ class CrashReportStoreTest {
     @get:Rule
     val temporary = TemporaryFolder()
 
-    private fun store(directory: File = temporary.root.resolve("crash")) =
-        CrashReportStore(directory)
+    private fun store(directory: File = temporary.root.resolve("crash")) = CrashReportStore(directory)
 
     @Test
     fun `a report that was written is the report that is read back`() {

@@ -1,5 +1,10 @@
 # Research: making the set WPM the *average* experienced speed (2026-09-10)
 
+> **Historical record.** Research written on 2026-09-10 against the code of
+> that date; it is not kept current. The engine files it cites now live in
+> `:reader-engine` (#201), and the links below point there. The current map
+> of the code is [docs/architecture.md](../../architecture.md).
+
 Follow-up to [research-rsvp.md](research-rsvp.md). Problem raised while
 reading with v1.3.0: the pause multipliers (REQ-011) are *added on top of*
 the set speed, so the number on the dial is the burst speed of plain words,
@@ -30,7 +35,8 @@ wrong quantity.
 
 ## 1. What the current engine does
 
-[RsvpTimingEngine](../../../app/src/main/java/com/cedagova/fastreader/timing/RsvpTimingEngine.kt):
+[RsvpTimingEngine](../../../reader-engine/src/main/kotlin/com/cedagova/reader/engine/timing/RsvpTimingEngine.kt)
+(at the time of writing: `app/src/main/java/com/cedagova/fastreader/timing/`; moved by #201):
 
 ```
 word     = 60000 / wpm
@@ -180,7 +186,8 @@ Readings:
 
 1. **Redefine WPM as the average.** Precompute the mean multiplier per book
    at open (the suffix array in
-   [RemainingTime.kt](../../../app/src/main/java/com/cedagova/fastreader/reader/RemainingTime.kt)
+   [RemainingTimeIndex.kt](../../../reader-engine/src/main/kotlin/com/cedagova/reader/engine/timing/RemainingTimeIndex.kt)
+   (then in `app/src/main/java/com/cedagova/fastreader/reader/`; moved by #201)
    already holds this sum at index 0) and divide the base word time by it.
    Consequences that fall out for free: time remaining becomes exactly
    `words / wpm`, the ramp still works because it multiplies the base, and

@@ -1,5 +1,24 @@
 package com.cedagova.reader.auth
 
+import com.cedagova.reader.auth.testing.Arrivals
+import com.cedagova.reader.auth.testing.CAPABILITIES
+import com.cedagova.reader.auth.testing.CAPABILITIES_BODY
+import com.cedagova.reader.auth.testing.FakeClock
+import com.cedagova.reader.auth.testing.FakeServers
+import com.cedagova.reader.auth.testing.InMemorySessionStore
+import com.cedagova.reader.auth.testing.PASSWORD_GRANT
+import com.cedagova.reader.auth.testing.PRE_AUTH
+import com.cedagova.reader.auth.testing.REFRESH_GRANT
+import com.cedagova.reader.auth.testing.RecordingWaiter
+import com.cedagova.reader.auth.testing.USER
+import com.cedagova.reader.auth.testing.apiError
+import com.cedagova.reader.auth.testing.gated
+import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.auth.testing.preAuthJson
+import com.cedagova.reader.auth.testing.session
+import com.cedagova.reader.auth.testing.sessionJson
+import com.cedagova.reader.auth.testing.testConfig
+import com.cedagova.reader.auth.testing.user
 import io.github.jan.supabase.auth.user.UserSession
 import io.ktor.http.HttpStatusCode
 import kotlin.time.Duration.Companion.seconds
@@ -61,7 +80,11 @@ class SessionLockTest {
         // Caller B: reader-api rejects the session outright — the old token, then the refreshed one.
         servers.queue(
             CAPABILITIES,
-            { json(apiError("auth.invalid_token"), HttpStatusCode.Unauthorized).also { rejectionServed.complete(Unit) } },
+            {
+                json(apiError("auth.invalid_token"), HttpStatusCode.Unauthorized).also {
+                    rejectionServed.complete(Unit)
+                }
+            },
             { json(apiError("auth.invalid_token"), HttpStatusCode.Unauthorized) },
         )
         val (client, store) = clientWith(session(expiresAt = clock.expiring(3000)))
@@ -188,13 +211,21 @@ class SessionLockTest {
         refreshing.await()
         changing.await()
 
-        assertEquals("the password change waited for the refresh", listOf("access-2"), servers.requestsTo("/auth/v1/user").map { it.bearer })
+        assertEquals(
+            "the password change waited for the refresh",
+            listOf("access-2"),
+            servers.requestsTo("/auth/v1/user").map {
+                it.bearer
+            },
+        )
         assertEquals("refresh-2", store.session?.refreshToken)
 
         // The next refresh sends the rotated token, not the spent one.
         clock.advance(3600.seconds)
         client.onForeground()
-        val grants = servers.requestsTo("/auth/v1/token").map { Json.parseToJsonElement(it.body).jsonObject["refresh_token"]?.jsonPrimitive?.content }
+        val grants = servers.requestsTo("/auth/v1/token").map {
+            Json.parseToJsonElement(it.body).jsonObject["refresh_token"]?.jsonPrimitive?.content
+        }
         assertEquals(listOf("refresh-1", "refresh-2"), grants)
         assertEquals("refresh-3", store.session?.refreshToken)
         client.close()

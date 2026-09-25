@@ -2,6 +2,18 @@ package com.cedagova.reader.auth
 
 import com.cedagova.reader.auth.api.PreAuthDocument
 import com.cedagova.reader.auth.api.SignInMethod
+import com.cedagova.reader.auth.testing.FakeClock
+import com.cedagova.reader.auth.testing.FakeServers
+import com.cedagova.reader.auth.testing.InMemorySessionStore
+import com.cedagova.reader.auth.testing.OTP
+import com.cedagova.reader.auth.testing.PASSWORD_GRANT
+import com.cedagova.reader.auth.testing.PRE_AUTH
+import com.cedagova.reader.auth.testing.RecordingWaiter
+import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.auth.testing.networkFailure
+import com.cedagova.reader.auth.testing.preAuthJson
+import com.cedagova.reader.auth.testing.sessionJson
+import com.cedagova.reader.auth.testing.testConfig
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -24,7 +36,9 @@ class PreAuthPolicyTest {
     private val clock = FakeClock(Instant.parse("2026-09-24T12:00:00Z"))
 
     private suspend fun client(): ReaderAuthClient =
-        ReaderAuthClient.build(testConfig, InMemorySessionStore(), servers.engine, clock, RecordingWaiter()).also { it.awaitReady() }
+        ReaderAuthClient.build(testConfig, InMemorySessionStore(), servers.engine, clock, RecordingWaiter()).also {
+            it.awaitReady()
+        }
 
     private fun providerCalls() = servers.requests.filter { it.host == "provider.test" }
 
@@ -127,7 +141,9 @@ class PreAuthPolicyTest {
 
         client.requestEmailCode("reader@example.test", createUser = true)
         clock.advance(2.hours)
-        failureOf<ReaderAuthException.SignInUnavailable> { client.requestEmailCode("reader@example.test", createUser = true) }
+        failureOf<ReaderAuthException.SignInUnavailable> {
+            client.requestEmailCode("reader@example.test", createUser = true)
+        }
         assertEquals(listOf(PRE_AUTH, OTP, PRE_AUTH), servers.routes())
         client.close()
     }
@@ -144,7 +160,9 @@ class PreAuthPolicyTest {
         assertEquals(listOf(PRE_AUTH, OTP, PRE_AUTH, OTP), servers.routes())
 
         clock.advance(31.minutes) // past staleUntil
-        failureOf<ReaderAuthException.NetworkUnavailable> { client.requestEmailCode("reader@example.test", createUser = true) }
+        failureOf<ReaderAuthException.NetworkUnavailable> {
+            client.requestEmailCode("reader@example.test", createUser = true)
+        }
         assertEquals(listOf(PRE_AUTH, OTP, PRE_AUTH, OTP, PRE_AUTH), servers.routes())
         client.close()
     }

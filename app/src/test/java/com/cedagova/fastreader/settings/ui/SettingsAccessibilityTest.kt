@@ -7,10 +7,10 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.account.ReaderAccountSummary
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.account.ReaderAccountSummary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -117,7 +117,9 @@ class SettingsAccessibilityTest {
         // before the tap, and says that reading needs none.
         assertTrue(
             "the account row should announce its state, got $labels",
-            labels.any { it.startsWith("Reader account. Signed in as reader@example.test. Optional. Reading needs no account") },
+            labels.any {
+                it.startsWith("Reader account. Signed in as reader@example.test. Optional. Reading needs no account")
+            },
         )
         // The mechanism's internal vocabulary must not reach a screen reader.
         listOf("pivot", "ORP", "Spritz").forEach { word ->

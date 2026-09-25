@@ -5,7 +5,7 @@ package com.cedagova.fastreader.reader
  *
  * A value rather than a screen state: the reader surface draws it, the route
  * persists the fact that it was made, and
- * [com.cedagova.fastreader.reader.ReaderViewModel] decides when it applies.
+ * [com.cedagova.fastreader.reader.ui.ReaderViewModel] decides when it applies.
  * Keeping the three apart is what lets the offer be proven by arithmetic in the
  * session tests, by a golden on the screen, and by a store test for the flag,
  * without any of the three needing the other two.

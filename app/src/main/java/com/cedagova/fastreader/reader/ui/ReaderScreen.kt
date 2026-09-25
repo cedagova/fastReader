@@ -1,115 +1,58 @@
 package com.cedagova.fastreader.reader.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ResumeOffer
 import com.cedagova.fastreader.settings.CueSettings
 import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WidthAware
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.fastreader.ui.components.BackButton
+import com.cedagova.fastreader.ui.components.ProblemBanner
+import com.cedagova.fastreader.ui.theme.Sizes
+import com.cedagova.fastreader.ui.theme.Spacing
 import kotlin.math.roundToInt
-
-/** Android's accessibility minimum for an interactive control (REQ-060). */
-private val TouchTarget = 48.dp
 
 /**
  * The reader surface (LEAF203): the paused context view, the word stream, in-book
@@ -265,123 +208,127 @@ fun ReaderScreen(
     val chromeHidden = state is ReaderUiState.Reading && (focused || state.mode == ReaderMode.PLAYING)
 
     WidthAware(modifier.fillMaxSize()) { layout ->
-    Scaffold(
-        modifier = Modifier.fillMaxSize().testTag("reader_screen"),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            if (!chromeHidden) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = state.bookTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                        )
-                    },
-                    navigationIcon = {
-                        val back = stringResource(R.string.reader_back)
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier
-                                .size(TouchTarget)
-                                .semantics { contentDescription = back }
-                                .testTag("reader_back"),
-                        ) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+        Scaffold(
+            modifier = Modifier.fillMaxSize().testTag("reader_screen"),
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                if (!chromeHidden) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = state.bookTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                            )
+                        },
+                        navigationIcon = {
+                            BackButton(stringResource(R.string.reader_back), onBack, tag = "reader_back")
+                        },
+                        actions = {
+                            // Cues and pause strength are things a reader judges while
+                            // actually reading, so settings are one tap from the book
+                            // rather than only from the library (REQ-023).
+                            val settings = stringResource(R.string.settings_open)
+                            IconButton(
+                                onClick = onOpenSettings,
+                                modifier = Modifier
+                                    .size(Sizes.TouchTarget)
+                                    .semantics { contentDescription = settings }
+                                    .testTag("reader_settings"),
+                            ) {
+                                Icon(imageVector = Icons.Filled.Settings, contentDescription = null)
+                            }
+                        },
+                    )
+                }
+            },
+        ) { innerPadding ->
+            // Scaffold's inset padding is what keeps the transport controls clear of
+            // the gesture navigation bar; the app draws edge to edge.
+            Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                when (state) {
+                    is ReaderUiState.Opening -> OpeningBook(state, Modifier.weight(1f))
+
+                    is ReaderUiState.Unavailable -> Unavailable(state, Modifier.weight(1f))
+
+                    is ReaderUiState.Reading -> {
+                        if (!chromeHidden) {
+                            // The store is refusing writes, so the reader's place is not
+                            // being kept. A banner and not a dialog: nothing here should
+                            // stop someone reading, and it sits above the reading surface,
+                            // outside it, so the stream keeps its fixed size and static
+                            // background (REQ-062, AD-6).
+                            state.persistenceFailure?.let {
+                                ProblemBanner(
+                                    title = stringResource(R.string.reader_persistence_problem_title),
+                                    message = it,
+                                    modifier = Modifier.testTag("reader_persistence_problem"),
+                                )
+                            }
+                            if (externalNotice) {
+                                ExternalOpenNotice(
+                                    onAddToLibrary = onAddToLibrary,
+                                    onDismiss = onDismissExternalNotice,
+                                )
+                            }
+                            frontMatterOffer?.let { chapterTitle ->
+                                FrontMatterOfferNotice(
+                                    chapterTitle = chapterTitle,
+                                    onSkip = onSkipFrontMatter,
+                                    onDismiss = onDismissFrontMatterOffer,
+                                )
+                            }
+                            resumeOffer?.let { offer ->
+                                ResumeOfferNotice(
+                                    offer = offer,
+                                    onAccept = onAcceptResumeOffer,
+                                    onDismiss = onDismissResumeOffer,
+                                )
+                            }
                         }
-                    },
-                    actions = {
-                        // Cues and pause strength are things a reader judges while
-                        // actually reading, so settings are one tap from the book
-                        // rather than only from the library (REQ-023).
-                        val settings = stringResource(R.string.settings_open)
-                        IconButton(
-                            onClick = onOpenSettings,
-                            modifier = Modifier
-                                .size(TouchTarget)
-                                .semantics { contentDescription = settings }
-                                .testTag("reader_settings"),
-                        ) {
-                            Icon(imageVector = Icons.Filled.Settings, contentDescription = null)
-                        }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
-        // Scaffold's inset padding is what keeps the transport controls clear of
-        // the gesture navigation bar; the app draws edge to edge.
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when (state) {
-                is ReaderUiState.Opening -> OpeningBook(state, Modifier.weight(1f))
-                is ReaderUiState.Unavailable -> Unavailable(state, Modifier.weight(1f))
-                is ReaderUiState.Reading -> {
-                    if (!chromeHidden) {
-                        state.persistenceFailure?.let { PersistenceFailureBanner(it) }
-                        if (externalNotice) {
-                            ExternalOpenNotice(
-                                onAddToLibrary = onAddToLibrary,
-                                onDismiss = onDismissExternalNotice,
+                        // The two slots the layouts share. Hoisted so the wide branch
+                        // cannot drift from the narrow one: there is one argument list
+                        // for the stream and one for the controls, and the branches
+                        // differ only in where they put them.
+                        val surface: @Composable (Modifier) -> Unit = { slot ->
+                            ReadingSurface(
+                                state = state,
+                                onTogglePlay = onTogglePlay,
+                                onToggleFocused = onToggleFocused,
+                                focused = focused,
+                                chromeHidden = chromeHidden,
+                                speedNotice = speedNotice,
+                                onSpeedStep = onSpeedStep,
+                                word = word,
+                                modifier = slot,
                             )
                         }
-                        frontMatterOffer?.let { chapterTitle ->
-                            FrontMatterOfferNotice(
-                                chapterTitle = chapterTitle,
-                                onSkip = onSkipFrontMatter,
-                                onDismiss = onDismissFrontMatterOffer,
+                        val controls: @Composable (Modifier, Arrangement.Vertical) -> Unit = { slot, arrangement ->
+                            ReaderControls(
+                                state = state,
+                                onTogglePlay = onTogglePlay,
+                                onWpmChange = onWpmChange,
+                                onBackSentence = onBackSentence,
+                                onForwardSentence = onForwardSentence,
+                                onBackParagraph = onBackParagraph,
+                                onForwardParagraph = onForwardParagraph,
+                                onScrub = onScrub,
+                                progressShown = progressShown,
+                                onOpenChapters = { chapterPickerOpen = true },
+                                modifier = slot,
+                                verticalArrangement = arrangement,
                             )
                         }
-                        resumeOffer?.let { offer ->
-                            ResumeOfferNotice(
-                                offer = offer,
-                                onAccept = onAcceptResumeOffer,
-                                onDismiss = onDismissResumeOffer,
-                            )
+                        if (layout.wide && !chromeHidden) {
+                            WideReadingLayout(layout, surface, controls, Modifier.weight(1f))
+                        } else {
+                            surface(Modifier.weight(1f))
+                            if (!chromeHidden) controls(Modifier.fillMaxWidth(), Arrangement.Top)
                         }
-                    }
-                    // The two slots the layouts share. Hoisted so the wide branch
-                    // cannot drift from the narrow one: there is one argument list
-                    // for the stream and one for the controls, and the branches
-                    // differ only in where they put them.
-                    val surface: @Composable (Modifier) -> Unit = { slot ->
-                        ReadingSurface(
-                            state = state,
-                            onTogglePlay = onTogglePlay,
-                            onToggleFocused = onToggleFocused,
-                            focused = focused,
-                            chromeHidden = chromeHidden,
-                            speedNotice = speedNotice,
-                            onSpeedStep = onSpeedStep,
-                            word = word,
-                            modifier = slot,
-                        )
-                    }
-                    val controls: @Composable (Modifier, Arrangement.Vertical) -> Unit = { slot, arrangement ->
-                        ReaderControls(
-                            state = state,
-                            onTogglePlay = onTogglePlay,
-                            onWpmChange = onWpmChange,
-                            onBackSentence = onBackSentence,
-                            onForwardSentence = onForwardSentence,
-                            onBackParagraph = onBackParagraph,
-                            onForwardParagraph = onForwardParagraph,
-                            onScrub = onScrub,
-                            progressShown = progressShown,
-                            onOpenChapters = { chapterPickerOpen = true },
-                            modifier = slot,
-                            verticalArrangement = arrangement,
-                        )
-                    }
-                    if (layout.wide && !chromeHidden) {
-                        WideReadingLayout(layout, surface, controls, Modifier.weight(1f))
-                    } else {
-                        surface(Modifier.weight(1f))
-                        if (!chromeHidden) controls(Modifier.fillMaxWidth(), Arrangement.Top)
                     }
                 }
             }
         }
-    }
     }
 
     if (chapterPickerOpen && state is ReaderUiState.Reading) {
@@ -447,9 +394,9 @@ private fun ColumnScope.WideReadingLayout(
  *   [MaxControlsWidth] hands the rest back to the stream.
  */
 private fun readerControlsWidth(available: Dp): Dp =
-    (available * ControlsWidthFraction).coerceIn(MinControlsWidth, MaxControlsWidth)
+    (available * CONTROLS_WIDTH_FRACTION).coerceIn(MinControlsWidth, MaxControlsWidth)
 
-private const val ControlsWidthFraction = 0.42f
+private const val CONTROLS_WIDTH_FRACTION = 0.42f
 
 /** Five 48 dp targets, their arrangement, and the column's own 16 dp padding. */
 private val MinControlsWidth = 280.dp
@@ -460,218 +407,12 @@ private val MaxControlsWidth = 420.dp
  * The book-open loading state. LEAF201 parses off the main thread and reports one
  * step per spine item, so this is determinate as soon as the spine is known.
  */
-/**
- * The store is refusing writes, so the reader's place is not being kept.
- *
- * Deliberately a banner and not a dialog: nothing here should stop someone
- * reading. It sits above the reading surface, outside it, so the stream itself
- * keeps its fixed size and static background (REQ-062, AD-6).
- */
-@Composable
-private fun PersistenceFailureBanner(message: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        modifier = Modifier.fillMaxWidth().testTag("reader_persistence_problem"),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(
-                text = stringResource(R.string.reader_persistence_problem_title),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(text = message, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
-
-/**
- * The book was opened from another app and is not in the library (REQ-103).
- *
- * One line and two buttons, in the register of every other explanation in the
- * app: it says the one thing that is kept — the reading position — because that
- * is the whole of what the privacy statement promises for this path (REQ-107),
- * and it offers the way to keep the book itself.
- *
- * Stacked rather than a single row: at the largest font scale on a 720p phone a
- * sentence and two labels side by side either clip or squeeze the sentence into a
- * column of single words. The buttons keep 48 dp of height at every scale
- * (REQ-301), and both carry their own label for TalkBack — the sentence above
- * them is read as ordinary text, so neither button has to repeat it.
- *
- * A banner and not a dialog, for the same reason as
- * [PersistenceFailureBanner]: nothing here should stop someone reading. It sits
- * above the reading surface rather than inside it, so the stream keeps its fixed
- * size and static background (REQ-062, REQ-302, AD-6), and it goes with the rest
- * of the chrome in focused mode.
- */
-@Composable
-private fun ExternalOpenNotice(onAddToLibrary: () -> Unit, onDismiss: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.fillMaxWidth().testTag("reader_external_notice"),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                text = stringResource(R.string.reader_external_notice),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    onClick = onAddToLibrary,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = TouchTarget)
-                        .testTag("reader_external_add"),
-                ) {
-                    Text(text = stringResource(R.string.reader_external_add))
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = TouchTarget)
-                        .testTag("reader_external_dismiss"),
-                ) {
-                    Text(text = stringResource(R.string.reader_external_dismiss))
-                }
-            }
-        }
-    }
-}
-
-/**
- * REQ-202: the one-time offer to start past a book's cover and title pages.
- *
- * A banner in the same slot and the same shape as [ExternalOpenNotice], and for
- * the same reasons: it must not stop anyone reading, it must not sit inside the
- * reading surface where it would change the stream's fixed size or static
- * background (REQ-062, REQ-302, AD-6), and it goes with the chrome in focused
- * mode.
- *
- * Both buttons answer the question, which is why the second one says what it
- * does rather than "Dismiss": staying on the cover is a choice about where to
- * start reading, not the closing of a message. Either way the offer is recorded
- * as made and this book never shows it again.
- *
- * ## Accessibility (REQ-301)
- *
- * The skip button names the chapter it goes to, so a reader who cannot see the
- * sentence above it still learns where the tap lands. That label is as long as
- * the book's chapter title, which is why the buttons sit in a [FlowRow]: on a
- * 360 dp screen at a large font scale a plain `Row` gives the second button no
- * width at all, wraps its label one character to a line, and pushes the way to
- * decline off the screen — the compact golden beside this one was recorded
- * against exactly that failure. Both buttons clear [TouchTarget].
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun FrontMatterOfferNotice(chapterTitle: String, onSkip: () -> Unit, onDismiss: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.fillMaxWidth().testTag("reader_front_matter_offer"),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                text = stringResource(R.string.reader_front_matter_notice),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    onClick = onSkip,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = TouchTarget)
-                        .testTag("reader_front_matter_skip"),
-                ) {
-                    Text(text = stringResource(R.string.reader_front_matter_skip, chapterTitle))
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = TouchTarget)
-                        .testTag("reader_front_matter_stay"),
-                ) {
-                    Text(text = stringResource(R.string.reader_front_matter_stay))
-                }
-            }
-        }
-    }
-}
-
-/**
- * REQ-511: the offer to pick up where another device left off.
- *
- * The third banner in this slot, drawn in the same shape as
- * [FrontMatterOfferNotice] and [ExternalOpenNotice] for the same three reasons:
- * it must not stop anyone reading, it must not sit inside the reading surface
- * where it would change the stream's fixed size or static background (REQ-062,
- * REQ-302, AD-6), and it goes with the chrome in focused mode. The stream keeps
- * running underneath it — this is a question, not a modal.
- *
- * ## Two sentences, one condition
- *
- * When the other client named a section this parse has, the offer names that
- * chapter and the percent. When it did not — a different edition, a renamed
- * spine — the offer names the percent alone, because the tap lands by fraction
- * and naming a chapter it will not land in would be worse than naming none.
- * That is the whole of `chapterTitle == null`.
- *
- * ## Accessibility (REQ-301)
- *
- * The accepting button names the destination rather than only the verb, for the
- * reason the front-matter offer's does: "Resume" alone leaves a reader using
- * TalkBack no way to know where the tap goes. That makes its label as long as a
- * chapter title, so the buttons sit in a [FlowRow] — on a 360 dp screen at a
- * large font scale a plain `Row` gives the second button no width at all and
- * pushes the way to decline off the screen. Both clear [TouchTarget].
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ResumeOfferNotice(offer: ResumeOffer, onAccept: () -> Unit, onDismiss: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.fillMaxWidth().testTag("reader_resume_offer"),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                text = offer.chapterTitle
-                    ?.let { stringResource(R.string.reader_resume_offer, it, offer.percent) }
-                    ?: stringResource(R.string.reader_resume_offer_percent_only, offer.percent),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    onClick = onAccept,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = TouchTarget)
-                        .testTag("reader_resume_accept"),
-                ) {
-                    Text(
-                        text = offer.chapterTitle
-                            ?.let { stringResource(R.string.reader_resume_accept, it) }
-                            ?: stringResource(R.string.reader_resume_accept_percent, offer.percent),
-                    )
-                }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = TouchTarget)
-                        .testTag("reader_resume_stay"),
-                ) {
-                    Text(text = stringResource(R.string.reader_resume_stay))
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun OpeningBook(state: ReaderUiState.Opening, modifier: Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = Spacing.XXLarge)
             .testTag("reader_opening"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -681,13 +422,13 @@ private fun OpeningBook(state: ReaderUiState.Opening, modifier: Modifier) {
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Spacing.Large))
         val fraction = state.fraction
         if (fraction == null) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         } else {
             LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.Small))
             Text(
                 text = stringResource(R.string.reader_percent, (fraction * 100).roundToInt()),
                 style = MaterialTheme.typography.bodySmall,
@@ -702,7 +443,7 @@ private fun Unavailable(state: ReaderUiState.Unavailable, modifier: Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = Spacing.XXLarge)
             .testTag("reader_unavailable"),
         verticalArrangement = Arrangement.Center,
     ) {
@@ -711,7 +452,7 @@ private fun Unavailable(state: ReaderUiState.Unavailable, modifier: Modifier) {
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.semantics { heading() },
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Spacing.Small))
         Text(
             text = stringResource(state.reason.messageRes()),
             style = MaterialTheme.typography.bodyMedium,
@@ -719,820 +460,3 @@ private fun Unavailable(state: ReaderUiState.Unavailable, modifier: Modifier) {
         )
     }
 }
-
-/**
- * The reading area: one tap target covering everything above the controls, so
- * "tap to pause" (REQ-014) does not require aiming at a button. It resumes too,
- * except at the end of the book, where play would have nothing to show.
- *
- * ## The two gestures (REQ-030)
- *
- * A **tap** plays or pauses. A **long press** hides or restores the chrome. They
- * are the same target on purpose — focused mode leaves nothing else to aim at —
- * and they cannot collide, because a long press is not a tap: Compose's
- * `combinedClickable` fires exactly one of them. Neither is a swipe, so neither
- * competes with the system's edge-swipe navigation, which a reader holding the
- * phone one-handed will trigger by accident.
- *
- * Both are announced. `onClickLabel` and `onLongClickLabel` land on the node that
- * carries the actions, so TalkBack offers "Pause" and "Hide the controls" on the
- * reading surface rather than leaving focused mode undiscoverable without sight.
- *
- * ## The third gesture, only while the chrome is hidden (REQ-108)
- *
- * With the chrome hidden the speed slider is gone, so the surface takes a
- * **vertical drag**: up faster, down slower, one 25 WPM step per
- * [SpeedStepDistance]. It is added only when [chromeHidden] — focused mode, or a
- * running stream — because the slider is the speed control everywhere else and a
- * drag on a surface with the slider under it would only be a second way to do
- * the same thing.
- *
- * It cannot collide with the two gestures above. A drag consumes the pointer past
- * touch slop, which cancels `combinedClickable`'s press, and the drag node sits
- * *inside* the clickable in the modifier chain, so it sees each pointer event
- * first. A press that never moves is still a tap or a long press.
- *
- * Over the paused paragraph, whose own vertical scroll is nested inside this, the
- * scroll wins where there is anything to scroll — the nearer meaning of a drag on
- * a paragraph the reader is reading. The word itself, which is where the thumb
- * goes in a running stream, always changes speed.
- *
- * A screen reader cannot perform a drag: TalkBack takes the swipes for its own
- * navigation. So the same two steps are also custom accessibility actions on this
- * node, "Increase reading speed" and "Decrease reading speed" (REQ-301), which is
- * both the accessible control and the place the gesture is named for a reader who
- * never sees the hint.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ReadingSurface(
-    state: ReaderUiState.Reading,
-    onTogglePlay: () -> Unit,
-    onToggleFocused: () -> Unit,
-    /** What the long press toggles; the label names it. */
-    focused: Boolean,
-    /** Nothing but this surface is on the page, so the speed drag lives here. */
-    chromeHidden: Boolean,
-    speedNotice: String?,
-    onSpeedStep: (Int) -> Unit,
-    word: @Composable (ReaderWord, Modifier) -> Unit,
-    modifier: Modifier,
-) {
-    val tappable = state.mode != ReaderMode.FINISHED
-    // At the end of the book a tap does nothing, so it must not announce that it
-    // will play: in focused mode the surface is still long-clickable, and a click
-    // label on a node whose click is a no-op is a lie to a screen reader.
-    val label = if (tappable) {
-        stringResource(if (state.isStopped) R.string.reader_play else R.string.reader_pause)
-    } else {
-        null
-    }
-    val focusLabel = stringResource(if (focused) R.string.reader_show_controls else R.string.reader_hide_controls)
-    Box(modifier = modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                // No content description: the word and, when stopped, the paragraph
-                // under it are what a screen reader should read here. The click labels
-                // still name the actions, so the tap target announces them without
-                // hiding the text it covers.
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    // No ripple. The default indication tints this entire surface
-                    // for as long as a pointer is down, and the speed drag put that
-                    // on screen *during a running stream* — a whole-page brightness
-                    // change on the one surface REQ-062/REQ-302 promise is static
-                    // apart from glyphs, and an animation on a screen AD-6 says has
-                    // none. Tap and long press lose nothing: each already answers
-                    // with the state change itself, the paragraph appearing or the
-                    // chrome going.
-                    indication = null,
-                    enabled = tappable || focused,
-                    onClickLabel = label,
-                    onLongClickLabel = focusLabel,
-                    onLongClick = onToggleFocused,
-                    onClick = { if (tappable) onTogglePlay() },
-                )
-                // After the clickable, never before: the inner node sees each
-                // pointer event first, so a real drag is consumed here and the
-                // press above it is cancelled instead of also firing.
-                .then(if (chromeHidden) Modifier.speedGesture(onSpeedStep) else Modifier)
-                .padding(horizontal = 20.dp)
-                .testTag(if (chromeHidden) "reader_surface_focused" else "reader_surface"),
-        ) {
-            when (state.mode) {
-                // The word keeps the same place whether the stream is running or
-                // stopped, so pausing reveals the paragraph underneath instead of
-                // moving the word the reader is looking at. Whether the paragraph
-                // is there is the presenter's call, not the mode's: a reader who
-                // chose to keep it on screen has it while playing too.
-                ReaderMode.PLAYING, ReaderMode.PAUSED -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().weight(1f).testTag("reader_word"),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        word(state.word, Modifier.fillMaxSize())
-                    }
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.TopCenter) {
-                        if (state.context != null) ParagraphContext(state.context)
-                    }
-                }
-
-                // A stop screen has no word to keep in place, so it uses the whole
-                // surface.
-                ReaderMode.CHAPTER_PAUSE -> FullSurface { ChapterPause(state) }
-                ReaderMode.FINISHED -> FullSurface { Finished(state) }
-            }
-        }
-        if (speedNotice != null) {
-            SpeedNotice(speedNotice, Modifier.align(Alignment.BottomCenter))
-        }
-    }
-}
-
-/**
- * The focused-mode speed drag and its screen-reader equivalent, on one node.
- *
- * A `Modifier` extension rather than inline chain so the surface's own layout
- * stays readable and so the two halves of REQ-108's control — the gesture and the
- * custom actions that stand in for it under TalkBack — cannot drift apart.
- */
-@Composable
-private fun Modifier.speedGesture(onSpeedStep: (Int) -> Unit): Modifier {
-    val faster = stringResource(R.string.reader_speed_faster)
-    val slower = stringResource(R.string.reader_speed_slower)
-    val stepPixels = with(LocalDensity.current) { SpeedStepDistance.toPx() }
-    val drag = remember(stepPixels) { SpeedDrag(stepPixels) }
-    // The callback is read through a state holder rather than being a key of the
-    // block below. This screen recomposes on every streamed word — sixteen times a
-    // second at the 1000 WPM ceiling — and `pointerInput` restarts its block, and
-    // so cancels a gesture in progress, whenever a key changes by identity. Today
-    // the caller's lambda happens to be memoized and the drag survives; a single
-    // unstable capture added to it later would silently break dragging at speed
-    // and nowhere else. This makes that impossible rather than lucky.
-    val step by rememberUpdatedState(onSpeedStep)
-    return this
-        .semantics {
-            customActions = listOf(
-                CustomAccessibilityAction(faster) { step(1); true },
-                CustomAccessibilityAction(slower) { step(-1); true },
-            )
-        }
-        .pointerInput(drag) {
-            detectVerticalDragGestures(
-                onDragStart = { drag.begin() },
-                onVerticalDrag = { _, deltaY ->
-                    val steps = drag.drag(deltaY)
-                    if (steps != 0) step(steps)
-                },
-            )
-        }
-}
-
-/**
- * REQ-108's readout, and the hint that names the gesture: one line of text over
- * the bottom of the focused surface, gone again within two seconds.
- *
- * Text and nothing else — no card, no scrim, no animation. Its background is the
- * page's own background, so it occludes the paused paragraph where it overlaps it
- * without putting a second brightness on the screen (REQ-062/REQ-302). Being an
- * overlay, it does not exist in the surface's layout at all: the word does not
- * move when it appears or when it goes.
- *
- * A live region, because the reader who most needs the readout is the one who
- * reached the speed change through the custom accessibility actions and cannot
- * see the line it left behind.
- */
-@Composable
-private fun SpeedNotice(text: String, modifier: Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-        modifier = modifier
-            .padding(horizontal = 24.dp, vertical = 32.dp)
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite }
-            .testTag("reader_speed_notice"),
-    )
-}
-
-@Composable
-private fun ColumnScope.FullSurface(content: @Composable () -> Unit) {
-    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { content() }
-}
-
-/**
- * The paused view (REQ-010): the paragraph the reader stopped in, with the current
- * word marked, so the thread can be picked back up before playing again. With
- * "Always show paragraph" on it is also the running view, and the mark moves
- * from word to word as the stream goes.
- *
- * The paragraph is rebuilt from each token's own text and the exact separator that
- * followed it, so it reads as the book sets it — `—¿Quién teme a la máquina?
- * —preguntó ella—.`, not the bare word list increment 002 showed here. That is
- * the whole reason [com.cedagova.fastreader.content.WordToken] carries its
- * punctuation: a paused reader is reading prose, and prose without its
- * punctuation is materially harder to pick a thread up from.
- */
-@Composable
-private fun ParagraphContext(context: ReaderContext) {
-    val highlight = MaterialTheme.colorScheme.primary
-    val ellipsis = stringResource(R.string.reader_context_continues)
-    // Where the marked word starts in the text below, so the layout can say
-    // which line it landed on.
-    var currentStart = 0
-    val paragraph = buildAnnotatedString {
-        if (context.truncatedStart) append("$ellipsis ")
-        context.words.forEachIndexed { offset, entry ->
-            if (offset == context.currentOffset) {
-                currentStart = length
-                withStyle(SpanStyle(color = highlight, fontWeight = FontWeight.Bold)) {
-                    append(entry.text)
-                }
-            } else {
-                append(entry.text)
-            }
-            append(entry.gapAfter)
-        }
-        if (context.truncatedEnd) append(" $ellipsis")
-    }
-
-    // Landscape and large font scales can leave less room than the paragraph
-    // needs. The column scrolls, and it scrolls itself to the section of lines
-    // holding the marked word, so the mark never sits below the fold: whichever
-    // way the reader got here — pausing deep in a long paragraph, or the stream
-    // carrying the mark down the shown lines — the word is on screen (REQ-010).
-    val scrollState = rememberScrollState()
-    var viewportHeight by remember { mutableIntStateOf(0) }
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    LaunchedEffect(layout, viewportHeight, currentStart) {
-        val lines = layout ?: return@LaunchedEffect
-        // A layout of the previous text: the fresh one re-runs this. Keying on
-        // the text alone would scroll to a line measured on words no longer shown.
-        if (lines.layoutInput.text != paragraph) return@LaunchedEffect
-        if (viewportHeight <= 0 || lines.lineCount == 0) return@LaunchedEffect
-        val current = lines.getLineForOffset(currentStart)
-        val first = sectionStartLine(lines.lineCount, viewportHeight.toFloat(), current, lines::getLineTop, lines::getLineBottom)
-        scrollState.scrollTo(lines.getLineTop(first).roundToInt())
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Outside the scroll: the size here is the viewport, not the text.
-            .onSizeChanged { viewportHeight = it.height }
-            .verticalScroll(scrollState)
-            .testTag("reader_paused"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = paragraph,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Start,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            onTextLayout = { layout = it },
-            modifier = Modifier.fillMaxWidth().testTag("reader_context"),
-        )
-    }
-}
-
-/** REQ-015: crossing a chapter end stops the stream on a screen naming the new chapter. */
-@Composable
-private fun ChapterPause(state: ReaderUiState.Reading) {
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag("reader_chapter_pause"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.reader_chapter_position, state.chapterNumber, state.chapterCount),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = state.chapterTitle,
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.semantics { heading() },
-        )
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = stringResource(R.string.reader_chapter_pause_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-/** REQ-018: the end of a book is an explicit state, not a stream that quietly stops. */
-@Composable
-private fun Finished(state: ReaderUiState.Reading) {
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag("reader_finished"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.reader_finished_title),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.semantics { heading() },
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = state.bookTitle,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.reader_finished_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-private fun ReaderControls(
-    state: ReaderUiState.Reading,
-    onTogglePlay: () -> Unit,
-    onWpmChange: (Int) -> Unit,
-    onBackSentence: () -> Unit,
-    onForwardSentence: () -> Unit,
-    onBackParagraph: () -> Unit,
-    onForwardParagraph: () -> Unit,
-    onScrub: (Float) -> Unit,
-    onOpenChapters: () -> Unit,
-    progressShown: Boolean,
-    modifier: Modifier = Modifier,
-    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
-) {
-    Column(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("reader_controls"),
-        verticalArrangement = verticalArrangement,
-    ) {
-        ChapterRow(state = state, onOpenChapters = onOpenChapters)
-        if (progressShown) ProgressRow(state)
-        PositionControl(state = state, onScrub = onScrub)
-        Transport(
-            state = state,
-            onTogglePlay = onTogglePlay,
-            onBackSentence = onBackSentence,
-            onForwardSentence = onForwardSentence,
-            onBackParagraph = onBackParagraph,
-            onForwardParagraph = onForwardParagraph,
-        )
-        SpeedControl(state = state, onWpmChange = onWpmChange)
-    }
-}
-
-/**
- * The chapter title doubles as the chapter picker's entry point (REQ-014).
- *
- * The title takes two lines rather than one, and ellipsises rather than clipping.
- * On a phone it never needs either — "Chapter One: The Arrival" fits a 379 dp row
- * at every font size the app allows — but REQ-205's control column is 280 dp at
- * the 600 dp boundary, where the same title at the largest font size lost "The
- * Arrival" off the end with no ellipsis to say so. Wrapping costs the narrow
- * layout nothing: a title that already fits one line is laid out identically, which
- * is why no phone golden moved when this changed.
- */
-@Composable
-private fun ChapterRow(state: ReaderUiState.Reading, onOpenChapters: () -> Unit) {
-    val position = stringResource(R.string.reader_chapter_position, state.chapterNumber, state.chapterCount)
-    val label = stringResource(R.string.reader_chapters_of, state.chapterTitle, position)
-    TextButton(
-        onClick = onOpenChapters,
-        enabled = state.canNavigate && state.chapters.isNotEmpty(),
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = TouchTarget)
-            .semantics { contentDescription = label }
-            .testTag("reader_chapters"),
-    ) {
-        Text(
-            text = state.chapterTitle.ifBlank { stringResource(R.string.reader_chapters) },
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = position,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/**
- * REQ-017: progress percent and time remaining at the current speed.
- *
- * The two labels each take half the row rather than being pushed apart by
- * `SpaceBetween`, which at a 2.0 system font scale let them meet with no gap and
- * render as "54% readUnder a minute left" (REQ-060). Halves cannot collide: the
- * longer label wraps inside its own half instead.
- */
-@Composable
-private fun ProgressRow(state: ReaderUiState.Reading) {
-    Row(modifier = Modifier.fillMaxWidth().testTag("reader_progress")) {
-        Text(
-            text = stringResource(R.string.reader_progress, state.progressPercent),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = remainingLabel(state.remainingMillis),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-/**
- * A progress bar drawn by hand.
- *
- * Material's indicator animates when its progress changes, which at 1000 WPM
- * would put a continuously moving, brightening element on a screen AD-6 promises
- * is static apart from glyphs. Two boxes cannot animate.
- */
-@Composable
-private fun ProgressBar(fraction: Float) {
-    val filled = fraction.coerceIn(0f, 1f)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        if (filled > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(filled)
-                    .height(4.dp)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
-        }
-    }
-}
-
-/**
- * Position in the book: a scrubber while the stream is stopped (REQ-014), and a
- * plain bar while it runs.
- *
- * The swap happens only when playback starts or stops, never between two words,
- * and the slot keeps a fixed height so neither transition reflows the screen. It
- * is also the cheaper of the two to draw, which matters at the 1000 WPM ceiling
- * where the whole control column is laid out again on every word.
- */
-@Composable
-private fun PositionControl(state: ReaderUiState.Reading, onScrub: (Float) -> Unit) {
-    val label = stringResource(R.string.reader_scrub)
-    val position = stringResource(R.string.reader_progress, state.progressPercent)
-    Box(
-        modifier = Modifier.fillMaxWidth().height(TouchTarget).testTag("reader_position"),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (state.canNavigate) {
-            Slider(
-                value = state.progressFraction,
-                onValueChange = onScrub,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("reader_scrub")
-                    .semantics {
-                        contentDescription = label
-                        stateDescription = position
-                    },
-            )
-        } else {
-            ProgressBar(state.progressFraction)
-        }
-    }
-}
-
-@Composable
-private fun Transport(
-    state: ReaderUiState.Reading,
-    onTogglePlay: () -> Unit,
-    onBackSentence: () -> Unit,
-    onForwardSentence: () -> Unit,
-    onBackParagraph: () -> Unit,
-    onForwardParagraph: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().testTag("reader_transport"),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        StepButton(
-            description = stringResource(R.string.reader_back_paragraph),
-            enabled = state.canNavigate,
-            chevrons = 2,
-            forward = false,
-            onClick = onBackParagraph,
-            tag = "reader_back_paragraph",
-        )
-        StepButton(
-            description = stringResource(R.string.reader_back_sentence),
-            enabled = state.canNavigate,
-            chevrons = 1,
-            forward = false,
-            onClick = onBackSentence,
-            tag = "reader_back_sentence",
-        )
-        PlayPauseButton(state = state, onTogglePlay = onTogglePlay)
-        StepButton(
-            description = stringResource(R.string.reader_forward_sentence),
-            enabled = state.canNavigate,
-            chevrons = 1,
-            forward = true,
-            onClick = onForwardSentence,
-            tag = "reader_forward_sentence",
-        )
-        StepButton(
-            description = stringResource(R.string.reader_forward_paragraph),
-            enabled = state.canNavigate,
-            chevrons = 2,
-            forward = true,
-            onClick = onForwardParagraph,
-            tag = "reader_forward_paragraph",
-        )
-    }
-}
-
-/**
- * One navigation step. Sentence and paragraph differ by how many chevrons are
- * drawn, which keeps every icon inside the core Material set instead of pulling in
- * the extended icon library for four glyphs.
- *
- * The label goes on the button rather than on an icon inside it. A `Modifier`
- * label lands on the same node that carries the click action, so an accessibility
- * sweep of this screen shows every focusable control naming itself — which the
- * default arrangement, with the description on a child of the clickable node,
- * does not.
- */
-@Composable
-private fun StepButton(
-    description: String,
-    enabled: Boolean,
-    chevrons: Int,
-    forward: Boolean,
-    onClick: () -> Unit,
-    tag: String,
-) {
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier
-            .size(TouchTarget)
-            .semantics { contentDescription = description }
-            .testTag(tag),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy((-14).dp)) {
-            repeat(chevrons) {
-                Icon(
-                    imageVector = if (forward) Icons.Filled.KeyboardArrowRight else Icons.Filled.KeyboardArrowLeft,
-                    contentDescription = null,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlayPauseButton(state: ReaderUiState.Reading, onTogglePlay: () -> Unit) {
-    val playing = state.mode == ReaderMode.PLAYING
-    val enabled = state.mode != ReaderMode.FINISHED
-    val description = stringResource(if (playing) R.string.reader_pause else R.string.reader_play)
-    val container = if (enabled) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val content = if (enabled) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Box(
-        modifier = Modifier
-            .size(56.dp)
-            .clip(CircleShape)
-            .background(container)
-            .clickable(enabled = enabled, onClick = onTogglePlay)
-            .semantics { contentDescription = description }
-            .testTag("reader_play_pause"),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (playing) {
-            PauseGlyph(content)
-        } else {
-            Icon(
-                imageVector = Icons.Filled.PlayArrow,
-                contentDescription = null,
-                tint = content,
-                modifier = Modifier.size(28.dp),
-            )
-        }
-    }
-}
-
-/** Two bars. The core Material icon set has `PlayArrow` but no pause, and one shape is not worth 30 MB of extended icons. */
-@Composable
-private fun PauseGlyph(color: Color) {
-    Canvas(modifier = Modifier.size(24.dp).clearAndSetSemantics {}) {
-        val barWidth = size.width * 0.28f
-        val gap = size.width * 0.16f
-        val left = (size.width - (2 * barWidth + gap)) / 2f
-        drawRect(
-            color = color,
-            topLeft = androidx.compose.ui.geometry.Offset(left, 0f),
-            size = androidx.compose.ui.geometry.Size(barWidth, size.height),
-        )
-        drawRect(
-            color = color,
-            topLeft = androidx.compose.ui.geometry.Offset(left + barWidth + gap, 0f),
-            size = androidx.compose.ui.geometry.Size(barWidth, size.height),
-        )
-    }
-}
-
-/**
- * The slider's ceiling, below the range's own [RsvpTiming.MAX_WPM].
- *
- * The track is a phone width minus the readout, and over the full 100–1000
- * range each 25 WPM step was a few pixels of thumb travel — too fine for a
- * thumb to stop on the step meant rather than the one beside it. Halving the
- * span doubles the travel per step. Speeds past 600 stay reachable: the typed
- * entry and the focused-mode drag still take the whole range, and a speed
- * above the slider's end simply shows the thumb at the end.
- */
-private const val SLIDER_MAX_WPM: Int = 600
-
-/** REQ-012: speed is adjustable at any time, including mid-stream, and never stops playback. */
-@Composable
-private fun SpeedControl(state: ReaderUiState.Reading, onWpmChange: (Int) -> Unit) {
-    val label = stringResource(R.string.reader_speed_label)
-    val speed = stringResource(R.string.reader_speed, state.wpm)
-    val editSpeed = stringResource(R.string.reader_speed_edit)
-    var editing by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Slider(
-            value = state.wpm.toFloat(),
-            onValueChange = { onWpmChange((it / SPEED_STEP_WPM).roundToInt() * SPEED_STEP_WPM) },
-            valueRange = RsvpTiming.MIN_WPM.toFloat()..SLIDER_MAX_WPM.toFloat(),
-            modifier = Modifier
-                .weight(1f)
-                .testTag("reader_speed")
-                .semantics {
-                    contentDescription = label
-                    stateDescription = speed
-                },
-        )
-        Spacer(Modifier.width(12.dp))
-        if (editing) {
-            SpeedEntry(
-                wpm = state.wpm,
-                onDone = { typed ->
-                    editing = false
-                    typed?.let(onWpmChange)
-                },
-            )
-        } else {
-            Text(
-                text = speed,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier
-                    .clickable(role = Role.Button, onClick = { editing = true })
-                    .testTag("reader_speed_readout")
-                    .clearAndSetSemantics { contentDescription = editSpeed },
-            )
-        }
-    }
-}
-
-/**
- * The slider lands on 25 WPM steps; the readout it sits beside is the way off
- * the grid. Pressed, it becomes this field, which hands back any whole number in
- * [RsvpTiming.MIN_WPM]..[RsvpTiming.MAX_WPM] exactly as typed. Done commits, and
- * the field commits or reverts on its own when focus leaves it or the keyboard
- * is dismissed, so there is no second control to reach for.
- */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun SpeedEntry(wpm: Int, onDone: (Int?) -> Unit) {
-    // The cursor starts after the last digit: the reader came here to change the
-    // number, so a backspace or a typed digit must act on its end, not its front.
-    var field by remember {
-        val initial = wpm.toString()
-        mutableStateOf(TextFieldValue(initial, selection = TextRange(initial.length)))
-    }
-    val parsed = field.text.toIntOrNull()?.takeIf { it in RsvpTiming.MIN_WPM..RsvpTiming.MAX_WPM }
-    val focusRequester = remember { FocusRequester() }
-    var hadFocus by remember { mutableStateOf(false) }
-    var finished by remember { mutableStateOf(false) }
-    val finish = { value: Int? ->
-        if (!finished) {
-            finished = true
-            onDone(value)
-        }
-    }
-    OutlinedTextField(
-        value = field,
-        onValueChange = { field = it.copy(text = it.text.filter(Char::isDigit).take(4)) },
-        isError = parsed == null,
-        singleLine = true,
-        textStyle = MaterialTheme.typography.labelLarge,
-        suffix = { Text(stringResource(R.string.reader_speed_unit)) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { parsed?.let(finish) }),
-        modifier = Modifier
-            .width(SpeedEntryWidth)
-            .focusRequester(focusRequester)
-            .onFocusChanged { focus ->
-                if (focus.isFocused) hadFocus = true else if (hadFocus) finish(parsed)
-            }
-            .testTag("reader_speed_entry"),
-    )
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    // Back, or the keyboard's own dismiss, hides the IME without moving focus; the
-    // field must not sit there editing over a keyboard that is gone.
-    val imeVisible = WindowInsets.isImeVisible
-    var imeWasVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(imeVisible) {
-        if (imeVisible) imeWasVisible = true else if (imeWasVisible) finish(parsed)
-    }
-}
-
-private val SpeedEntryWidth = 132.dp
-
-@Composable
-private fun ChapterPicker(
-    chapters: List<ChapterEntry>,
-    currentPosition: Int,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.reader_chapters)) },
-        text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 360.dp).testTag("reader_chapter_list")) {
-                itemsIndexed(items = chapters, key = { _, chapter -> chapter.chapterIndex }) { position, chapter ->
-                    TextButton(
-                        onClick = { onSelect(chapter.chapterIndex) },
-                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = TouchTarget),
-                    ) {
-                        Text(
-                            text = chapter.title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (position == currentPosition) FontWeight.Bold else FontWeight.Normal,
-                            maxLines = 2,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.reader_close)) }
-        },
-    )
-}
-
-/**
- * Time remaining, rounded the way a reader reads it. The estimate is worth minutes,
- * not seconds, and a seconds display would also be a second element changing on
- * every word.
- */
-@Composable
-private fun remainingLabel(remainingMillis: Long): String {
-    val totalMinutes = (remainingMillis / 60_000L).toInt()
-    return when {
-        remainingMillis <= 0L -> stringResource(R.string.reader_remaining_none)
-        totalMinutes <= 0 -> stringResource(R.string.reader_remaining_under_minute)
-        totalMinutes < 60 -> stringResource(R.string.reader_remaining_minutes, totalMinutes)
-        else -> stringResource(R.string.reader_remaining_hours, totalMinutes / 60, totalMinutes % 60)
-    }
-}
-
-/*
- * Speed lands on round 25 WPM steps, which [SPEED_STEP_WPM] holds for the slider
- * and the focused-mode gesture alike. The slider itself stays continuous rather
- * than using Material's `steps`, whose tick marks would draw 36 dots across a
- * control the reader is only ever asked to read one number off.
- */

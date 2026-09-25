@@ -6,7 +6,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 
-/**
+/*
  * Reading the semantics tree the way a screen reader does, for the REQ-060 and
  * REQ-301 sweeps over the library's surfaces.
  *
@@ -33,8 +33,7 @@ internal fun ComposeContentTestRule.allNodes(): List<SemanticsNode> {
     return out
 }
 
-internal fun SemanticsNode.testTag(): String =
-    config.getOrElseNullable(SemanticsProperties.TestTag) { null }.orEmpty()
+internal fun SemanticsNode.testTag(): String = config.getOrElseNullable(SemanticsProperties.TestTag) { null }.orEmpty()
 
 /** What a screen reader would say: the description if there is one, else the text. */
 internal fun SemanticsNode.label(): String {

@@ -1,6 +1,7 @@
 package com.cedagova.reader.library.imports
 
-import com.cedagova.reader.library.Recorded
+import com.cedagova.reader.auth.testing.Recorded
+import com.cedagova.reader.auth.testing.recorded
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
@@ -99,8 +100,7 @@ class FilePublication(bytes: ByteArray) : InMemoryPublication(bytes) {
         deleteOnExit()
     }
 
-    override fun openChannel(): SeekableByteChannel =
-        Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
+    override fun openChannel(): SeekableByteChannel = Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
 }
 
 /**
@@ -112,9 +112,7 @@ class FilePublication(bytes: ByteArray) : InMemoryPublication(bytes) {
  * grant. [received] is everything it ever stored, in order, so a test can
  * assert byte-for-byte that nothing was re-sent and nothing was skipped.
  */
-class FakeStorage(
-    private val requiredHeaders: Map<String, String> = GRANT_HEADERS,
-) {
+class FakeStorage(private val requiredHeaders: Map<String, String> = GRANT_HEADERS) {
     val requests: MutableList<Recorded> = Collections.synchronizedList(mutableListOf())
 
     private val stored = ByteArrayOutputStream()
@@ -157,7 +155,7 @@ class FakeStorage(
     fun countOf(method: String): Int = requests.count { it.method == method }
 
     val engine = MockEngine { data ->
-        val recorded = data.record()
+        val recorded = data.recorded(withBody = false)
         requests += recorded
         rejectWith?.let { return@MockEngine respond("", HttpStatusCode.fromValue(it)) }
         missingHeader(recorded)?.let { name ->
@@ -176,10 +174,12 @@ class FakeStorage(
                     headersOf(HttpHeaders.Location to listOf(location)),
                 )
             }
+
             "HEAD" -> {
                 rejectHeadWith?.let { return@MockEngine respond("", HttpStatusCode.fromValue(it)) }
                 respond("", HttpStatusCode.OK, uploadOffset(offset))
             }
+
             "PATCH" -> {
                 val declared = recorded.headers[PublicationTransferClient.HEADER_UPLOAD_OFFSET]?.toLong()
                 declared?.let { patchOffsets += it }
@@ -207,6 +207,7 @@ class FakeStorage(
                 offset += body.size
                 respond("", HttpStatusCode.NoContent, uploadOffset(offset))
             }
+
             else -> error("a TUS client does not send ${recorded.method}")
         }
     }
@@ -214,18 +215,7 @@ class FakeStorage(
     private fun uploadOffset(value: Long) =
         headersOf(PublicationTransferClient.HEADER_UPLOAD_OFFSET to listOf(value.toString()))
 
-    private fun missingHeader(recorded: Recorded): String? =
-        requiredHeaders.keys.firstOrNull { name ->
-            recorded.headers.none { it.key.equals(name, ignoreCase = true) }
-        }
-
-    private suspend fun HttpRequestData.record(): Recorded = Recorded(
-        method = method.value,
-        host = url.host,
-        path = url.encodedPath,
-        query = url.encodedQuery,
-        headers = headers.entries().associate { (k, v) -> k to v.joinToString(",") } +
-            (body.contentType?.let { mapOf(HttpHeaders.ContentType to it.toString()) } ?: emptyMap()),
-        body = "",
-    )
+    private fun missingHeader(recorded: Recorded): String? = requiredHeaders.keys.firstOrNull { name ->
+        recorded.headers.none { it.key.equals(name, ignoreCase = true) }
+    }
 }

@@ -32,12 +32,7 @@ internal object AccountCanonicalPayload {
      * and always replaces the stored one — it is the base revision the next
      * mutation for this book quotes.
      */
-    fun libraryItem(
-        existing: AccountBook?,
-        resourceId: String,
-        payload: JsonObject,
-        revision: Long?,
-    ): AccountBook {
+    fun libraryItem(existing: AccountBook?, resourceId: String, payload: JsonObject, revision: Long?): AccountBook {
         val book = payload.obj("book")
         val assets = (payload["assets"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
         val asset = assets.firstOrNull { it.string("checksum") != null } ?: assets.firstOrNull()
@@ -158,15 +153,13 @@ internal object AccountCanonicalPayload {
  * serializer's own descriptor rather than restated here — so a `@SerialName`
  * that changes in `:reader-library` changes this too, instead of drifting.
  */
-fun ReaderLibraryStatus.wireName(): String =
-    ReaderLibraryStatus.serializer().descriptor.getElementName(ordinal)
+public fun ReaderLibraryStatus.wireName(): String = ReaderLibraryStatus.serializer().descriptor.getElementName(ordinal)
 
-fun ReaderCoverStatus.wireName(): String =
-    ReaderCoverStatus.serializer().descriptor.getElementName(ordinal)
+public fun ReaderCoverStatus.wireName(): String = ReaderCoverStatus.serializer().descriptor.getElementName(ordinal)
 
-fun ReaderSyncRejectionCode.wireName(): String =
+public fun ReaderSyncRejectionCode.wireName(): String =
     ReaderSyncRejectionCode.serializer().descriptor.getElementName(ordinal)
 
 /** The reason a capability document states, as the shelf quotes it. */
-fun ReaderCapabilityReason.wireName(): String =
+public fun ReaderCapabilityReason.wireName(): String =
     ReaderCapabilityReason.serializer().descriptor.getElementName(ordinal)

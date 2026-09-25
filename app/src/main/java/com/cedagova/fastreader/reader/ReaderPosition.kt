@@ -1,8 +1,8 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.TokenPosition
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.TokenPosition
+import com.cedagova.reader.engine.timing.RsvpTiming
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -64,7 +64,7 @@ data class ReaderPosition(
      *   migration, and for one written by an open that produced no fingerprint;
      * - the computed side is null when the open fell back to the streaming
      *   archive, which reads no central directory (see
-     *   `com.cedagova.fastreader.epub.EpubArchive.structuralFingerprint`).
+     *   `com.cedagova.reader.engine.epub.EpubArchive.structuralFingerprint`).
      *
      * It is a change detector, not a tamper check: two files whose entries have
      * identical names, sizes and CRC-32s count as the same content, so the same

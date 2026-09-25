@@ -2,6 +2,7 @@ package com.cedagova.reader.library
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.auth.api.ReaderApiClient
+import com.cedagova.reader.auth.api.ReaderApiOperations
 import com.cedagova.reader.library.model.CancelPublicationImportRequest
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
@@ -31,21 +32,22 @@ import kotlinx.serialization.json.jsonObject
  * owns.
  *
  * It holds no session, no token, no refresh and no retry of its own. Every call
- * goes through [ReaderApiClient], so the bearer, `X-Reader-Client`,
+ * goes through [ReaderApiOperations] — in production the [ReaderApiClient]
+ * `ReaderAuthClient.api` holds (#199) — so the bearer, `X-Reader-Client`,
  * `X-Request-ID`, the 10 s timeout, the single-flight refresh and the whole
  * error policy are `:reader-auth`'s, unchanged — which is exactly why tokens
  * never leave that module.
  *
  * What this class adds is shape: the request bodies it sends and the response
- * documents it reads are the ones `contracts/reader-api.openapi.json` declares,
+ * documents it reads are the ones `reader-auth/contracts/reader-api.openapi.json` declares,
  * and `ReaderLibraryContractTest` fails the build when a model and that
  * document disagree.
  */
-class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOperations {
+public class ReaderLibraryClient(private val api: ReaderApiOperations) : ReaderLibraryOperations {
 
     /**
      * The one JSON body builder: a request model in, the object
-     * [ReaderApiClient.post] puts on the wire out.
+     * [ReaderApiOperations.post] puts on the wire out.
      */
     private fun <T> body(serializer: KSerializer<T>, value: T): JsonObject =
         ReaderLibraryJson.encodeToJsonElement(serializer, value).jsonObject
@@ -138,8 +140,10 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         require(request.ownershipIntent == CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY) {
             "ownership_intent must be '${CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY}', not '${request.ownershipIntent}'"
         }
-        require(request.clientImportId.isNotBlank() &&
-            request.clientImportId.length <= CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH) {
+        require(
+            request.clientImportId.isNotBlank() &&
+                request.clientImportId.length <= CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH,
+        ) {
             "a client_import_id is 1..${CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH} characters"
         }
         require(request.sizeBytes > 0) { "a source size is positive, not ${request.sizeBytes}" }
@@ -166,7 +170,10 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
             "a cancel reason is 1..${CancelPublicationImportRequest.MAX_REASON_LENGTH} characters"
         }
         val path = importPath(importId) + CANCEL_SUFFIX
-        val document = api.post(path, body(CancelPublicationImportRequest.serializer(), CancelPublicationImportRequest(reason)))
+        val document = api.post(
+            path,
+            body(CancelPublicationImportRequest.serializer(), CancelPublicationImportRequest(reason)),
+        )
         return decode(document, PublicationImportResponse.serializer(), path)
     }
 
@@ -210,46 +217,46 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         )
     }
 
-    companion object {
-        const val LIBRARY_PATH: String = "/v1/reader/library"
-        const val PROGRESS_PATH: String = "/v1/reader/progress"
-        const val MUTATIONS_PATH: String = "/v1/reader/sync/mutations"
-        const val DELTAS_PATH: String = "/v1/reader/sync/deltas"
+    public companion object {
+        public const val LIBRARY_PATH: String = "/v1/reader/library"
+        public const val PROGRESS_PATH: String = "/v1/reader/progress"
+        public const val MUTATIONS_PATH: String = "/v1/reader/sync/mutations"
+        public const val DELTAS_PATH: String = "/v1/reader/sync/deltas"
 
         // The publication-import routes (#116). Note the prefix: these are
         // `/reader/v1/...`, not `/v1/reader/...` like the four above. That is
         // the pinned document's own spelling, and
         // `every route the module calls is declared by the pinned document`
         // is what keeps this honest rather than plausible.
-        const val IMPORTS_PATH: String = "/reader/v1/imports"
-        const val IMPORT_POLICY_PATH: String = "/reader/v1/imports/policy"
-        const val COMPLETE_SUFFIX: String = "/complete"
-        const val CANCEL_SUFFIX: String = "/cancel"
+        public const val IMPORTS_PATH: String = "/reader/v1/imports"
+        public const val IMPORT_POLICY_PATH: String = "/reader/v1/imports/policy"
+        public const val COMPLETE_SUFFIX: String = "/complete"
+        public const val CANCEL_SUFFIX: String = "/cancel"
 
         /** The document's own path-parameter name, for the contract test's route check. */
-        const val IMPORT_ID_TEMPLATE: String = "{ingestion_id}"
+        public const val IMPORT_ID_TEMPLATE: String = "{ingestion_id}"
 
         // The asset download grant (#118). Back to the `/v1/reader/...` prefix,
         // again because that is the pinned document's own spelling.
-        const val ASSETS_PATH: String = "/v1/reader/assets"
-        const val DOWNLOAD_GRANT_SUFFIX: String = "/download-grant"
+        public const val ASSETS_PATH: String = "/v1/reader/assets"
+        public const val DOWNLOAD_GRANT_SUFFIX: String = "/download-grant"
 
         /** The document's own path-parameter name, for the contract test's route check. */
-        const val ASSET_ID_TEMPLATE: String = "{asset_id}"
+        public const val ASSET_ID_TEMPLATE: String = "{asset_id}"
 
         /** The capability this module gates every sync request on. */
-        const val SYNC_CAPABILITY_KEY: String = "reader.sync.v1"
+        public const val SYNC_CAPABILITY_KEY: String = "reader.sync.v1"
 
         /** The capability that decides whether "Add to account library" is offered (#139). */
-        const val PUBLICATION_IMPORT_CAPABILITY_KEY: String = "reader.publication-import.v1"
+        public const val PUBLICATION_IMPORT_CAPABILITY_KEY: String = "reader.publication-import.v1"
 
         /** The cursor a client that has never synced starts from. */
-        const val FIRST_CURSOR: String = "0"
+        public const val FIRST_CURSOR: String = "0"
 
         /** The document's own default page size. */
-        const val DEFAULT_DELTA_LIMIT: Int = 100
-        const val MIN_DELTA_LIMIT: Int = 1
-        const val MAX_DELTA_LIMIT: Int = 500
+        public const val DEFAULT_DELTA_LIMIT: Int = 100
+        public const val MIN_DELTA_LIMIT: Int = 1
+        public const val MAX_DELTA_LIMIT: Int = 500
 
         /**
          * The status an unusable-but-successful body is reported under: the

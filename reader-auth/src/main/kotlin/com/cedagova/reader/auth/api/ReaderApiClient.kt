@@ -60,24 +60,29 @@ import kotlinx.serialization.json.jsonObject
  *   and `request_id`; a network failure or timeout is
  *   [ReaderAuthException.NetworkUnavailable]. Nothing else is retried.
  */
-class ReaderApiClient internal constructor(
+public class ReaderApiClient internal constructor(
     private val config: ReaderAuthConfig,
     private val http: HttpClient,
     private val refresher: SessionRefresher,
     private val waiter: RetryWaiter,
     private val requestIds: () -> String = { UUID.randomUUID().toString().lowercase() },
-) {
+) : ReaderApiOperations {
 
     /**
      * `GET /v1/reader/pre-auth?clientVersion=…`: public, called before any
      * sign-in. A 2xx whose object does not decode as the document is an
      * [ReaderAuthException.ApiError] (#191), like a 2xx that is not JSON.
      */
-    suspend fun preAuth(): PreAuthDocument =
-        send(HttpMethod.Get, PRE_AUTH_PATH, authenticated = false, clientVersion = true, read = PreAuthDocument::parse).value
+    override suspend fun preAuth(): PreAuthDocument = send(
+        HttpMethod.Get,
+        PRE_AUTH_PATH,
+        authenticated = false,
+        clientVersion = true,
+        read = PreAuthDocument::parse,
+    ).value
 
     /** `GET /v1/reader/capabilities?clientVersion=…`: the first authenticated call after sign-in. */
-    suspend fun capabilities(): JsonObject = capabilitiesResponse().document
+    override suspend fun capabilities(): JsonObject = capabilitiesResponse().document
 
     /**
      * The same call, with the `X-Request-ID` the successful attempt carried
@@ -86,19 +91,23 @@ class ReaderApiClient internal constructor(
      * request, same headers, same policy as [capabilities]; only the return
      * shape differs.
      */
-    suspend fun capabilitiesResponse(): ReaderApiResponse =
+    override suspend fun capabilitiesResponse(): ReaderApiResponse =
         send(HttpMethod.Get, CAPABILITIES_PATH, authenticated = true, clientVersion = true) { it }
             .let { ReaderApiResponse(it.value, it.requestId) }
 
     /** `PUT /v1/reader/profile`: the upsert that precedes any profile `GET`. */
-    suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject =
-        request(HttpMethod.Put, PROFILE_PATH, authenticated = true, body = json.encodeToString(ReaderProfileUpdate.serializer(), update))
+    override suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = request(
+        HttpMethod.Put,
+        PROFILE_PATH,
+        authenticated = true,
+        body = json.encodeToString(ReaderProfileUpdate.serializer(), update),
+    )
 
     /** Any further protected `GET` a host needs, under the same policy. */
-    suspend fun get(path: String): JsonObject = request(HttpMethod.Get, path, authenticated = true)
+    override suspend fun get(path: String): JsonObject = request(HttpMethod.Get, path, authenticated = true)
 
     /** Any further protected `PUT` a host needs, under the same policy. */
-    suspend fun put(path: String, body: JsonObject): JsonObject =
+    override suspend fun put(path: String, body: JsonObject): JsonObject =
         request(HttpMethod.Put, path, authenticated = true, body = body.toString())
 
     /**
@@ -111,7 +120,7 @@ class ReaderApiClient internal constructor(
      * it is unchanged. [path] may carry a query string; the caller is
      * responsible for it being a route the published contract declares.
      */
-    suspend fun post(path: String, body: JsonObject): JsonObject =
+    override suspend fun post(path: String, body: JsonObject): JsonObject =
         request(HttpMethod.Post, path, authenticated = true, body = body.toString())
 
     private suspend fun request(
@@ -145,7 +154,9 @@ class ReaderApiClient internal constructor(
         while (true) {
             val session = if (authenticated) {
                 refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
-            } else null
+            } else {
+                null
+            }
             val requestId = requestIds()
             val response = try {
                 http.request(config.readerApiOrigin + path) {
@@ -170,13 +181,17 @@ class ReaderApiClient internal constructor(
             val error = ErrorBody.of(response)
             when {
                 response.status == HttpStatusCode.Unauthorized -> {
-                    if (error.code == ReaderAuthPolicy.EXPIRED_TOKEN_CODE && session != null && refreshed < ReaderAuthPolicy.RETRY_LIMIT) {
+                    if (error.code == ReaderAuthPolicy.EXPIRED_TOKEN_CODE && session != null &&
+                        refreshed < ReaderAuthPolicy.RETRY_LIMIT
+                    ) {
                         refreshed += 1
                         refresher.refreshAfterRejection(session.accessToken)
                             ?: throw ReaderAuthException.SignedOut(error.code, error.requestId)
                         continue
                     }
-                    if (session != null && error.code != ReaderAuthPolicy.EXPIRED_TOKEN_CODE && error.code?.startsWith(AUTH_CODE_PREFIX) == true) {
+                    if (session != null && error.code != ReaderAuthPolicy.EXPIRED_TOKEN_CODE &&
+                        error.code?.startsWith(AUTH_CODE_PREFIX) == true
+                    ) {
                         if (refresher.clearAfterRejection(session.accessToken)) {
                             throw ReaderAuthException.SignedOut(error.code, error.requestId)
                         }
@@ -187,12 +202,22 @@ class ReaderApiClient internal constructor(
                             continue
                         }
                     }
-                    throw ReaderAuthException.ApiError(response.status.value, error.code, error.requestId, error.message)
+                    throw ReaderAuthException.ApiError(
+                        response.status.value,
+                        error.code,
+                        error.requestId,
+                        error.message,
+                    )
                 }
+
                 response.status == HttpStatusCode.Forbidden ->
                     throw ReaderAuthException.Forbidden(error.code, error.requestId)
+
                 response.status == HttpStatusCode.TooManyRequests ||
-                    (response.status == HttpStatusCode.BadGateway && error.code == ReaderAuthPolicy.JWKS_DEPENDENCY_FAILED_CODE) ||
+                    (
+                        response.status == HttpStatusCode.BadGateway &&
+                            error.code == ReaderAuthPolicy.JWKS_DEPENDENCY_FAILED_CODE
+                        ) ||
                     (response.status.value >= SERVER_ERROR && error.retryable) -> {
                     val retryAfter = ReaderAuthPolicy.retryAfter(response.headers[HttpHeaders.RetryAfter])
                     if (waited < ReaderAuthPolicy.RETRY_LIMIT && ReaderAuthPolicy.retriesInline(retryAfter)) {
@@ -202,7 +227,13 @@ class ReaderApiClient internal constructor(
                     }
                     throw ReaderAuthException.TryLater(response.status.value, error.code, retryAfter, error.requestId)
                 }
-                else -> throw ReaderAuthException.ApiError(response.status.value, error.code, error.requestId, error.message)
+
+                else -> throw ReaderAuthException.ApiError(
+                    response.status.value,
+                    error.code,
+                    error.requestId,
+                    error.message,
+                )
             }
         }
     }
@@ -212,13 +243,23 @@ class ReaderApiClient internal constructor(
         val document = try {
             json.parseToJsonElement(text).jsonObject
         } catch (e: Exception) {
-            throw ReaderAuthException.ApiError(status.value, null, headers[HEADER_REQUEST_ID], "response is not a JSON object")
+            throw ReaderAuthException.ApiError(
+                status.value,
+                null,
+                headers[HEADER_REQUEST_ID],
+                "response is not a JSON object",
+            )
         }
         return try {
             read(document)
         } catch (e: IllegalArgumentException) {
             // kotlinx.serialization's SerializationException is an IllegalArgumentException.
-            throw ReaderAuthException.ApiError(status.value, null, headers[HEADER_REQUEST_ID], "response is not the expected document")
+            throw ReaderAuthException.ApiError(
+                status.value,
+                null,
+                headers[HEADER_REQUEST_ID],
+                "response is not the expected document",
+            )
         }
     }
 
@@ -251,23 +292,24 @@ class ReaderApiClient internal constructor(
                     message = body.text("message") ?: text.take(MAX_MESSAGE),
                     requestId = body.text("request_id") ?: fromHeader,
                     category = (body["category"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
-                    retryable = (body["retryable"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull ?: false,
+                    retryable =
+                        (body["retryable"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull ?: false,
                 )
             }
         }
     }
 
-    companion object {
+    public companion object {
         /** [key] as text when it is a JSON scalar; an object, an array, `null` or a missing key is `null`. */
         private fun JsonObject.text(key: String): String? =
             (this[key] as? JsonPrimitive)?.takeUnless { it is JsonNull }?.content
 
-        const val PRE_AUTH_PATH: String = "/v1/reader/pre-auth"
-        const val CAPABILITIES_PATH: String = "/v1/reader/capabilities"
-        const val PROFILE_PATH: String = "/v1/reader/profile"
-        const val HEADER_CLIENT: String = "X-Reader-Client"
-        const val HEADER_REQUEST_ID: String = "X-Request-ID"
-        const val QUERY_CLIENT_VERSION: String = "clientVersion"
+        public const val PRE_AUTH_PATH: String = "/v1/reader/pre-auth"
+        public const val CAPABILITIES_PATH: String = "/v1/reader/capabilities"
+        public const val PROFILE_PATH: String = "/v1/reader/profile"
+        public const val HEADER_CLIENT: String = "X-Reader-Client"
+        public const val HEADER_REQUEST_ID: String = "X-Request-ID"
+        public const val QUERY_CLIENT_VERSION: String = "clientVersion"
         private const val AUTH_CODE_PREFIX = "auth."
         private const val MAX_MESSAGE = 200
         private const val SERVER_ERROR = 500

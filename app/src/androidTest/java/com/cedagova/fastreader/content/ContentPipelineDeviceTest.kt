@@ -1,7 +1,19 @@
 package com.cedagova.fastreader.content
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.epub.EpubFixtures
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.BookContentResult
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.ContentBlock
+import com.cedagova.reader.engine.content.ContentFailureReason
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.content.EpubContentPipeline
+import com.cedagova.reader.engine.content.SkipKind
+import com.cedagova.reader.engine.content.SkipMarkerToken
+import com.cedagova.reader.engine.content.Tokenizer
+import com.cedagova.reader.engine.content.WordToken
+import com.cedagova.reader.engine.epub.EpubFixtures
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

@@ -1,5 +1,4 @@
 import java.util.Properties
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // --- Release versioning -----------------------------------------------------
 // version.properties is tracked and is the single source of truth shared by
@@ -25,8 +24,10 @@ val appVersionName = requireNotNull(versionProperties.getProperty("versionName")
 val defaultKeystorePropertiesPath =
     File(System.getProperty("user.home"), ".config/fastreader/signing/keystore.properties")
 val keystorePropertiesPath: File =
-    (providers.gradleProperty("fastreader.keystoreProperties").orNull
-        ?: providers.environmentVariable("FASTREADER_KEYSTORE_PROPERTIES").orNull)
+    (
+        providers.gradleProperty("fastreader.keystoreProperties").orNull
+            ?: providers.environmentVariable("FASTREADER_KEYSTORE_PROPERTIES").orNull
+        )
         ?.let { File(it) }
         ?: defaultKeystorePropertiesPath
 val keystoreProperties: Properties? = keystorePropertiesPath
@@ -54,7 +55,9 @@ fun readerValue(propertyKey: String, environmentKey: String): String =
         .replace("\"", "\\\"")
 
 plugins {
-    alias(libs.plugins.android.application)
+    // SDK levels, JVM target, lint, unit-test settings and the formatter come
+    // from build-logic (#205); this file keeps only what is the app's own.
+    id("conventions.android.application")
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.roborazzi)
     alias(libs.plugins.kotlin.serialization)
@@ -62,23 +65,27 @@ plugins {
 
 android {
     namespace = "com.cedagova.fastreader"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.cedagova.fastreader"
-        minSdk = 26
-        targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "READER_SUPABASE_URL", "\"${readerValue("reader.supabaseUrl", "READER_SUPABASE_URL")}\"")
+        buildConfigField(
+            "String",
+            "READER_SUPABASE_URL",
+            "\"${readerValue("reader.supabaseUrl", "READER_SUPABASE_URL")}\"",
+        )
         buildConfigField(
             "String",
             "READER_SUPABASE_PUBLISHABLE_KEY",
             "\"${readerValue("reader.supabasePublishableKey", "READER_SUPABASE_PUBLISHABLE_KEY")}\"",
         )
-        buildConfigField("String", "READER_API_BASE_URL", "\"${readerValue("reader.apiBaseUrl", "READER_API_BASE_URL")}\"")
+        buildConfigField(
+            "String",
+            "READER_API_BASE_URL",
+            "\"${readerValue("reader.apiBaseUrl", "READER_API_BASE_URL")}\"",
+        )
     }
 
     signingConfigs {
@@ -90,8 +97,11 @@ android {
                     "$keystorePropertiesPath is missing storeFile"
                 }.trim()
                 storeFile = File(declaredStoreFile).let { declared ->
-                    if (declared.isAbsolute) declared
-                    else File(keystorePropertiesPath.parentFile, declaredStoreFile)
+                    if (declared.isAbsolute) {
+                        declared
+                    } else {
+                        File(keystorePropertiesPath.parentFile, declaredStoreFile)
+                    }
                 }
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
@@ -113,57 +123,10 @@ android {
         }
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
     buildFeatures {
         compose = true
         // For the three Reader account values above and nothing else.
         buildConfig = true
-    }
-
-    // EPUB fixtures are shared by the JVM tests and the on-device SAF test.
-    // AGP 9 compiles Kotlin through its built-in Kotlin support, which reads the
-    // source set's `kotlin` directories, not `java`: registering the shared
-    // directory on `java` alone left every fixture unresolved at test compile.
-    sourceSets {
-        getByName("test").kotlin.directories.add("src/sharedTest/java")
-        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
-    }
-
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
-
-    // The missing-translation gate (AD-15, REQ-206).
-    //
-    // From #55 the app ships `values-es` as well as `values`, and the failure
-    // this block exists to prevent is silent: Android resolves a string that
-    // `values-es` does not define by falling back to the default resource, so a
-    // Spanish device shows an English sentence and nothing anywhere reports it.
-    // The only signal is a reader noticing. `MissingTranslation` is exactly that
-    // report, and `ExtraTranslation` is its mirror — a Spanish string whose
-    // English original was renamed or deleted, which is dead weight the next
-    // translator would trust.
-    //
-    // Both are declared here rather than left at their defaults so that the gate
-    // is a property of this repository and survives a lint baseline, a severity
-    // default changing between AGP versions, or a future `lint.xml`. `lint` runs
-    // on every push and pull request (.github/workflows/checks.yml), and
-    // `abortOnError` makes either finding a red run rather than a warning
-    // somebody reads later.
-    //
-    // The escape hatch, when a string genuinely must not be translated, is
-    // `translatable="false"` on that string in `values/strings.xml` — a visible,
-    // reviewable edit next to the string itself. Loosening this block is not.
-    lint {
-        error += listOf("MissingTranslation", "ExtraTranslation", "MissingQuantity")
-        abortOnError = true
-        warningsAsErrors = false
     }
 }
 
@@ -174,16 +137,17 @@ android {
 // golden edit invalidate the task locally and invalidate the build-cache key on
 // CI, so the regression gate always actually runs. This tightens the gate; it
 // changes no tolerance.
+//
+// The same holds for PackageGraphTest (#202), which reads the main sources'
+// `import` lines: an import that changes no bytecode would otherwise leave the
+// task UP-TO-DATE over a new package cycle.
 tasks.withType<Test>().configureEach {
     inputs.dir(layout.projectDirectory.dir("screenshots"))
         .withPropertyName("roborazziGoldens")
         .withPathSensitivity(PathSensitivity.RELATIVE)
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
+    inputs.dir(layout.projectDirectory.dir("src/main/java"))
+        .withPropertyName("mainSourcesForPackageGraph")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 dependencies {
@@ -194,6 +158,12 @@ dependencies {
     // The account-library contract module (#112). It depends on :reader-auth;
     // :app is its host, exactly as it is :reader-auth's.
     implementation(project(":reader-library"))
+    // The EPUB, content and RSVP timing engines (#201): Android-free, and they
+    // import nothing from :app.
+    implementation(project(":reader-engine"))
+    // The Reader account pipeline and its one assembly call (#200); it brings
+    // :reader-library and :reader-auth with it.
+    implementation(project(":reader-account"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -207,6 +177,12 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
+    // The libraries' test fixtures (#199): the scripted doubles of their
+    // host-facing interfaces the account tests and goldens run against, so
+    // this app defines no fake of a library type.
+    testImplementation(testFixtures(project(":reader-auth")))
+    testImplementation(testFixtures(project(":reader-library")))
+    testImplementation(testFixtures(project(":reader-account")))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
@@ -218,6 +194,10 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.uiautomator)
+    // The engine's EPUB and content fixtures (#201), shared by the JVM tests and
+    // the on-device SAF and pipeline tests.
+    testImplementation(testFixtures(project(":reader-engine")))
+    androidTestImplementation(testFixtures(project(":reader-engine")))
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

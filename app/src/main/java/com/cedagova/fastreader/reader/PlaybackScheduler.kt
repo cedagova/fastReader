@@ -26,9 +26,7 @@ package com.cedagova.fastreader.reader
  * It holds no clock of its own — frame times are handed in — which is what lets
  * `PlaybackSchedulerTest` run a full minute of 1000 WPM playback as arithmetic.
  */
-class PlaybackScheduler(
-    private val resyncThresholdNanos: Long = RESYNC_THRESHOLD_NANOS,
-) {
+class PlaybackScheduler(private val resyncThresholdNanos: Long = RESYNC_THRESHOLD_NANOS) {
 
     /** Frame time the word on screen was shown at, in the frame clock's nanoseconds. */
     private var shownAtNanos: Long = 0L

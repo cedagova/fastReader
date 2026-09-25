@@ -223,23 +223,42 @@ sign-out, and what a host must declare — is
 
 Since #112 there is a second one, `reader-library/`: the account-library module
 (`com.cedagova.reader.library`). It depends on `:reader-auth` and on nothing
-under `app/`, declares no permission of its own, and offers exactly six typed
-library operations — `GET /v1/reader/library`, `GET /v1/reader/progress`,
+under `app/`, declares no permission of its own, and offers exactly the twelve
+typed operations `ReaderLibraryOperations` declares — six library ones
+(`GET /v1/reader/library`, `GET /v1/reader/progress`,
 `POST /v1/reader/sync/mutations`, `GET /v1/reader/sync/deltas` and the
-`reader.sync.v1` and `reader.publication-import.v1` capability reads — beside
-the publication-import lifecycle and the asset download grant. There is deliberately no generic
+`reader.sync.v1` and `reader.publication-import.v1` capability reads), five
+for the publication-import lifecycle and one for the asset download grant —
+plus the account sync engine. There is deliberately no generic
 `call(path, body)`. See [reader-library/README.md](reader-library/README.md).
+
+Since #200 a third, `reader-account/` (`com.cedagova.reader.account`), holds
+the account pipeline on top of both — session state, shelf, verified copies,
+downloads and imports — and `ReaderAccountGraph`, the one call that assembles
+the libraries for a host. FastReader implements its four host seams (device
+catalog, device book bytes, book identity, resume-offer note) and makes that
+call in its composition root, `AppGraph`. See
+[reader-account/README.md](reader-account/README.md).
+
+A fourth, `reader-engine/` (`com.cedagova.reader.engine`, #201), is the EPUB,
+content and RSVP timing engines as a plain Kotlin/JVM module with no Android
+dependency. See [reader-engine/README.md](reader-engine/README.md).
+
+**Starting a new client from this repository?** Read
+[docs/architecture.md](docs/architecture.md) first: the module map, which way
+the modules depend, what to copy and what to use as a pattern, and what each
+library needs from its host.
 
 **The Reader API contract it is built against is pinned, by identity, in this
 repository:**
 
 | | |
 | --- | --- |
-| Document | [`reader-library/contracts/reader-api.openapi.json`](reader-library/contracts/reader-api.openapi.json) |
+| Document | [`reader-auth/contracts/reader-api.openapi.json`](reader-auth/contracts/reader-api.openapi.json) — the one document both libraries are gated against (#208) |
 | Source | `Chunipers/reader-api@909174aff6a380514da7b81263d69a4e653cfe76`, `contracts/reader-api.openapi.json`, byte for byte |
-| sha256 | `e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90`, recorded in [`reader-library/contracts/reader-api.openapi.json.sha256`](reader-library/contracts/reader-api.openapi.json.sha256) |
-| Gate | `ReaderLibraryContractTest` recomputes that digest on every run, then checks every field name, JSON type, enum member and required flag the module sends or reads against the document's schemas |
-| Updating the pin | [`reader-library/contracts/PINNED.md`](reader-library/contracts/PINNED.md) |
+| sha256 | `e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90`, recorded in [`reader-auth/contracts/reader-api.openapi.json.sha256`](reader-auth/contracts/reader-api.openapi.json.sha256) |
+| Gate | `ReaderLibraryContractTest` and `ReaderAuthContractTest`, through one shared checker, recompute that digest on every run, then check every field name, JSON type, enum member and required flag either library sends or reads against the document's schemas |
+| Updating the pin | [`reader-auth/contracts/PINNED.md`](reader-auth/contracts/PINNED.md) |
 
 Drift between the module and a newer published contract is a proposal to
 Chunipers, never a local workaround: the models move to follow the contract, and
@@ -256,14 +275,16 @@ lint and tests are unchanged and the screen reads "Not configured".
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 ./gradlew assembleDebug
-./gradlew testDebugUnitTest verifyRoborazziDebug lint
+./gradlew testDebugUnitTest verifyRoborazziDebug lint spotlessCheck
 ```
 
 Gradle needs **JDK 21**. A debug build needs no signing material; a release
 build does, and only the owner has it — see
 [docs/release.md](docs/release.md) for the whole release procedure and
 [docs/agent-first-development.md](docs/agent-first-development.md) for how the
-project is developed and verified.
+project is developed and verified. How the code is laid out — modules,
+dependency direction, the app shell — is
+[docs/architecture.md](docs/architecture.md).
 
 ## Licence
 

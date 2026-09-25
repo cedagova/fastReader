@@ -7,13 +7,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.account.AccountOutcome
-import com.cedagova.fastreader.account.ReaderAccountActions
-import com.cedagova.fastreader.account.ReaderAccountState
 import com.cedagova.fastreader.library.ui.actionableNodes
 import com.cedagova.fastreader.library.ui.allNodes
 import com.cedagova.fastreader.library.ui.label
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.account.AccountOutcome
+import com.cedagova.reader.account.ReaderAccountActions
+import com.cedagova.reader.account.ReaderAccountState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -42,16 +42,38 @@ class ReaderAccountAccessibilityTest {
     private val calls = mutableListOf<String>()
 
     private val recording = object : ReaderAccountActions {
-        override fun requestEmailCode(email: String, newAccount: Boolean) { calls += "requestEmailCode($email, $newAccount)" }
-        override fun verifyEmailCode(email: String, code: String) { calls += "verifyEmailCode($email, $code)" }
-        override fun signInWithPassword(email: String, password: String) { calls += "signInWithPassword($email, $password)" }
-        override fun requestRecoveryCode(email: String) { calls += "requestRecoveryCode($email)" }
-        override fun verifyRecoveryCode(email: String, code: String) { calls += "verifyRecoveryCode($email, $code)" }
-        override fun setPassword(newPassword: String) { calls += "setPassword($newPassword)" }
-        override fun loadCapabilities() { calls += "loadCapabilities()" }
-        override fun signOut() { calls += "signOut()" }
-        override fun signOutOtherDevices() { calls += "signOutOtherDevices()" }
-        override fun dismissOutcome() { calls += "dismissOutcome()" }
+        override fun requestEmailCode(email: String, newAccount: Boolean) {
+            calls +=
+                "requestEmailCode($email, $newAccount)"
+        }
+        override fun verifyEmailCode(email: String, code: String) {
+            calls += "verifyEmailCode($email, $code)"
+        }
+        override fun signInWithPassword(email: String, password: String) {
+            calls +=
+                "signInWithPassword($email, $password)"
+        }
+        override fun requestRecoveryCode(email: String) {
+            calls += "requestRecoveryCode($email)"
+        }
+        override fun verifyRecoveryCode(email: String, code: String) {
+            calls += "verifyRecoveryCode($email, $code)"
+        }
+        override fun setPassword(newPassword: String) {
+            calls += "setPassword($newPassword)"
+        }
+        override fun loadCapabilities() {
+            calls += "loadCapabilities()"
+        }
+        override fun signOut() {
+            calls += "signOut()"
+        }
+        override fun signOutOtherDevices() {
+            calls += "signOutOtherDevices()"
+        }
+        override fun dismissOutcome() {
+            calls += "dismissOutcome()"
+        }
     }
 
     @Before
@@ -98,7 +120,14 @@ class ReaderAccountAccessibilityTest {
         show(SIGNED_IN.copy(capabilities = CAPABILITIES))
 
         val labels = composeRule.actionableNodes().map { it.label() }
-        listOf("Back", "Refresh capabilities", "Show", "Set password", "Sign out", "Sign out other devices").forEach { expected ->
+        listOf(
+            "Back",
+            "Refresh capabilities",
+            "Show",
+            "Set password",
+            "Sign out",
+            "Sign out other devices",
+        ).forEach { expected ->
             assertTrue("no control announces \"$expected\", only $labels", labels.contains(expected))
         }
         assertTrue(
@@ -113,12 +142,22 @@ class ReaderAccountAccessibilityTest {
 
         val minimum = with(composeRule.density) { 48.dp.toPx() }
         val short = composeRule.actionableNodes().filter { it.boundsInRoot.height < minimum - 1f }
-        assertEquals("controls shorter than 48 dp: " + short.map { "${it.label()} @ ${it.boundsInRoot}" }, 0, short.size)
+        assertEquals(
+            "controls shorter than 48 dp: " + short.map {
+                "${it.label()} @ ${it.boundsInRoot}"
+            },
+            0,
+            short.size,
+        )
     }
 
     @Test
     fun `an outcome is announced when it appears`() {
-        show(ReaderAccountState.SignedOut(outcome = AccountOutcome.ProviderRejected(400, "invalid_credentials", "Invalid login credentials")))
+        show(
+            ReaderAccountState.SignedOut(
+                outcome = AccountOutcome.ProviderRejected(400, "invalid_credentials", "Invalid login credentials"),
+            ),
+        )
 
         val outcome = composeRule.onNodeWithTag("account_outcome").fetchSemanticsNode()
         assertEquals(
@@ -145,7 +184,10 @@ class ReaderAccountAccessibilityTest {
         settle()
         composeRule.onNodeWithTag("account_verify_code").performClick()
 
-        assertEquals(listOf("requestEmailCode(reader@example.test, true)", "verifyEmailCode(reader@example.test, 123456)"), calls)
+        assertEquals(
+            listOf("requestEmailCode(reader@example.test, true)", "verifyEmailCode(reader@example.test, 123456)"),
+            calls,
+        )
     }
 
     @Test
@@ -156,11 +198,21 @@ class ReaderAccountAccessibilityTest {
         composeRule.onNodeWithTag("account_password").performTextInput("hunter2!")
         settle()
         val masked = composeRule.onNodeWithTag("account_password").fetchSemanticsNode()
-        assertTrue("the password must be masked", masked.config.getOrElseNullable(SemanticsProperties.Password) { null } != null)
+        assertTrue(
+            "the password must be masked",
+            masked.config.getOrElseNullable(SemanticsProperties.Password) { null } != null,
+        )
         assertTrue(masked.config.getOrElseNullable(SemanticsProperties.EditableText) { null }?.text != "hunter2!")
         composeRule.onNodeWithTag("account_password_reveal").performClick()
         settle()
-        assertEquals("hunter2!", composeRule.onNodeWithTag("account_password").fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.EditableText) { null }?.text)
+        assertEquals(
+            "hunter2!",
+            composeRule.onNodeWithTag(
+                "account_password",
+            ).fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.EditableText) {
+                null
+            }?.text,
+        )
         composeRule.onNodeWithTag("account_sign_in_password").performClick()
 
         assertEquals(listOf("signInWithPassword(reader@example.test, hunter2!)"), calls)
@@ -177,7 +229,10 @@ class ReaderAccountAccessibilityTest {
         settle()
         composeRule.onNodeWithTag("account_verify_recovery").performClick()
 
-        assertEquals(listOf("requestRecoveryCode(reader@example.test)", "verifyRecoveryCode(reader@example.test, 654321)"), calls)
+        assertEquals(
+            listOf("requestRecoveryCode(reader@example.test)", "verifyRecoveryCode(reader@example.test, 654321)"),
+            calls,
+        )
     }
 
     @Test
@@ -191,7 +246,10 @@ class ReaderAccountAccessibilityTest {
         composeRule.onNodeWithTag("account_sign_out_others").performClick()
         composeRule.onNodeWithTag("account_sign_out").performClick()
 
-        assertEquals(listOf("loadCapabilities()", "setPassword(new-secret)", "signOutOtherDevices()", "signOut()"), calls)
+        assertEquals(
+            listOf("loadCapabilities()", "setPassword(new-secret)", "signOutOtherDevices()", "signOut()"),
+            calls,
+        )
     }
 
     @Test

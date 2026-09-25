@@ -1,9 +1,9 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.content.ContentPipelineVersion
 import com.cedagova.fastreader.library.store.CatalogSchema
 import com.cedagova.fastreader.settings.ReaderSettings
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.content.ContentPipelineVersion
+import com.cedagova.reader.engine.timing.RsvpTiming
 import kotlinx.serialization.Serializable
 
 /**
@@ -68,8 +68,7 @@ data class Catalog(
     fun folder(id: String): BookFolder? = folders.firstOrNull { it.id == id }
 
     /** Every book this folder currently provides, at any depth beneath it. */
-    fun booksIn(folderId: String): List<Book> =
-        books.filter { book -> book.sources.any { it.folderId == folderId } }
+    fun booksIn(folderId: String): List<Book> = books.filter { book -> book.sources.any { it.folderId == folderId } }
 
     /**
      * The books that would leave the library if this folder were removed — the
@@ -186,6 +185,7 @@ data class BookSource(
 
     /** True when this source is a private copy of an account book (D2, AD-24). */
     val isAccountCopy: Boolean get() = origin == SourceOrigin.ACCOUNT_COPY
+
     /**
      * True when the file looks untouched since it was last inspected, which is
      * what lets a rescan skip re-parsing it. A provider that reports neither a
@@ -288,7 +288,7 @@ data class ReadingState(
      * position, and the refusal is the point — the file changed underneath it.
      *
      * A write that carries no fingerprint leaves an already-stored one alone
-     * (see `LibraryRepository.writeReadingState`), so a book only ever gains this
+     * (see `ReadingPositions.write`), so a book only ever gains this
      * protection.
      */
     val structuralFingerprint: String? = null,

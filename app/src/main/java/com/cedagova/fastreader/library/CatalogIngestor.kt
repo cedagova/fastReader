@@ -1,11 +1,11 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.epub.EpubByteSource
-import com.cedagova.fastreader.epub.EpubInspection
-import com.cedagova.fastreader.epub.EpubInspector
-import com.cedagova.fastreader.epub.EpubRejectReason
-import com.cedagova.fastreader.epub.FileEpubByteSource
 import com.cedagova.fastreader.library.store.CoverStore
+import com.cedagova.reader.engine.epub.EpubByteSource
+import com.cedagova.reader.engine.epub.EpubInspection
+import com.cedagova.reader.engine.epub.EpubInspector
+import com.cedagova.reader.engine.epub.EpubRejectReason
+import com.cedagova.reader.engine.epub.FileEpubByteSource
 import java.io.File
 
 /** What one ingestion pass changed. */
@@ -58,6 +58,7 @@ class CatalogIngestor(
                     // Picking a file is an explicit request for it, so it undoes an earlier removal.
                     honorRemovals = false,
                 )
+
                 DocumentLookup.Missing, DocumentLookup.PermissionLost -> working.unavailable++
             }
         }
@@ -153,6 +154,7 @@ class CatalogIngestor(
         for (uri in pickedUris) {
             when (val lookup = gateway.lookup(uri)) {
                 is DocumentLookup.Found -> work += WorkItem(lookup.ref, SourceOrigin.DIRECT_PICK, null)
+
                 DocumentLookup.Missing ->
                     working.markSources(SourceAvailability.MISSING) { it.uri == uri }
 
@@ -192,12 +194,7 @@ class CatalogIngestor(
      * Adding a copy undoes an earlier removal of the same book, exactly as
      * picking its file again does: downloading it is an explicit request for it.
      */
-    fun addAccountCopy(
-        catalog: Catalog,
-        contentSha256: String,
-        file: File,
-        displayName: String,
-    ): IngestOutcome {
+    fun addAccountCopy(catalog: Catalog, contentSha256: String, file: File, displayName: String): IngestOutcome {
         val working = Working(catalog, clock())
         working.ingest(
             ref = DocumentRef(
@@ -316,6 +313,7 @@ class CatalogIngestor(
         val existing = catalog.book(book.id)
         val restored = when (existing) {
             null -> book.copy(sources = sources)
+
             else -> existing.copy(
                 sources = existing.sources + sources.filterNot { old -> existing.sources.any { it.uri == old.uri } },
             )
@@ -515,7 +513,11 @@ class CatalogIngestor(
                 }
             }
 
-            if (existing == null) added++ else if (existing != book) updated++
+            if (existing == null) {
+                added++
+            } else if (existing != book) {
+                updated++
+            }
             books[digest] = book
             book.sources.forEach { bookIdByUri[it.uri] = digest }
         }
@@ -527,6 +529,7 @@ class CatalogIngestor(
 
     private fun EpubRejectReason.toContentStatus(): BookContentStatus = when (this) {
         EpubRejectReason.DRM_PROTECTED -> BookContentStatus.DRM_PROTECTED
+
         EpubRejectReason.CORRUPT_ARCHIVE,
         EpubRejectReason.INVALID_STRUCTURE,
         EpubRejectReason.UNREADABLE,

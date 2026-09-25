@@ -9,14 +9,14 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.account.ReaderAccountSummary
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
-import com.cedagova.fastreader.timing.PauseStrength
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.account.ReaderAccountSummary
+import com.cedagova.reader.engine.timing.PauseStrength
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test
@@ -126,7 +126,11 @@ class SettingsScreenScreenshotTest {
     fun theLargestTextSizeAppliesToThisScreenToo() {
         capture(
             "settings_font_extra_large",
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE, theme = ThemeChoice.DARK),
+            ReaderSettings.DEFAULTS.copy(
+                fontSize = FontSize.EXTRA_LARGE,
+                wordSize = FontSize.EXTRA_LARGE,
+                theme = ThemeChoice.DARK,
+            ),
             darkTheme = true,
         )
     }

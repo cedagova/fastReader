@@ -50,8 +50,9 @@ class ReaderAccountManifestTest {
         val settings = repositoryFile("settings.gradle.kts").readText()
         val included = Regex("""include\("([^"]+)"\)""").findAll(settings).map { it.groupValues[1] }.toList()
         // The exact module list, so a module reappearing (or the retired host
-        // returning) is a deliberate edit here. :reader-library joined in #112.
-        assertEquals(listOf(":app", ":reader-auth", ":reader-library"), included)
+        // returning) is a deliberate edit here. :reader-library joined in #112,
+        // :reader-engine in #201, :reader-account in #200.
+        assertEquals(listOf(":app", ":reader-auth", ":reader-library", ":reader-engine", ":reader-account"), included)
     }
 
     /**
@@ -158,7 +159,10 @@ class ReaderAccountManifestTest {
         )
         assertFalse(
             "a network security configuration exists outside the debug source set",
-            appFile("src").walkTopDown().any { it.name == "network_security_config.xml" && !it.path.contains("/src/debug/") },
+            appFile("src").walkTopDown().any {
+                it.name == "network_security_config.xml" &&
+                    !it.path.contains("/src/debug/")
+            },
         )
         assertTrue(
             "the base configuration must forbid cleartext explicitly",
@@ -177,7 +181,9 @@ class ReaderAccountManifestTest {
         )
 
         val manifests = listOf("app/src", "reader-auth/src")
-            .flatMap { File(repositoryRoot(), it).walkTopDown().filter { f -> f.name == "AndroidManifest.xml" }.toList() }
+            .flatMap {
+                File(repositoryRoot(), it).walkTopDown().filter { f -> f.name == "AndroidManifest.xml" }.toList()
+            }
         assertTrue("no manifests found", manifests.isNotEmpty())
         manifests.forEach { file ->
             assertFalse(
@@ -193,12 +199,13 @@ class ReaderAccountManifestTest {
         val build = repositoryFile("reader-auth/build.gradle.kts").readText()
 
         assertFalse("reader-auth/build.gradle.kts declares a project dependency", build.contains("project("))
-        val sources = File(repositoryRoot(), "reader-auth/src").walkTopDown().filter { it.isFile && it.extension == "kt" }
+        val sources = File(repositoryRoot(), "reader-auth/src").walkTopDown().filter {
+            it.isFile && it.extension == "kt"
+        }
         assertTrue(sources.none { it.readText().contains("com.cedagova.fastreader") })
     }
 
-    private fun appFile(path: String): File =
-        File(repositoryRoot(), "app/$path").also {
-            check(it.exists()) { "app/$path is missing" }
-        }
+    private fun appFile(path: String): File = File(repositoryRoot(), "app/$path").also {
+        check(it.exists()) { "app/$path is missing" }
+    }
 }

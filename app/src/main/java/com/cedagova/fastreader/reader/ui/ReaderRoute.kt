@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.reader.ui
 
-import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -8,13 +7,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
@@ -22,37 +20,30 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.fastreader.account.library.AccountShelf
-import com.cedagova.fastreader.account.library.PortableReadingPosition
-import com.cedagova.reader.library.sync.RemoteReadingPosition
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.TokenPosition
+import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import com.cedagova.fastreader.external.ExternalOpen
-import com.cedagova.fastreader.library.LibraryGraph
+import com.cedagova.fastreader.external.ExternalOpenController
+import com.cedagova.fastreader.library.BookBytes
 import com.cedagova.fastreader.library.LibraryRepository
-import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.ReaderSettingsStore
+import com.cedagova.fastreader.library.ReadingPositions
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.ui.PickPersistableDocuments
-import com.cedagova.fastreader.library.ui.accountBookIdForDevice
-import com.cedagova.fastreader.reader.PlaybackScheduler
 import com.cedagova.fastreader.reader.BookOpenRequest
-import com.cedagova.fastreader.reader.ReaderBooks
+import com.cedagova.fastreader.reader.PlaybackScheduler
 import com.cedagova.fastreader.reader.ReaderMode
-import com.cedagova.fastreader.reader.ReaderPosition
-import com.cedagova.fastreader.reader.ReaderPositions
-import com.cedagova.fastreader.reader.ReaderTarget
-import com.cedagova.fastreader.reader.ReaderViewModel
-import com.cedagova.fastreader.reader.ResumeOffer
+import com.cedagova.fastreader.reader.catalog.CatalogBooks
+import com.cedagova.fastreader.reader.catalog.CatalogPositions
+import com.cedagova.reader.account.library.AccountShelf
+import com.cedagova.reader.library.sync.AccountLibraryState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlin.math.roundToInt
 
 /**
  * The reader wired to a real book: catalog bytes in, playback out.
@@ -63,7 +54,16 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun ReaderRoute(
-    graph: LibraryGraph,
+    /** The catalog, for the open book's row, and "Add to library" (REQ-103). */
+    repository: LibraryRepository,
+    /** The cues, timing and presentation the reader draws with (LEAF302). */
+    settingsStore: ReaderSettingsStore,
+    /** Where each book is read to, and the front-matter record (REQ-016, REQ-202). */
+    positions: ReadingPositions,
+    /** A library book's bytes (#118). */
+    bookBytes: BookBytes,
+    /** The book handed over from another app, if any (REQ-103), and its identity work. */
+    handover: ExternalOpenController,
     target: ReaderTarget,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -82,15 +82,16 @@ fun ReaderRoute(
      */
     account: AccountShelf? = null,
 ) {
-    val repository = graph.repository
     // The stored settings drive the cue layer LEAF301 built and the timing engine
     // LEAF202 built. This is the whole of "live preview" outside the settings
     // screen: the reader is drawn from the same value the settings screen writes,
     // so a change made mid-book is on screen as soon as the store accepts it.
-    val settings by repository.settings.collectAsState()
+    val settings by settingsStore.settings.collectAsStateWithLifecycle()
     val reader = viewModel<ReaderViewModel>(
         factory = viewModelFactory {
-            initializer { ReaderViewModel(CatalogBooks(repository), CatalogPositions(repository, account)) }
+            initializer {
+                ReaderViewModel(CatalogBooks(repository, bookBytes), CatalogPositions(positions, account))
+            }
         },
     )
     // Keyed on which book, not on the target value: an external target changes
@@ -104,13 +105,14 @@ fun ReaderRoute(
     LaunchedEffect(reader, target.openKey) {
         when (target) {
             is ReaderTarget.Library -> reader.openLibraryBook(target.bookId)
+
             is ReaderTarget.External -> reader.open(
                 BookOpenRequest.external(
                     uri = target.open.uri,
                     title = target.open.title,
                     identity = target.open.identity,
                     origin = target.open.origin,
-                    bytes = graph.external.byteSource(target.open.uri),
+                    bytes = handover.byteSource(target.open.uri),
                 ),
             )
         }
@@ -131,7 +133,7 @@ fun ReaderRoute(
         reader.setParagraphAlwaysShown(settings.paragraphAlwaysShown)
     }
 
-    val state by reader.state.collectAsState()
+    val state by reader.state.collectAsStateWithLifecycle()
     val playing = (state as? ReaderUiState.Reading)?.mode == ReaderMode.PLAYING
 
     val unavailable = state as? ReaderUiState.Unavailable
@@ -141,12 +143,12 @@ fun ReaderRoute(
     }
 
     val external = (target as? ReaderTarget.External)?.open
-    ExternalIdentity(graph, external, reader)
+    ExternalIdentity(handover, external, reader)
 
     // Live, because the answer changes under this screen: the keepable half of
     // REQ-103 adds the row itself, and "Add to library" adds it through the
     // picker. Either way the notice has to go the moment the book has a row.
-    val catalog by repository.catalog.collectAsState()
+    val catalog by repository.catalog.collectAsStateWithLifecycle()
     val inLibrary = external?.identity?.let { catalog.book(it.value) != null } == true
 
     // REQ-202. The reader knows this book opens on front matter and that the
@@ -156,13 +158,13 @@ fun ReaderRoute(
     // A book with no identity yet — an "Open with" whose digest is still being
     // computed — has no key to look up, so it is offered: nothing durable was
     // ever written about it, and answering is what writes the record.
-    val offer by reader.frontMatterOffer.collectAsState()
+    val offer by reader.frontMatterOffer.collectAsStateWithLifecycle()
     val offeredBefore = offer?.positionKey?.let { it in catalog.frontMatterOfferedBookIds } == true
     val frontMatterOffer = offer?.takeIf { !offeredBefore }
     // Answering settles the offer for this book for good, whichever way it was
     // answered: the requirement is that it is *offered* once (REQ-202).
     val settleFrontMatterOffer = {
-        offer?.positionKey?.let { repository.requestMarkFrontMatterOffered(it) }
+        offer?.positionKey?.let { positions.requestMarkFrontMatterOffered(it) }
         Unit
     }
     // REQ-511. The reader knows the account holds a place ahead of this one and
@@ -175,8 +177,8 @@ fun ReaderRoute(
     // call that appears and disappears with `account`.
     val accountLibrary by remember(account) {
         account?.state ?: MutableStateFlow(AccountLibraryState.SIGNED_OUT)
-    }.collectAsState()
-    val offered by reader.resumeOffer.collectAsState()
+    }.collectAsStateWithLifecycle()
+    val offered by reader.resumeOffer.collectAsStateWithLifecycle()
     val resumeSettledBefore = offered?.let { offer ->
         accountLibrary.books.firstOrNull { it.bookId == offer.accountBookId }
             ?.resumeOfferSettledFor == offer.changeKey
@@ -280,7 +282,7 @@ fun ReaderRoute(
         onOpenSettings = onOpenSettings,
         externalNotice = external != null && external.resolved && !external.noticeDismissed && !inLibrary,
         onAddToLibrary = { addToLibrary.launch(SafDocumentGateway.PICKER_MIME_TYPES) },
-        onDismissExternalNotice = { graph.external.dismissNotice() },
+        onDismissExternalNotice = { handover.dismissNotice() },
         frontMatterOffer = frontMatterOffer?.chapterTitle,
         onSkipFrontMatter = {
             settleFrontMatterOffer()
@@ -315,11 +317,7 @@ fun ReaderRoute(
  * other's.
  */
 @Composable
-private fun ExternalIdentity(
-    graph: LibraryGraph,
-    external: ExternalOpen?,
-    reader: ReaderViewModel,
-) {
+private fun ExternalIdentity(controller: ExternalOpenController, external: ExternalOpen?, reader: ReaderViewModel) {
     LaunchedEffect(reader, external?.uri) {
         val uri = external?.uri ?: return@LaunchedEffect
         // Waits for *this* book's stream, not for "a" stream. A state value read
@@ -330,7 +328,7 @@ private fun ExternalIdentity(
         // which is both the wrong REQ-110 claim and the window in which
         // [ReaderViewModel.identityResolved] has no session to stamp.
         reader.state.first { it is ReaderUiState.Reading && reader.openKey == uri }
-        graph.external.resolveIdentity(uri)
+        controller.resolveIdentity(uri)
     }
     LaunchedEffect(reader, external?.uri, external?.identity) {
         val identity = external?.identity ?: return@LaunchedEffect
@@ -350,179 +348,6 @@ private data class SpeedNotice(val text: String, val serial: Int)
  * to read three digits without being long enough to sit in the way of the stream.
  */
 private const val SPEED_NOTICE_MILLIS = 1_400L
-
-/**
- * The catalog, as the reader needs it: one open request per book.
- *
- * The catalog id it hands over *is* the book's whole-file SHA-256 (AD-2), which
- * is exactly why the reader never has to compute one (AD-8).
- */
-private class CatalogBooks(private val repository: LibraryRepository) : ReaderBooks {
-
-    override fun libraryBook(bookId: String) = BookOpenRequest.library(
-        bookId = bookId,
-        title = repository.catalog.value.book(bookId)?.title.orEmpty(),
-        // Whether those bytes are a picked file, a folder's file or a verified
-        // private copy of an account book is the repository's business alone
-        // (#118): this asks for the book and gets the book.
-        bytes = repository.byteSource(bookId),
-    )
-}
-
-/**
- * The catalog store, as durability needs it (LEAF204).
- *
- * The only place the reader's [ReaderPosition] and the catalog's [ReadingState]
- * meet, so neither package has to know the other's shape.
- */
-internal class CatalogPositions(
-    private val repository: LibraryRepository,
-    /**
-     * Where a portable position goes, or null when this build has no account
-     * surface at all (#120).
-     *
-     * Deliberately the whole shelf rather than a book id: whether the open book
-     * is an account book is a question about the account's *current* rows, and
-     * the answer changes while the reader is reading — a book added to the
-     * account from the shelf, a sign-out mid-chapter. Resolving it at each flush
-     * asks the live state; resolving it once at open would answer from a shelf
-     * that has since changed.
-     */
-    private val account: AccountShelf? = null,
-) : ReaderPositions {
-
-    override val failure: StateFlow<String?> get() = repository.persistenceFailure
-
-    override fun restore(bookId: String): ReaderPosition? {
-        val stored = repository.readingState(bookId) ?: return null
-        return ReaderPosition(
-            position = TokenPosition(stored.bookDigest, stored.tokenIndex, stored.pipelineVersion),
-            progressFraction = stored.progressFraction,
-            wpm = stored.wpm,
-            structuralFingerprint = stored.structuralFingerprint,
-        )
-    }
-
-    override fun record(bookId: String, position: ReaderPosition) {
-        repository.recordReadingState(
-            bookId,
-            ReadingState(
-                bookDigest = position.position.bookDigest,
-                tokenIndex = position.position.tokenIndex,
-                pipelineVersion = position.position.pipelineVersion,
-                progressFraction = position.progressFraction,
-                wpm = position.wpm,
-                // Null when this open read no central directory. The store keeps
-                // whatever it already holds rather than clearing it (AD-18).
-                structuralFingerprint = position.structuralFingerprint,
-            ),
-        )
-    }
-
-    override fun flush() {
-        repository.flushReadingState()
-    }
-
-    /**
-     * Publishes the portable position, for an account book only.
-     *
-     * Two gates, and a device book fails the second exactly as REQ-512 requires.
-     * `accountBookIdForDevice` is the same content-identity bridge the shelf uses
-     * to tell the reader's open apart from the account's row (AD-23), and it
-     * returns null for every book the account does not hold — so a device-only
-     * book never names itself to the Reader API from here, any more than it does
-     * from the open that `MainActivity` reports.
-     *
-     * Signed out there is no shelf state to resolve against and `books` is empty,
-     * so the same null comes back and nothing is sent (D4).
-     */
-    override fun publishPortable(bookId: String, content: BookContent, tokenIndex: Int) {
-        val shelf = account ?: return
-        val accountBookId = accountBookIdForDevice(bookId, shelf.state.value) ?: return
-        val portable = PortableReadingPosition.of(content, tokenIndex) ?: return
-        shelf.recordPosition(accountBookId, portable)
-    }
-
-    /**
-     * The resume offer for this book, or null when there is nothing to ask
-     * (REQ-511).
-     *
-     * The same two gates [publishPortable] has, in the same order and for the
-     * same reasons — a device book resolves to no account id, and signed out
-     * there are no rows to resolve against — and then four of its own:
-     *
-     * 1. **The account holds no position for this book.** Nothing has been said
-     *    about it by anybody, so there is nothing to offer.
-     * 2. **The position maps to where the reader already is, or behind it.**
-     * 3. **The book has no tokens.** There is no word to land on.
-     * 4. **The position is this device's own** (#140): the backend admitted it
-     *    from this device's publish, as
-     *    [com.cedagova.reader.library.sync.AccountBook.ownPositionChangeKey]
-     *    records. Gate 2 alone does not cover it — publish at 40 %, rewind to
-     *    30 %, and the account's 40 % is ahead of the reader but was never
-     *    another device's.
-     *
-     * ## Gate 2 is a question about whether to ask, not about who wins
-     *
-     * This is the one comparison in the app that puts a remote position next to
-     * a local one, and the distinction matters enough to state twice. It decides
-     * whether a *question* is worth putting on the screen; it never selects a
-     * position. Nothing downstream of it reads the comparison: accepting always
-     * moves to [ResumeOffer.targetTokenIndex] exactly as the mapping produced
-     * it, declining always keeps the local position untouched, and the position
-     * this device publishes is unaffected either way — a backward move still
-     * goes out like any other, and `reader.activity-convergence.v1` still
-     * decides which position the account ends up holding.
-     *
-     * What it rules out is the case that made the gate necessary: this device's
-     * *own* published position comes back through the change stream, so without
-     * it every pause would be followed by an offer to resume at the percent the
-     * reader is already reading. The strict `>` is what makes "the same place"
-     * silent, and #121's "a remote position older than local produces no offer"
-     * is the same `>` seen from the other side.
-     */
-    override fun remoteOffer(bookId: String, content: BookContent, tokenIndex: Int): ResumeOffer? {
-        if (content.isEmpty) return null
-        val shelf = account ?: return null
-        val state = shelf.state.value
-        val accountBookId = accountBookIdForDevice(bookId, state) ?: return null
-        val row = state.books.firstOrNull { it.bookId == accountBookId } ?: return null
-        val remote = row.remotePosition ?: return null
-        // Gate 4 (#140): the account's position is this device's own admitted
-        // publish. It is not another device's place, whatever the reader has done
-        // since — a rewind below it included — so it is never offered as one.
-        if (remote.changeKey == row.ownPositionChangeKey) return null
-        val position = RemoteReadingPosition(
-            href = remote.href,
-            chapterTitle = remote.chapterTitle,
-            progression = remote.progression,
-            percent = remote.percent,
-            updatedAt = remote.updatedAt,
-        )
-        val target = PortableReadingPosition.tokenIndexFor(content, position)
-        if (target <= tokenIndex) return null
-        return ResumeOffer(
-            accountBookId = accountBookId,
-            changeKey = remote.changeKey,
-            targetTokenIndex = target,
-            // This parse's own title for the section the record named, and null
-            // for a section it does not have — the record's own chapter title is
-            // not a substitute, because it describes an edition this device
-            // cannot land in.
-            chapterTitle = remote.href
-                ?.let { href -> content.chapters.firstOrNull { it.spinePath == href } }
-                ?.title
-                ?.takeIf { it.isNotBlank() },
-            // The other client's own number when it stated one, so the reader
-            // sees what was published rather than a re-derivation of it; the
-            // mapped token's percent otherwise, which is the same fallback the
-            // mapping made to get there.
-            percent = remote.percent?.roundToInt()?.coerceIn(0, 100)
-                ?: PortableReadingPosition.of(content, target)?.percent
-                ?: return null,
-        )
-    }
-}
 
 /**
  * REQ-070: the screen stays awake while the stream is playing, and only while it

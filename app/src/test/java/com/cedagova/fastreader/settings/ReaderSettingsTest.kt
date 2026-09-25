@@ -1,6 +1,6 @@
 package com.cedagova.fastreader.settings
 
-import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.reader.engine.timing.PauseStrength
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

@@ -9,17 +9,17 @@ import kotlin.time.Duration
  * answer lands in is fixed by `CONTRACT.md`; `ReaderApiPolicyTest` and
  * `ProviderOperationsTest` pin the mapping.
  */
-sealed class ReaderAuthException(message: String) : Exception(message) {
+public sealed class ReaderAuthException(message: String) : Exception(message) {
 
     /** The host passed a [ReaderAuthConfig] with a blank service value; nothing was called. */
-    class NotConfigured : ReaderAuthException("reader-auth is not configured")
+    public class NotConfigured : ReaderAuthException("reader-auth is not configured")
 
     /**
      * The reader-api pre-auth document does not describe this client's
      * configuration (wrong application id, publishable key, or authority), so
      * sign-in was refused before any provider call.
      */
-    class ConfigurationMismatch(val reason: String) :
+    public class ConfigurationMismatch(public val reason: String) :
         ReaderAuthException("pre-auth does not match this client: $reason")
 
     /**
@@ -29,13 +29,18 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      * `accountEntry.reason`, [retryable] its `retryable`), or the server has
      * turned off [method] ([reason] `method_disabled`, [retryable] false).
      */
-    class SignInUnavailable(val reason: String, val retryable: Boolean, val method: SignInMethod? = null) :
-        ReaderAuthException("sign-in unavailable: ${method?.let { "$it " } ?: ""}$reason")
+    public class SignInUnavailable(
+        public val reason: String,
+        public val retryable: Boolean,
+        public val method: SignInMethod? = null,
+    ) : ReaderAuthException("sign-in unavailable: ${method?.let { "$it " } ?: ""}$reason")
 
     /** The network was unreachable or the request timed out; nothing was cleared. */
-    class NetworkUnavailable(cause: Throwable) :
+    public class NetworkUnavailable(cause: Throwable) :
         ReaderAuthException("network unavailable: ${cause.javaClass.simpleName}") {
-        init { initCause(cause) }
+        init {
+            initCause(cause)
+        }
     }
 
     /**
@@ -47,8 +52,12 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      * case it carries the server's value. The session is intact; the user
      * should try later. Never a credential error.
      */
-    class TryLater(val status: Int, val code: String?, val retryAfter: Duration?, val requestId: String? = null) :
-        ReaderAuthException("try later: HTTP $status${code?.let { " $it" } ?: ""}")
+    public class TryLater(
+        public val status: Int,
+        public val code: String?,
+        public val retryAfter: Duration?,
+        public val requestId: String? = null,
+    ) : ReaderAuthException("try later: HTTP $status${code?.let { " $it" } ?: ""}")
 
     /**
      * There is no usable session. It has two meanings, and [code] tells them
@@ -64,7 +73,7 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      *
      * Either way the host must show the sign-in screen.
      */
-    class SignedOut(val code: String?, val requestId: String? = null) :
+    public class SignedOut(public val code: String?, public val requestId: String? = null) :
         ReaderAuthException("signed out by the server${code?.let { ": $it" } ?: ""}")
 
     /**
@@ -76,9 +85,11 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      * refresh token, is removed, so the next process start is signed out.
      * Never retried: the provider has already rotated the refresh token.
      */
-    class StorageUnavailable(cause: Throwable) :
+    public class StorageUnavailable(cause: Throwable) :
         ReaderAuthException("the session could not be saved on this device: ${cause.javaClass.simpleName}") {
-        init { initCause(cause) }
+        init {
+            initCause(cause)
+        }
     }
 
     /**
@@ -90,20 +101,26 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      * already have rotated the refresh token, so the grant is never resent.
      * Never a credential error; the user may try again.
      */
-    class UnexpectedResponse(cause: Throwable) :
+    public class UnexpectedResponse(cause: Throwable) :
         ReaderAuthException("unexpected answer from the identity provider: ${cause.javaClass.simpleName}") {
-        init { initCause(cause) }
+        init {
+            initCause(cause)
+        }
     }
 
     /** reader-api 403: the caller is authenticated but not allowed; the session is intact. */
-    class Forbidden(val code: String?, val requestId: String?) :
+    public class Forbidden(public val code: String?, public val requestId: String?) :
         ReaderAuthException("forbidden${code?.let { ": $it" } ?: ""}")
 
     /** The identity provider rejected the operation itself (wrong code, bad password, weak password, ...). */
-    class ProviderRejected(val status: Int, val code: String?, val description: String) :
+    public class ProviderRejected(public val status: Int, public val code: String?, public val description: String) :
         ReaderAuthException("provider rejected (HTTP $status${code?.let { " $it" } ?: ""}): $description")
 
     /** Any other reader-api error, surfaced with the server's `code` and `request_id`. */
-    class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String) :
-        ReaderAuthException("reader-api HTTP $status${code?.let { " $it" } ?: ""}: $description")
+    public class ApiError(
+        public val status: Int,
+        public val code: String?,
+        public val requestId: String?,
+        public val description: String,
+    ) : ReaderAuthException("reader-api HTTP $status${code?.let { " $it" } ?: ""}: $description")
 }

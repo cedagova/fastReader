@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -12,13 +11,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
-import com.cedagova.fastreader.account.library.AccountDownloads
-import com.cedagova.fastreader.account.library.AccountImports
-import com.cedagova.fastreader.account.library.AccountShelf
-import com.cedagova.fastreader.library.LibraryGraph
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cedagova.fastreader.library.LibraryRepository
+import com.cedagova.fastreader.library.ReaderSettingsStore
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
+import com.cedagova.fastreader.library.store.CoverStore
+import com.cedagova.reader.account.library.AccountDownloads
+import com.cedagova.reader.account.library.AccountImports
+import com.cedagova.reader.account.library.AccountShelf
 
 /**
  * The library screen wired to the real catalog: repository state in, document
@@ -27,7 +29,11 @@ import com.cedagova.fastreader.library.saf.SafDocumentGateway
  */
 @Composable
 fun LibraryRoute(
-    graph: LibraryGraph,
+    repository: LibraryRepository,
+    /** The library order is a setting (REQ-203); the screen changes it through here. */
+    settingsStore: ReaderSettingsStore,
+    /** Where the rows' cover thumbnails are cached. */
+    covers: CoverStore,
     /** The signed-in account's library and its operations (#114). */
     account: AccountShelf,
     /** Adding a device book to that account, with its consent gate (#117). */
@@ -40,14 +46,13 @@ fun LibraryRoute(
     onDismissResumeNotice: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
 ) {
-    val repository = graph.repository
-    val catalog by repository.catalog.collectAsState()
-    val ingestion by repository.ingestion.collectAsState()
-    val undoableRemoval by repository.undoableRemoval.collectAsState()
-    val accountLibrary by account.state.collectAsState()
-    val accountRemoval by account.undo.collectAsState()
-    val accountImports by imports.state.collectAsState()
-    val accountDownloads by downloads.state.collectAsState()
+    val catalog by repository.catalog.collectAsStateWithLifecycle()
+    val ingestion by repository.ingestion.collectAsStateWithLifecycle()
+    val undoableRemoval by repository.undoableRemoval.collectAsStateWithLifecycle()
+    val accountLibrary by account.state.collectAsStateWithLifecycle()
+    val accountRemoval by account.undo.collectAsStateWithLifecycle()
+    val accountImports by imports.state.collectAsStateWithLifecycle()
+    val accountDownloads by downloads.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     var foldersOpen by rememberSaveable { mutableStateOf(false) }
     // Which account notice the reader has put away, by the notice's own key, so
@@ -96,13 +101,13 @@ fun LibraryRoute(
     // waits on exists only inside `AccountBookCopies`' `Ready` branch — so
     // "Open never starts reading before verification succeeds" is a property
     // of what this effect can observe, not of the order of two lines.
-    val downloaded by downloads.opened.collectAsState()
+    val downloaded by downloads.opened.collectAsStateWithLifecycle()
     LaunchedEffect(downloaded) {
         val bookId = downloaded ?: return@LaunchedEffect
         downloads.opened(bookId)
         onOpenBook(bookId)
     }
-    val coverLoader = remember(graph) { CoverStoreLoader(graph.covers) }
+    val coverLoader = remember(covers) { CoverStoreLoader(covers) }
 
     val pickBooks = rememberLauncherForActivityResult(PickPersistableDocuments()) { uris ->
         if (uris.isNotEmpty()) repository.requestAddPickedBooks(uris.map(Uri::toString))
@@ -124,7 +129,7 @@ fun LibraryRoute(
     // graph, for the same reason settings do: it is one place the reader steps
     // into and back out of, and the library behind it keeps its search and scroll.
     if (foldersOpen) {
-        FolderListRoute(graph = graph, onBack = { foldersOpen = false }, modifier = modifier)
+        FolderListRoute(repository = repository, onBack = { foldersOpen = false }, modifier = modifier)
         return
     }
 
@@ -168,12 +173,18 @@ fun LibraryRoute(
             // Re-granting a folder re-adds it at the same tree URI, which restores
             // every book it holds; a directly picked file has to be picked again.
             val tree = book.regrantTreeUri
-            if (tree != null) pickFolder.launch(tree.toUri()) else pickBooks.launch(SafDocumentGateway.PICKER_MIME_TYPES)
+            if (tree !=
+                null
+            ) {
+                pickFolder.launch(tree.toUri())
+            } else {
+                pickBooks.launch(SafDocumentGateway.PICKER_MIME_TYPES)
+            }
         },
         coverLoader = coverLoader,
         onDismissResumeNotice = onDismissResumeNotice,
         onOpenSettings = onOpenSettings,
-        onOrderChange = { repository.requestUpdateSettings { settings -> settings.copy(libraryOrder = it) } },
+        onOrderChange = { settingsStore.requestUpdate { settings -> settings.copy(libraryOrder = it) } },
         modifier = modifier,
     )
 }

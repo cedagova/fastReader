@@ -1,13 +1,13 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.Chapter
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RsvpTiming
-import com.cedagova.fastreader.timing.RsvpTimingEngine
-import com.cedagova.fastreader.timing.TimingSettings
-import com.cedagova.fastreader.timing.TimingState
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.Chapter
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RsvpTiming
+import com.cedagova.reader.engine.timing.RsvpTimingEngine
+import com.cedagova.reader.engine.timing.TimingSettings
+import com.cedagova.reader.engine.timing.TimingState
 
 /**
  * The reader's state machine (LEAF203): where in the book we are, whether the
@@ -79,14 +79,13 @@ data class ReaderSession(
     val progressFraction: Float get() = content.progressFraction(index)
 
     /** Starts or resumes the stream. Finishing the book is terminal until the reader navigates. */
-    fun play(): ReaderSession =
-        if (mode == ReaderMode.FINISHED) {
-            this
-        } else {
-            // AT_PLAYBACK_START restarts the ramp at 80% and re-arms the
-            // re-orientation hold, which is exactly REQ-013's "after any resume".
-            copy(mode = ReaderMode.PLAYING, timing = TimingState.AT_PLAYBACK_START)
-        }
+    fun play(): ReaderSession = if (mode == ReaderMode.FINISHED) {
+        this
+    } else {
+        // AT_PLAYBACK_START restarts the ramp at 80% and re-arms the
+        // re-orientation hold, which is exactly REQ-013's "after any resume".
+        copy(mode = ReaderMode.PLAYING, timing = TimingState.AT_PLAYBACK_START)
+    }
 
     /**
      * Stops the stream on the word currently on screen (REQ-014's tap-to-pause and

@@ -128,7 +128,11 @@ internal class SessionRefresher(
                     }
                     throw ReaderAuthException.TryLater(e.statusCode, e.errorCode?.value ?: e.error, retryAfter)
                 }
-                throw ReaderAuthException.ProviderRejected(e.statusCode, e.errorCode?.value ?: e.error, e.errorDescription)
+                throw ReaderAuthException.ProviderRejected(
+                    e.statusCode,
+                    e.errorCode?.value ?: e.error,
+                    e.errorDescription,
+                )
             } catch (e: RestException) {
                 if (e.isTransient()) {
                     val retryAfter = ReaderAuthPolicy.retryAfter(e.response.headers[HttpHeaders.RetryAfter])

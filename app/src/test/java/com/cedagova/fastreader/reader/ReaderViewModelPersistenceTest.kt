@@ -1,10 +1,11 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.content.EpubContentPipeline
-import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.reader.ui.ReaderUiState
+import com.cedagova.fastreader.reader.ui.ReaderViewModel
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.content.EpubContentPipeline
+import com.cedagova.reader.engine.content.TokenPosition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -291,8 +292,7 @@ class ReaderViewModelPersistenceTest {
 
         val recorded: List<ReaderPosition> get() = calls.map { it.second }
 
-        fun recordedFor(bookId: String): List<ReaderPosition> =
-            calls.filter { it.first == bookId }.map { it.second }
+        fun recordedFor(bookId: String): List<ReaderPosition> = calls.filter { it.first == bookId }.map { it.second }
 
         override val failure: StateFlow<String?> get() = failureState
 

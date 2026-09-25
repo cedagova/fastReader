@@ -1,11 +1,9 @@
 package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.auth.ReaderAuthException
-import com.cedagova.reader.library.Harness
+import com.cedagova.reader.auth.testing.apiError
+import com.cedagova.reader.auth.testing.json
 import com.cedagova.reader.library.LIBRARY
-import com.cedagova.reader.library.apiError
-import com.cedagova.reader.library.json
-import io.ktor.http.HttpStatusCode
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderBookAsset
 import com.cedagova.reader.library.model.ReaderBookAssetKind
@@ -33,6 +31,9 @@ import com.cedagova.reader.library.model.ReaderSyncMutationResult
 import com.cedagova.reader.library.model.ReaderSyncRejection
 import com.cedagova.reader.library.model.ReaderSyncRejectionCode
 import com.cedagova.reader.library.model.ReaderSyncStatus
+import com.cedagova.reader.library.testing.FakeReaderLibraryGateway
+import com.cedagova.reader.library.testing.ReaderLibraryHarness
+import io.ktor.http.HttpStatusCode
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -145,7 +146,12 @@ class AccountSyncEngineTest {
                 latestCursor = "2",
                 nextCursor = "2",
                 changes = listOf(
-                    change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", status = "finished")),
+                    change(
+                        "2",
+                        "book-1",
+                        ReaderMutationKind.UPSERT,
+                        itemPayload("book-1", "Dune", status = "finished"),
+                    ),
                 ),
             ),
         )
@@ -170,7 +176,12 @@ class AccountSyncEngineTest {
                 latestCursor = "4",
                 nextCursor = "4",
                 changes = listOf(
-                    change("4", "book-1", ReaderMutationKind.RESTORE, itemPayload("book-1", "Dune", status = "reading")),
+                    change(
+                        "4",
+                        "book-1",
+                        ReaderMutationKind.RESTORE,
+                        itemPayload("book-1", "Dune", status = "reading"),
+                    ),
                 ),
             ),
         )
@@ -193,7 +204,14 @@ class AccountSyncEngineTest {
                 latestCursor = "3",
                 nextCursor = "2",
                 hasMore = true,
-                changes = listOf(change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", status = "finished"))),
+                changes = listOf(
+                    change(
+                        "2",
+                        "book-1",
+                        ReaderMutationKind.UPSERT,
+                        itemPayload("book-1", "Dune", status = "finished"),
+                    ),
+                ),
             ),
             deltas(latestCursor = "3", nextCursor = "3"),
         )
@@ -207,49 +225,63 @@ class AccountSyncEngineTest {
     // ---------------------------------------------------------------- outbox
 
     @Test
-    fun `the same entry sent twice is applied once and replayed once, and the row does not move`() = runTest(dispatcher) {
-        gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
-        gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
-        val engine = engine()
-        signIn("user-1")
+    fun `the same entry sent twice is applied once and replayed once, and the row does not move`() =
+        runTest(dispatcher) {
+            gateway.libraryResponses = queueOf(libraryOf(item("book-1", "Dune")))
+            gateway.deltaResponses = queueOf(deltas(latestCursor = "1"))
+            val engine = engine()
+            signIn("user-1")
 
-        engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
-        advanceUntilIdle()
-        val queuedKey = gateway.submitted.single().single().idempotencyKey
+            engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
+            advanceUntilIdle()
+            val queuedKey = gateway.submitted.single().single().idempotencyKey
 
-        // The store as it stood with the entry still queued: this is what a
-        // process death between the send and the save leaves behind.
-        val beforeDrain = storeFile("user-1").readText()
+            // The store as it stood with the entry still queued: this is what a
+            // process death between the send and the save leaves behind.
+            val beforeDrain = storeFile("user-1").readText()
 
-        gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.APPLIED, revision = 8, payload = itemPayload("book-1", "Dune", status = "finished"), key = queuedKey),
-        )
-        engine.requestSync(AccountSyncTrigger.MANUAL_REFRESH)
-        advanceUntilIdle()
-        val applied = engine.state.value.books.single()
-        assertEquals(ReaderLibraryStatus.FINISHED, applied.status)
-        assertEquals(0, engine.state.value.queued)
+            gateway.answerMutations(
+                result(
+                    "book-1",
+                    ReaderSyncStatus.APPLIED,
+                    revision = 8,
+                    payload = itemPayload("book-1", "Dune", status = "finished"),
+                    key = queuedKey,
+                ),
+            )
+            engine.requestSync(AccountSyncTrigger.MANUAL_REFRESH)
+            advanceUntilIdle()
+            val applied = engine.state.value.books.single()
+            assertEquals(ReaderLibraryStatus.FINISHED, applied.status)
+            assertEquals(0, engine.state.value.queued)
 
-        // Rewind the store to before the save and start a second engine on it:
-        // the key must come back out of the document, not out of a new UUID.
-        storeFile("user-1").writeText(beforeDrain)
-        session.value = AccountSession.Loading
-        advanceUntilIdle()
-        gateway.submitted.clear()
-        gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.REPLAYED, revision = 8, payload = itemPayload("book-1", "Dune", status = "finished"), key = queuedKey, admission = ReaderServerAdmission.REPLAYED),
-        )
-        val second = engine()
-        signIn("user-1")
+            // Rewind the store to before the save and start a second engine on it:
+            // the key must come back out of the document, not out of a new UUID.
+            storeFile("user-1").writeText(beforeDrain)
+            session.value = AccountSession.Loading
+            advanceUntilIdle()
+            gateway.submitted.clear()
+            gateway.answerMutations(
+                result(
+                    "book-1",
+                    ReaderSyncStatus.REPLAYED,
+                    revision = 8,
+                    payload = itemPayload("book-1", "Dune", status = "finished"),
+                    key = queuedKey,
+                    admission = ReaderServerAdmission.REPLAYED,
+                ),
+            )
+            val second = engine()
+            signIn("user-1")
 
-        assertEquals(
-            "the retry must carry the original key, so the backend replays it",
-            listOf(queuedKey),
-            gateway.submitted.single().map { it.idempotencyKey },
-        )
-        assertEquals(applied, second.state.value.books.single())
-        assertEquals(0, second.state.value.queued)
-    }
+            assertEquals(
+                "the retry must carry the original key, so the backend replays it",
+                listOf(queuedKey),
+                gateway.submitted.single().map { it.idempotencyKey },
+            )
+            assertEquals(applied, second.state.value.books.single())
+            assertEquals(0, second.state.value.queued)
+        }
 
     @Test
     fun `the outbox drains before the stream is read`() = runTest(dispatcher) {
@@ -324,7 +356,11 @@ class AccountSyncEngineTest {
         advanceUntilIdle()
 
         val row = engine.state.value.books.single()
-        assertEquals("the backend's value wins, with no decision asked of anybody", ReaderLibraryStatus.ARCHIVED, row.status)
+        assertEquals(
+            "the backend's value wins, with no decision asked of anybody",
+            ReaderLibraryStatus.ARCHIVED,
+            row.status,
+        )
         assertEquals(12L, row.revision)
         assertNull(engine.state.value.lastError)
         assertEquals(0, engine.state.value.queued)
@@ -432,7 +468,7 @@ class AccountSyncEngineTest {
     }
 
     /**
-     * A host record — FastReader's answered resume offer, its copy references —
+     * A host record — an answered resume offer, the copy references —
      * is stored under the one writer and adds no envelope to the outbox and sends
      * nothing at all. Asserted beside the envelope invariant above because this
      * is the write most likely to grow a wire call by accident: it is the only
@@ -476,7 +512,9 @@ class AccountSyncEngineTest {
         gateway.deltaResponses = queueOf(
             deltas(
                 latestCursor = "2",
-                changes = listOf(change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune II", "reading"))),
+                changes = listOf(
+                    change("2", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune II", "reading")),
+                ),
             ),
         )
         engine.requestSync(AccountSyncTrigger.FOREGROUND)
@@ -510,7 +548,13 @@ class AccountSyncEngineTest {
         signIn("user-1")
 
         gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.APPLIED, revision = 2, payload = itemPayload("book-1", "Dune", status = "finished"), key = "key-1"),
+            result(
+                "book-1",
+                ReaderSyncStatus.APPLIED,
+                revision = 2,
+                payload = itemPayload("book-1", "Dune", status = "finished"),
+                key = "key-1",
+            ),
         )
         engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
         advanceUntilIdle()
@@ -617,7 +661,13 @@ class AccountSyncEngineTest {
                 deltas(
                     latestCursor = "80",
                     changes = listOf(
-                        change("78", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 8),
+                        change(
+                            "78",
+                            "book-1",
+                            ReaderMutationKind.UPSERT,
+                            itemPayload("book-1", "Dune", "reading"),
+                            revision = 8,
+                        ),
                     ),
                 ),
             )
@@ -830,7 +880,8 @@ class AccountSyncEngineTest {
         signIn("user-1")
 
         // A refresh answered by a captive portal's page (#191).
-        gateway.nextFailure = ReaderAuthException.UnexpectedResponse(kotlinx.serialization.SerializationException("<html>"))
+        gateway.nextFailure =
+            ReaderAuthException.UnexpectedResponse(kotlinx.serialization.SerializationException("<html>"))
         engine.removeFromAccount("book-1")
         advanceUntilIdle()
 
@@ -851,8 +902,10 @@ class AccountSyncEngineTest {
         signIn("user-1")
 
         // The failure the real reader-api client produces for this answer (#158).
-        val api = Harness()
-        api.servers.on(LIBRARY) { json(apiError("reader_sync.unavailable", "req-503", retryable = true), HttpStatusCode.ServiceUnavailable) }
+        val api = ReaderLibraryHarness()
+        api.servers.on(LIBRARY) {
+            json(apiError("reader_sync.unavailable", "req-503", retryable = true), HttpStatusCode.ServiceUnavailable)
+        }
         val outage = runCatching { api.operations().library() }.exceptionOrNull() as ReaderAuthException
         api.close()
 
@@ -862,7 +915,12 @@ class AccountSyncEngineTest {
 
         assertEquals(AccountSyncPhase.DEFERRED, engine.state.value.phase)
         assertEquals(
-            AccountSyncError.TryLater(status = 503, code = "reader_sync.unavailable", retryAfterSeconds = 10, requestId = "req-503"),
+            AccountSyncError.TryLater(
+                status = 503,
+                code = "reader_sync.unavailable",
+                retryAfterSeconds = 10,
+                requestId = "req-503",
+            ),
             engine.state.value.lastError,
         )
         assertEquals("the queued removal is kept", 1, engine.state.value.queued)
@@ -875,8 +933,13 @@ class AccountSyncEngineTest {
         val engine = engine()
         signIn("user-1")
 
-        val api = Harness()
-        api.servers.on(LIBRARY) { json(apiError("publication_import.admissions_disabled", "req-off", retryable = false), HttpStatusCode.ServiceUnavailable) }
+        val api = ReaderLibraryHarness()
+        api.servers.on(LIBRARY) {
+            json(
+                apiError("publication_import.admissions_disabled", "req-off", retryable = false),
+                HttpStatusCode.ServiceUnavailable,
+            )
+        }
         val refusal = runCatching { api.operations().library() }.exceptionOrNull() as ReaderAuthException
         api.close()
 
@@ -1029,7 +1092,7 @@ class AccountSyncEngineTest {
     /**
      * REQ-512, at the level where an envelope is actually built: over a long run
      * of publishes, no key of any `reading_progress` payload is one of
-     * FastReader's own values.
+     * the host's own values.
      */
     @Test
     fun `no published position payload ever carries a token index or a speed`() = runTest(dispatcher) {
@@ -1060,7 +1123,14 @@ class AccountSyncEngineTest {
     fun `a flush that changed neither section nor whole percent publishes nothing`() = runTest(dispatcher) {
         val engine = signedInEngine()
         gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.APPLIED, revision = 3, payload = JsonObject(emptyMap()), key = "key-1", kind = ReaderMutationKind.UPSERT),
+            result(
+                "book-1",
+                ReaderSyncStatus.APPLIED,
+                revision = 3,
+                payload = JsonObject(emptyMap()),
+                key = "key-1",
+                kind = ReaderMutationKind.UPSERT,
+            ),
         )
 
         engine.recordPosition("book-1", position("OEBPS/ch3.xhtml", 40))
@@ -1148,7 +1218,14 @@ class AccountSyncEngineTest {
         engine.refresh()
         advanceUntilIdle()
         gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.APPLIED, revision = 6, payload = JsonObject(emptyMap()), key = "key-1", kind = ReaderMutationKind.UPSERT),
+            result(
+                "book-1",
+                ReaderSyncStatus.APPLIED,
+                revision = 6,
+                payload = JsonObject(emptyMap()),
+                key = "key-1",
+                kind = ReaderMutationKind.UPSERT,
+            ),
         )
 
         engine.recordPosition("book-1", position("OEBPS/ch4.xhtml", 44))
@@ -1368,7 +1445,13 @@ class AccountSyncEngineTest {
     fun `a superseded publish adopts the winner without marking it as this device's`() = runTest(dispatcher) {
         val engine = signedInEngine()
         gateway.answerMutations(
-            positionResult("key-1", ReaderSyncStatus.SUPERSEDED, revision = 7, percent = 81.0, href = "OEBPS/ch8.xhtml"),
+            positionResult(
+                "key-1",
+                ReaderSyncStatus.SUPERSEDED,
+                revision = 7,
+                percent = 81.0,
+                href = "OEBPS/ch8.xhtml",
+            ),
         )
 
         engine.recordPosition("book-1", position(href = "OEBPS/ch4.xhtml", percent = 40))
@@ -1637,7 +1720,9 @@ class AccountSyncEngineTest {
         gateway.deltaResponses = queueOf(
             deltas(
                 latestCursor = "8",
-                changes = listOf(change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished"))),
+                changes = listOf(
+                    change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished")),
+                ),
             ),
         )
         engine.refresh()
@@ -1648,7 +1733,13 @@ class AccountSyncEngineTest {
             deltas(
                 latestCursor = "10",
                 changes = listOf(
-                    change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 6),
+                    change(
+                        "9",
+                        "book-1",
+                        ReaderMutationKind.UPSERT,
+                        itemPayload("book-1", "Dune", "reading"),
+                        revision = 6,
+                    ),
                     change("10", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap()), revision = 7),
                 ),
             ),
@@ -1673,7 +1764,13 @@ class AccountSyncEngineTest {
                 latestCursor = "12",
                 changes = listOf(
                     change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished")),
-                    change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 6),
+                    change(
+                        "9",
+                        "book-1",
+                        ReaderMutationKind.UPSERT,
+                        itemPayload("book-1", "Dune", "reading"),
+                        revision = 6,
+                    ),
                     change("12", "book-1", ReaderMutationKind.DELETE, JsonObject(emptyMap())),
                 ),
             ),
@@ -1697,7 +1794,9 @@ class AccountSyncEngineTest {
         gateway.deltaResponses = queueOf(
             deltas(
                 latestCursor = "8",
-                changes = listOf(change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"))),
+                changes = listOf(
+                    change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading")),
+                ),
             ),
         )
         engine.refresh()
@@ -1711,8 +1810,20 @@ class AccountSyncEngineTest {
             deltas(
                 latestCursor = "10",
                 changes = listOf(
-                    change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"), revision = 8),
-                    change("10", "book-1", ReaderMutationKind.RESTORE, itemPayload("book-1", "Dune", "finished"), revision = 8),
+                    change(
+                        "9",
+                        "book-1",
+                        ReaderMutationKind.UPSERT,
+                        itemPayload("book-1", "Dune", "reading"),
+                        revision = 8,
+                    ),
+                    change(
+                        "10",
+                        "book-1",
+                        ReaderMutationKind.RESTORE,
+                        itemPayload("book-1", "Dune", "finished"),
+                        revision = 8,
+                    ),
                 ),
             ),
         )
@@ -1732,7 +1843,13 @@ class AccountSyncEngineTest {
     fun `an equal-revision superseded result still replaces the optimistic row`() = runTest(dispatcher) {
         val engine = engineAtRevision8()
         gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.SUPERSEDED, revision = 8, payload = itemPayload("book-1", "Dune", "reading"), key = "key-1"),
+            result(
+                "book-1",
+                ReaderSyncStatus.SUPERSEDED,
+                revision = 8,
+                payload = itemPayload("book-1", "Dune", "reading"),
+                key = "key-1",
+            ),
         )
         gateway.deltaResponses = queueOf(deltas(latestCursor = "8"))
         engine.recordStatus("book-1", ReaderLibraryStatus.FINISHED)
@@ -1781,41 +1898,44 @@ class AccountSyncEngineTest {
      * winning change is no longer re-applied, nothing else would repair it.
      */
     @Test
-    fun `a removal answered conflict with the book present ends present, and the equal-revision echo keeps it`() = runTest(dispatcher) {
-        val engine = engineAtRevision8()
-        gateway.answerMutations(
-            ReaderSyncMutationResult(
-                idempotencyKey = "key-1",
-                resourceType = ReaderResourceType.LIBRARY_ITEM,
-                resourceId = "book-1",
-                mutationKind = ReaderMutationKind.DELETE,
-                status = ReaderSyncStatus.CONFLICT,
-                canonicalPayload = itemPayload("book-1", "Dune", "reading"),
-                conflict = ReaderSyncConflict(
-                    conflictId = "c-1",
-                    code = ReaderSyncConflictCode.REVISION_CONFLICT,
-                    remoteRevision = 9,
+    fun `a removal answered conflict with the book present ends present, and the equal-revision echo keeps it`() =
+        runTest(dispatcher) {
+            val engine = engineAtRevision8()
+            gateway.answerMutations(
+                ReaderSyncMutationResult(
+                    idempotencyKey = "key-1",
+                    resourceType = ReaderResourceType.LIBRARY_ITEM,
+                    resourceId = "book-1",
+                    mutationKind = ReaderMutationKind.DELETE,
+                    status = ReaderSyncStatus.CONFLICT,
                     canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                    conflict = ReaderSyncConflict(
+                        conflictId = "c-1",
+                        code = ReaderSyncConflictCode.REVISION_CONFLICT,
+                        remoteRevision = 9,
+                        canonicalPayload = itemPayload("book-1", "Dune", "reading"),
+                    ),
                 ),
-            ),
-        )
-        gateway.deltaResponses = queueOf(
-            deltas(
-                latestCursor = "9",
-                changes = listOf(change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"))),
-            ),
-        )
-        engine.removeFromAccount("book-1")
-        advanceUntilIdle()
+            )
+            gateway.deltaResponses = queueOf(
+                deltas(
+                    latestCursor = "9",
+                    changes = listOf(
+                        change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading")),
+                    ),
+                ),
+            )
+            engine.removeFromAccount("book-1")
+            advanceUntilIdle()
 
-        val row = document("user-1").book("book-1")!!
-        assertEquals(0, engine.state.value.queued)
-        assertFalse("the backend kept the book, so it is back on the shelf", row.removed)
-        assertEquals(9L, row.revision)
-        assertEquals(ReaderLibraryStatus.READING, row.status)
-        assertEquals(listOf("book-1"), engine.state.value.books.map { it.bookId })
-        assertEquals("9", document("user-1").cursor)
-    }
+            val row = document("user-1").book("book-1")!!
+            assertEquals(0, engine.state.value.queued)
+            assertFalse("the backend kept the book, so it is back on the shelf", row.removed)
+            assertEquals(9L, row.revision)
+            assertEquals(ReaderLibraryStatus.READING, row.status)
+            assertEquals(listOf("book-1"), engine.state.value.books.map { it.bookId })
+            assertEquals("9", document("user-1").cursor)
+        }
 
     /** #149 review B1: the same for a removal answered `superseded` by a live book. */
     @Test
@@ -1834,7 +1954,9 @@ class AccountSyncEngineTest {
         gateway.deltaResponses = queueOf(
             deltas(
                 latestCursor = "9",
-                changes = listOf(change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished"))),
+                changes = listOf(
+                    change("9", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "finished")),
+                ),
             ),
         )
         engine.removeFromAccount("book-1")
@@ -1891,7 +2013,13 @@ class AccountSyncEngineTest {
     fun `an upsert answered superseded by a removal ends removed`() = runTest(dispatcher) {
         val engine = engineAtRevision8()
         gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.SUPERSEDED, revision = 9, payload = JsonObject(emptyMap()), key = "key-1"),
+            result(
+                "book-1",
+                ReaderSyncStatus.SUPERSEDED,
+                revision = 9,
+                payload = JsonObject(emptyMap()),
+                key = "key-1",
+            ),
         )
         gateway.deltaResponses = queueOf(
             deltas(
@@ -2016,7 +2144,9 @@ class AccountSyncEngineTest {
         gateway.deltaResponses = queueOf(
             deltas(
                 latestCursor = "8",
-                changes = listOf(change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading"))),
+                changes = listOf(
+                    change("8", "book-1", ReaderMutationKind.UPSERT, itemPayload("book-1", "Dune", "reading")),
+                ),
             ),
         )
         engine.refresh()
@@ -2077,21 +2207,16 @@ class AccountSyncEngineTest {
         put("contract_version", JsonPrimitive("reader.portable-semantics.v1"))
     }
 
-    private fun progressChange(
-        cursor: String,
-        bookId: String,
-        revision: Long,
-        percent: Double,
-        href: String,
-    ) = ReaderSyncChange(
-        cursor = cursor,
-        resourceType = ReaderResourceType.READING_PROGRESS,
-        resourceId = bookId,
-        revision = revision,
-        kind = ReaderMutationKind.UPSERT,
-        serverAdmittedAt = SERVER_TIME,
-        canonicalPayload = progressPayload(bookId, percent, href),
-    )
+    private fun progressChange(cursor: String, bookId: String, revision: Long, percent: Double, href: String) =
+        ReaderSyncChange(
+            cursor = cursor,
+            resourceType = ReaderResourceType.READING_PROGRESS,
+            resourceId = bookId,
+            revision = revision,
+            kind = ReaderMutationKind.UPSERT,
+            serverAdmittedAt = SERVER_TIME,
+            canonicalPayload = progressPayload(bookId, percent, href),
+        )
 
     /** A canonical `reading_progress` record as reader-api returns it. */
     private fun progressPayload(bookId: String, percent: Double, href: String) = buildJsonObject {
@@ -2102,29 +2227,31 @@ class AccountSyncEngineTest {
     }
 
     /** The backend's answer to this device's own `reading_progress` upsert for book-1. */
-    private fun positionResult(
-        key: String,
-        status: ReaderSyncStatus,
-        revision: Long,
-        percent: Double,
-        href: String,
-    ) = ReaderSyncMutationResult(
-        idempotencyKey = key,
-        resourceType = ReaderResourceType.READING_PROGRESS,
-        resourceId = "book-1",
-        mutationKind = ReaderMutationKind.UPSERT,
-        status = status,
-        canonicalPayload = progressPayload("book-1", percent, href),
-        serverAdmission = if (status == ReaderSyncStatus.APPLIED) ReaderServerAdmission.ACCEPTED else null,
-        revision = revision,
-        cursor = revision.toString(),
-        serverAdmittedAt = SERVER_TIME,
-    )
+    private fun positionResult(key: String, status: ReaderSyncStatus, revision: Long, percent: Double, href: String) =
+        ReaderSyncMutationResult(
+            idempotencyKey = key,
+            resourceType = ReaderResourceType.READING_PROGRESS,
+            resourceId = "book-1",
+            mutationKind = ReaderMutationKind.UPSERT,
+            status = status,
+            canonicalPayload = progressPayload("book-1", percent, href),
+            serverAdmission = if (status == ReaderSyncStatus.APPLIED) ReaderServerAdmission.ACCEPTED else null,
+            revision = revision,
+            cursor = revision.toString(),
+            serverAdmittedAt = SERVER_TIME,
+        )
 
     /** Answer the next batch's single envelope as admitted, with an empty canonical payload. */
     private fun admit(key: String, kind: ReaderMutationKind) {
         gateway.answerMutations(
-            result("book-1", ReaderSyncStatus.APPLIED, revision = 2, payload = JsonObject(emptyMap()), key = key, kind = kind),
+            result(
+                "book-1",
+                ReaderSyncStatus.APPLIED,
+                revision = 2,
+                payload = JsonObject(emptyMap()),
+                key = key,
+                kind = kind,
+            ),
         )
     }
 
@@ -2151,35 +2278,32 @@ class AccountSyncEngineTest {
     private fun libraryOf(vararg items: ReaderLibraryItem) =
         ReaderLibraryResponse(requestId = REQUEST_ID, items = items.toList())
 
-    private fun item(
-        id: String,
-        title: String,
-        status: ReaderLibraryStatus = ReaderLibraryStatus.QUEUED,
-    ) = ReaderLibraryItem(
-        book = ReaderBook(
-            id = id,
-            title = title,
-            createdAt = SERVER_TIME,
-            updatedAt = SERVER_TIME,
-            author = "Frank Herbert",
-            language = "en",
-        ),
-        status = status,
-        createdAt = SERVER_TIME,
-        updatedAt = SERVER_TIME,
-        assets = listOf(
-            ReaderBookAsset(
-                assetId = "asset-$id",
-                bookId = id,
-                kind = ReaderBookAssetKind.EPUB,
-                uploadStatus = "ready",
+    private fun item(id: String, title: String, status: ReaderLibraryStatus = ReaderLibraryStatus.QUEUED) =
+        ReaderLibraryItem(
+            book = ReaderBook(
+                id = id,
+                title = title,
                 createdAt = SERVER_TIME,
                 updatedAt = SERVER_TIME,
-                checksum = "sha-$id",
+                author = "Frank Herbert",
+                language = "en",
             ),
-        ),
-        coverStatus = ReaderCoverStatus.COVERED,
-    )
+            status = status,
+            createdAt = SERVER_TIME,
+            updatedAt = SERVER_TIME,
+            assets = listOf(
+                ReaderBookAsset(
+                    assetId = "asset-$id",
+                    bookId = id,
+                    kind = ReaderBookAssetKind.EPUB,
+                    uploadStatus = "ready",
+                    createdAt = SERVER_TIME,
+                    updatedAt = SERVER_TIME,
+                    checksum = "sha-$id",
+                ),
+            ),
+            coverStatus = ReaderCoverStatus.COVERED,
+        )
 
     private fun itemPayload(id: String, title: String, status: String) = buildJsonObject {
         put(

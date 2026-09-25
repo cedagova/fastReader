@@ -10,14 +10,14 @@ import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 
 /** Result of loading one account's document from storage. */
-sealed interface AccountLibraryLoad {
+public sealed interface AccountLibraryLoad {
 
     /**
      * A usable document. [recoveredFrom] names a damaged document that was set
      * aside instead of being deleted; [migratedFrom] names an older schema
      * version that was upgraded on the way in.
      */
-    data class Loaded(
+    public data class Loaded(
         val document: AccountLibraryDocument,
         val recoveredFrom: String? = null,
         val migratedFrom: Int? = null,
@@ -28,13 +28,13 @@ sealed interface AccountLibraryLoad {
      * schema, or could not be read at all. The engine surfaces this and writes
      * nothing, so a newer build's queue survives an older build running.
      */
-    data class Blocked(val message: String) : AccountLibraryLoad
+    public data class Blocked(val message: String) : AccountLibraryLoad
 }
 
 /** Persistence boundary for one account's document. */
-interface AccountLibraryStore {
-    fun load(): AccountLibraryLoad
-    fun save(document: AccountLibraryDocument)
+public interface AccountLibraryStore {
+    public fun load(): AccountLibraryLoad
+    public fun save(document: AccountLibraryDocument)
 }
 
 /**
@@ -50,16 +50,18 @@ interface AccountLibraryStore {
  * document stays loadable. Deleting first would open a window in which a
  * process death leaves no document at all — and with it the unsent outbox.
  */
-class FileAccountLibraryStore internal constructor(
+public class FileAccountLibraryStore internal constructor(
     private val file: File,
     private val codec: AccountLibraryCodec,
     private val clock: () -> Long,
     private val replace: (source: File, target: File) -> Unit,
 ) : AccountLibraryStore {
 
-    constructor(
+    public constructor(file: File) : this(file, AccountLibraryCodec(), System::currentTimeMillis, ::atomicReplace)
+
+    internal constructor(
         file: File,
-        codec: AccountLibraryCodec = AccountLibraryCodec(),
+        codec: AccountLibraryCodec,
         clock: () -> Long = System::currentTimeMillis,
     ) : this(file, codec, clock, ::atomicReplace)
 
@@ -145,13 +147,13 @@ private fun syncDirectory(directory: File) {
  * caller can rewrite each one without this interface growing a second way to
  * save.
  */
-interface AccountLibraryStores {
+public interface AccountLibraryStores {
 
     /** The store for [userId]; a user id this device has never seen loads as an empty document. */
-    fun forUser(userId: String): AccountLibraryStore
+    public fun forUser(userId: String): AccountLibraryStore
 
     /** Every stored account document on this device except [userId]'s. */
-    fun exceptUser(userId: String): List<AccountLibraryStore>
+    public fun exceptUser(userId: String): List<AccountLibraryStore>
 }
 
 /**
@@ -164,10 +166,12 @@ interface AccountLibraryStores {
  * is all [forUser] needs — the id is stored *inside* the document for anything
  * that has to read it back.
  */
-class FileAccountLibraryStores(
+public class FileAccountLibraryStores internal constructor(
     private val directory: File,
-    private val codec: AccountLibraryCodec = AccountLibraryCodec(),
+    private val codec: AccountLibraryCodec,
 ) : AccountLibraryStores {
+
+    public constructor(directory: File) : this(directory, AccountLibraryCodec())
 
     override fun forUser(userId: String): AccountLibraryStore =
         FileAccountLibraryStore(File(directory, fileName(userId)), codec)
@@ -183,14 +187,13 @@ class FileAccountLibraryStores(
 
     private fun fileName(userId: String): String = PREFIX + sha256Hex(userId) + SUFFIX
 
-    private fun sha256Hex(value: String): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString(separator = "") { byte -> "%02x".format(byte) }
+    private fun sha256Hex(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .joinToString(separator = "") { byte -> "%02x".format(byte) }
 
-    companion object {
+    public companion object {
         /** The directory name under `filesDir`, beside the catalog's own. */
-        const val DIRECTORY_NAME: String = "account-library"
+        public const val DIRECTORY_NAME: String = "account-library"
         private const val PREFIX: String = "account-"
         private const val SUFFIX: String = ".json"
     }

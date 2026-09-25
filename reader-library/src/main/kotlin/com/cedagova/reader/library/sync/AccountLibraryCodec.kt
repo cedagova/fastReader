@@ -11,13 +11,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Result of turning stored bytes back into an [AccountLibraryDocument]. */
-sealed interface AccountLibraryDecoding {
+internal sealed interface AccountLibraryDecoding {
 
     /** Decoded successfully; [migratedFrom] is set when older bytes were upgraded on the way in. */
-    data class Decoded(
-        val document: AccountLibraryDocument,
-        val migratedFrom: Int? = null,
-    ) : AccountLibraryDecoding
+    data class Decoded(val document: AccountLibraryDocument, val migratedFrom: Int? = null) : AccountLibraryDecoding
 
     /** The bytes are damaged or not an account document at all; the caller re-bootstraps. */
     data class Damaged(val message: String) : AccountLibraryDecoding
@@ -44,7 +41,7 @@ sealed interface AccountLibraryDecoding {
  * written back as keys of the same level. A declared key always wins — a host
  * record can add to a level, never shadow what the schema says there.
  */
-class AccountLibraryCodec(
+internal class AccountLibraryCodec(
     private val json: Json = defaultJson,
     private val currentVersion: Int = AccountLibrarySchema.CURRENT_VERSION,
     private val migrations: Map<Int, AccountLibraryMigration> = AccountLibrarySchema.MIGRATIONS,

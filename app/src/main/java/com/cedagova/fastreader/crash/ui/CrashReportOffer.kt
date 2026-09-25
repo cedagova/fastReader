@@ -2,22 +2,15 @@ package com.cedagova.fastreader.crash.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
-
-/** Android's accessibility minimum for an interactive control (REQ-060, REQ-301). */
-private val TouchTarget = 48.dp
+import com.cedagova.fastreader.ui.components.ConfirmDialog
+import com.cedagova.fastreader.ui.theme.Spacing
 
 /**
  * The offer to share the report from the last crash (REQ-207).
@@ -46,55 +39,35 @@ fun CrashReportOffer(
     /** Set when no app on this device can accept the report as text. */
     shareUnavailable: Boolean = false,
 ) {
-    AlertDialog(
-        onDismissRequest = onDelete,
-        modifier = modifier.testTag("crash_offer"),
-        title = {
+    ConfirmDialog(
+        title = stringResource(R.string.crash_offer_title),
+        confirmLabel = stringResource(R.string.crash_offer_share),
+        dismissLabel = stringResource(R.string.crash_offer_delete),
+        onConfirm = onShare,
+        onDismiss = onDelete,
+        tag = "crash_offer",
+        modifier = modifier,
+        confirmTag = "crash_offer_share",
+        dismissTag = "crash_offer_delete",
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
             Text(
-                text = stringResource(R.string.crash_offer_title),
-                modifier = Modifier.semantics { heading() },
+                text = stringResource(R.string.crash_offer_body),
+                style = MaterialTheme.typography.bodyLarge,
             )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.crash_offer_contents),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (shareUnavailable) {
                 Text(
-                    text = stringResource(R.string.crash_offer_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = stringResource(R.string.crash_offer_contents),
+                    text = stringResource(R.string.crash_offer_unavailable),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("crash_offer_unavailable"),
                 )
-                if (shareUnavailable) {
-                    Text(
-                        text = stringResource(R.string.crash_offer_unavailable),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag("crash_offer_unavailable"),
-                    )
-                }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onShare,
-                modifier = Modifier
-                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
-                    .testTag("crash_offer_share"),
-            ) {
-                Text(stringResource(R.string.crash_offer_share))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDelete,
-                modifier = Modifier
-                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
-                    .testTag("crash_offer_delete"),
-            ) {
-                Text(stringResource(R.string.crash_offer_delete))
-            }
-        },
-    )
+        }
+    }
 }

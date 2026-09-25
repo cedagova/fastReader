@@ -1,10 +1,10 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.BookContentResult
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.content.EpubContentPipeline
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.BookContentResult
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.content.EpubContentPipeline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 

@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.library.store
 
-import com.cedagova.fastreader.content.ContentPipelineVersion
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.content.ContentPipelineVersion
+import com.cedagova.reader.engine.timing.RsvpTiming
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.floatOrNull
@@ -48,9 +48,7 @@ internal object ReadingStateV2Migration : CatalogMigration {
         return JsonObject(document + ("readingStates" to JsonObject(upgraded)))
     }
 
-    private fun JsonObject.float(name: String): Float =
-        this[name]?.jsonPrimitive?.floatOrNull ?: 0f
+    private fun JsonObject.float(name: String): Float = this[name]?.jsonPrimitive?.floatOrNull ?: 0f
 
-    private fun JsonObject.long(name: String): Long =
-        this[name]?.jsonPrimitive?.longOrNull ?: 0L
+    private fun JsonObject.long(name: String): Long = this[name]?.jsonPrimitive?.longOrNull ?: 0L
 }

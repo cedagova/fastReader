@@ -24,7 +24,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * returned as it arrived: that reader is at the default size, and the default
  * word size is the same step. A `settings` or `fontSize` value of the wrong
  * shape falls through untouched rather than throwing, because a throw here
- * escapes [CatalogCodec.decode]'s guard and would set aside the reader's whole
+ * escapes [com.cedagova.fastreader.library.CatalogCodec.decode]'s guard and would set aside the reader's whole
  * library.
  */
 internal object WordSizeV8Migration : CatalogMigration {

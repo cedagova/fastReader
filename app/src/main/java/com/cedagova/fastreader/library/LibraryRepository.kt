@@ -1,19 +1,6 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.epub.EpubByteSource
-import com.cedagova.fastreader.epub.FileEpubByteSource
-import com.cedagova.fastreader.library.store.CatalogLoad
-import com.cedagova.fastreader.library.store.CatalogStore
-import com.cedagova.fastreader.library.store.CoverStore
-import com.cedagova.fastreader.settings.ReaderSettings
-import com.cedagova.fastreader.settings.ThemeMirror
 import java.io.File
-import java.io.FileInputStream
-import java.io.IOException
-import java.io.InputStream
-import java.nio.channels.SeekableByteChannel
-import java.nio.file.Files
-import java.nio.file.StandardOpenOption
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,88 +14,48 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * The library's single entry point for the UI (LEAF102) and later for the reader.
+ * The device library: what is in it, and the changes a reader makes to it —
+ * adding and rescanning books and folders, removing them with an undo window,
+ * and the private copies of account books (LEAF102, #118).
  *
- * Owns the catalog in memory, serialises every mutation, and runs all file work
- * off the main thread. When the stored catalog is unreadable in a way that would
- * lose data, the repository refuses to write and reports it instead.
+ * Settings, reading positions and book bytes are not its business (#204): they
+ * are [ReaderSettingsStore], [ReadingPositions] and [BookBytes]. All of them
+ * share one [CatalogDocument], the single writer of `catalog.json`, and are
+ * built together by [DeviceLibrary].
+ *
+ * Runs all file work off the main thread. When the stored catalog is unreadable
+ * in a way that would lose data, the document refuses to write and reports it
+ * instead.
  */
-class LibraryRepository(
-    private val store: CatalogStore,
+class LibraryRepository internal constructor(
+    private val document: CatalogDocument,
     private val ingestor: CatalogIngestor,
     private val gateway: DocumentGateway,
-    private val covers: CoverStore,
     private val scope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher,
-    private val clock: () -> Long = System::currentTimeMillis,
-    /**
-     * Keeps the pre-Compose copy of the theme choice in step with the catalog
-     * (AD-10). Defaults to [ThemeMirror.None], which mirrors nothing: only the
-     * running app needs a real one.
-     */
-    private val themeMirror: ThemeMirror = ThemeMirror.None,
-    private val minimumRescanIntervalMs: Long = DEFAULT_MINIMUM_RESCAN_INTERVAL_MS,
-    private val undoWindowMs: Long = DEFAULT_UNDO_WINDOW_MS,
-    positionFlushIntervalMs: Long = ReadingPositionWriter.DEFAULT_INTERVAL_MILLIS,
+    private val clock: () -> Long,
+    private val minimumRescanIntervalMs: Long,
+    private val undoWindowMs: Long,
 ) {
-
-    private val mutex = Mutex()
-    private val _catalog = MutableStateFlow(Catalog())
-    private val _ingestion = MutableStateFlow<IngestionState>(IngestionState.Idle)
-    private val _persistenceFailure = MutableStateFlow<String?>(null)
-    private val _settings = MutableStateFlow(ReaderSettings.DEFAULTS)
 
     /**
      * The book removal that can still be taken back, and the timer that ends the
-     * offer. Held under [undoMutex] rather than [mutex] so claiming the pending
-     * removal never nests inside a catalog write, which would deadlock.
+     * offer. Held under [undoMutex] rather than the document's lock so claiming
+     * the pending removal never nests inside a catalog write, which would
+     * deadlock.
      */
     private val undoMutex = Mutex()
     private var pendingRemoval: PendingRemoval? = null
     private val _undoableRemoval = MutableStateFlow<RemovedBook?>(null)
 
-    /**
-     * Coalesces reading positions so the reader can report one per word without
-     * putting a durable write between two frames. See [ReadingPositionWriter].
-     */
-    private val positions = ReadingPositionWriter(scope, positionFlushIntervalMs) { bookId, state ->
-        writeReadingState(bookId, state)
-    }
-
-    private var loaded = false
-    private var blockedMessage: String? = null
+    /** Read and written only inside a [CatalogDocument.transaction], under its lock. */
     private var lastScanAtEpochMs = 0L
 
     /** The current catalog. Empty until the first load completes. */
-    val catalog: StateFlow<Catalog> = _catalog.asStateFlow()
+    val catalog: StateFlow<Catalog> get() = document.catalog
 
     /** Loading/result state for the library's loading and refresh affordances. */
-    val ingestion: StateFlow<IngestionState> = _ingestion.asStateFlow()
-
-    /**
-     * Non-null while the store is refusing writes, so losing a reading position is
-     * never silent (the definition's persistence guardrail). The reader shows it
-     * on the reading surface, where the library's own banner is not visible.
-     */
-    val persistenceFailure: StateFlow<String?> = _persistenceFailure.asStateFlow()
-
-    /**
-     * How the reader wants books presented (LEAF302).
-     *
-     * A projection of [catalog], so there is exactly one source of truth: the
-     * settings screen, the app's theme, the library and the reader all read the
-     * value the store accepted, and a write that fails leaves every one of them
-     * showing what is actually saved while [persistenceFailure] says why.
-     *
-     * It is published by [publish] alongside the catalog rather than derived with
-     * `map(…).stateIn(…)`, because that would put a dispatch between a settings
-     * write landing and the theme changing — one frame of the old theme on every
-     * change, and a value that lags its own catalog in any caller that reads both.
-     *
-     * Its value is [ReaderSettings.DEFAULTS] until [load] has run, which is also
-     * what a device with nothing stored resolves to.
-     */
-    val settings: StateFlow<ReaderSettings> = _settings.asStateFlow()
+    val ingestion: StateFlow<IngestionState> get() = document.ingestion
 
     /**
      * The book the reader has just removed, while taking it back is still on
@@ -117,7 +64,7 @@ class LibraryRepository(
     val undoableRemoval: StateFlow<RemovedBook?> = _undoableRemoval.asStateFlow()
 
     /** Loads the stored catalog without scanning. Safe to call repeatedly. */
-    suspend fun load() = mutex.withLock { ensureLoaded() }
+    suspend fun load() = document.load()
 
     /**
      * Re-checks whether the last-read book is still reachable, and nothing else.
@@ -132,12 +79,11 @@ class LibraryRepository(
      * It writes only when the answer changed, so the ordinary launch does no I/O
      * beyond the read it already did.
      */
-    suspend fun refreshLastReadBook() = mutex.withLock {
-        if (!ensureLoaded()) return@withLock
-        val catalog = _catalog.value
-        val bookId = catalog.lastReadBookId ?: return@withLock
-        val book = catalog.book(bookId) ?: return@withLock
-        if (book.sources.isEmpty()) return@withLock
+    suspend fun refreshLastReadBook() = document.transaction {
+        val catalog = current
+        val bookId = catalog.lastReadBookId ?: return@transaction
+        val book = catalog.book(bookId) ?: return@transaction
+        if (book.sources.isEmpty()) return@transaction
         val refreshed = withContext(ioDispatcher) {
             book.sources.map { source ->
                 // A private copy has no provider to ask and no permission to
@@ -154,20 +100,18 @@ class LibraryRepository(
                 source.copy(availability = availability)
             }
         }
-        if (refreshed == book.sources) return@withLock
+        if (refreshed == book.sources) return@transaction
         val next = catalog.copy(
             books = catalog.books.map { if (it.id == bookId) it.copy(sources = refreshed) else it },
         )
         try {
-            withContext(ioDispatcher) { store.save(next) }
+            save(next)
             publish(next)
         } catch (error: Exception) {
             // Routing still uses the fresher in-memory answer; the write failing
             // is a library problem, not a reason to resume into an unreadable book.
             publish(next)
-            val message = error.message ?: "the library could not be updated"
-            _ingestion.value = IngestionState.Failed(message)
-            _persistenceFailure.value = message
+            reportWriteFailure(error.message ?: "the library could not be updated")
         }
     }
 
@@ -226,14 +170,14 @@ class LibraryRepository(
      */
     suspend fun removeBook(bookId: String) {
         var removed: Book? = null
-        mutateCatalog { catalog ->
+        document.write { catalog ->
             removed = catalog.book(bookId)
             if (removed == null) catalog else ingestor.removeBook(catalog, bookId)
         }
         val book = removed ?: return
         // A write that failed left the book on screen; offering to undo a removal
         // that did not happen would be a lie the reader could tap.
-        if (_catalog.value.book(bookId) != null) return
+        if (document.catalog.value.book(bookId) != null) return
         offerUndo(book)
     }
 
@@ -244,7 +188,7 @@ class LibraryRepository(
     suspend fun undoRemoveBook() {
         val pending = claimPendingRemoval(null) ?: return
         pending.timer.cancel()
-        mutateCatalog { ingestor.restoreBook(it, pending.book) }
+        document.write { ingestor.restoreBook(it, pending.book) }
     }
 
     /**
@@ -252,174 +196,24 @@ class LibraryRepository(
      * ([Catalog.booksOnlyFrom]). Files are never touched and every position is
      * kept, including those of the books that left (REQ-104, REQ-004).
      */
-    suspend fun removeFolder(folderId: String) = mutateCatalog { ingestor.removeFolder(it, folderId) }
-
-    /**
-     * Notes where the reader is, without writing yet (REQ-016).
-     *
-     * Safe to call once per word: the position is held in memory and written at
-     * most twice a second. Anything that is not "the next word" should follow it
-     * with [flushReadingState].
-     */
-    fun recordReadingState(bookId: String, state: ReadingState) = positions.record(bookId, state)
-
-    /** Makes the last [recordReadingState] durable now. Returns the job doing it. */
-    fun flushReadingState(): Job = positions.flush()
-
-    /** Stores the reading position for a book, waiting for the write. */
-    suspend fun updateReadingState(bookId: String, state: ReadingState) = writeReadingState(bookId, state)
-
-    /**
-     * Stores a change to the reader's settings (REQ-020 to REQ-023).
-     *
-     * Takes a transform rather than a whole value so two changes made in quick
-     * succession cannot lose one another: each one is applied to whatever the
-     * store currently holds, under the same mutex every other catalog write uses.
-     *
-     * The write is loud on failure like every other one here — [settings] keeps
-     * reporting the value that is actually saved and [persistenceFailure] carries
-     * the reason — so a setting that appears not to take is a store problem the
-     * reader is told about, never a silently discarded preference.
-     */
-    suspend fun updateSettings(transform: (ReaderSettings) -> ReaderSettings) =
-        mutateCatalog { it.copy(settings = transform(it.settings)) }
-
-    /** Fire-and-forget [updateSettings], for the settings screen's callbacks. */
-    fun requestUpdateSettings(transform: (ReaderSettings) -> ReaderSettings): Job =
-        scope.launch { updateSettings(transform) }
-
-    /**
-     * Records that this book has been offered the front-matter skip (REQ-202).
-     *
-     * Written whichever way the reader answered, because the requirement is that
-     * the offer is made *once*: someone who chose to start at the cover has
-     * answered the question and must not be asked it again.
-     *
-     * A book that is already in the set is not rewritten, so answering the offer
-     * on a book that somehow reached it twice costs no catalog write.
-     */
-    suspend fun markFrontMatterOffered(bookId: String) = mutateCatalog { catalog ->
-        if (bookId in catalog.frontMatterOfferedBookIds) {
-            catalog
-        } else {
-            catalog.copy(frontMatterOfferedBookIds = catalog.frontMatterOfferedBookIds + bookId)
-        }
-    }
-
-    /** Fire-and-forget [markFrontMatterOffered], for the reader's callbacks. */
-    fun requestMarkFrontMatterOffered(bookId: String): Job = scope.launch { markFrontMatterOffered(bookId) }
-
-    /** The retained position for a book, including one that was removed and re-added. */
-    fun readingState(bookId: String): ReadingState? = _catalog.value.readingStates[bookId]
-
-    /**
-     * The one place a position reaches the store.
-     *
-     * Recording a position is also what makes a book the last-read one, which is
-     * what launch resumes into (REQ-009) — but only for a book the catalog has.
-     * The id is still kept for a book that is currently missing or removed,
-     * because the launch routing has to name the book it could not open; what it
-     * is *not* kept for is a book that was never a library row at all.
-     *
-     * That case is new in v1.1.0: a session-only "Open with" stores a position
-     * under a digest the catalog does not list (REQ-103, AD-9). Making that the
-     * last-read book would send the next launch looking for a row that does not
-     * exist and land the reader on "it is no longer in your library" — a sentence
-     * about a book they never added. Leaving the id alone means the last book
-     * they actually own stays the one launch comes back to, and the external
-     * book's position is kept exactly as the definition says, waiting for the
-     * file to be added.
-     *
-     * ## The one thing a write must not do (AD-18)
-     *
-     * A position taken from an open that produced no structural fingerprint —
-     * the streaming fallback, or a book whose layout the directory reader refuses
-     * — carries a null. Storing that null over a fingerprint already recorded
-     * would disarm the content-change guard for that book silently and for good:
-     * nothing would report it, and the next swapped file would resume at an
-     * arbitrary word again. So a null keeps what is stored, and only a real
-     * fingerprint replaces one. A book only ever gains this protection.
-     *
-     * Done here rather than at the reader's boundary because this is the single
-     * place a position reaches the store, and it runs under the catalog mutex
-     * with the current document in hand — so the read of the previous value and
-     * the write of the new one cannot interleave with another write.
-     */
-    private suspend fun writeReadingState(bookId: String, state: ReadingState) = mutateCatalog { catalog ->
-        val storedFingerprint = catalog.readingStates[bookId]?.structuralFingerprint
-        val next = state.copy(
-            structuralFingerprint = state.structuralFingerprint ?: storedFingerprint,
-            updatedAtEpochMs = clock(),
-        )
-        catalog.copy(
-            readingStates = catalog.readingStates + (bookId to next),
-            lastReadBookId = if (catalog.book(bookId) != null) bookId else catalog.lastReadBookId,
-        )
-    }
-
-    /** The cached cover image for a book, or null when it has none. */
-    fun coverFile(bookId: String): File? = covers.read(bookId)
-
-    /**
-     * The book's bytes, as everything that reads a book wants them (#118).
-     *
-     * One seam, two kinds of source behind it. A picked or folder-discovered
-     * book is read in place through the document provider (AD-1); a private copy
-     * of an account book is a file this app owns, read through
-     * [FileEpubByteSource] (AD-24). Which one it is, is decided here and
-     * nowhere else — the reader, the pipeline and the archive reader see an
-     * [EpubByteSource] and do not know the difference, which is exactly what
-     * "a copy opens like a device book" (REQ-510) has to mean in code.
-     *
-     * It resolves the source lazily, on each `open`, so a reference held across
-     * a rescan still opens whatever is readable now.
-     */
-    fun byteSource(bookId: String): EpubByteSource = object : EpubByteSource {
-        override fun open(): InputStream = openBook(bookId)
-
-        override fun openChannel(): SeekableByteChannel? = openBookChannel(bookId)
-    }
-
-    /**
-     * Opens the book's bytes for reading, in place. The reading pipeline
-     * (increment 002) consumes this instead of holding URIs of its own.
-     */
-    @Throws(IOException::class)
-    fun openBook(bookId: String): InputStream = when (val source = readableSource(bookId)) {
-        is ReadableSource.PrivateFile -> FileInputStream(source.file)
-        is ReadableSource.Document -> gateway.open(source.uri)
-    }
-
-    /**
-     * A seekable view of the book's bytes, or null when the provider has none.
-     *
-     * What lets the reader open a book by seeking to its text instead of reading
-     * past its pictures (REQ-110). A private copy always has one, which is why a
-     * downloaded book opens through the directory strategy rather than the
-     * streaming fallback.
-     */
-    @Throws(IOException::class)
-    fun openBookChannel(bookId: String): SeekableByteChannel? = when (val source = readableSource(bookId)) {
-        is ReadableSource.PrivateFile -> Files.newByteChannel(source.file.toPath(), StandardOpenOption.READ)
-        is ReadableSource.Document -> gateway.openSeekable(source.uri)
-    }
+    suspend fun removeFolder(folderId: String) = document.write { ingestor.removeFolder(it, folderId) }
 
     /**
      * Adds the verified private copy of an account book to the catalog (#118).
      *
      * [file] must already have been verified by
-     * `com.cedagova.fastreader.account.library.AccountCopyStore`: this writes a
+     * `com.cedagova.reader.account.library.AccountCopyStore`: this writes a
      * catalog row, and a row is a promise that the bytes are the book. Returns
      * the id of the row the copy belongs to — the same id a device book of the
      * same content already has, when there is one — or null when the file could
      * not be read as an EPUB at all.
      */
     suspend fun addAccountCopy(contentSha256: String, file: File, displayName: String): String? {
-        mutateCatalog { catalog ->
+        document.write { catalog ->
             withContext(ioDispatcher) { ingestor.addAccountCopy(catalog, contentSha256, file, displayName).catalog }
         }
         val uri = BookSource.accountCopyUri(contentSha256)
-        return _catalog.value.books.firstOrNull { book -> book.sources.any { it.uri == uri } }?.id
+        return document.catalog.value.books.firstOrNull { book -> book.sources.any { it.uri == uri } }?.id
     }
 
     /**
@@ -431,7 +225,7 @@ class LibraryRepository(
      * the reader left off.
      */
     suspend fun removeAccountCopy(bookId: String) =
-        mutateCatalog { catalog -> ingestor.removeAccountCopy(catalog, bookId) }
+        document.write { catalog -> ingestor.removeAccountCopy(catalog, bookId) }
 
     /**
      * Re-checks whether each private copy's file is still there (#118).
@@ -440,50 +234,25 @@ class LibraryRepository(
      * and a row that claims to be readable when its bytes are gone is the one
      * state the library has no way to explain.
      */
-    suspend fun reconcileAccountCopies(exists: (String) -> Boolean = { File(it).isFile }) = mutex.withLock {
-        if (!ensureLoaded()) return@withLock
-        val catalog = _catalog.value
+    suspend fun reconcileAccountCopies(exists: (String) -> Boolean = { File(it).isFile }) = document.transaction {
+        val catalog = current
         val next = withContext(ioDispatcher) { ingestor.reconcileAccountCopies(catalog, exists) }
-        // Deliberately not [mutateCatalog]: this runs on every process that has
+        // Deliberately not [CatalogDocument.write]: this runs on every process that has
         // ever downloaded a book, and the answer is almost always "everything is
         // where it was". A write that changes nothing is still a write — one
         // that would re-save the catalog and re-push the theme mirror on every
         // start — so the unchanged case does nothing at all.
-        if (next == catalog) return@withLock
+        if (next == catalog) return@transaction
         try {
-            withContext(ioDispatcher) { store.save(next) }
+            save(next)
             publish(next)
         } catch (error: Exception) {
             // A row that claims to be readable when its bytes are gone is worse
             // than a stale document, so the in-memory answer is published either
             // way and the failure is reported the way every other write failure is.
             publish(next)
-            val message = error.message ?: "the library could not be updated"
-            _ingestion.value = IngestionState.Failed(message)
-            _persistenceFailure.value = message
+            reportWriteFailure(error.message ?: "the library could not be updated")
         }
-    }
-
-    /** Where a book's bytes are right now: a file this app owns, or a provider document. */
-    private sealed interface ReadableSource {
-        data class PrivateFile(val file: File) : ReadableSource
-        data class Document(val uri: String) : ReadableSource
-    }
-
-    @Throws(IOException::class)
-    private fun readableSource(bookId: String): ReadableSource {
-        val book = _catalog.value.book(bookId) ?: throw IOException("unknown book $bookId")
-        val source = book.readableSource ?: throw IOException("no reachable source for ${book.title}")
-        val path = source.filePath
-        if (source.isAccountCopy) {
-            // A copy with no path is a row this build could not have written.
-            // Failing here keeps "a copy is verified before it is readable" true
-            // rather than handing an account-copy uri to the document provider,
-            // which would fail later and less clearly.
-            if (path == null) throw IOException("the private copy of ${book.title} has no file")
-            return ReadableSource.PrivateFile(File(path))
-        }
-        return ReadableSource.Document(source.uri)
     }
 
     /** Fire-and-forget wrappers for callers without a coroutine scope of their own. */
@@ -537,55 +306,6 @@ class LibraryRepository(
     }
 
     /**
-     * Gives back every long-lived grant the catalog no longer references.
-     *
-     * [releaseGrantsNoLongerNeeded] only runs while the process that removed the
-     * book is alive. A reader who removes a book and then swipes the app away
-     * inside the undo window leaves the row gone from the stored catalog and the
-     * grant still held, with nothing left in memory that knows about it — and
-     * Android caps how many persisted grants an app may hold, so that leak
-     * eventually stops the reader from adding books at all. The platform's own
-     * list is the only record that survives, so reconciling against it at load
-     * closes that window and any grant an earlier crash orphaned.
-     *
-     * It runs exactly once per process, from the first successful load, which is
-     * necessarily before this process can have a removal pending.
-     *
-     * It runs only on a load that produced a *genuine* catalog. Two loads report
-     * an empty one without meaning the library is empty, and sweeping against
-     * either would release the grant for every book the reader has:
-     *
-     * - a **blocked** store, which refuses to be read at all; and
-     * - a **recovered** one, where a damaged document was set aside under
-     *   `recoveredFrom` and the app carried on with an empty catalog. That path
-     *   exists to make corruption survivable — the document is kept, not
-     *   deleted. A grant cannot be taken again except by sending the reader back
-     *   through the document picker, so releasing them here would destroy the
-     *   access the set-aside document describes and make it unrecoverable even
-     *   if repaired. Grants orphaned before the corruption simply wait for the
-     *   next clean load.
-     *
-     * A migrated catalog is a real one and needs no such guard.
-     *
-     * A grant that cannot be enumerated or given back is a housekeeping miss,
-     * not a reason to refuse to show the library, so it does not fail the load.
-     */
-    private fun releaseOrphanedGrants(catalog: Catalog) {
-        try {
-            val referenced = HashSet<String>()
-            catalog.books.forEach { book -> book.sources.forEach { referenced += it.uri } }
-            catalog.folders.forEach { referenced += it.treeUri }
-            gateway.persistedReadPermissions()
-                .filterNot { it in referenced }
-                // Neither gateway distinguishes a tree from a document when
-                // giving a grant back; a sweep cannot know which an orphan is.
-                .forEach { gateway.releaseReadPermission(it, isTree = false) }
-        } catch (_: Exception) {
-            // Deliberately quiet: see above.
-        }
-    }
-
-    /**
      * Gives back only the grants nothing in the catalog still uses.
      *
      * Re-picking the same file inside the undo window brings the book back with
@@ -594,7 +314,7 @@ class LibraryRepository(
      * timer cannot stop half-way through this.
      */
     private fun releaseGrantsNoLongerNeeded(book: Book) {
-        val stillUsed = _catalog.value.book(book.id)?.sources?.mapTo(HashSet()) { it.uri }.orEmpty()
+        val stillUsed = document.catalog.value.book(book.id)?.sources?.mapTo(HashSet()) { it.uri }.orEmpty()
         ingestor.releaseGrants(book.sources.filterNot { it.uri in stillUsed })
     }
 
@@ -602,113 +322,30 @@ class LibraryRepository(
         trigger: ScanTrigger,
         skip: () -> Boolean = { false },
         block: (Catalog, ScanProgress) -> IngestOutcome,
-    ) = mutex.withLock {
-        if (!ensureLoaded()) return@withLock
-        if (skip()) return@withLock
-        _ingestion.value = IngestionState.Scanning(trigger)
+    ) = document.transaction {
+        if (skip()) return@transaction
+        report(IngestionState.Scanning(trigger))
         val progress = ScanProgress { processed, total, name ->
-            _ingestion.value = IngestionState.Scanning(trigger, processed, total, name)
+            report(IngestionState.Scanning(trigger, processed, total, name))
         }
         try {
-            val outcome = withContext(ioDispatcher) { block(_catalog.value, progress) }
-            withContext(ioDispatcher) { store.save(outcome.catalog) }
+            val outcome = withContext(ioDispatcher) { block(current, progress) }
+            save(outcome.catalog)
             publish(outcome.catalog)
-            _persistenceFailure.value = null
+            clearPersistenceFailure()
             lastScanAtEpochMs = clock()
-            _ingestion.value = IngestionState.Completed(
-                trigger = trigger,
-                added = outcome.added,
-                updated = outcome.updated,
-                rejected = outcome.rejected,
-                unavailable = outcome.unavailable,
-                finishedAtEpochMs = lastScanAtEpochMs,
+            report(
+                IngestionState.Completed(
+                    trigger = trigger,
+                    added = outcome.added,
+                    updated = outcome.updated,
+                    rejected = outcome.rejected,
+                    unavailable = outcome.unavailable,
+                    finishedAtEpochMs = lastScanAtEpochMs,
+                ),
             )
         } catch (error: Exception) {
-            _ingestion.value = IngestionState.Failed(error.message ?: "the library could not be updated")
-        }
-    }
-
-    /**
-     * One catalog write under the one lock. [block] is a suspending lambda so a
-     * write whose work is more than a field change — inspecting a downloaded
-     * copy, for instance — can put that work on the IO dispatcher itself rather
-     * than leaving it on whatever thread happened to call.
-     */
-    private suspend fun mutateCatalog(block: suspend (Catalog) -> Catalog) = mutex.withLock {
-        if (!ensureLoaded()) return@withLock
-        try {
-            val next = block(_catalog.value)
-            withContext(ioDispatcher) {
-                store.save(next)
-                // Catalog first, mirror second, both before anything is published.
-                // A catalog write that throws therefore leaves *both* copies at
-                // the old value, so the two can never disagree about a change
-                // that did not happen (AD-10).
-                themeMirror.write(next.settings.theme)
-            }
-            publish(next)
-            _persistenceFailure.value = null
-            // A store that has just accepted a write is no longer failing, so the
-            // library's banner has to go with the reader's. Without this, one
-            // transient write failure would leave "the library could not be
-            // updated" on screen until the next folder scan — and since positions
-            // are written continuously now, that is a banner a reader could easily
-            // provoke and never be able to clear.
-            if (_ingestion.value is IngestionState.Failed) _ingestion.value = IngestionState.Idle
-        } catch (error: Exception) {
-            // Loud on both surfaces: the library banner and, while reading, the
-            // reader's own. A write that fails silently is a lost position.
-            val message = error.message ?: "your place could not be saved"
-            _ingestion.value = IngestionState.Failed(message)
-            _persistenceFailure.value = message
-        }
-    }
-
-    /**
-     * The one place the catalog becomes visible, so [catalog] and [settings] can
-     * never disagree about which document they describe.
-     */
-    private fun publish(next: Catalog) {
-        _catalog.value = next
-        _settings.value = next.settings
-    }
-
-    /** Returns false when the catalog must not be written, leaving the reason in [ingestion]. */
-    private suspend fun ensureLoaded(): Boolean {
-        blockedMessage?.let {
-            _ingestion.value = IngestionState.Failed(it)
-            _persistenceFailure.value = it
-            return false
-        }
-        if (loaded) return true
-        return when (val load = withContext(ioDispatcher) { store.load() }) {
-            is CatalogLoad.Loaded -> {
-                publish(load.catalog)
-                loaded = true
-                // Re-sync on load, not only on write: this is what repairs a
-                // mirror that a failed write left stale, and what gives an
-                // install whose catalog predates the mirror a correct second
-                // launch instead of a permanently default first frame.
-                // Unconditional, recovery included: a recovered load really does
-                // put the app on the default theme, so the mirror has to say so
-                // or the next cold start opens on the pre-corruption colour.
-                withContext(ioDispatcher) { themeMirror.write(load.catalog.settings.theme) }
-                // The grant sweep is the opposite case and stays guarded: an
-                // empty recovered catalog is no evidence the library is empty,
-                // and a released grant cannot be taken back. See
-                // [releaseOrphanedGrants].
-                if (load.recoveredFrom == null) {
-                    withContext(ioDispatcher) { releaseOrphanedGrants(load.catalog) }
-                }
-                true
-            }
-
-            is CatalogLoad.Blocked -> {
-                blockedMessage = load.message
-                _ingestion.value = IngestionState.Failed(load.message)
-                _persistenceFailure.value = load.message
-                false
-            }
+            report(IngestionState.Failed(error.message ?: "the library could not be updated"))
         }
     }
 
@@ -761,4 +398,54 @@ private fun DocumentLookup.availability(): SourceAvailability = when (this) {
     is DocumentLookup.Found -> SourceAvailability.AVAILABLE
     DocumentLookup.Missing -> SourceAvailability.MISSING
     DocumentLookup.PermissionLost -> SourceAvailability.PERMISSION_LOST
+}
+
+/**
+ * Gives back every long-lived grant the catalog no longer references.
+ *
+ * `LibraryRepository.releaseGrantsNoLongerNeeded` only runs while the process that removed the
+ * book is alive. A reader who removes a book and then swipes the app away
+ * inside the undo window leaves the row gone from the stored catalog and the
+ * grant still held, with nothing left in memory that knows about it — and
+ * Android caps how many persisted grants an app may hold, so that leak
+ * eventually stops the reader from adding books at all. The platform's own
+ * list is the only record that survives, so reconciling against it at load
+ * closes that window and any grant an earlier crash orphaned.
+ *
+ * It runs exactly once per process, as the [CatalogDocument]'s clean-load hook
+ * from the first successful load, which is necessarily before this process can
+ * have a removal pending.
+ *
+ * It runs only on a load that produced a *genuine* catalog. Two loads report
+ * an empty one without meaning the library is empty, and sweeping against
+ * either would release the grant for every book the reader has:
+ *
+ * - a **blocked** store, which refuses to be read at all; and
+ * - a **recovered** one, where a damaged document was set aside under
+ *   `recoveredFrom` and the app carried on with an empty catalog. That path
+ *   exists to make corruption survivable — the document is kept, not
+ *   deleted. A grant cannot be taken again except by sending the reader back
+ *   through the document picker, so releasing them here would destroy the
+ *   access the set-aside document describes and make it unrecoverable even
+ *   if repaired. Grants orphaned before the corruption simply wait for the
+ *   next clean load.
+ *
+ * A migrated catalog is a real one and needs no such guard.
+ *
+ * A grant that cannot be enumerated or given back is a housekeeping miss,
+ * not a reason to refuse to show the library, so it does not fail the load.
+ */
+internal fun DocumentGateway.releaseOrphanedGrants(catalog: Catalog) {
+    try {
+        val referenced = HashSet<String>()
+        catalog.books.forEach { book -> book.sources.forEach { referenced += it.uri } }
+        catalog.folders.forEach { referenced += it.treeUri }
+        persistedReadPermissions()
+            .filterNot { it in referenced }
+            // Neither gateway distinguishes a tree from a document when
+            // giving a grant back; a sweep cannot know which an orphan is.
+            .forEach { releaseReadPermission(it, isTree = false) }
+    } catch (_: Exception) {
+        // Deliberately quiet: see above.
+    }
 }

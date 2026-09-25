@@ -2,15 +2,15 @@ package com.cedagova.fastreader.reader.ui
 
 import androidx.annotation.StringRes
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.ContentFailureReason
-import com.cedagova.fastreader.content.SkipMarkerToken
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderSession
-import com.cedagova.fastreader.reader.RemainingTimeIndex
-import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.ContentFailureReason
+import com.cedagova.reader.engine.content.SkipMarkerToken
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.content.WordToken
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RemainingTimeIndex
 import kotlin.math.roundToInt
 
 /**
@@ -49,10 +49,7 @@ sealed interface ReaderUiState {
      * live: [com.cedagova.fastreader.reader.ui.messageRes] maps each reason to a
      * plain-language string, in the register of the library's own states.
      */
-    data class Unavailable(
-        override val bookTitle: String,
-        val reason: ContentFailureReason,
-    ) : ReaderUiState
+    data class Unavailable(override val bookTitle: String, val reason: ContentFailureReason) : ReaderUiState
 
     /** The reader proper. */
     data class Reading(
@@ -147,16 +144,10 @@ data class ReaderContext(
  * sets it — including the cases a plain space would get wrong, such as an em dash
  * with no space around it.
  */
-data class ContextWord(
-    val text: String,
-    val gapAfter: String = " ",
-)
+data class ContextWord(val text: String, val gapAfter: String = " ")
 
 /** One row of the chapter picker (REQ-014). */
-data class ChapterEntry(
-    val chapterIndex: Int,
-    val title: String,
-)
+data class ChapterEntry(val chapterIndex: Int, val title: String)
 
 /**
  * The per-book half of the screen state: everything that depends on the parsed
@@ -181,7 +172,7 @@ class ReaderBookView(
      * materially sooner than the same book read with `strong`. Changing the
      * setting mid-book therefore has to build a new view rather than leave a
      * stale estimate on screen — see
-     * [com.cedagova.fastreader.reader.ReaderViewModel.setPauseStrength].
+     * [com.cedagova.fastreader.reader.ui.ReaderViewModel.setPauseStrength].
      */
     val pauseStrength: PauseStrength = PauseStrength.NORMAL,
 ) {
@@ -250,7 +241,9 @@ private fun Token.toReaderWord(): ReaderWord = when (this) {
         coreStart = coreStart,
         coreEnd = coreEnd,
     )
+
     is SkipMarkerToken -> ReaderWord(text = label, isSkipMarker = true)
+
     else -> ReaderWord(text = displayText)
 }
 

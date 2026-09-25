@@ -3,6 +3,9 @@ package com.cedagova.fastreader.account.library
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.DocumentGateway
 import com.cedagova.fastreader.library.DocumentLookup
+import com.cedagova.reader.account.library.DevicePublicationSources
+import com.cedagova.reader.account.library.PublicationSourceProblem
+import com.cedagova.reader.account.library.PublicationSourceResult
 import com.cedagova.reader.library.imports.PublicationSource
 import java.io.IOException
 import java.io.InputStream
@@ -46,29 +49,6 @@ class DeviceBookPublicationSource(
     }
 }
 
-/** Why a device book cannot be turned into a [PublicationSource] right now. */
-enum class PublicationSourceProblem {
-    /** No source of this book is reachable: the file moved, or the grant is gone. */
-    UNREACHABLE,
-
-    /**
-     * The provider will not say how long the file is, and nothing here could
-     * measure it either.
-     *
-     * It matters because the size is not cosmetic: it is what the policy cap is
-     * checked against and what `Upload-Length` declares to the storage
-     * provider, so a guess would either refuse a book that fits or start a
-     * transfer that can never complete.
-     */
-    SIZE_UNKNOWN,
-}
-
-/** A device book resolved to bytes, or the reason it could not be. */
-sealed interface PublicationSourceResult {
-    data class Ready(val source: PublicationSource) : PublicationSourceResult
-    data class Unavailable(val problem: PublicationSourceProblem) : PublicationSourceResult
-}
-
 /**
  * Turns a catalog [Book] into the bytes the import path reads.
  *
@@ -82,8 +62,20 @@ sealed interface PublicationSourceResult {
  * rather than a stream count — a forward pass over a fifty-megabyte file to
  * learn a number the provider simply did not give is not a thing to do on the
  * tap of a button, and the book stays exactly as readable as it was.
+ *
+ * It is FastReader's [DevicePublicationSources], the import's host seam in
+ * `:reader-account` (#200): [sourceFor] resolves the catalog book behind an id
+ * with [bookForId] and a book this device no longer has is
+ * [PublicationSourceProblem.UNREACHABLE].
  */
-class DeviceBookSources(private val gateway: DocumentGateway) {
+class DeviceBookSources(
+    private val gateway: DocumentGateway,
+    /** The catalog's book for an id, or null when this device no longer has it. */
+    private val bookForId: (String) -> Book?,
+) : DevicePublicationSources {
+
+    override fun sourceFor(deviceBookId: String): PublicationSourceResult =
+        bookForId(deviceBookId)?.let(::of) ?: unavailable(PublicationSourceProblem.UNREACHABLE)
 
     fun of(book: Book): PublicationSourceResult {
         val source = book.readableSource ?: return unavailable(PublicationSourceProblem.UNREACHABLE)
@@ -107,6 +99,5 @@ class DeviceBookSources(private val gateway: DocumentGateway) {
         return runCatching { gateway.openSeekable(uri)?.use { it.size() } }.getOrNull()?.takeIf { it > 0 }
     }
 
-    private fun unavailable(problem: PublicationSourceProblem) =
-        PublicationSourceResult.Unavailable(problem)
+    private fun unavailable(problem: PublicationSourceProblem) = PublicationSourceResult.Unavailable(problem)
 }

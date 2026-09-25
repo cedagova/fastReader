@@ -1,5 +1,31 @@
 package com.cedagova.reader.auth
 
+import com.cedagova.reader.auth.testing.Arrivals
+import com.cedagova.reader.auth.testing.FakeClock
+import com.cedagova.reader.auth.testing.FakeServers
+import com.cedagova.reader.auth.testing.InMemorySessionStore
+import com.cedagova.reader.auth.testing.LOGOUT_LOCAL
+import com.cedagova.reader.auth.testing.LOGOUT_OTHERS
+import com.cedagova.reader.auth.testing.OTP
+import com.cedagova.reader.auth.testing.PASSWORD_GRANT
+import com.cedagova.reader.auth.testing.PRE_AUTH
+import com.cedagova.reader.auth.testing.PUBLISHABLE_KEY
+import com.cedagova.reader.auth.testing.RECOVER
+import com.cedagova.reader.auth.testing.REFRESH_GRANT
+import com.cedagova.reader.auth.testing.Recorded
+import com.cedagova.reader.auth.testing.RecordingWaiter
+import com.cedagova.reader.auth.testing.USER
+import com.cedagova.reader.auth.testing.VERIFY
+import com.cedagova.reader.auth.testing.apiError
+import com.cedagova.reader.auth.testing.gated
+import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.auth.testing.networkFailure
+import com.cedagova.reader.auth.testing.preAuthJson
+import com.cedagova.reader.auth.testing.providerError
+import com.cedagova.reader.auth.testing.session
+import com.cedagova.reader.auth.testing.sessionJson
+import com.cedagova.reader.auth.testing.testConfig
+import com.cedagova.reader.auth.testing.user
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -72,7 +98,13 @@ class ProviderOperationsTest {
 
     @Test
     fun `a provider 429 on verify is try-later and is never retried`() = runTest {
-        servers.on(VERIFY) { json(providerError("over_request_rate_limit"), HttpStatusCode.TooManyRequests, "Retry-After" to "30") }
+        servers.on(VERIFY) {
+            json(
+                providerError("over_request_rate_limit"),
+                HttpStatusCode.TooManyRequests,
+                "Retry-After" to "30",
+            )
+        }
         val store = InMemorySessionStore()
         val client = client(store)
 
@@ -89,7 +121,9 @@ class ProviderOperationsTest {
 
     @Test
     fun `a wrong or expired code is a provider rejection, once`() = runTest {
-        servers.on(VERIFY) { json(providerError("otp_expired", "Token has expired or is invalid"), HttpStatusCode.Forbidden) }
+        servers.on(VERIFY) {
+            json(providerError("otp_expired", "Token has expired or is invalid"), HttpStatusCode.Forbidden)
+        }
         val client = client()
 
         val failure = runCatching { client.verifyEmailCode(email, "000000") }.exceptionOrNull()
@@ -119,7 +153,9 @@ class ProviderOperationsTest {
 
     @Test
     fun `wrong credentials are a provider rejection with the session untouched`() = runTest {
-        servers.on(PASSWORD_GRANT) { json(providerError("invalid_credentials", "Invalid login credentials"), HttpStatusCode.BadRequest) }
+        servers.on(PASSWORD_GRANT) {
+            json(providerError("invalid_credentials", "Invalid login credentials"), HttpStatusCode.BadRequest)
+        }
         val store = InMemorySessionStore()
         val client = client(store)
 
@@ -155,7 +191,12 @@ class ProviderOperationsTest {
 
     @Test
     fun `a weak password is a provider rejection that names the reasons`() = runTest {
-        servers.on(USER) { json("""{"error_code":"weak_password","msg":"Password is too weak","weak_password":{"reasons":["length","characters"]}}""", HttpStatusCode.UnprocessableEntity) }
+        servers.on(USER) {
+            json(
+                """{"error_code":"weak_password","msg":"Password is too weak","weak_password":{"reasons":["length","characters"]}}""",
+                HttpStatusCode.UnprocessableEntity,
+            )
+        }
         val client = client(InMemorySessionStore(session(expiresAt = clock.expiring(3600))))
 
         val failure = runCatching { client.setPassword("short") }.exceptionOrNull()
@@ -185,7 +226,10 @@ class ProviderOperationsTest {
     fun `local sign-out clears the store before telling the provider`() = runTest {
         val store = InMemorySessionStore(session(expiresAt = clock.expiring(3600)))
         var storeAtLogout: Any? = "unset"
-        servers.on(LOGOUT_LOCAL) { storeAtLogout = store.session; json("{}", HttpStatusCode.NoContent) }
+        servers.on(LOGOUT_LOCAL) {
+            storeAtLogout = store.session
+            json("{}", HttpStatusCode.NoContent)
+        }
         val client = client(store)
 
         client.signOut()
@@ -212,7 +256,13 @@ class ProviderOperationsTest {
 
         val rejected = FakeServers()
         rejected.on(LOGOUT_LOCAL) { json(providerError("session_not_found"), HttpStatusCode.Forbidden) }
-        val other = ReaderAuthClient.build(testConfig, InMemorySessionStore(session(expiresAt = clock.expiring(3600))), rejected.engine, clock, waiter)
+        val other = ReaderAuthClient.build(
+            testConfig,
+            InMemorySessionStore(session(expiresAt = clock.expiring(3600))),
+            rejected.engine,
+            clock,
+            waiter,
+        )
         other.awaitReady()
         other.signOut()
         assertEquals(ReaderSessionState.SignedOut, other.currentState())
@@ -241,33 +291,40 @@ class SignOutOrderingTest {
     private val waiter = RecordingWaiter()
 
     @Test
-    fun `sign-out waits for a refresh in flight and the refreshed session is not re-saved`() = kotlinx.coroutines.test.runTest {
-        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
-        val servers = FakeServers()
-        val refreshing = Arrivals(1)
-        servers.on(REFRESH_GRANT, gated(gate, refreshing) { json(sessionJson("access-2", "refresh-2")) })
-        val bearerAtLogout = java.util.concurrent.atomic.AtomicReference<String?>()
-        servers.on(LOGOUT_LOCAL) { bearerAtLogout.set(it.bearer); json("{}", HttpStatusCode.NoContent) }
-        val store = InMemorySessionStore(session(expiresAt = clock.expiring(60)))
-        val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter)
-        client.awaitReady()
+    fun `sign-out waits for a refresh in flight and the refreshed session is not re-saved`() =
+        kotlinx.coroutines.test.runTest {
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val servers = FakeServers()
+            val refreshing = Arrivals(1)
+            servers.on(REFRESH_GRANT, gated(gate, refreshing) { json(sessionJson("access-2", "refresh-2")) })
+            val bearerAtLogout = java.util.concurrent.atomic.AtomicReference<String?>()
+            servers.on(LOGOUT_LOCAL) {
+                bearerAtLogout.set(it.bearer)
+                json("{}", HttpStatusCode.NoContent)
+            }
+            val store = InMemorySessionStore(session(expiresAt = clock.expiring(60)))
+            val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter)
+            client.awaitReady()
 
-        val foreground = async { client.onForeground() }
-        // The foreground refresh is at the provider, so it holds the refresh lock.
-        refreshing.await()
-        val signOut = async { client.signOut() }
-        testScheduler.runCurrent()
-        assertTrue("sign-out must not run while the refresh is in flight", servers.requestsTo("/auth/v1/logout").isEmpty())
-        gate.complete(Unit)
-        foreground.await()
-        signOut.await()
+            val foreground = async { client.onForeground() }
+            // The foreground refresh is at the provider, so it holds the refresh lock.
+            refreshing.await()
+            val signOut = async { client.signOut() }
+            testScheduler.runCurrent()
+            assertTrue(
+                "sign-out must not run while the refresh is in flight",
+                servers.requestsTo("/auth/v1/logout").isEmpty(),
+            )
+            gate.complete(Unit)
+            foreground.await()
+            signOut.await()
 
-        assertEquals(listOf(REFRESH_GRANT, LOGOUT_LOCAL), servers.routes())
-        assertEquals("access-2", bearerAtLogout.get())
-        assertNull("the refreshed session was re-saved after sign-out", store.session)
-        assertEquals(ReaderSessionState.SignedOut, client.currentState())
-        client.close()
-    }
+            assertEquals(listOf(REFRESH_GRANT, LOGOUT_LOCAL), servers.routes())
+            assertEquals("access-2", bearerAtLogout.get())
+            assertNull("the refreshed session was re-saved after sign-out", store.session)
+            assertEquals(ReaderSessionState.SignedOut, client.currentState())
+            client.close()
+        }
 
     @Test
     fun `a 401 on the public pre-auth route never signs the device out`() = kotlinx.coroutines.test.runTest {

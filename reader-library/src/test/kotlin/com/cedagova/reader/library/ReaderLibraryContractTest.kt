@@ -1,10 +1,14 @@
 package com.cedagova.reader.library
 
+import com.cedagova.reader.auth.contract.ReaderApiContract
+import com.cedagova.reader.auth.contract.primitive
+import com.cedagova.reader.auth.testing.recorded
 import com.cedagova.reader.library.model.CancelPublicationImportRequest
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
+import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
 import com.cedagova.reader.library.model.PORTABLE_SEMANTICS_VERSION
-import com.cedagova.reader.library.model.PutReaderProgressRequest
+import com.cedagova.reader.library.model.PUBLICATION_SOURCE_ACCOUNT
 import com.cedagova.reader.library.model.PublicationArchivePolicy
 import com.cedagova.reader.library.model.PublicationFormatPolicy
 import com.cedagova.reader.library.model.PublicationImport
@@ -15,6 +19,7 @@ import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.PublicationOwnershipPolicy
 import com.cedagova.reader.library.model.PublicationPromotion
 import com.cedagova.reader.library.model.PublicationTransferGrant
+import com.cedagova.reader.library.model.PutReaderProgressRequest
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetGrantResponse
@@ -25,12 +30,10 @@ import com.cedagova.reader.library.model.ReaderBookAssetKind
 import com.cedagova.reader.library.model.ReaderCapabilityEntry
 import com.cedagova.reader.library.model.ReaderCapabilityQuota
 import com.cedagova.reader.library.model.ReaderEpubLocatorV1
-import com.cedagova.reader.library.model.ReaderPortableLocationV1
-import com.cedagova.reader.library.model.ReaderPortablePublicationV1
-import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
-import com.cedagova.reader.library.model.PUBLICATION_SOURCE_ACCOUNT
 import com.cedagova.reader.library.model.ReaderLibraryItem
 import com.cedagova.reader.library.model.ReaderLibraryResponse
+import com.cedagova.reader.library.model.ReaderPortableLocationV1
+import com.cedagova.reader.library.model.ReaderPortablePublicationV1
 import com.cedagova.reader.library.model.ReaderProgress
 import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderPublicationMembershipOutcome
@@ -45,21 +48,13 @@ import com.cedagova.reader.library.model.ReaderSyncMutationResult
 import com.cedagova.reader.library.model.ReaderSyncRejection
 import com.cedagova.reader.library.model.UNKNOWN_VALUE
 import java.io.File
-import java.security.MessageDigest
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,11 +66,12 @@ import org.junit.Test
  *
  * `:reader-library` writes its models by hand rather than generating them, so
  * something has to fail the build when a model and the published Reader API
- * contract stop agreeing. This is that something. It reads the OpenAPI document
- * committed under `reader-library/contracts/`, confirms it is byte-for-byte the
- * pinned identity by sha256, and then — for every model the module sends or
- * reads — compares the model's own kotlinx.serialization descriptor with the
- * document's schema:
+ * contract stop agreeing. This is that something. It reads the one pinned
+ * OpenAPI document both libraries share (`reader-auth/contracts/`, #208),
+ * confirms it is byte-for-byte the pinned identity by sha256, and then — for
+ * every model the module sends or reads — compares the model's own
+ * kotlinx.serialization descriptor with the document's schema through the
+ * shared checker, `ReaderApiContract` (`Fit.WHOLE`):
  *
  * - every field the model uses exists in the schema, under that exact wire name;
  * - its JSON type agrees (string / integer / number / boolean / array / object);
@@ -92,23 +88,18 @@ import org.junit.Test
  * caught` proves that claim on deliberately broken copies of three models: a
  * gate nobody has watched fail is not a gate.
  *
- * When reader-api genuinely changes, the fix is to re-pin the document and move
- * the models — never to relax this test. Drift is a proposal to Chunipers
+ * When reader-api genuinely changes, the fix is to re-pin the document
+ * (`reader-auth/contracts/PINNED.md`) and move the models — never to relax this
+ * test. Drift is a proposal to Chunipers
  * (reader-api #511 / #512), never a local workaround.
  */
-@OptIn(ExperimentalSerializationApi::class)
 class ReaderLibraryContractTest {
 
     private val moduleDir = File(repositoryRoot(), "reader-library")
-    private val contractFile = File(moduleDir, "contracts/reader-api.openapi.json")
-    private val digestFile = File(moduleDir, "contracts/reader-api.openapi.json.sha256")
 
-    private val document: JsonObject by lazy {
-        Json.parseToJsonElement(contractFile.readText()).jsonObject
-    }
-    private val schemas: JsonObject by lazy {
-        document["components"]!!.jsonObject["schemas"]!!.jsonObject
-    }
+    private val contract = ReaderApiContract.pinned
+    private val document: JsonObject get() = contract.document
+    private val schemas: JsonObject get() = contract.schemas
 
     /**
      * Every model this module puts on the wire or reads off it, against the
@@ -122,7 +113,7 @@ class ReaderLibraryContractTest {
         ReaderBookAsset.serializer() to "ReaderBookAsset",
         ReaderProgressListResponse.serializer() to "ReaderProgressListResponse",
         ReaderProgress.serializer() to "ReaderProgress",
-        // The portable position FastReader publishes (#120).
+        // The portable position this module publishes (#120).
         PutReaderProgressRequest.serializer() to "PutReaderProgressRequest",
         ReaderEpubLocatorV1.serializer() to "ReaderEpubLocatorV1",
         // The location envelope the position travels in since the #139 re-pin.
@@ -157,39 +148,48 @@ class ReaderLibraryContractTest {
         ReaderAssetGrantResponse.serializer() to "ReaderAssetGrantResponse",
     )
 
-    /** Kotlin descriptor serial name → the schema it must agree with, for `$ref` checks. */
-    private val schemaOf: Map<String, String> by lazy {
-        pinned.entries.associate { (serializer, schema) -> serializer.descriptor.serialName to schema }
-    }
+    /** The shared checker over this module's models, every one of them a whole shape. */
+    private val checker = contract.checker(
+        pinned.map { (serializer, schema) ->
+            ReaderApiContract.Pin(serializer, schema)
+        },
+    )
+
+    private fun violations(descriptor: SerialDescriptor, schemaName: String): List<String> =
+        checker.violations(descriptor, schemaName)
 
     @Test
     fun `the committed document is the pinned identity, byte for byte`() {
+        val contractFile = ReaderApiContract.documentFile
         assertTrue("missing ${contractFile.path}", contractFile.isFile)
-        val recorded = digestFile.readText().trim().substringBefore(' ')
-        val actual = MessageDigest.getInstance("SHA-256")
-            .digest(contractFile.readBytes())
-            .joinToString("") { "%02x".format(it) }
+        val actual = ReaderApiContract.actualDigest()
         assertEquals(
-            "reader-library/contracts/reader-api.openapi.json does not match its recorded sha256; " +
-                "re-pin it deliberately (contracts/PINNED.md) rather than editing the digest",
-            recorded,
+            "reader-auth/contracts/reader-api.openapi.json does not match its recorded sha256; " +
+                "re-pin it deliberately (reader-auth/contracts/PINNED.md) rather than editing the digest",
+            ReaderApiContract.recordedDigest(),
             actual,
         )
-        assertEquals("e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90", actual)
+        assertEquals(ReaderApiContract.PINNED_SHA256, actual)
+        // The checker skips the shared forward-compatibility sentinel by name; it must be this module's.
+        assertEquals(UNKNOWN_VALUE, ReaderApiContract.UNKNOWN_ENUM_MEMBER)
     }
 
     @Test
     fun `every model the module sends or reads agrees with the pinned schema`() {
-        val problems = pinned.entries.flatMap { (serializer, schema) ->
-            violations(serializer.descriptor, schema)
-        }
-        assertEquals("the models and the pinned contract disagree:\n" + problems.joinToString("\n"), emptyList<String>(), problems)
+        val problems = checker.violations()
+        assertEquals(
+            "the models and the pinned contract disagree:\n" + problems.joinToString("\n"),
+            emptyList<String>(),
+            problems,
+        )
     }
 
     /** A route this module calls that the document does not declare would be a request nobody promised. */
     @Test
     fun `every route the module calls is declared by the pinned document`() {
         val paths = document["paths"]!!.jsonObject
+        val importPath = "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}"
+        val assetPath = "${ReaderLibraryClient.ASSETS_PATH}/${ReaderLibraryClient.ASSET_ID_TEMPLATE}"
         listOf(
             ReaderLibraryClient.LIBRARY_PATH to "get",
             ReaderLibraryClient.PROGRESS_PATH to "get",
@@ -199,19 +199,23 @@ class ReaderLibraryContractTest {
             // The import lifecycle. Note the other prefix: `/reader/v1/...`.
             ReaderLibraryClient.IMPORT_POLICY_PATH to "get",
             ReaderLibraryClient.IMPORTS_PATH to "post",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}" to "get",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.COMPLETE_SUFFIX}" to "post",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.CANCEL_SUFFIX}" to "post",
+            importPath to "get",
+            "$importPath${ReaderLibraryClient.COMPLETE_SUFFIX}" to "post",
+            "$importPath${ReaderLibraryClient.CANCEL_SUFFIX}" to "post",
             // The asset download grant (#118): the one route book bytes arrive by.
-            "${ReaderLibraryClient.ASSETS_PATH}/${ReaderLibraryClient.ASSET_ID_TEMPLATE}${ReaderLibraryClient.DOWNLOAD_GRANT_SUFFIX}" to "post",
+            "$assetPath${ReaderLibraryClient.DOWNLOAD_GRANT_SUFFIX}" to "post",
         ).forEach { (path, method) ->
             val declared = paths[path]?.jsonObject
             assertTrue("the document declares no $path", declared != null)
             assertTrue("the document declares no $method on $path", declared!!.containsKey(method))
         }
         // The delta query parameters, with the bounds the client enforces locally.
-        val parameters = paths[ReaderLibraryClient.DELTAS_PATH]!!.jsonObject["get"]!!.jsonObject["parameters"] as JsonArray
-        val byName = parameters.associate { it.jsonObject["name"]!!.primitive()!! to it.jsonObject["schema"]!!.jsonObject }
+        val parameters =
+            paths[ReaderLibraryClient.DELTAS_PATH]!!.jsonObject["get"]!!.jsonObject["parameters"] as JsonArray
+        val byName = parameters.associate {
+            it.jsonObject["name"]!!.primitive()!! to
+                it.jsonObject["schema"]!!.jsonObject
+        }
         assertEquals("^[0-9]+$", byName["after_cursor"]!!["pattern"]!!.primitive())
         assertEquals(ReaderLibraryClient.MIN_DELTA_LIMIT.toString(), byName["limit"]!!["minimum"].toString())
         assertEquals(ReaderLibraryClient.MAX_DELTA_LIMIT.toString(), byName["limit"]!!["maximum"].toString())
@@ -264,7 +268,8 @@ class ReaderLibraryContractTest {
             request["sha256"]!!.jsonObject["pattern"]!!.primitive(),
         )
 
-        val cancel = schemas["CancelPublicationImportRequest"]!!.jsonObject["properties"]!!.jsonObject["reason"]!!.jsonObject
+        val cancel =
+            schemas["CancelPublicationImportRequest"]!!.jsonObject["properties"]!!.jsonObject["reason"]!!.jsonObject
         assertEquals(CancelPublicationImportRequest.DEFAULT_REASON, cancel["default"]!!.primitive())
         assertEquals(CancelPublicationImportRequest.MAX_REASON_LENGTH.toString(), cancel["maxLength"].toString())
 
@@ -358,7 +363,7 @@ class ReaderLibraryContractTest {
      *
      * The shape checker compares fields and types. What it cannot see is that the
      * `oneOf` locator really maps `epub` to the very schema the module builds its
-     * locator from, and that the publication values FastReader sends — `epub`,
+     * locator from, and that the publication values the module sends — `epub`,
      * `application/epub+zip`, `account` — are members of the document's enums.
      * Each of those is a 422 `invalid_payload` against stage if wrong.
      */
@@ -392,7 +397,9 @@ class ReaderLibraryContractTest {
         assertTrue("an account book id must be a legal publication_id", pattern.matches(sent.publicationId))
         assertEquals(
             listOf("publication_id", "format", "media_type", "source"),
-            (schemas["ReaderPortablePublicationV1"]!!.jsonObject["required"] as JsonArray).mapNotNull { it.primitive() },
+            (schemas["ReaderPortablePublicationV1"]!!.jsonObject["required"] as JsonArray).mapNotNull {
+                it.primitive()
+            },
         )
     }
 
@@ -411,7 +418,7 @@ class ReaderLibraryContractTest {
      * The shape checker above already compares every field and enum member.
      * What this adds is the two facts the copy store *acts* on and would
      * otherwise be trusting from memory: that a grant's checksum and size come
-     * from the document as required fields (nothing in FastReader may supply
+     * from the document as required fields (nothing in a host may supply
      * either), and that the direction and method values the client gates on —
      * `download` and `GET` — are values the schema actually declares.
      */
@@ -483,131 +490,43 @@ class ReaderLibraryContractTest {
     @Test
     fun `a renamed, retyped or dropped field is caught`() {
         val renamed = violations(RenamedLibraryItem.serializer().descriptor, "ReaderLibraryItem")
-        assertTrue("a renamed field went unnoticed: $renamed", renamed.any { it.contains("bookk") && it.contains("not declared") })
+        assertTrue(
+            "a renamed field went unnoticed: $renamed",
+            renamed.any {
+                it.contains("bookk") &&
+                    it.contains("not declared")
+            },
+        )
 
         val retyped = violations(RetypedProgress.serializer().descriptor, "ReaderProgress")
-        assertTrue("a retyped field went unnoticed: $retyped", retyped.any { it.contains("progress_percent") && it.contains("type") })
+        assertTrue(
+            "a retyped field went unnoticed: $retyped",
+            retyped.any {
+                it.contains("progress_percent") &&
+                    it.contains("type")
+            },
+        )
 
         val dropped = violations(DroppedRequiredChange.serializer().descriptor, "ReaderSyncChange")
-        assertTrue("a dropped required field went unnoticed: $dropped", dropped.any { it.contains("cursor") && it.contains("required") })
+        assertTrue(
+            "a dropped required field went unnoticed: $dropped",
+            dropped.any {
+                it.contains("cursor") &&
+                    it.contains("required")
+            },
+        )
 
         val shrunkEnum = violations(ShrunkEnumRejection.serializer().descriptor, "ReaderSyncRejection")
-        assertTrue("a dropped enum member went unnoticed: $shrunkEnum", shrunkEnum.any { it.contains("unsupported_mutation") })
+        assertTrue(
+            "a dropped enum member went unnoticed: $shrunkEnum",
+            shrunkEnum.any {
+                it.contains("unsupported_mutation")
+            },
+        )
 
         // And the checker is not simply always angry: the real models are clean.
         assertEquals(emptyList<String>(), violations(ReaderSyncChange.serializer().descriptor, "ReaderSyncChange"))
     }
-
-    // ------------------------------------------------------------- the checker
-
-    private fun violations(descriptor: SerialDescriptor, schemaName: String): List<String> {
-        val schema = schemas[schemaName]?.jsonObject
-            ?: return listOf("$schemaName: the pinned document declares no such schema")
-        val properties = schema["properties"]?.jsonObject ?: JsonObject(emptyMap())
-        val required = (schema["required"] as? JsonArray)?.mapNotNull { it.primitive() }?.toSet() ?: emptySet()
-        val problems = mutableListOf<String>()
-        val seen = mutableSetOf<String>()
-
-        for (index in 0 until descriptor.elementsCount) {
-            val field = descriptor.getElementName(index)
-            seen += field
-            val element = descriptor.getElementDescriptor(index)
-            val property = properties[field]?.jsonObject
-            if (property == null) {
-                problems += "$schemaName.$field: not declared by the pinned schema"
-                continue
-            }
-            val resolved = resolve(property)
-            if (element.isNullable && !resolved.nullable && field in required) {
-                problems += "$schemaName.$field: the model makes it nullable but the schema requires a value"
-            }
-            if (!element.isNullable && resolved.nullable) {
-                problems += "$schemaName.$field: the schema allows null but the model does not"
-            }
-            problems += checkShape(element, resolved, "$schemaName.$field")
-        }
-
-        (required - seen).forEach { missing ->
-            problems += "$schemaName.$missing: the schema marks it required but the model has no such field"
-        }
-        return problems
-    }
-
-    /** One element's JSON type, enum members and `$ref` target against the resolved schema. */
-    private fun checkShape(element: SerialDescriptor, resolved: Resolved, where: String): List<String> {
-        val problems = mutableListOf<String>()
-        val expected = jsonType(element)
-        if (expected == null) {
-            return listOf("$where: the model uses ${element.kind}, which this checker cannot compare")
-        }
-        if (resolved.ref != null) {
-            // A nullable class descriptor's serial name carries a trailing '?'.
-            val mapped = schemaOf[element.serialName.removeSuffix("?")]
-            when {
-                mapped == null -> problems += "$where: the schema is a \$ref to ${resolved.ref}, but ${element.serialName} is not pinned to any schema"
-                mapped != resolved.ref -> problems += "$where: the schema refers to ${resolved.ref}, the model to $mapped"
-            }
-            if (expected != "object") problems += "$where: the schema is an object reference, the model a $expected"
-            return problems
-        }
-        if (resolved.type != null && resolved.type != expected) {
-            problems += "$where: the schema's type is ${resolved.type}, the model's is $expected"
-        }
-        if (element.kind == SerialKind.ENUM) {
-            val declared = (resolved.schema["enum"] as? JsonArray)?.mapNotNull { it.primitive() }?.toSet()
-            if (declared == null) {
-                problems += "$where: the model is an enum but the schema declares no enum values"
-            } else {
-                val members = (0 until element.elementsCount)
-                    .map { element.getElementName(it) }
-                    .filterNot { it == UNKNOWN_VALUE }
-                    .toSet()
-                (members - declared).forEach { problems += "$where: the model declares '$it', which the schema does not" }
-                (declared - members).forEach { problems += "$where: the schema declares '$it', which the model does not" }
-            }
-        }
-        if (element.kind == StructureKind.LIST) {
-            val items = resolved.schema["items"]?.jsonObject
-            if (items == null) {
-                problems += "$where: the model is an array but the schema declares no items"
-            } else {
-                problems += checkShape(element.getElementDescriptor(0), resolve(items), "$where[]")
-            }
-        }
-        return problems
-    }
-
-    private data class Resolved(val schema: JsonObject, val type: String?, val nullable: Boolean, val ref: String?)
-
-    /** Unwraps `anyOf [X, null]` and `$ref`, which is how the document spells "optional" and "another schema". */
-    private fun resolve(property: JsonObject): Resolved {
-        property["\$ref"]?.primitive()?.let { return Resolved(property, "object", false, it.substringAfterLast('/')) }
-        val anyOf = property["anyOf"] as? JsonArray
-        if (anyOf != null) {
-            val branches = anyOf.map { it.jsonObject }
-            val nullable = branches.any { it["type"]?.primitive() == "null" }
-            val concrete = branches.firstOrNull { it["type"]?.primitive() != "null" } ?: JsonObject(emptyMap())
-            val inner = resolve(concrete)
-            return Resolved(inner.schema, inner.type, nullable || inner.nullable, inner.ref)
-        }
-        return Resolved(property, property["type"]?.primitive(), false, null)
-    }
-
-    /** The document's JSON type for a Kotlin element, or null when this checker has no opinion. */
-    private fun jsonType(element: SerialDescriptor): String? = when (element.kind) {
-        PrimitiveKind.STRING, PrimitiveKind.CHAR -> "string"
-        PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> "integer"
-        PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> "number"
-        PrimitiveKind.BOOLEAN -> "boolean"
-        SerialKind.ENUM -> "string"
-        StructureKind.LIST -> "array"
-        StructureKind.MAP, StructureKind.CLASS, StructureKind.OBJECT -> "object"
-        PolymorphicKind.OPEN, PolymorphicKind.SEALED -> null
-        else -> null
-    }
-
-    private fun kotlinx.serialization.json.JsonElement.primitive(): String? =
-        (this as? JsonPrimitive)?.contentOrNull
 
     // ------------------------------------------------- deliberately broken copies
 
@@ -647,10 +566,17 @@ class ReaderLibraryContractTest {
 
     @Serializable
     private enum class ShrunkRejectionCode {
-        @SerialName("invalid_payload") INVALID_PAYLOAD,
-        @SerialName("invalid_resource_id") INVALID_RESOURCE_ID,
-        @SerialName("idempotency_mismatch") IDEMPOTENCY_MISMATCH,
-        @SerialName("related_resource_missing") RELATED_RESOURCE_MISSING,
+        @SerialName("invalid_payload")
+        INVALID_PAYLOAD,
+
+        @SerialName("invalid_resource_id")
+        INVALID_RESOURCE_ID,
+
+        @SerialName("idempotency_mismatch")
+        IDEMPOTENCY_MISMATCH,
+
+        @SerialName("related_resource_missing")
+        RELATED_RESOURCE_MISSING,
     }
 
     /**

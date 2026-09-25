@@ -18,8 +18,8 @@ import org.junit.Test
  * `reading_progress` record is about, and what a canonical payload states.
  *
  * The host-specific half — mapping a position to and from a host's own reading
- * unit — is the host's; FastReader's lives in its `PortableReadingPosition`, and
- * the exact-key-set proof over a whole parsed book stays beside it.
+ * unit — is the host's, and the exact-key-set proof over a whole parsed book
+ * stays beside the host's mapping.
  */
 class PortableProgressTest {
 

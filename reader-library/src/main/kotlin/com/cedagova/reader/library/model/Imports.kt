@@ -3,7 +3,7 @@ package com.cedagova.reader.library.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
+/*
  * The publication-import contract as reader-api publishes it (#116, LEAF801 of
  * #104), modelled the same way the rest of this module is: one Kotlin type per
  * schema, every wire name spelled out, every enum carrying the [UNKNOWN_VALUE]
@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * Read the pinned document, not this file, for the authority: these are
  * `CreatePublicationImportRequest`, `PublicationImportPolicyResponse`,
  * `PublicationTransferGrant`, `PublicationImport` and their neighbours in
- * `contracts/reader-api.openapi.json`.
+ * `reader-auth/contracts/reader-api.openapi.json`.
  *
  * Two shapes deliberately have no Kotlin equivalent:
  *
@@ -28,19 +28,42 @@ import kotlinx.serialization.Serializable
 
 /** `PublicationFormat`: every source format the backend routes. */
 @Serializable
-enum class PublicationFormat {
-    @SerialName("epub") EPUB,
-    @SerialName("pdf") PDF,
-    @SerialName("txt") TXT,
-    @SerialName("mobi") MOBI,
-    @SerialName("azw") AZW,
-    @SerialName("azw3") AZW3,
-    @SerialName("docx") DOCX,
-    @SerialName("fb2") FB2,
-    @SerialName("md") MD,
-    @SerialName("html") HTML,
-    @SerialName("mhtml") MHTML,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+public enum class PublicationFormat {
+    @SerialName("epub")
+    EPUB,
+
+    @SerialName("pdf")
+    PDF,
+
+    @SerialName("txt")
+    TXT,
+
+    @SerialName("mobi")
+    MOBI,
+
+    @SerialName("azw")
+    AZW,
+
+    @SerialName("azw3")
+    AZW3,
+
+    @SerialName("docx")
+    DOCX,
+
+    @SerialName("fb2")
+    FB2,
+
+    @SerialName("md")
+    MD,
+
+    @SerialName("html")
+    HTML,
+
+    @SerialName("mhtml")
+    MHTML,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -50,21 +73,44 @@ enum class PublicationFormat {
  * polls while an import is not terminal and stops when it is.
  */
 @Serializable
-enum class PublicationImportStatus {
-    @SerialName("pending_upload") PENDING_UPLOAD,
-    @SerialName("verifying_upload") VERIFYING_UPLOAD,
-    @SerialName("queued") QUEUED,
-    @SerialName("processing") PROCESSING,
-    @SerialName("ready") READY,
-    @SerialName("failed") FAILED,
-    @SerialName("cancel_requested") CANCEL_REQUESTED,
-    @SerialName("cancelled") CANCELLED,
-    @SerialName("deleting") DELETING,
-    @SerialName("deleted") DELETED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN;
+public enum class PublicationImportStatus {
+    @SerialName("pending_upload")
+    PENDING_UPLOAD,
+
+    @SerialName("verifying_upload")
+    VERIFYING_UPLOAD,
+
+    @SerialName("queued")
+    QUEUED,
+
+    @SerialName("processing")
+    PROCESSING,
+
+    @SerialName("ready")
+    READY,
+
+    @SerialName("failed")
+    FAILED,
+
+    @SerialName("cancel_requested")
+    CANCEL_REQUESTED,
+
+    @SerialName("cancelled")
+    CANCELLED,
+
+    @SerialName("deleting")
+    DELETING,
+
+    @SerialName("deleted")
+    DELETED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
+
+    ;
 
     /** True once the backend will not move this import again on its own. */
-    val isTerminal: Boolean
+    public val isTerminal: Boolean
         get() = this == READY || this == FAILED || this == CANCELLED || this == DELETED
 }
 
@@ -76,50 +122,91 @@ enum class PublicationImportStatus {
  * invented its own wording would be showing something the server did not say.
  */
 @Serializable
-enum class PublicationFailureCategory {
-    @SerialName("unsupported") UNSUPPORTED,
-    @SerialName("protected") PROTECTED,
-    @SerialName("unsafe") UNSAFE,
-    @SerialName("too_large") TOO_LARGE,
-    @SerialName("malformed") MALFORMED,
-    @SerialName("upload") UPLOAD,
-    @SerialName("conversion") CONVERSION,
-    @SerialName("cancelled") CANCELLED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+public enum class PublicationFailureCategory {
+    @SerialName("unsupported")
+    UNSUPPORTED,
+
+    @SerialName("protected")
+    PROTECTED,
+
+    @SerialName("unsafe")
+    UNSAFE,
+
+    @SerialName("too_large")
+    TOO_LARGE,
+
+    @SerialName("malformed")
+    MALFORMED,
+
+    @SerialName("upload")
+    UPLOAD,
+
+    @SerialName("conversion")
+    CONVERSION,
+
+    @SerialName("cancelled")
+    CANCELLED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationFormatPolicy.account_admission`: what account admission costs for a format. */
 @Serializable
-enum class PublicationAccountAdmission {
-    @SerialName("upload_only") UPLOAD_ONLY,
-    @SerialName("upload_and_conversion") UPLOAD_AND_CONVERSION,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+public enum class PublicationAccountAdmission {
+    @SerialName("upload_only")
+    UPLOAD_ONLY,
+
+    @SerialName("upload_and_conversion")
+    UPLOAD_AND_CONVERSION,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationFormatPolicy.device_renderability`. */
 @Serializable
-enum class PublicationDeviceRenderability {
-    @SerialName("device_native") DEVICE_NATIVE,
-    @SerialName("reader_conversion_required") READER_CONVERSION_REQUIRED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+public enum class PublicationDeviceRenderability {
+    @SerialName("device_native")
+    DEVICE_NATIVE,
+
+    @SerialName("reader_conversion_required")
+    READER_CONVERSION_REQUIRED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationPromotion.account_admission`: how far the promotion has got. */
 @Serializable
-enum class PublicationPromotionAdmission {
-    @SerialName("pending") PENDING,
-    @SerialName("admitted") ADMITTED,
-    @SerialName("failed") FAILED,
-    @SerialName("cancelled") CANCELLED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+public enum class PublicationPromotionAdmission {
+    @SerialName("pending")
+    PENDING,
+
+    @SerialName("admitted")
+    ADMITTED,
+
+    @SerialName("failed")
+    FAILED,
+
+    @SerialName("cancelled")
+    CANCELLED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationPromotion.activity_continuity`. */
 @Serializable
-enum class PublicationActivityContinuity {
-    @SerialName("wait_for_admission") WAIT_FOR_ADMISSION,
-    @SerialName("replay_to_admitted_identity") REPLAY_TO_ADMITTED_IDENTITY,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+public enum class PublicationActivityContinuity {
+    @SerialName("wait_for_admission")
+    WAIT_FOR_ADMISSION,
+
+    @SerialName("replay_to_admitted_identity")
+    REPLAY_TO_ADMITTED_IDENTITY,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -132,7 +219,7 @@ enum class PublicationActivityContinuity {
  * not a field with a convenient default.
  */
 @Serializable
-data class CreatePublicationImportRequest(
+public data class CreatePublicationImportRequest(
     /** Derived from the content identity and the account; see `PublicationImportRecord`. */
     @SerialName("client_import_id") val clientImportId: String,
     @SerialName("source_format") val sourceFormat: PublicationFormat,
@@ -145,27 +232,25 @@ data class CreatePublicationImportRequest(
     @SerialName("upload_consent") val uploadConsent: Boolean? = null,
     @SerialName("original_file_name") val originalFileName: String? = null,
 ) {
-    companion object {
+    public companion object {
         /** The document's only accepted `promotion_source`. */
-        const val PROMOTION_SOURCE_DEVICE_ONLY: String = "device_only"
+        public const val PROMOTION_SOURCE_DEVICE_ONLY: String = "device_only"
 
         /** The document's only accepted `ownership_intent`. */
-        const val OWNERSHIP_INTENT_ACCOUNT_LIBRARY: String = "account_library"
+        public const val OWNERSHIP_INTENT_ACCOUNT_LIBRARY: String = "account_library"
 
         /** `client_import_id` is 1..255 characters. */
-        const val MAX_CLIENT_IMPORT_ID_LENGTH: Int = 255
+        public const val MAX_CLIENT_IMPORT_ID_LENGTH: Int = 255
     }
 }
 
 /** `POST /reader/v1/imports/{id}/cancel` — the cancel body. */
 @Serializable
-data class CancelPublicationImportRequest(
-    @SerialName("reason") val reason: String = DEFAULT_REASON,
-) {
-    companion object {
+public data class CancelPublicationImportRequest(@SerialName("reason") val reason: String = DEFAULT_REASON) {
+    public companion object {
         /** The document's own default, and the only reason this module sends. */
-        const val DEFAULT_REASON: String = "cancelled_by_actor"
-        const val MAX_REASON_LENGTH: Int = 120
+        public const val DEFAULT_REASON: String = "cancelled_by_actor"
+        public const val MAX_REASON_LENGTH: Int = 120
     }
 }
 
@@ -178,7 +263,7 @@ data class CancelPublicationImportRequest(
  * module hard-codes none of them (REQ-506).
  */
 @Serializable
-data class PublicationImportPolicyResponse(
+public data class PublicationImportPolicyResponse(
     @SerialName("request_id") val requestId: String,
     /** False when the deployment offers no imports at all; a host shows the action off. */
     @SerialName("enabled") val enabled: Boolean,
@@ -189,7 +274,7 @@ data class PublicationImportPolicyResponse(
     @SerialName("ownership") val ownership: PublicationOwnershipPolicy = PublicationOwnershipPolicy(),
 ) {
     /** The policy entry whose declared MIME types contain [mimeType], case-insensitively. */
-    fun formatForMimeType(mimeType: String): PublicationFormatPolicy? {
+    public fun formatForMimeType(mimeType: String): PublicationFormatPolicy? {
         val wanted = mimeType.substringBefore(';').trim().lowercase()
         return formats.firstOrNull { entry ->
             entry.mimeTypes.any { it.substringBefore(';').trim().lowercase() == wanted }
@@ -199,7 +284,7 @@ data class PublicationImportPolicyResponse(
 
 /** One format the backend routes, with the bounds that apply to it. */
 @Serializable
-data class PublicationFormatPolicy(
+public data class PublicationFormatPolicy(
     @SerialName("format") val format: PublicationFormat = PublicationFormat.UNKNOWN,
     @SerialName("extensions") val extensions: List<String> = emptyList(),
     @SerialName("mime_types") val mimeTypes: List<String> = emptyList(),
@@ -217,7 +302,7 @@ data class PublicationFormatPolicy(
  * on are modelled; the rest of the schema is read past, as everywhere else.
  */
 @Serializable
-data class PublicationOwnershipPolicy(
+public data class PublicationOwnershipPolicy(
     /** True in the contract: why [com.cedagova.reader.library.imports.UploadConsent] exists. */
     @SerialName("promotion_upload_consent_required") val promotionUploadConsentRequired: Boolean = true,
     /** False in the contract: reading a device book uploads nothing. */
@@ -228,7 +313,7 @@ data class PublicationOwnershipPolicy(
 
 /** The archive-expansion bounds the backend enforces on a zipped source. */
 @Serializable
-data class PublicationArchivePolicy(
+public data class PublicationArchivePolicy(
     @SerialName("max_entries") val maxEntries: Long,
     @SerialName("max_expanded_bytes") val maxExpandedBytes: Long,
     @SerialName("max_expansion_ratio") val maxExpansionRatio: Long,
@@ -243,7 +328,7 @@ data class PublicationArchivePolicy(
  * session, and `PublicationTransferClientTest` asserts it.
  */
 @Serializable
-data class PublicationTransferGrant(
+public data class PublicationTransferGrant(
     /** The signed creation endpoint; the contract has it ending in `/upload/resumable/sign`. */
     @SerialName("endpoint") val endpoint: String,
     @SerialName("headers") val headers: Map<String, String> = emptyMap(),
@@ -257,18 +342,18 @@ data class PublicationTransferGrant(
     @SerialName("protocol") val protocol: String = PROTOCOL_TUS,
     @SerialName("method") val method: String = METHOD_POST,
 ) {
-    companion object {
-        const val PROTOCOL_TUS: String = "tus"
-        const val METHOD_POST: String = "POST"
+    public companion object {
+        public const val PROTOCOL_TUS: String = "tus"
+        public const val METHOD_POST: String = "POST"
 
         /** The suffix the document promises on [endpoint]. */
-        const val SIGNED_ENDPOINT_SUFFIX: String = "/upload/resumable/sign"
+        public const val SIGNED_ENDPOINT_SUFFIX: String = "/upload/resumable/sign"
     }
 }
 
 /** The durable import record: the backend's own lifecycle state for one admission. */
 @Serializable
-data class PublicationImport(
+public data class PublicationImport(
     @SerialName("id") val id: String,
     @SerialName("client_import_id") val clientImportId: String,
     @SerialName("source_format") val sourceFormat: PublicationFormat = PublicationFormat.UNKNOWN,
@@ -296,9 +381,13 @@ data class PublicationImport(
 
 /** The promotion half of a record: device-only source, account-library destination. */
 @Serializable
-data class PublicationPromotion(
-    @SerialName("account_admission") val accountAdmission: PublicationPromotionAdmission = PublicationPromotionAdmission.UNKNOWN,
-    @SerialName("activity_continuity") val activityContinuity: PublicationActivityContinuity = PublicationActivityContinuity.UNKNOWN,
+public data class PublicationPromotion(
+    @SerialName(
+        "account_admission",
+    ) val accountAdmission: PublicationPromotionAdmission = PublicationPromotionAdmission.UNKNOWN,
+    @SerialName(
+        "activity_continuity",
+    ) val activityContinuity: PublicationActivityContinuity = PublicationActivityContinuity.UNKNOWN,
     /** Only ever present once `account_admission` is `admitted`. */
     @SerialName("account_book_id") val accountBookId: String? = null,
     @SerialName("source") val source: String = SOURCE_DEVICE_ONLY,
@@ -306,10 +395,10 @@ data class PublicationPromotion(
     @SerialName("local_state_disposition") val localStateDisposition: String = LOCAL_STATE_RETAIN,
     @SerialName("local_state_may_be_discarded") val localStateMayBeDiscarded: Boolean = false,
 ) {
-    companion object {
-        const val SOURCE_DEVICE_ONLY: String = "device_only"
-        const val DESTINATION_ACCOUNT_LIBRARY: String = "account_library"
-        const val LOCAL_STATE_RETAIN: String = "retain"
+    public companion object {
+        public const val SOURCE_DEVICE_ONLY: String = "device_only"
+        public const val DESTINATION_ACCOUNT_LIBRARY: String = "account_library"
+        public const val LOCAL_STATE_RETAIN: String = "retain"
     }
 }
 
@@ -320,16 +409,16 @@ data class PublicationPromotion(
  * promising that the device book is untouched.
  */
 @Serializable
-data class PublicationImportFailure(
+public data class PublicationImportFailure(
     @SerialName("category") val category: PublicationFailureCategory = PublicationFailureCategory.UNKNOWN,
     @SerialName("retryable") val retryable: Boolean,
     @SerialName("broken_account_entry_created") val brokenAccountEntryCreated: Boolean = false,
     @SerialName("local_state_disposition") val localStateDisposition: String = LOCAL_STATE_RETAINED,
     @SerialName("external_source_disposition") val externalSourceDisposition: String = EXTERNAL_SOURCE_UNTOUCHED,
 ) {
-    companion object {
-        const val LOCAL_STATE_RETAINED: String = "retained"
-        const val EXTERNAL_SOURCE_UNTOUCHED: String = "untouched"
+    public companion object {
+        public const val LOCAL_STATE_RETAINED: String = "retained"
+        public const val EXTERNAL_SOURCE_UNTOUCHED: String = "untouched"
     }
 }
 
@@ -340,7 +429,7 @@ data class PublicationImportFailure(
  * import (AD-26).
  */
 @Serializable
-data class PublicationImportAdmissionResponse(
+public data class PublicationImportAdmissionResponse(
     @SerialName("request_id") val requestId: String,
     @SerialName("import") val importRecord: PublicationImport,
     @SerialName("created") val created: Boolean,
@@ -350,7 +439,7 @@ data class PublicationImportAdmissionResponse(
 
 /** The answer to a status read, a completion and a cancellation alike. */
 @Serializable
-data class PublicationImportResponse(
+public data class PublicationImportResponse(
     @SerialName("request_id") val requestId: String,
     @SerialName("import") val importRecord: PublicationImport,
 )

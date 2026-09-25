@@ -3,6 +3,22 @@ package com.cedagova.reader.auth
 import com.cedagova.reader.auth.session.FileSessionStore
 import com.cedagova.reader.auth.session.SessionCipher
 import com.cedagova.reader.auth.session.SessionStore
+import com.cedagova.reader.auth.session.StoredSession
+import com.cedagova.reader.auth.testing.CAPABILITIES
+import com.cedagova.reader.auth.testing.CAPABILITIES_BODY
+import com.cedagova.reader.auth.testing.FakeClock
+import com.cedagova.reader.auth.testing.FakeServers
+import com.cedagova.reader.auth.testing.LOGOUT_OTHERS
+import com.cedagova.reader.auth.testing.PASSWORD_GRANT
+import com.cedagova.reader.auth.testing.PRE_AUTH
+import com.cedagova.reader.auth.testing.REFRESH_GRANT
+import com.cedagova.reader.auth.testing.RecordingWaiter
+import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.auth.testing.preAuthJson
+import com.cedagova.reader.auth.testing.recorded
+import com.cedagova.reader.auth.testing.session
+import com.cedagova.reader.auth.testing.sessionJson
+import com.cedagova.reader.auth.testing.testConfig
 import io.github.jan.supabase.auth.user.UserSession
 import java.io.IOException
 import java.nio.file.Files
@@ -50,12 +66,14 @@ class SessionSaveFailureTest {
     private class UnwritableStore(initial: UserSession?) : SessionStore {
         @Volatile var session: UserSession? = initial
         var failedSaves = 0
-        override suspend fun save(session: UserSession) {
+        override suspend fun save(session: StoredSession) {
             failedSaves += 1
             throw IOException("no space left on device")
         }
-        override suspend fun load(): UserSession? = session
-        override suspend fun clear() { session = null }
+        override suspend fun load(): StoredSession? = session?.let(::StoredSession)
+        override suspend fun clear() {
+            session = null
+        }
     }
 
     private suspend fun clientOver(store: SessionStore): ReaderAuthClient =
@@ -68,7 +86,7 @@ class SessionSaveFailureTest {
         val directory = Files.createTempDirectory("reader-auth").toFile()
         val cipher = RefusingCipher()
         val store = FileSessionStore(directory, cipher, StandardTestDispatcher(testScheduler))
-        store.save(session(expiresAt = clock.expiring(60)))
+        store.save(StoredSession(session(expiresAt = clock.expiring(60))))
         cipher.failEncrypt = true
         val client = clientOver(store)
 
@@ -183,7 +201,9 @@ class SessionSaveFailureTest {
         launch(Dispatchers.Unconfined) {
             client.sessionState.first { it is ReaderSessionState.SignedIn && it.expiresAt > stored.expiresAt }
             otherDevices.complete(
-                this@runTest.async(start = CoroutineStart.UNDISPATCHED) { runCatching { client.signOutOtherDevices() } },
+                this@runTest.async(start = CoroutineStart.UNDISPATCHED) {
+                    runCatching { client.signOutOtherDevices() }
+                },
             )
         }
 

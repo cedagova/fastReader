@@ -35,7 +35,7 @@ import kotlinx.serialization.json.Json
  *   If the rename fails, the previous file stays as it was and [save] throws
  *   an [IOException] — there is no in-place fallback write.
  */
-class FileSessionStore internal constructor(
+internal class FileSessionStore(
     private val directory: File,
     private val cipher: SessionCipher,
     private val ioDispatcher: CoroutineDispatcher,
@@ -51,9 +51,12 @@ class FileSessionStore internal constructor(
     /** The one file the session is ever written to. */
     val file: File get() = File(directory, FILE_NAME)
 
-    override suspend fun save(session: UserSession) = withContext(ioDispatcher) {
+    override suspend fun save(session: StoredSession): Unit = withContext(ioDispatcher) {
         directory.mkdirs()
-        val plaintext = json.encodeToString(Envelope.serializer(), Envelope(session = session)).encodeToByteArray()
+        val plaintext = json.encodeToString(
+            Envelope.serializer(),
+            Envelope(session = session.value),
+        ).encodeToByteArray()
         val blob = cipher.encrypt(plaintext)
         // A temp file per save, so two concurrent saves never write into the same bytes.
         val temporary = File.createTempFile("$FILE_NAME.", TEMP_SUFFIX, directory)
@@ -71,21 +74,25 @@ class FileSessionStore internal constructor(
         Unit
     }
 
-    override suspend fun load(): UserSession? = withContext(ioDispatcher) {
+    override suspend fun load(): StoredSession? = withContext(ioDispatcher) {
         val target = file
         if (!target.isFile) return@withContext null
         try {
             val plaintext = cipher.decrypt(target.readBytes())
             val envelope = json.decodeFromString(Envelope.serializer(), plaintext.decodeToString())
-            if (envelope.formatVersion != FORMAT_VERSION) throw IllegalStateException("unsupported format ${envelope.formatVersion}")
-            envelope.session
+            if (envelope.formatVersion !=
+                FORMAT_VERSION
+            ) {
+                throw IllegalStateException("unsupported format ${envelope.formatVersion}")
+            }
+            StoredSession(envelope.session)
         } catch (e: Exception) {
             target.delete()
             null
         }
     }
 
-    override suspend fun clear() = withContext(ioDispatcher) {
+    override suspend fun clear(): Unit = withContext(ioDispatcher) {
         file.delete()
         directory.listFiles { candidate -> candidate.isTemporary() }.orEmpty().forEach { it.delete() }
         Unit
@@ -109,7 +116,10 @@ class FileSessionStore internal constructor(
 
         private const val TEMP_SUFFIX = ".tmp"
 
-        private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        private val json = Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
 
         private fun File.isTemporary(): Boolean = name.startsWith("$FILE_NAME.") && name.endsWith(TEMP_SUFFIX)
 
@@ -118,7 +128,12 @@ class FileSessionStore internal constructor(
          * (the target untouched) when the filesystem cannot do it atomically.
          */
         private fun atomicReplace(temporary: File, target: File) {
-            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
         }
 
         /** The production location: `<noBackupFilesDir>/reader-auth/session.bin`. */
