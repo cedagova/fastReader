@@ -6,7 +6,9 @@
 // FastReader naming anywhere. It owns the one thing every host needs merged in
 // from it — the INTERNET permission in src/main/AndroidManifest.xml — and it
 // documents in README.md the host obligations a library cannot enforce through
-// manifest merging. CONTRACT.md is the client contract this module implements.
+// manifest merging. CONTRACT.md is the client contract this module implements;
+// contracts/ holds the one pinned reader-api document both libraries are gated
+// against (#208), and ReaderAuthContractTest is this module's drift gate.
 plugins {
     // Shared SDK, JVM, lint, test and formatter settings (build-logic, #205).
     id("conventions.android.library")
@@ -21,6 +23,20 @@ android {
         // the file for why.
         consumerProguardFiles("consumer-rules.pro")
     }
+
+    // The reader-api contract checker (#208): test support, shared with
+    // :reader-library's contract test, which compiles the same source.
+    sourceSets {
+        getByName("test").kotlin.directories.add("src/contractTest/kotlin")
+    }
+}
+
+// ReaderAuthContractTest reads contracts/ from the filesystem, not from the
+// test classpath, so the pinned document is declared an input of the test task;
+// otherwise a changed contract file returns the last green result from the
+// build cache and the drift gate never runs.
+tasks.withType<Test>().configureEach {
+    inputs.dir("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 dependencies {

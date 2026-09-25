@@ -301,12 +301,22 @@ policy. Each host owns:
   https://github.com/cedagova/fastReader/blob/1b99102603eb05975e655b26be02a5a79abd646e/docs/audits/A83-android-client-auth/report.md
 - Root issue and preserved audit record: https://github.com/cedagova/fastReader/issues/93;
   plan: https://github.com/cedagova/fastReader/pull/97
-- reader-api contract (Chunipers/reader-api, private): the Android projection
-  delivered by reader-api#489 (pre-auth and capabilities per `X-Reader-Client`,
-  `reader-android` 1.0.0), the error catalogue `docs/error-codes.md`
-  (`auth.expired_token`, `auth.invalid_token`, `auth.jwks_dependency_failed`,
-  …), the leeway quick fix `SUPABASE_JWT_LEEWAY_SECONDS` and
-  `auth.anonymous_identity_rejected` (#91, recorded on #93 on 2026-09-12).
+- reader-api contract (Chunipers/reader-api, private), cited at the one pinned
+  commit `Chunipers/reader-api@909174aff6a380514da7b81263d69a4e653cfe76`
+  (identity and update procedure: [contracts/PINNED.md](contracts/PINNED.md)):
+  - `contracts/reader-api.openapi.json`, committed byte for byte as
+    [contracts/reader-api.openapi.json](contracts/reader-api.openapi.json):
+    the pre-auth, capabilities and profile routes and shapes, projected per
+    `X-Reader-Client` (`reader-android` 1.0.0; the projection was first
+    delivered by reader-api#489). `ReaderAuthContractTest` gates every shape
+    this module sends or reads against it.
+  - `docs/error-codes.md`: the error catalogue (`auth.expired_token`,
+    `auth.invalid_token`, `auth.jwks_dependency_failed`,
+    `auth.anonymous_identity_rejected`, …).
+  - `README.md`: the clock-skew tolerance `SUPABASE_JWT_LEEWAY_SECONDS`
+    (default 120 s), the leeway quick fix requested by #91 and recorded on #93
+    on 2026-09-12.
+
   Stage answers were checked live on 2026-09-13.
 - reader-web reference behaviour (Chunipers/reader-web `packages/auth`,
   `packages/clients`), as cited in the dossier.

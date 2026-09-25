@@ -1,5 +1,7 @@
 package com.cedagova.reader.library
 
+import com.cedagova.reader.auth.contract.ReaderApiContract
+import com.cedagova.reader.auth.contract.primitive
 import com.cedagova.reader.library.model.CancelPublicationImportRequest
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
@@ -45,21 +47,13 @@ import com.cedagova.reader.library.model.ReaderSyncMutationResult
 import com.cedagova.reader.library.model.ReaderSyncRejection
 import com.cedagova.reader.library.model.UNKNOWN_VALUE
 import java.io.File
-import java.security.MessageDigest
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,11 +65,12 @@ import org.junit.Test
  *
  * `:reader-library` writes its models by hand rather than generating them, so
  * something has to fail the build when a model and the published Reader API
- * contract stop agreeing. This is that something. It reads the OpenAPI document
- * committed under `reader-library/contracts/`, confirms it is byte-for-byte the
- * pinned identity by sha256, and then — for every model the module sends or
- * reads — compares the model's own kotlinx.serialization descriptor with the
- * document's schema:
+ * contract stop agreeing. This is that something. It reads the one pinned
+ * OpenAPI document both libraries share (`reader-auth/contracts/`, #208),
+ * confirms it is byte-for-byte the pinned identity by sha256, and then — for
+ * every model the module sends or reads — compares the model's own
+ * kotlinx.serialization descriptor with the document's schema through the
+ * shared checker, `ReaderApiContract` (`Fit.WHOLE`):
  *
  * - every field the model uses exists in the schema, under that exact wire name;
  * - its JSON type agrees (string / integer / number / boolean / array / object);
@@ -92,23 +87,18 @@ import org.junit.Test
  * caught` proves that claim on deliberately broken copies of three models: a
  * gate nobody has watched fail is not a gate.
  *
- * When reader-api genuinely changes, the fix is to re-pin the document and move
- * the models — never to relax this test. Drift is a proposal to Chunipers
+ * When reader-api genuinely changes, the fix is to re-pin the document
+ * (`reader-auth/contracts/PINNED.md`) and move the models — never to relax this
+ * test. Drift is a proposal to Chunipers
  * (reader-api #511 / #512), never a local workaround.
  */
-@OptIn(ExperimentalSerializationApi::class)
 class ReaderLibraryContractTest {
 
     private val moduleDir = File(repositoryRoot(), "reader-library")
-    private val contractFile = File(moduleDir, "contracts/reader-api.openapi.json")
-    private val digestFile = File(moduleDir, "contracts/reader-api.openapi.json.sha256")
 
-    private val document: JsonObject by lazy {
-        Json.parseToJsonElement(contractFile.readText()).jsonObject
-    }
-    private val schemas: JsonObject by lazy {
-        document["components"]!!.jsonObject["schemas"]!!.jsonObject
-    }
+    private val contract = ReaderApiContract.pinned
+    private val document: JsonObject get() = contract.document
+    private val schemas: JsonObject get() = contract.schemas
 
     /**
      * Every model this module puts on the wire or reads off it, against the
@@ -157,32 +147,35 @@ class ReaderLibraryContractTest {
         ReaderAssetGrantResponse.serializer() to "ReaderAssetGrantResponse",
     )
 
-    /** Kotlin descriptor serial name → the schema it must agree with, for `$ref` checks. */
-    private val schemaOf: Map<String, String> by lazy {
-        pinned.entries.associate { (serializer, schema) -> serializer.descriptor.serialName to schema }
-    }
+    /** The shared checker over this module's models, every one of them a whole shape. */
+    private val checker = contract.checker(
+        pinned.map { (serializer, schema) ->
+            ReaderApiContract.Pin(serializer, schema)
+        },
+    )
+
+    private fun violations(descriptor: SerialDescriptor, schemaName: String): List<String> =
+        checker.violations(descriptor, schemaName)
 
     @Test
     fun `the committed document is the pinned identity, byte for byte`() {
+        val contractFile = ReaderApiContract.documentFile
         assertTrue("missing ${contractFile.path}", contractFile.isFile)
-        val recorded = digestFile.readText().trim().substringBefore(' ')
-        val actual = MessageDigest.getInstance("SHA-256")
-            .digest(contractFile.readBytes())
-            .joinToString("") { "%02x".format(it) }
+        val actual = ReaderApiContract.actualDigest()
         assertEquals(
-            "reader-library/contracts/reader-api.openapi.json does not match its recorded sha256; " +
-                "re-pin it deliberately (contracts/PINNED.md) rather than editing the digest",
-            recorded,
+            "reader-auth/contracts/reader-api.openapi.json does not match its recorded sha256; " +
+                "re-pin it deliberately (reader-auth/contracts/PINNED.md) rather than editing the digest",
+            ReaderApiContract.recordedDigest(),
             actual,
         )
-        assertEquals("e2c184dbd51d0e3f542d73d69e56a193300615de604486615b254911b67ade90", actual)
+        assertEquals(ReaderApiContract.PINNED_SHA256, actual)
+        // The checker skips the shared forward-compatibility sentinel by name; it must be this module's.
+        assertEquals(UNKNOWN_VALUE, ReaderApiContract.UNKNOWN_ENUM_MEMBER)
     }
 
     @Test
     fun `every model the module sends or reads agrees with the pinned schema`() {
-        val problems = pinned.entries.flatMap { (serializer, schema) ->
-            violations(serializer.descriptor, schema)
-        }
+        val problems = checker.violations()
         assertEquals(
             "the models and the pinned contract disagree:\n" + problems.joinToString("\n"),
             emptyList<String>(),
@@ -533,125 +526,6 @@ class ReaderLibraryContractTest {
         // And the checker is not simply always angry: the real models are clean.
         assertEquals(emptyList<String>(), violations(ReaderSyncChange.serializer().descriptor, "ReaderSyncChange"))
     }
-
-    // ------------------------------------------------------------- the checker
-
-    private fun violations(descriptor: SerialDescriptor, schemaName: String): List<String> {
-        val schema = schemas[schemaName]?.jsonObject
-            ?: return listOf("$schemaName: the pinned document declares no such schema")
-        val properties = schema["properties"]?.jsonObject ?: JsonObject(emptyMap())
-        val required = (schema["required"] as? JsonArray)?.mapNotNull { it.primitive() }?.toSet() ?: emptySet()
-        val problems = mutableListOf<String>()
-        val seen = mutableSetOf<String>()
-
-        for (index in 0 until descriptor.elementsCount) {
-            val field = descriptor.getElementName(index)
-            seen += field
-            val element = descriptor.getElementDescriptor(index)
-            val property = properties[field]?.jsonObject
-            if (property == null) {
-                problems += "$schemaName.$field: not declared by the pinned schema"
-                continue
-            }
-            val resolved = resolve(property)
-            if (element.isNullable && !resolved.nullable && field in required) {
-                problems += "$schemaName.$field: the model makes it nullable but the schema requires a value"
-            }
-            if (!element.isNullable && resolved.nullable) {
-                problems += "$schemaName.$field: the schema allows null but the model does not"
-            }
-            problems += checkShape(element, resolved, "$schemaName.$field")
-        }
-
-        (required - seen).forEach { missing ->
-            problems += "$schemaName.$missing: the schema marks it required but the model has no such field"
-        }
-        return problems
-    }
-
-    /** One element's JSON type, enum members and `$ref` target against the resolved schema. */
-    private fun checkShape(element: SerialDescriptor, resolved: Resolved, where: String): List<String> {
-        val problems = mutableListOf<String>()
-        val expected = jsonType(element)
-        if (expected == null) {
-            return listOf("$where: the model uses ${element.kind}, which this checker cannot compare")
-        }
-        if (resolved.ref != null) {
-            // A nullable class descriptor's serial name carries a trailing '?'.
-            val mapped = schemaOf[element.serialName.removeSuffix("?")]
-            when {
-                mapped == null ->
-                    problems +=
-                        "$where: the schema is a \$ref to ${resolved.ref}, but ${element.serialName} is not pinned to any schema"
-
-                mapped != resolved.ref ->
-                    problems +=
-                        "$where: the schema refers to ${resolved.ref}, the model to $mapped"
-            }
-            if (expected != "object") problems += "$where: the schema is an object reference, the model a $expected"
-            return problems
-        }
-        if (resolved.type != null && resolved.type != expected) {
-            problems += "$where: the schema's type is ${resolved.type}, the model's is $expected"
-        }
-        if (element.kind == SerialKind.ENUM) {
-            val declared = (resolved.schema["enum"] as? JsonArray)?.mapNotNull { it.primitive() }?.toSet()
-            if (declared == null) {
-                problems += "$where: the model is an enum but the schema declares no enum values"
-            } else {
-                val members = (0 until element.elementsCount)
-                    .map { element.getElementName(it) }
-                    .filterNot { it == UNKNOWN_VALUE }
-                    .toSet()
-                (members - declared).forEach {
-                    problems += "$where: the model declares '$it', which the schema does not"
-                }
-                (declared - members).forEach {
-                    problems += "$where: the schema declares '$it', which the model does not"
-                }
-            }
-        }
-        if (element.kind == StructureKind.LIST) {
-            val items = resolved.schema["items"]?.jsonObject
-            if (items == null) {
-                problems += "$where: the model is an array but the schema declares no items"
-            } else {
-                problems += checkShape(element.getElementDescriptor(0), resolve(items), "$where[]")
-            }
-        }
-        return problems
-    }
-
-    private data class Resolved(val schema: JsonObject, val type: String?, val nullable: Boolean, val ref: String?)
-
-    /** Unwraps `anyOf [X, null]` and `$ref`, which is how the document spells "optional" and "another schema". */
-    private fun resolve(property: JsonObject): Resolved {
-        property["\$ref"]?.primitive()?.let { return Resolved(property, "object", false, it.substringAfterLast('/')) }
-        val anyOf = property["anyOf"] as? JsonArray
-        if (anyOf != null) {
-            val branches = anyOf.map { it.jsonObject }
-            val nullable = branches.any { it["type"]?.primitive() == "null" }
-            val concrete = branches.firstOrNull { it["type"]?.primitive() != "null" } ?: JsonObject(emptyMap())
-            val inner = resolve(concrete)
-            return Resolved(inner.schema, inner.type, nullable || inner.nullable, inner.ref)
-        }
-        return Resolved(property, property["type"]?.primitive(), false, null)
-    }
-
-    /** The document's JSON type for a Kotlin element, or null when this checker has no opinion. */
-    private fun jsonType(element: SerialDescriptor): String? = when (element.kind) {
-        PrimitiveKind.STRING, PrimitiveKind.CHAR -> "string"
-        PrimitiveKind.BYTE, PrimitiveKind.SHORT, PrimitiveKind.INT, PrimitiveKind.LONG -> "integer"
-        PrimitiveKind.FLOAT, PrimitiveKind.DOUBLE -> "number"
-        PrimitiveKind.BOOLEAN -> "boolean"
-        SerialKind.ENUM -> "string"
-        StructureKind.LIST -> "array"
-        StructureKind.MAP, StructureKind.CLASS, StructureKind.OBJECT -> "object"
-        PolymorphicKind.OPEN, PolymorphicKind.SEALED -> null
-        else -> null
-    }
-
-    private fun kotlinx.serialization.json.JsonElement.primitive(): String? = (this as? JsonPrimitive)?.contentOrNull
 
     // ------------------------------------------------- deliberately broken copies
 
