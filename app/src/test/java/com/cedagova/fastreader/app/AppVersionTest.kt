@@ -4,8 +4,8 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.account.library.AccountCopyStore
 import com.cedagova.fastreader.settings.AppVersion
+import com.cedagova.reader.account.library.AccountCopyStore
 import java.io.File
 import java.util.Properties
 import org.junit.Assert.assertEquals

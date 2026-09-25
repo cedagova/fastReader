@@ -1,16 +1,16 @@
 package com.cedagova.fastreader.library.ui
 
-import com.cedagova.fastreader.account.library.AccountDownloadsState
-import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.fastreader.account.library.BookDownloadState
-import com.cedagova.fastreader.account.library.BookImportState
-import com.cedagova.fastreader.account.library.DownloadProblem
-import com.cedagova.fastreader.account.library.ImportOffer
-import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.SourceAvailability
+import com.cedagova.reader.account.library.AccountDownloadsState
+import com.cedagova.reader.account.library.AccountImportsState
+import com.cedagova.reader.account.library.BookDownloadState
+import com.cedagova.reader.account.library.BookImportState
+import com.cedagova.reader.account.library.DownloadProblem
+import com.cedagova.reader.account.library.ImportOffer
+import com.cedagova.reader.account.library.ImportsOff
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.sync.AccountBook

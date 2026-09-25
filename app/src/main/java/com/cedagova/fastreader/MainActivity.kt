@@ -17,10 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.cedagova.fastreader.account.ReaderAccountController
-import com.cedagova.fastreader.account.library.AccountDownloads
-import com.cedagova.fastreader.account.library.AccountImports
-import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.ui.ReaderAccountRoute
 import com.cedagova.fastreader.crash.CrashReportStore
 import com.cedagova.fastreader.crash.ui.CrashReportOfferHost
@@ -38,6 +34,10 @@ import com.cedagova.fastreader.settings.SharedPreferencesThemeMirror
 import com.cedagova.fastreader.settings.ui.SettingsRoute
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import com.cedagova.fastreader.ui.theme.isDark
+import com.cedagova.reader.account.ReaderAccountController
+import com.cedagova.reader.account.library.AccountDownloads
+import com.cedagova.reader.account.library.AccountImports
+import com.cedagova.reader.account.library.AccountShelf
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

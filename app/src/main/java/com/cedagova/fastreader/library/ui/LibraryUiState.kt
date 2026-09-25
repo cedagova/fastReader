@@ -1,8 +1,5 @@
 package com.cedagova.fastreader.library.ui
 
-import com.cedagova.fastreader.account.library.AccountDownloadsState
-import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
@@ -15,6 +12,9 @@ import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.LibraryOrder
+import com.cedagova.reader.account.library.AccountDownloadsState
+import com.cedagova.reader.account.library.AccountImportsState
+import com.cedagova.reader.account.library.BookDownloadState
 import com.cedagova.reader.library.sync.AccountLibraryState
 import java.text.Collator
 import java.text.Normalizer

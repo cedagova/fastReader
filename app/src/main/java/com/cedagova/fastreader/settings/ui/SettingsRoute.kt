@@ -13,12 +13,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
-import com.cedagova.fastreader.account.ReaderAccountController
-import com.cedagova.fastreader.account.summary
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.RELEASES_URL
 import com.cedagova.fastreader.settings.ReaderSettings
+import com.cedagova.reader.account.ReaderAccountController
+import com.cedagova.reader.account.summary
 
 /**
  * The settings screen wired to the store: the saved settings in, changes out.

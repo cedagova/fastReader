@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.BuildConfig
 import com.cedagova.fastreader.FastReaderApplication
 import com.cedagova.fastreader.app.repositoryFile
+import com.cedagova.reader.account.ReaderAccountState
 import com.cedagova.reader.auth.ReaderAuthClient
 import com.cedagova.reader.auth.ReaderAuthConfig
 import com.cedagova.reader.auth.ReaderAuthException

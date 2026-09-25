@@ -5,7 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import com.cedagova.fastreader.account.ReaderAccountController
+import com.cedagova.reader.account.ReaderAccountController
 
 /**
  * The account screen wired to the process-scoped [ReaderAccountController]:

@@ -12,13 +12,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
-import com.cedagova.fastreader.account.library.AccountDownloads
-import com.cedagova.fastreader.account.library.AccountImports
-import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ScanTrigger
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
+import com.cedagova.reader.account.library.AccountDownloads
+import com.cedagova.reader.account.library.AccountImports
+import com.cedagova.reader.account.library.AccountShelf
 
 /**
  * The library screen wired to the real catalog: repository state in, document

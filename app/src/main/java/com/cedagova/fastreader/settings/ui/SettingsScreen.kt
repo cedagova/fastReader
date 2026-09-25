@@ -56,13 +56,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.account.ReaderAccountSummary
 import com.cedagova.fastreader.reader.ui.resolve
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
+import com.cedagova.reader.account.ReaderAccountSummary
 import com.cedagova.reader.engine.timing.PauseStrength
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
