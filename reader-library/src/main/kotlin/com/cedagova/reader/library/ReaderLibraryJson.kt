@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
  *
  * - `ignoreUnknownKeys`: a field reader-api adds later is skipped, not fatal.
  * - `coerceInputValues`: an enum member reader-api adds later decodes to the
- *   model's `UNKNOWN` default instead of throwing, so an older FastReader
+ *   model's `UNKNOWN` default instead of throwing, so an older client
  *   still reads a newer server's rows (see `UNKNOWN_VALUE`).
  * - `explicitNulls = false`: an absent optional is omitted from a request
  *   rather than sent as an explicit `null`.

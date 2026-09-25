@@ -5,12 +5,12 @@ package com.cedagova.reader.account.library
  * A197-F003): [AccountShelf]'s one collaborator besides the engine's actions.
  *
  * Whether and when a reader is offered to resume at another device's position
- * is host UX policy (REQ-511 in FastReader), so the note stays the host's: the
+ * is host UX policy, so the note stays the host's: the
  * shelf only passes the answer through. One operation, and it must put nothing
  * on the wire — `AccountShelfTest` holds that this interface has no other.
  *
- * FastReader's implementation is `AccountResumeOffers`, a host record on the
- * book's row of the account document. A host's tests substitute
+ * A natural implementation is a book host record on the account document
+ * (`AccountHostRecords.updateBookHostRecord`). A host's tests substitute
  * `com.cedagova.reader.account.testing.RecordingResumeOfferRecords` from this
  * module's test fixtures.
  */

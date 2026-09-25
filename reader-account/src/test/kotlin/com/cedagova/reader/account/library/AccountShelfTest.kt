@@ -214,8 +214,8 @@ class AccountShelfTest {
      * category of data.
      *
      * Settling a resume offer (#121) is not on this interface since #147: it is a
-     * host record the host keeps, reached through [ResumeOfferRecords] (FastReader's
-     * `AccountResumeOffers` since #200), whose one operation writes a book row's
+     * host record the host keeps, reached through [ResumeOfferRecords] (since
+     * #200), whose one operation writes a book row's
      * note and puts nothing on the wire at all.
      * `AccountSyncEngineTest.a host record is stored verbatim and sends nothing`
      * holds that, and the next test holds that it is the shelf's only other

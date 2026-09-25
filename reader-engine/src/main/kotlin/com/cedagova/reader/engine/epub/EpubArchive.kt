@@ -33,8 +33,8 @@ internal interface EpubArchive : AutoCloseable {
      * too many entries) also lands here, and would otherwise be assumed to have a
      * fingerprint it does not have.
      *
-     * See [StructuralFingerprint] for what a non-null value means, and
-     * `com.cedagova.fastreader.reader.ReaderPosition` for what is done with it.
+     * See [StructuralFingerprint] for what a non-null value means; a host keeps
+     * it beside a stored position and refuses the position when it differs.
      */
     val structuralFingerprint: String?
 

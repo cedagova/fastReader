@@ -34,3 +34,6 @@ stands after these changes, which had no version of their own:
   (#208).
 - Shared build conventions from `build-logic` (#205).
 - Consumer keep rules in `consumer-rules.pro` (#100).
+- Documentation (#209): README and doc comments name no host app; the
+  README says where SDK levels and versions come from (`build-logic`, the
+  catalog). No code change.

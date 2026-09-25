@@ -22,16 +22,16 @@ import kotlinx.serialization.json.JsonObject
  *
  * ## Host records
  *
- * A host app keeps a little state of its own beside the account's — FastReader
- * keeps its verified-copy references and its answered resume offers — and it has
+ * A host app keeps a little state of its own beside the account's — for
+ * example its verified-copy references and its answered resume offers — and it has
  * to live in this document, because the document has exactly one writer and a
  * second file racing it would be the first way to lose a queued mutation. The
  * schema therefore reserves nothing for any host: every key the document or a
  * book row does not declare is a **host record**, kept verbatim through every
  * load, adoption and save ([AccountLibraryDocument.host], [AccountBook.host]),
  * and written back at the same level it was read from. That is also what keeps
- * a document written before #147 byte-compatible: FastReader's `copies` and
- * `resumeOfferSettledFor` keys are where they always were.
+ * a document written before #147 byte-compatible: the first host's `copies`
+ * and `resumeOfferSettledFor` keys are where they always were.
  */
 internal object AccountLibrarySchema {
 
@@ -43,7 +43,7 @@ internal object AccountLibrarySchema {
      * - **2** — increment 002 (LEAF802): `imports`, the durable publication
      *   import records of AD-26, so an add interrupted by app death addresses
      *   the same admission instead of making a second one.
-     * - **3** — increment 003 (LEAF811): `copies`, FastReader's references to
+     * - **3** — increment 003 (LEAF811): `copies`, the host's references to
      *   the verified private copies on its device (REQ-510, D2). A host record
      *   since #147: the schema number stays, the key is the host's.
      * - **4** — increment 004 (LEAF821): `remotePosition` on a book row, the
@@ -52,7 +52,7 @@ internal object AccountLibrarySchema {
      *   `ReadingState` keeps its own shape and semantics, and the two are never
      *   merged here.
      * - **5** — increment 004 (LEAF822): `resumeOfferSettledFor` on a book row,
-     *   FastReader's note of the resume offer the reader already answered
+     *   the host's note of the resume offer the reader already answered
      *   (REQ-511). A book host record since #147; it never reaches the backend.
      * - **6** — #140: `ownPositionChangeKey` on a book row, the position change
      *   the backend admitted from *this* device's own publish. Like schema 5 it

@@ -23,8 +23,8 @@ import java.io.File
  *    digests them as they land and refuses to place anything whose SHA-256 is
  *    not the account's identity for that book;
  * 3. only once a file has been placed, ask the host's [AccountCopyCatalog] to
- *    make it readable (FastReader writes its device-catalog row with an
- *    `ACCOUNT_COPY` source);
+ *    make it readable (for example, a device-catalog row with an account-copy
+ *    source);
  * 4. and then record the account's copy reference.
  *
  * Nothing between steps 1 and 3 can produce a readable book, which is the

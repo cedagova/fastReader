@@ -3,11 +3,11 @@
 // Account session state, the verified private copies of account books, their
 // download and the add-to-account import, the account shelf, and the one call
 // that assembles all of it over :reader-auth and :reader-library for a host
-// (ReaderAccountGraph). It was written inside FastReader's :app but is what any
-// Reader Android client needs, so it lives here: no dependency on :app, no
-// com.cedagova.fastreader symbol, and every FastReader coupling it used to have
-// — the device catalog, how a device book is identified, the resume-offer note
-// — is a small interface the host implements.
+// (ReaderAccountGraph). It was written inside the host app's :app but is what
+// any Reader Android client needs, so it lives here: no dependency on :app, no
+// symbol of the host app, and every host coupling it used to have — the device
+// catalog, how a device book is identified, the resume-offer note — is a small
+// interface the host implements.
 //
 // It holds no session and no token: every account call goes through
 // :reader-auth's ReaderAuthOperations or :reader-library's gateways, and every

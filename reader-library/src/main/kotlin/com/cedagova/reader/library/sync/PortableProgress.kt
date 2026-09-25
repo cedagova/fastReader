@@ -20,8 +20,8 @@ import kotlinx.serialization.json.jsonObject
  *
  * It knows nothing of how a host counts its own place in a book. A host maps
  * its own position to a [LocalReadingPosition] and a [RemoteReadingPosition]
- * back to its own position; FastReader's token mapping is its
- * `PortableReadingPosition`, not this.
+ * back to its own position; that mapping (a token index, for an RSVP host)
+ * lives in the host, not here.
  *
  * ## Two derivations live here
  *

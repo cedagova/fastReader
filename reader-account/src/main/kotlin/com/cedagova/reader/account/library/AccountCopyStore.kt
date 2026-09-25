@@ -118,7 +118,7 @@ public class AccountCopyStore(private val directory: File) {
             return CopyPlacement.Refused("a copy is keyed by a content SHA-256, not by '$contentSha256'")
         }
         if (!directory.isDirectory && !directory.mkdirs()) {
-            return CopyPlacement.NoStorage("could not open FastReader's private storage")
+            return CopyPlacement.NoStorage("could not open the private copies directory")
         }
 
         val partial = File(directory, PREFIX + expected + PARTIAL_SUFFIX)

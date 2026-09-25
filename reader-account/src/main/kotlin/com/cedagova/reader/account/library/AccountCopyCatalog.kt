@@ -14,8 +14,7 @@ import java.io.File
  * after a verified placement, the row before the bytes on removal), so a host
  * implements the catalog half and nothing about ordering.
  *
- * FastReader's implementation writes the `ACCOUNT_COPY` source of its
- * `LibraryRepository`. A host's tests substitute the recording
+ * A host's tests substitute the recording
  * `com.cedagova.reader.account.testing.FakeAccountCopyCatalog` from this
  * module's test fixtures.
  */

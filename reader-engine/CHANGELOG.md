@@ -27,3 +27,5 @@ unchanged (#201, A197-F004). Tokenizer output and
 - Keep rules for the module's `@Serializable` types ship in the jar
   (`META-INF/proguard/reader-engine.pro`).
 - EPUB and content test fixtures are published as the module's test fixtures.
+- Documentation (#209): doc comments no longer point at a host app's
+  position type. No code change.

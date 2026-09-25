@@ -99,7 +99,7 @@ class ReaderLibraryClientTest {
         assertEquals("Preface", row.chapterTitle)
         assertEquals(BOOK_ID, row.location.publication.publicationId)
         assertEquals("epub", row.location.publication.format)
-        // The locator is carried through whole, including a field FastReader never writes.
+        // The locator is carried through whole, including a field this module never writes.
         assertEquals(JsonPrimitive("epubcfi(/6/14!/4/2/2)"), row.location.locator["epub_cfi"])
         assertEquals(JsonPrimitive("OEBPS/preface.xhtml"), row.location.locator["href"])
         assertEquals("access-1", h.servers.requestsTo(ReaderLibraryClient.PROGRESS_PATH).single().bearer)

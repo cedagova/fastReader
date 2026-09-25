@@ -41,3 +41,7 @@ locations unchanged.
   rules for its own `@Serializable` types (`consumer-rules.pro`); scripted
   doubles of its seams in the test fixtures
   (`com.cedagova.reader.account.testing`).
+- Documentation (#209): README and doc comments name no host app, and the
+  error-mapping split with `:reader-library` is written down. The internal
+  `CopyPlacement.NoStorage` reason no longer names the host app (never shown
+  to a reader).

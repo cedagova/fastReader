@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * out, pinned to the document by `ReaderLibraryContractTest`. Read
  * `reader-auth/contracts/reader-api.openapi.json` (`ReaderAssetGrantResponse`,
  * `ReaderAssetGrant`) for the authority; this file only says what shape
- * FastReader reads it in.
+ * this module reads it in.
  *
  * The two grants differ in one way that matters to this module's design: the
  * upload grant carries a `chunk_size_bytes` because TUS sends the file in
@@ -39,7 +39,7 @@ public data class ReaderAssetGrantResponse(
  * One signed transfer of one asset, in one direction, until it expires.
  *
  * [url] is the storage provider's own signed URL. It is the *only* address this
- * client may fetch a book from: nothing in FastReader composes a download URL,
+ * client may fetch a book from: nothing in this module composes a download URL,
  * which is why `AssetDownloadClient` takes a whole grant rather than a string.
  *
  * [checksum] is the content SHA-256 the server holds for the stored object. It

@@ -30,7 +30,7 @@ public sealed interface ReaderAccountState {
 
     /**
      * A build without the account values: [missingValues] names the absent
-     * configuration keys (FastReader's are `local.properties` keys), every
+     * configuration keys (the host's own names for them), every
      * action is absent, and nothing is called.
      * `ReaderAuthException.NotConfigured` is this state, not an error.
      */

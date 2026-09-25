@@ -23,7 +23,7 @@ import org.junit.rules.TemporaryFolder
 
 /**
  * The one assembly call (#200, A197-F003) and its foreground hooks, which
- * FastReader's `Application` used to wire by hand: the session refresh on
+ * the host's `Application` used to wire by hand: the session refresh on
  * every foreground, the copy sweep on the first one only, and nothing on the
  * network while nobody is signed in.
  */
@@ -105,9 +105,9 @@ class ReaderAccountGraphTest {
         assertEquals("the local sweep still runs", listOf("reconcile"), catalog.calls)
     }
 
-    /** No migration (#200): the account documents and copies stay where FastReader kept them. */
+    /** No migration (#200): the account documents and copies stay where the first host kept them. */
     @Test
-    fun `the stores live in the directories FastReader used`() {
+    fun `the stores live in the directories the first host used`() {
         assertEquals("account-library", FileAccountLibraryStores.DIRECTORY_NAME)
         assertEquals("account-copies", AccountCopyStore.DIRECTORY_NAME)
     }

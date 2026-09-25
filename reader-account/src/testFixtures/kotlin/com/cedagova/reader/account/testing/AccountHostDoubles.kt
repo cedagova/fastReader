@@ -83,7 +83,7 @@ public class FakeDevicePublicationSources : DevicePublicationSources {
         ?: PublicationSourceResult.Unavailable(PublicationSourceProblem.UNREACHABLE)
 }
 
-/** A device-book id that is the content identity under a `sha256:` prefix, FastReader's convention. */
+/** A device-book id that is the content identity under a `sha256:` prefix. */
 public object PrefixedBookIdentity : DeviceBookIdentity {
     override fun deviceBookId(contentSha256: String): String = "sha256:$contentSha256"
 

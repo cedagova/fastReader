@@ -81,8 +81,7 @@ public class ReaderAccountGateways(
  * A host builds one of these for its process, in its `Application.onCreate`,
  * and calls [onForeground] and [onBackground] from its process lifecycle
  * observer. Everything else — which screens read [account], [shelf],
- * [imports] and [downloads] — is the host's. FastReader's call site is
- * `FastReaderApplication.onCreate`.
+ * [imports] and [downloads] — is the host's.
  *
  * ## What it wires
  *
@@ -93,8 +92,9 @@ public class ReaderAccountGateways(
  * - [shelf], [imports], [copies] and [downloads] over [sync]'s state and
  *   single writer, with the verified copies under `filesDir/account-copies/`.
  *
- * The directories and file formats are exactly the ones FastReader used before
- * this module existed, so a host that adopts it migrates nothing.
+ * The directories and file formats are exactly the ones the pipeline used
+ * before it became a module, so its first host migrated nothing. [filesDir] must
+ * be app-private and excluded from backup and device transfer.
  *
  * ## The host seams
  *
@@ -124,7 +124,7 @@ public class ReaderAccountGraph(
     bookIdentity: DeviceBookIdentity,
     resumeOffers: (AccountHostRecords) -> ResumeOfferRecords,
     private val scope: CoroutineScope,
-    /** How long an account removal can be taken back; FastReader passes its device shelf's window. */
+    /** How long an account removal can be taken back; a host passes its own device shelf's window, if it has one. */
     undoWindowMs: Long = AccountShelf.DEFAULT_UNDO_WINDOW_MS,
 ) {
     private val auth: ReaderAuthOperations? = gateways?.auth

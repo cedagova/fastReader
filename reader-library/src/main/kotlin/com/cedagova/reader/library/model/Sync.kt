@@ -108,7 +108,7 @@ public data class ReaderSyncMutationResult(
  * A conflict the server resolved authoritatively.
  *
  * The contract says this cannot occur for activity or membership and may only
- * occur for profile and settings, which FastReader never sends — so a caller
+ * occur for profile and settings, which this module never sends — so a caller
  * adopts [canonicalPayload] and logs it, and never prompts (AD-22).
  */
 @Serializable
