@@ -28,6 +28,7 @@ the check builds.
 module reader-auth
 module reader-library com.cedagova.reader.library
 module reader-engine com.cedagova.reader.engine
+module reader-account com.cedagova.reader.account
 
 # path <file or directory>
 #   Shared build pieces the modules need, copied verbatim.
@@ -48,7 +49,7 @@ test reader-library *ContractTest
 # fixtures <module>...
 #   Listed modules whose test fixtures (src/testFixtures, copied with the
 #   module) a host's unit tests use (#199); the check runs a host test on them.
-fixtures reader-auth reader-library reader-engine
+fixtures reader-auth reader-library reader-engine reader-account
 
 # versions | libraries | plugins <keys...>
 #   The gradle/libs.versions.toml entries the copied build files and
@@ -74,7 +75,8 @@ What each piece is for:
 | `reader-auth/src/contractTest/` | The shared contract checker. `:reader-auth`'s test source set includes it, and `:reader-library`'s build adds `../reader-auth/src/contractTest/kotlin` to its own, so the two module directories stay siblings. |
 | `reader-library/` | The account-library client and sync engine. |
 | `reader-engine/` | The EPUB, content and RSVP timing engines: a plain Kotlin/JVM module, no Android dependency (#201). |
-| Test fixtures (`src/testFixtures/` of the listed modules) | The one test-fixture surface (#199): the scripted doubles of the modules' interfaces, the one mock reader-api/identity-provider server and a real client over it. A host's tests take them with `testImplementation(testFixtures(project(":reader-auth")))` (and `":reader-library"`); a host writes no fake of a library type. `:reader-engine`'s are its EPUB and content fixture books (#201). |
+| `reader-account/` | The account pipeline over the two libraries — session state, shelf, verified copies, downloads, imports — and `ReaderAccountGraph`, the one call that assembles it for a host behind four host seams (#200). Its unit tests use `:reader-engine` and its fixtures, test-only. |
+| Test fixtures (`src/testFixtures/` of the listed modules) | The one test-fixture surface (#199): the scripted doubles of the modules' interfaces, the one mock reader-api/identity-provider server and a real client over it. A host's tests take them with `testImplementation(testFixtures(project(":reader-auth")))` (and `":reader-library"`); a host writes no fake of a library type. `:reader-engine`'s are its EPUB and content fixture books (#201); `:reader-account`'s are doubles of its host seams (#200). |
 | `build-logic/` | The convention plugins every module applies (`conventions.android.library`, `conventions.kotlin.library` for the JVM `reader-engine`; the app and root conventions come along in the same build). |
 | `.editorconfig` | The ktlint rules the conventions' formatter reads from the root. |
 | Catalog entries | SDK levels, JVM target and tool versions build-logic reads, the Gradle plugins it compiles against, and every dependency the two build files declare. |
@@ -97,13 +99,14 @@ What each piece is for:
 ## Copying (and updating) into a host
 
 1. Pick a tag for each module, and use the same commit for modules that
-   depend on each other (`:reader-library` depends on `:reader-auth`).
+   depend on each other (`:reader-library` depends on `:reader-auth`,
+   `:reader-account` on `:reader-library`).
 2. Replace the host's copies of every path in the block with the files
    tracked at that commit (`git archive <tag> <paths> | tar -x`); do not copy
    build output or `local.properties`.
 3. Merge the listed catalog lines into the host's `gradle/libs.versions.toml`.
 4. In the host's settings, `includeBuild("build-logic")` inside
-   `pluginManagement` and `include(":reader-auth", ":reader-library", ":reader-engine")`; in the
+   `pluginManagement` and `include(":reader-auth", ":reader-library", ":reader-engine", ":reader-account")`; in the
    host's root build file, declare the four listed plugins `apply false` so
    build-logic runs against those plugin classes.
 5. Set `android.useAndroidX=true` in the host's `gradle.properties` — and
@@ -131,6 +134,8 @@ rule of its own for them:
 - `:reader-auth` keeps the same members for every `@Serializable` class
   (its own and the identity provider SDK's) plus the JSON element
   serializers; see the file.
+- `:reader-account` keeps the same members for its `@Serializable` type
+  (`AccountCopy`, package `com.cedagova.reader.account`).
 - `:reader-engine` keeps the same members for its `@Serializable` types
   (package `com.cedagova.reader.engine`). As a plain JVM library it has no
   `consumerProguardFiles`: its rules ship inside its jar, in
@@ -179,9 +184,8 @@ writes nothing else.
 
 ## Adding a module
 
-A new reusable module (`:reader-account` of #200, the engine modules of
-#201) joins in the same change
-that creates it:
+A new reusable module (as `:reader-engine` did in #201 and `:reader-account`
+in #200) joins in the same change that creates it:
 
 1. Give it `version = "0.1.0"`, a `CHANGELOG.md` and, if it has
    `@Serializable` types, a `consumer-rules.pro` scoped to its own package

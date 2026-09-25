@@ -230,6 +230,14 @@ library operations — `GET /v1/reader/library`, `GET /v1/reader/progress`,
 the publication-import lifecycle and the asset download grant. There is deliberately no generic
 `call(path, body)`. See [reader-library/README.md](reader-library/README.md).
 
+Since #200 a third, `reader-account/` (`com.cedagova.reader.account`), holds
+the account pipeline on top of both — session state, shelf, verified copies,
+downloads and imports — and `ReaderAccountGraph`, the one call that assembles
+the libraries for a host. FastReader implements its four host seams (device
+catalog, device book bytes, book identity, resume-offer note) and makes that
+call in `FastReaderApplication`. See
+[reader-account/README.md](reader-account/README.md).
+
 **The Reader API contract it is built against is pinned, by identity, in this
 repository:**
 
