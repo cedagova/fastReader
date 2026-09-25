@@ -31,10 +31,10 @@ import com.cedagova.fastreader.content.BookContent
  * is accurate to within 0.08%, and `RemainingTimeTest` pins the whole-book result
  * against [RsvpTimingEngine.estimatedMillis] itself.
  */
-class RemainingTimeIndex private constructor(
+public class RemainingTimeIndex private constructor(
     private val suffixMultipliers: DoubleArray,
     /** The pause strength the multipliers were measured at; a different one needs a new index. */
-    val pauseStrength: PauseStrength,
+    public val pauseStrength: PauseStrength,
 ) {
 
     /**
@@ -45,7 +45,7 @@ class RemainingTimeIndex private constructor(
      * pass. `1.0` for an empty stream, and never below `1.0`: every multiplier the
      * engine produces is at least one.
      */
-    val meanMultiplier: Double = if (suffixMultipliers.size > 1) {
+    public val meanMultiplier: Double = if (suffixMultipliers.size > 1) {
         (suffixMultipliers[0] / (suffixMultipliers.size - 1)).coerceAtLeast(1.0)
     } else {
         1.0
@@ -65,12 +65,12 @@ class RemainingTimeIndex private constructor(
      * Hand this index settings without the mean and it reports the old, additive
      * figure — which is what the engine's own `estimatedMillis` does too.
      */
-    fun millisAfter(tokenIndex: Int, settings: TimingSettings): Long {
+    public fun millisAfter(tokenIndex: Int, settings: TimingSettings): Long {
         val from = (tokenIndex + 1).coerceIn(0, suffixMultipliers.size - 1)
         return (suffixMultipliers[from] * settings.targetWordMillis).toLong().coerceAtLeast(0L)
     }
 
-    companion object {
+    public companion object {
 
         /**
          * The speed the multipliers are measured at. The slowest allowed speed gives
@@ -79,7 +79,7 @@ class RemainingTimeIndex private constructor(
          */
         private val REFERENCE = TimingSettings(wpm = RsvpTiming.MIN_WPM, rampEnabled = false)
 
-        fun build(content: BookContent, pauseStrength: PauseStrength): RemainingTimeIndex {
+        public fun build(content: BookContent, pauseStrength: PauseStrength): RemainingTimeIndex {
             val reference = REFERENCE.copy(pauseStrength = pauseStrength)
             val plainWord = reference.targetWordMillis
             val tokens = content.tokens

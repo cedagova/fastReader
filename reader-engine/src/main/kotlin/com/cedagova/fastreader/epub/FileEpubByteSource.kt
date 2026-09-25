@@ -32,7 +32,7 @@ import java.nio.file.StandardOpenOption
  * why a copy keeps working after sign-out with no code that knows about
  * sign-out (D4).
  */
-class FileEpubByteSource(private val file: File) : EpubByteSource {
+public class FileEpubByteSource(private val file: File) : EpubByteSource {
 
     @Throws(IOException::class)
     override fun open(): InputStream = FileInputStream(file)

@@ -6,15 +6,15 @@ package com.cedagova.fastreader.epub
  * Inspection never throws on malformed input: an unusable file becomes
  * [Rejected] with a distinct [EpubRejectReason] the catalog persists.
  */
-sealed interface EpubInspection {
+public sealed interface EpubInspection {
 
     /** Content-derived identity of the inspected bytes, when they could be read at all. */
-    val contentDigest: String?
+    public val contentDigest: String?
 
-    data class Readable(override val contentDigest: String, val metadata: EpubMetadata, val cover: EpubCover?) :
+    public data class Readable(override val contentDigest: String, val metadata: EpubMetadata, val cover: EpubCover?) :
         EpubInspection
 
-    data class Rejected(override val contentDigest: String?, val reason: EpubRejectReason, val detail: String) :
+    public data class Rejected(override val contentDigest: String?, val reason: EpubRejectReason, val detail: String) :
         EpubInspection
 }
 
@@ -22,7 +22,7 @@ sealed interface EpubInspection {
  * Why a file cannot be read as a DRM-free EPUB. Values are persisted by name in
  * the catalog, so renaming one is a schema change.
  */
-enum class EpubRejectReason {
+public enum class EpubRejectReason {
     /** Encrypted with something other than the two standard font-obfuscation schemes. */
     DRM_PROTECTED,
 
@@ -37,7 +37,7 @@ enum class EpubRejectReason {
 }
 
 /** Metadata this leaf extracts. Absent fields stay null; callers supply fallbacks. */
-data class EpubMetadata(
+public data class EpubMetadata(
     val title: String? = null,
     val author: String? = null,
     val language: String? = null,
@@ -45,7 +45,7 @@ data class EpubMetadata(
 )
 
 /** Raw cover image bytes as stored in the EPUB, plus its declared media type. */
-class EpubCover(val mediaType: String?, val bytes: ByteArray) {
+public class EpubCover(public val mediaType: String?, public val bytes: ByteArray) {
     override fun equals(other: Any?): Boolean = this === other ||
         (other is EpubCover && mediaType == other.mediaType && bytes.contentEquals(other.bytes))
 
@@ -72,14 +72,14 @@ class EpubCover(val mediaType: String?, val bytes: ByteArray) {
  * A source that cannot seek returns null from [openChannel] and every reader
  * falls back to one forward pass. That is slower, never wrong.
  */
-fun interface EpubByteSource {
+public fun interface EpubByteSource {
     @Throws(java.io.IOException::class)
-    fun open(): java.io.InputStream
+    public fun open(): java.io.InputStream
 
     /**
      * A random-access view of the same bytes, or null when this source has no
      * seekable form. Callers close the channel.
      */
     @Throws(java.io.IOException::class)
-    fun openChannel(): java.nio.channels.SeekableByteChannel? = null
+    public fun openChannel(): java.nio.channels.SeekableByteChannel? = null
 }

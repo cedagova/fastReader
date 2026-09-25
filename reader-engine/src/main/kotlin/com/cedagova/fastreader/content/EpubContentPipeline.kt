@@ -55,7 +55,7 @@ import kotlinx.coroutines.withContext
  * refused when the file changed under it — see
  * `com.cedagova.fastreader.reader.ReaderPosition`.
  */
-class EpubContentPipeline(private val dispatcher: CoroutineDispatcher = Dispatchers.Default) {
+public class EpubContentPipeline(private val dispatcher: CoroutineDispatcher = Dispatchers.Default) {
 
     /**
      * Reads [source] into a token stream, identified by [identity].
@@ -67,7 +67,7 @@ class EpubContentPipeline(private val dispatcher: CoroutineDispatcher = Dispatch
      * stored position resolves onto this parse and the reader starts at the
      * beginning rather than somewhere arbitrary.
      */
-    suspend fun parse(
+    public suspend fun parse(
         source: EpubByteSource,
         identity: BookIdentity? = null,
         onProgress: (ContentProgress) -> Unit = {},

@@ -19,7 +19,7 @@ import java.security.MessageDigest
  * against the real fixtures, because a digest that drifted would strand every
  * position stored under it.
  */
-object BookDigest {
+public object BookDigest {
 
     private const val BUFFER_BYTES = 64 * 1024
 
@@ -29,7 +29,7 @@ object BookDigest {
      * Reads the whole file by definition, so it must never be called on the open
      * path — that is the cost REQ-110 exists to remove.
      */
-    fun of(source: EpubByteSource): BookIdentity? = try {
+    public fun of(source: EpubByteSource): BookIdentity? = try {
         val digest = MessageDigest.getInstance("SHA-256")
         source.open().use { stream ->
             val buffer = ByteArray(BUFFER_BYTES)

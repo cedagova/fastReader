@@ -23,8 +23,8 @@ package com.cedagova.fastreader.content
  */
 
 /** Version of the tokenization rules. Bump when a change would move stored positions. */
-object ContentPipelineVersion {
-    const val CURRENT: Int = 1
+public object ContentPipelineVersion {
+    public const val CURRENT: Int = 1
 }
 
 /**
@@ -35,7 +35,7 @@ object ContentPipelineVersion {
  * `maxOf`. The multipliers themselves belong to LEAF202; this enum only says
  * which break happened.
  */
-enum class Boundary {
+public enum class Boundary {
     /** Ordinary word break. */
     NONE,
 
@@ -59,7 +59,7 @@ enum class Boundary {
  * the sentence pause) but not the detection, so each rule below is deliberately
  * mechanical and stated in one place.
  */
-enum class WordClass {
+public enum class WordClass {
     /** Longer than [WordClassifier.LONG_WORD_MIN_LENGTH] characters. */
     LONG,
 
@@ -88,7 +88,7 @@ enum class WordClass {
 }
 
 /** Why a piece of content is represented by a marker instead of its words. */
-enum class SkipKind {
+public enum class SkipKind {
     /** An `<img>`, `<svg>` or `<figure>` image the reader cannot stream as words. */
     IMAGE,
 
@@ -108,20 +108,20 @@ enum class SkipKind {
  * [displayText] is what the reader shows for this token — a word, or the marker
  * label for skipped content — so the renderer needs no type switch to draw it.
  */
-sealed interface Token {
-    val index: Int
-    val chapterIndex: Int
+public sealed interface Token {
+    public val index: Int
+    public val chapterIndex: Int
 
     /** Global paragraph ordinal, for paragraph-level navigation. */
-    val paragraphIndex: Int
+    public val paragraphIndex: Int
 
     /** Global sentence ordinal, for sentence-level navigation. */
-    val sentenceIndex: Int
+    public val sentenceIndex: Int
 
     /** The pause that applies *after* this token. */
-    val boundary: Boundary
+    public val boundary: Boundary
 
-    val displayText: String
+    public val displayText: String
 
     /**
      * What separates this token from the next one in the source text.
@@ -131,7 +131,7 @@ sealed interface Token {
      * mark (`he left — and never returned`). Concatenating
      * `displayText + gapAfter` across a paragraph reproduces the paragraph.
      */
-    val gapAfter: String get() = " "
+    public val gapAfter: String get() = " "
 }
 
 /**
@@ -161,7 +161,7 @@ sealed interface Token {
  * [ContentPipelineVersion.CURRENT] does not change. The same holds for [span]
  * (#81): it is a per-token annotation, not a change to what the tokens are.
  */
-data class WordToken(
+public data class WordToken(
     override val index: Int,
     /** The word itself: letters and digits, no surrounding punctuation. */
     val text: String,
@@ -215,7 +215,7 @@ data class WordToken(
  * silently dropping it, so this is a real token: it occupies a position and the
  * timing engine gives it a duration like any other.
  */
-data class SkipMarkerToken(
+public data class SkipMarkerToken(
     override val index: Int,
     val kind: SkipKind,
     override val chapterIndex: Int,
@@ -229,7 +229,7 @@ data class SkipMarkerToken(
 }
 
 /** Where a chapter's title came from, which the reader may want to present differently. */
-enum class ChapterTitleSource {
+public enum class ChapterTitleSource {
     /** The EPUB 3 nav document or the EPUB 2 NCX. */
     TOC,
 
@@ -247,7 +247,7 @@ enum class ChapterTitleSource {
  * colophon keeps its spine position rather than being filtered out, because the
  * reader streams the book as written.
  */
-data class Chapter(
+public data class Chapter(
     val index: Int,
     val title: String,
     val titleSource: ChapterTitleSource,
@@ -261,13 +261,13 @@ data class Chapter(
 
     val isEmpty: Boolean get() = tokenCount == 0
 
-    operator fun contains(tokenIndex: Int): Boolean = tokenIndex >= startTokenIndex && tokenIndex < endTokenIndex
+    public operator fun contains(tokenIndex: Int): Boolean = tokenIndex >= startTokenIndex && tokenIndex < endTokenIndex
 }
 
 /** A spine item the pipeline could not turn into words, kept so the PR-level state is honest. */
-data class ContentGap(val spinePath: String, val chapterIndex: Int, val reason: GapReason, val detail: String)
+public data class ContentGap(val spinePath: String, val chapterIndex: Int, val reason: GapReason, val detail: String)
 
-enum class GapReason {
+public enum class GapReason {
     /** Declared in the spine, absent from the archive — the interrupted-download case. */
     MISSING_FROM_ARCHIVE,
 
@@ -285,14 +285,14 @@ enum class GapReason {
  * valid for the same book ([bookDigest], the content-derived identity from AD-2)
  * parsed by the same rules ([pipelineVersion], AD-3).
  */
-data class TokenPosition(
+public data class TokenPosition(
     val bookDigest: String,
     val tokenIndex: Int,
     val pipelineVersion: Int = ContentPipelineVersion.CURRENT,
 )
 
 /** A parsed book: the whole token stream plus everything the reader needs about it. */
-data class BookContent(
+public data class BookContent(
     /** Content-derived book identity (AD-2), the same digest the catalog stores. */
     val bookDigest: String,
     /**
@@ -340,14 +340,14 @@ data class BookContent(
     val isEmpty: Boolean get() = tokens.isEmpty()
 
     /** Fraction read once [tokenIndex] has been shown, clamped to `0f..1f`. */
-    fun progressFraction(tokenIndex: Int): Float {
+    public fun progressFraction(tokenIndex: Int): Float {
         if (tokens.isEmpty()) return 0f
         val shown = (tokenIndex + 1).coerceIn(0, tokens.size)
         return shown.toFloat() / tokens.size
     }
 
     /** Words still to come after [tokenIndex], the numerator of time remaining. */
-    fun wordsRemaining(tokenIndex: Int): Int {
+    public fun wordsRemaining(tokenIndex: Int): Int {
         if (tokenIndex < 0) return totalWords
         var remaining = 0
         for (position in (tokenIndex + 1) until tokens.size) {
@@ -356,13 +356,13 @@ data class BookContent(
         return remaining
     }
 
-    fun chapterAt(tokenIndex: Int): Chapter? = chapters.firstOrNull { tokenIndex in it }
+    public fun chapterAt(tokenIndex: Int): Chapter? = chapters.firstOrNull { tokenIndex in it }
 
     /** The token that starts the sentence [tokenIndex] belongs to — "back one sentence". */
-    fun sentenceStart(tokenIndex: Int): Int = boundedStartOf(tokenIndex) { it.sentenceIndex }
+    public fun sentenceStart(tokenIndex: Int): Int = boundedStartOf(tokenIndex) { it.sentenceIndex }
 
     /** The token that starts the paragraph [tokenIndex] belongs to — "back one paragraph". */
-    fun paragraphStart(tokenIndex: Int): Int = boundedStartOf(tokenIndex) { it.paragraphIndex }
+    public fun paragraphStart(tokenIndex: Int): Int = boundedStartOf(tokenIndex) { it.paragraphIndex }
 
     private inline fun boundedStartOf(tokenIndex: Int, ordinal: (Token) -> Int): Int {
         if (tokens.isEmpty()) return 0
@@ -373,12 +373,12 @@ data class BookContent(
         return start
     }
 
-    fun positionAt(tokenIndex: Int): TokenPosition =
+    public fun positionAt(tokenIndex: Int): TokenPosition =
         TokenPosition(bookDigest, tokenIndex.coerceIn(0, maxOf(0, tokens.lastIndex)), pipelineVersion)
 }
 
 /** Why a book could not be turned into a token stream at all. */
-enum class ContentFailureReason {
+public enum class ContentFailureReason {
     /** The bytes could not be read from their source. */
     UNREADABLE_SOURCE,
 
@@ -393,11 +393,11 @@ enum class ContentFailureReason {
 }
 
 /** Parsing one book either produces content or a typed, non-throwing failure. */
-sealed interface BookContentResult {
+public sealed interface BookContentResult {
 
-    data class Parsed(val content: BookContent) : BookContentResult
+    public data class Parsed(val content: BookContent) : BookContentResult
 
-    data class Failed(
+    public data class Failed(
         val reason: ContentFailureReason,
         /** Plain language, safe to show the reader. */
         val detail: String,
@@ -410,6 +410,6 @@ sealed interface BookContentResult {
  * Reported per spine item, which is the only unit whose cost is knowable before
  * the file is read.
  */
-data class ContentProgress(val completedItems: Int, val totalItems: Int) {
+public data class ContentProgress(val completedItems: Int, val totalItems: Int) {
     val fraction: Float get() = if (totalItems <= 0) 0f else completedItems.toFloat() / totalItems
 }

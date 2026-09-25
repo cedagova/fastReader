@@ -14,7 +14,7 @@ package com.cedagova.fastreader.content
  * `—¿Cómo estás? —preguntó él.` the run after "estás" holds both the `?` and the
  * dialogue dash, so that word ends a sentence, and "él." ends the next one.
  */
-internal object Tokenizer {
+public object Tokenizer {
 
     /** Characters that end a sentence. Spanish `¿ ¡` open one, so they are not here. */
     private const val SENTENCE_PUNCTUATION = ".!?…"
@@ -45,7 +45,7 @@ internal object Tokenizer {
      * Splits [blocks] into tokens, continuing the counters in [state] so every
      * spine item of a book contributes to one stream.
      */
-    fun tokenize(blocks: List<ContentBlock>, chapterIndex: Int, state: StreamState): List<Token> {
+    public fun tokenize(blocks: List<ContentBlock>, chapterIndex: Int, state: StreamState): List<Token> {
         val tokens = ArrayList<Token>()
         for (block in blocks) {
             when (block) {
@@ -283,5 +283,9 @@ internal object Tokenizer {
      * Paragraph and sentence ordinals are global, so LEAF203's "back one sentence"
      * keeps working across a chapter boundary with no extra lookup.
      */
-    class StreamState(var nextIndex: Int = 0, var paragraphIndex: Int = -1, var sentenceIndex: Int = -1)
+    public class StreamState(
+        public var nextIndex: Int = 0,
+        public var paragraphIndex: Int = -1,
+        public var sentenceIndex: Int = -1,
+    )
 }

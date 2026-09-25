@@ -7,11 +7,11 @@ package com.cedagova.fastreader.content
  * flagged rather than separated, because a heading is read in place — it just
  * gets a longer pause and may be styled differently.
  */
-internal sealed interface ContentBlock {
+public sealed interface ContentBlock {
 
-    data class Paragraph(val text: String, val isHeading: Boolean = false) : ContentBlock
+    public data class Paragraph(val text: String, val isHeading: Boolean = false) : ContentBlock
 
-    data class Skip(val kind: SkipKind, val label: String) : ContentBlock
+    public data class Skip(val kind: SkipKind, val label: String) : ContentBlock
 }
 
 /**

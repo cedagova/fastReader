@@ -10,14 +10,14 @@ import kotlinx.serialization.Serializable
  * They live in one object because the whole point of AD-5 is that the numbers
  * are stated once, provable by unit test, and not smeared across a UI.
  */
-object RsvpTiming {
+public object RsvpTiming {
 
     /**
      * Research "Recommended defaults": *Default 250 WPM; range 100-1000*.
      * Spritz's own default and range, and the top of the band where research
      * finds no comprehension loss (250-350 WPM).
      */
-    const val DEFAULT_WPM: Int = 250
+    public const val DEFAULT_WPM: Int = 250
 
     /**
      * Research "Recommended defaults": range floor.
@@ -28,25 +28,25 @@ object RsvpTiming {
      * the two books measured in `research-pacing.md` — so the instantaneous
      * plain-word rate at the ceiling is roughly 1150 WPM, not 1000.
      */
-    const val MIN_WPM: Int = 100
+    public const val MIN_WPM: Int = 100
 
     /** Research "Recommended defaults": range ceiling — of the average, see [MIN_WPM]. */
-    const val MAX_WPM: Int = 1000
+    public const val MAX_WPM: Int = 1000
 
     /** Base word duration is `60000 / wpm`, the Squirt constant. */
-    const val MILLIS_PER_MINUTE: Double = 60_000.0
+    public const val MILLIS_PER_MINUTE: Double = 60_000.0
 
     /** Research timing heuristics: *sentence end .!? -> 3.0x*. */
-    const val SENTENCE_MULTIPLIER: Double = 3.0
+    public const val SENTENCE_MULTIPLIER: Double = 3.0
 
     /** Research timing heuristics: *comma/semicolon/colon/dash -> 2.0x*. */
-    const val CLAUSE_MULTIPLIER: Double = 2.0
+    public const val CLAUSE_MULTIPLIER: Double = 2.0
 
     /** Research timing heuristics: *paragraph break -> 3.5x*. */
-    const val PARAGRAPH_MULTIPLIER: Double = 3.5
+    public const val PARAGRAPH_MULTIPLIER: Double = 3.5
 
     /** Research "Recommended defaults": *heading full stop or >=4x*. */
-    const val HEADING_MULTIPLIER: Double = 4.0
+    public const val HEADING_MULTIPLIER: Double = 4.0
 
     /**
      * The span, in words, at which a clause, sentence or paragraph pause earns its
@@ -61,7 +61,7 @@ object RsvpTiming {
      * 60-word window of two full books within about ±4% of the dial. Heading
      * pauses are structural, not wrap-up, and are never scaled.
      */
-    const val SPAN_FULL_PAUSE_WORDS: Int = 10
+    public const val SPAN_FULL_PAUSE_WORDS: Int = 10
 
     /**
      * The hold on a breath word (#81, `research-pacing.md`): a rest inside a long
@@ -72,7 +72,7 @@ object RsvpTiming {
      * simulated value; detection lives in `WordClassifier` (8 plain words at a
      * conjunction or relative pronoun, 14 unconditionally).
      */
-    const val BREATH_MULTIPLIER: Double = 1.4
+    public const val BREATH_MULTIPLIER: Double = 1.4
 
     /**
      * Research timing heuristics: *long word (>11 chars) -> 1.5x*, and
@@ -83,7 +83,7 @@ object RsvpTiming {
      * them: a word carrying several is still one slow word, not a compounded
      * pause.
      */
-    const val EMPHASIS_MULTIPLIER: Double = 1.5
+    public const val EMPHASIS_MULTIPLIER: Double = 1.5
 
     /**
      * Research "Recommended defaults": *Ramp on by default: start ~80% of
@@ -92,7 +92,7 @@ object RsvpTiming {
      * This is a fraction of target *speed*, not of the duration: at 250 WPM
      * playback opens at 200 WPM, so the first word holds `240 / 0.8 = 300 ms`.
      */
-    const val RAMP_START_SPEED_FRACTION: Double = 0.8
+    public const val RAMP_START_SPEED_FRACTION: Double = 0.8
 
     /**
      * Research "Recommended defaults": *reach target over ~15-30 s*.
@@ -100,13 +100,13 @@ object RsvpTiming {
      * The midpoint of that window, which also satisfies REQ-013's acceptance
      * ("reaches target within ~30 s") with room to spare.
      */
-    const val RAMP_DURATION_MILLIS: Long = 20_000L
+    public const val RAMP_DURATION_MILLIS: Long = 20_000L
 
     /**
      * Research timing heuristics: *after jump/rewind -> 3x on first word*.
      * REQ-013 extends it to any resume as well.
      */
-    const val REORIENTATION_MULTIPLIER: Double = 3.0
+    public const val REORIENTATION_MULTIPLIER: Double = 3.0
 }
 
 /**
@@ -119,7 +119,7 @@ object RsvpTiming {
  * uniform").
  */
 @Serializable
-enum class PauseStrength(val extraPauseScale: Double) {
+public enum class PauseStrength(public val extraPauseScale: Double) {
     /** No modulation at all: uniform word durations. */
     OFF(0.0),
 
@@ -162,7 +162,7 @@ enum class PauseStrength(val extraPauseScale: Double) {
  * hand-written test stream) sees the raw research multipliers. At
  * [PauseStrength.OFF] every multiplier is 1 and so is the mean.
  */
-data class TimingSettings(
+public data class TimingSettings(
     val wpm: Int = RsvpTiming.DEFAULT_WPM,
     val pauseStrength: PauseStrength = PauseStrength.NORMAL,
     val rampEnabled: Boolean = true,
@@ -200,7 +200,7 @@ data class TimingSettings(
  * - [reorientationPending] — the next token is the first one after a start,
  *   resume, rewind or jump and therefore gets the re-orientation hold.
  */
-data class TimingState(val elapsedPlaybackMillis: Long = 0L, val reorientationPending: Boolean = true) {
+public data class TimingState(val elapsedPlaybackMillis: Long = 0L, val reorientationPending: Boolean = true) {
     /**
      * The state after showing a token for [durationMillis].
      *
@@ -208,7 +208,7 @@ data class TimingState(val elapsedPlaybackMillis: Long = 0L, val reorientationPe
      * ramp the engine computes and the deadlines the scheduler runs on never
      * diverge.
      */
-    fun afterShowing(durationMillis: Long): TimingState = TimingState(
+    public fun afterShowing(durationMillis: Long): TimingState = TimingState(
         elapsedPlaybackMillis = elapsedPlaybackMillis + durationMillis.coerceAtLeast(0L),
         reorientationPending = false,
     )
@@ -217,13 +217,13 @@ data class TimingState(val elapsedPlaybackMillis: Long = 0L, val reorientationPe
      * Re-arm the re-orientation hold without restarting the ramp — a rewind,
      * chapter jump or scrub while already warmed up.
      */
-    fun reorienting(): TimingState = copy(reorientationPending = true)
+    public fun reorienting(): TimingState = copy(reorientationPending = true)
 
-    companion object {
+    public companion object {
         /**
          * Pressing play: the ramp restarts from 80% and the first word carries
          * the re-orientation hold (REQ-013 covers "any resume").
          */
-        val AT_PLAYBACK_START: TimingState = TimingState()
+        public val AT_PLAYBACK_START: TimingState = TimingState()
     }
 }

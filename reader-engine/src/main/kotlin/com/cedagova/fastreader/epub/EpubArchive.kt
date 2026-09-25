@@ -17,9 +17,9 @@ package com.cedagova.fastreader.epub
  * The strategy is chosen per source, not per book: [EpubByteSource.openChannel]
  * either offers a seekable view or it does not.
  */
-internal interface EpubArchive : AutoCloseable {
+public interface EpubArchive : AutoCloseable {
 
-    val strategy: ArchiveReadStrategy
+    public val strategy: ArchiveReadStrategy
 
     /**
      * A digest of this archive's structure (AD-18), or null when the open produced
@@ -36,7 +36,7 @@ internal interface EpubArchive : AutoCloseable {
      * See [StructuralFingerprint] for what a non-null value means, and
      * `com.cedagova.fastreader.reader.ReaderPosition` for what is done with it.
      */
-    val structuralFingerprint: String?
+    public val structuralFingerprint: String?
 
     /**
      * Reads every entry [select] accepts, each capped at [maxBytes].
@@ -45,10 +45,10 @@ internal interface EpubArchive : AutoCloseable {
      * managed to read plus [ArchiveRead.damage], because a book with three of
      * its five chapters is still worth opening.
      */
-    fun read(select: (String) -> Boolean, maxBytes: Long): ArchiveRead
+    public fun read(select: (String) -> Boolean, maxBytes: Long): ArchiveRead
 }
 
-internal enum class ArchiveReadStrategy {
+public enum class ArchiveReadStrategy {
     /** Random access through the central directory: reads only the wanted entries. */
     DIRECTORY,
 
@@ -57,25 +57,25 @@ internal enum class ArchiveReadStrategy {
 }
 
 /** What one [EpubArchive.read] found. */
-internal class ArchiveRead(
+public class ArchiveRead(
     /** Every entry in the archive, in archive order, whether or not it was wanted. */
-    val entryNames: List<String>,
-    val entries: Map<String, ByteArray>,
+    public val entryNames: List<String>,
+    public val entries: Map<String, ByteArray>,
     /** Non-null when the bytes stopped being reachable mid-read — a grant revoked under us. */
-    val unreadable: String?,
+    public val unreadable: String?,
     /** Non-null when the archive itself is damaged; entries already read stay usable. */
-    val damage: String?,
+    public val damage: String?,
 )
 
 /** Opening an archive: either a usable reader, or a source that would not open at all. */
-internal sealed interface ArchiveOpen {
-    class Opened(val archive: EpubArchive) : ArchiveOpen
+public sealed interface ArchiveOpen {
+    public class Opened(public val archive: EpubArchive) : ArchiveOpen
 
     /** The bytes could not be reached — a revoked grant, a deleted file. */
-    class Unopenable(val detail: String) : ArchiveOpen
+    public class Unopenable(public val detail: String) : ArchiveOpen
 }
 
-internal object EpubArchives {
+public object EpubArchives {
 
     /**
      * Opens [source] for entry reads, preferring the directory strategy.
@@ -84,7 +84,7 @@ internal object EpubArchives {
      * decode, falls back to streaming rather than failing. Only a source that
      * cannot be opened at all is [ArchiveOpen.Unopenable].
      */
-    fun open(source: EpubByteSource): ArchiveOpen {
+    public fun open(source: EpubByteSource): ArchiveOpen {
         val directory = try {
             source.openChannel()?.let { ZipDirectory.open(it) }
         } catch (_: Exception) {

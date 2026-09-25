@@ -81,7 +81,7 @@ import kotlin.math.roundToLong
  * 5. **Every token gets a duration**, including [com.cedagova.fastreader.content.SkipMarkerToken];
  *    the scheduler needs no type switch.
  */
-object RsvpTimingEngine {
+public object RsvpTimingEngine {
 
     /**
      * The word classes that slow a word down.
@@ -104,7 +104,7 @@ object RsvpTimingEngine {
      * How long [token] is shown, in whole milliseconds, given [settings] and the
      * current [state]. Never less than 1 ms.
      */
-    fun durationMillis(token: Token, settings: TimingSettings, state: TimingState): Long {
+    public fun durationMillis(token: Token, settings: TimingSettings, state: TimingState): Long {
         val word = wordMillis(settings, state)
         val hold = if (state.reorientationPending) RsvpTiming.REORIENTATION_MULTIPLIER else 1.0
         val extra = (pauseMultiplier(token) - 1.0) * settings.pauseStrength.extraPauseScale
@@ -120,7 +120,7 @@ object RsvpTimingEngine {
      * actually going right now", which the reader screen needs while the ramp is
      * still climbing.
      */
-    fun plainWordMillis(settings: TimingSettings, state: TimingState): Long =
+    public fun plainWordMillis(settings: TimingSettings, state: TimingState): Long =
         wordMillis(settings, state).roundToLong().coerceAtLeast(1L)
 
     /**
@@ -137,14 +137,14 @@ object RsvpTimingEngine {
      * Ramp-up and the re-orientation hold are excluded on purpose: an estimate
      * for a whole book should not lurch every time the reader jumps.
      */
-    fun estimatedMillis(tokens: Iterable<Token>, settings: TimingSettings): Long =
+    public fun estimatedMillis(tokens: Iterable<Token>, settings: TimingSettings): Long =
         tokens.sumOf { durationMillis(it, settings, STEADY) }
 
     /**
      * The current speed as a fraction of target, `0.8..1.0` while the ramp
      * climbs and exactly `1.0` once it finishes or when the ramp is off.
      */
-    fun rampSpeedFraction(settings: TimingSettings, state: TimingState): Double {
+    public fun rampSpeedFraction(settings: TimingSettings, state: TimingState): Double {
         if (!settings.rampEnabled) return 1.0
         val progress = (
             state.elapsedPlaybackMillis.toDouble() / RsvpTiming.RAMP_DURATION_MILLIS

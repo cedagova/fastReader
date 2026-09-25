@@ -9,7 +9,7 @@ import org.w3c.dom.Element
  * Deliberately not a rendering engine — spine text extraction belongs to the
  * content pipeline (LEAF201). Nothing here throws on malformed input.
  */
-object EpubInspector {
+public object EpubInspector {
 
     private const val CONTAINER_PATH = "META-INF/container.xml"
     private const val ENCRYPTION_PATH = "META-INF/encryption.xml"
@@ -27,7 +27,7 @@ object EpubInspector {
         "http://ns.adobe.com/pdf/enc#RC",
     )
 
-    fun inspect(source: EpubByteSource): EpubInspection {
+    public fun inspect(source: EpubByteSource): EpubInspection {
         val scan = ZipReader.scan(
             source = source,
             collect = { name -> name.startsWith("META-INF/") || name.endsWith(".opf", ignoreCase = true) },

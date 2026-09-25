@@ -15,12 +15,12 @@ package com.cedagova.fastreader.content
  * or a title at a call site — they are all strings.
  */
 @JvmInline
-value class BookIdentity(val value: String) {
+public value class BookIdentity(public val value: String) {
 
     override fun toString(): String = value
 
-    companion object {
+    public companion object {
         /** Builds an identity from a bare hex digest, adding the stored `sha256:` prefix. */
-        fun ofSha256Hex(hex: String) = BookIdentity("sha256:$hex")
+        public fun ofSha256Hex(hex: String): BookIdentity = BookIdentity("sha256:$hex")
     }
 }

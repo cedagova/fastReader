@@ -9,7 +9,7 @@ package com.cedagova.fastreader.content
  * is `null`, because the reader-facing consequence of a wrong answer here is
  * being dropped past the first paragraph of a book — see [FrontMatterDetector].
  */
-data class FrontMatter(
+public data class FrontMatter(
     /** Index of the first chapter that is not front matter. Always greater than zero. */
     val firstBodyChapterIndex: Int,
     /** The token the skip lands on: the first word of that chapter. */
@@ -21,7 +21,7 @@ data class FrontMatter(
 )
 
 /** What told us where the body starts, strongest evidence first. */
-enum class FrontMatterSource {
+public enum class FrontMatterSource {
     /** An EPUB 3 `landmarks` navigation list with a `bodymatter` entry. The book's own answer. */
     LANDMARKS,
 
