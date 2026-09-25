@@ -25,7 +25,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.PortableReadingPosition
 import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import com.cedagova.fastreader.external.ExternalOpen
@@ -44,6 +43,7 @@ import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ReaderViewModel
 import com.cedagova.fastreader.reader.ResumeOffer
+import com.cedagova.reader.account.library.AccountShelf
 import com.cedagova.reader.engine.content.BookContent
 import com.cedagova.reader.engine.content.TokenPosition
 import com.cedagova.reader.library.sync.AccountLibraryState

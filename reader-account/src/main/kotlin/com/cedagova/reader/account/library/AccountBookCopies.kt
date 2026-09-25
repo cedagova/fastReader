@@ -1,7 +1,5 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
-import com.cedagova.fastreader.library.BookSource
-import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.downloads.AssetDownloadGateway
@@ -24,8 +22,9 @@ import java.io.File
  * 2. stream the bytes under that grant into [AccountCopyStore.place], which
  *    digests them as they land and refuses to place anything whose SHA-256 is
  *    not the account's identity for that book;
- * 3. only once a file has been placed, write the device-catalog row with its
- *    `ACCOUNT_COPY` source, which is what makes it readable;
+ * 3. only once a file has been placed, ask the host's [AccountCopyCatalog] to
+ *    make it readable (FastReader writes its device-catalog row with an
+ *    `ACCOUNT_COPY` source);
  * 4. and then record the account's copy reference.
  *
  * Nothing between steps 1 and 3 can produce a readable book, which is the
@@ -48,20 +47,21 @@ import java.io.File
  * copy *reference* is account-scoped, and it comes back when the same account
  * signs in again.
  */
-class AccountBookCopies(
+public class AccountBookCopies(
     /** Null on a build with no stage values: then nothing here can be reached. */
     private val gateway: AssetDownloadGateway?,
     private val store: AccountCopyStore,
     private val references: AccountCopyReferences,
-    private val library: LibraryRepository,
+    /** The host's device catalog: what makes a placed copy readable (#200). */
+    private val catalog: AccountCopyCatalog,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
     /** True when this device already holds the verified bytes of that book. */
-    fun has(contentSha256: String): Boolean = store.has(contentSha256)
+    public fun has(contentSha256: String): Boolean = store.has(contentSha256)
 
     /** The verified copy of that book, or null when this device has none. */
-    fun copy(contentSha256: String): File? = store.copy(contentSha256)
+    public fun copy(contentSha256: String): File? = store.copy(contentSha256)
 
     /**
      * Downloads [book]'s bytes, verifies them and makes them readable.
@@ -71,7 +71,7 @@ class AccountBookCopies(
      * copy that cannot be verified must not be fetched at all. [onProgress] is
      * called with the bytes received and the grant's own declared total.
      */
-    suspend fun download(
+    public suspend fun download(
         book: AccountBook,
         onProgress: (received: Long, total: Long) -> Unit = { _, _ -> },
     ): CopyOutcome {
@@ -117,11 +117,8 @@ class AccountBookCopies(
      * [reconcile] sweeps — rather than a row pointing at a file that is gone.
      * Returns true when there was a copy to free.
      */
-    suspend fun remove(contentSha256: String): Boolean {
-        val bookId = library.catalog.value.books
-            .firstOrNull { book -> book.sources.any { it.isAccountCopy && it.uri == copyUri(contentSha256) } }
-            ?.id
-        if (bookId != null) library.removeAccountCopy(bookId)
+    public suspend fun remove(contentSha256: String): Boolean {
+        catalog.removeAccountCopy(contentSha256)
         references.dropCopyReference(contentSha256)
         return store.delete(contentSha256)
     }
@@ -134,9 +131,9 @@ class AccountBookCopies(
      * references the store no longer backs. Returns how many partials went, so
      * a caller that wants to say so can.
      */
-    suspend fun reconcile(): Int {
+    public suspend fun reconcile(): Int {
         val discarded = store.discardPartials()
-        library.reconcileAccountCopies { path -> File(path).isFile }
+        catalog.reconcileAccountCopies { path -> File(path).isFile }
         references.retainCopyReferences(store.contents())
         return discarded
     }
@@ -150,7 +147,7 @@ class AccountBookCopies(
      */
     private suspend fun adopt(book: AccountBook, contentSha256: String, file: File): CopyOutcome {
         val displayName = book.title.ifBlank { contentSha256 } + EPUB_SUFFIX
-        val bookId = library.addAccountCopy(contentSha256, file, displayName)
+        val bookId = catalog.addAccountCopy(contentSha256, file, displayName)
             ?: return CopyOutcome.Unreadable(contentSha256)
         references.putCopyReference(
             AccountCopy(
@@ -161,8 +158,6 @@ class AccountBookCopies(
         )
         return CopyOutcome.Ready(bookId = bookId, file = file, sizeBytes = file.length())
     }
-
-    private fun copyUri(contentSha256: String): String = BookSource.accountCopyUri(contentSha256)
 
     private companion object {
         /** One spent grant is a TTL; two is the asset. */
@@ -180,25 +175,25 @@ class AccountBookCopies(
  * than a boolean — the shelf shows a different thing for each, and none of them
  * is "something went wrong".
  */
-sealed interface CopyOutcome {
+public sealed interface CopyOutcome {
 
     /** The copy is verified, placed and openable. [bookId] is the catalog row. */
-    data class Ready(val bookId: String, val file: File, val sizeBytes: Long) : CopyOutcome
+    public data class Ready(val bookId: String, val file: File, val sizeBytes: Long) : CopyOutcome
 
     /**
      * The bytes that arrived are not the book the account holds, so nothing was
      * placed (REQ-510's "a tampered download is refused with the reason").
      */
-    data class Tampered(val expected: String, val actual: String) : CopyOutcome
+    public data class Tampered(val expected: String, val actual: String) : CopyOutcome
 
     /** There is no room on this device. Nothing was placed. */
-    data class NoStorage(val reason: String) : CopyOutcome
+    public data class NoStorage(val reason: String) : CopyOutcome
 
     /** reader-api would not issue a grant. The failure is `:reader-auth`'s own, unchanged. */
-    data class GrantFailed(val error: ReaderAuthException) : CopyOutcome
+    public data class GrantFailed(val error: ReaderAuthException) : CopyOutcome
 
     /** The bytes did not arrive. A later attempt may work. */
-    data class DownloadFailed(val error: Throwable) : CopyOutcome
+    public data class DownloadFailed(val error: Throwable) : CopyOutcome
 
     /**
      * The file is verified but is not an EPUB this reader can open.
@@ -206,8 +201,8 @@ sealed interface CopyOutcome {
      * The bytes are exactly what the account holds — the digest said so — so
      * this is a statement about the book, not about the download.
      */
-    data class Unreadable(val contentSha256: String) : CopyOutcome
+    public data class Unreadable(val contentSha256: String) : CopyOutcome
 
     /** There was nothing to ask for: no account build, no asset, or no identity. */
-    data class Unavailable(val reason: String) : CopyOutcome
+    public data class Unavailable(val reason: String) : CopyOutcome
 }

@@ -408,7 +408,7 @@ class LibraryRepository(
      * Adds the verified private copy of an account book to the catalog (#118).
      *
      * [file] must already have been verified by
-     * `com.cedagova.fastreader.account.library.AccountCopyStore`: this writes a
+     * `com.cedagova.reader.account.library.AccountCopyStore`: this writes a
      * catalog row, and a row is a promise that the bytes are the book. Returns
      * the id of the row the copy belongs to — the same id a device book of the
      * same content already has, when there is one — or null when the file could

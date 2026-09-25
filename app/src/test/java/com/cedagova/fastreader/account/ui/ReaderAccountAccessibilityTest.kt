@@ -7,13 +7,13 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.account.AccountOutcome
-import com.cedagova.fastreader.account.ReaderAccountActions
-import com.cedagova.fastreader.account.ReaderAccountState
 import com.cedagova.fastreader.library.ui.actionableNodes
 import com.cedagova.fastreader.library.ui.allNodes
 import com.cedagova.fastreader.library.ui.label
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.account.AccountOutcome
+import com.cedagova.reader.account.ReaderAccountActions
+import com.cedagova.reader.account.ReaderAccountState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before

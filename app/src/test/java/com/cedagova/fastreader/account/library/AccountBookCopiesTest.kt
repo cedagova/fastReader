@@ -8,6 +8,10 @@ import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
+import com.cedagova.reader.account.library.AccountBookCopies
+import com.cedagova.reader.account.library.AccountCopyStore
+import com.cedagova.reader.account.library.CopyOutcome
+import com.cedagova.reader.account.testing.RecordingCopyReferences
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.engine.epub.EpubFixtures
 import com.cedagova.reader.library.downloads.AssetDownloadException
@@ -340,32 +344,10 @@ class AccountBookCopiesTest {
         gateway = downloads,
         store = store,
         references = references,
-        library = library,
+        catalog = LibraryAccountCopyCatalog(library),
         clock = { 1_700_000_000_000 },
     )
 
     private fun sha256(value: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(value).joinToString("") { "%02x".format(it) }
-
-    /** The account document's copy half, recorded rather than persisted. */
-    private class RecordingCopyReferences : AccountCopyReferences {
-        val stored = mutableListOf<AccountCopy>()
-
-        override fun accountId(): String = "user-1"
-
-        override suspend fun copyReferences(): List<AccountCopy> = stored.toList()
-
-        override suspend fun putCopyReference(copy: AccountCopy) {
-            stored.removeAll { it.contentSha256 == copy.contentSha256 }
-            stored += copy
-        }
-
-        override suspend fun dropCopyReference(contentSha256: String) {
-            stored.removeAll { it.contentSha256 == contentSha256 }
-        }
-
-        override suspend fun retainCopyReferences(present: Set<String>) {
-            stored.retainAll { it.contentSha256 in present }
-        }
-    }
 }

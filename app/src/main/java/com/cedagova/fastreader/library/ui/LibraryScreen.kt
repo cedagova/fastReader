@@ -83,12 +83,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.account.library.BookDownloadState
-import com.cedagova.fastreader.account.library.BookImportState
-import com.cedagova.fastreader.account.library.DownloadProblem
-import com.cedagova.fastreader.account.library.ImportProblem
-import com.cedagova.fastreader.account.library.ImportsOff
-import com.cedagova.fastreader.account.library.PublicationSourceProblem
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
@@ -96,6 +90,12 @@ import com.cedagova.fastreader.settings.LibraryOrder
 import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WideLayoutMinWidth
 import com.cedagova.fastreader.ui.WidthAware
+import com.cedagova.reader.account.library.BookDownloadState
+import com.cedagova.reader.account.library.BookImportState
+import com.cedagova.reader.account.library.DownloadProblem
+import com.cedagova.reader.account.library.ImportProblem
+import com.cedagova.reader.account.library.ImportsOff
+import com.cedagova.reader.account.library.PublicationSourceProblem
 import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.sync.wireName
@@ -1697,16 +1697,21 @@ private fun BookImportState.Refused.message(): String = when (val reason = probl
     is ImportProblem.Api -> stringResource(R.string.library_account_refused_other)
 
     is ImportProblem.Category -> when (reason.category) {
-        PublicationFailureCategory.TOO_LARGE ->
-            if (sizeBytes != null && maxSourceBytes != null) {
+        PublicationFailureCategory.TOO_LARGE -> {
+            // Locals: the state is :reader-account's (#200), so its properties
+            // do not smart-cast across the module boundary.
+            val size = sizeBytes
+            val cap = maxSourceBytes
+            if (size != null && cap != null) {
                 stringResource(
                     R.string.library_account_refused_too_large,
-                    humanSize(sizeBytes),
-                    humanSize(maxSourceBytes),
+                    humanSize(size),
+                    humanSize(cap),
                 )
             } else {
                 stringResource(R.string.library_account_refused_other)
             }
+        }
 
         PublicationFailureCategory.UNSUPPORTED -> stringResource(R.string.library_account_refused_unsupported)
 

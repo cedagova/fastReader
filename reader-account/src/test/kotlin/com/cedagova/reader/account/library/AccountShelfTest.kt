@@ -1,12 +1,12 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
+import com.cedagova.reader.account.testing.RecordingResumeOfferRecords
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.sync.AccountLibraryActions
 import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.reader.library.sync.LocalReadingPosition
 import com.cedagova.reader.library.testing.RecordingAccountLibraryActions
-import com.cedagova.reader.library.testing.RecordingHostRecords
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -186,7 +186,7 @@ class AccountShelfTest {
     fun `signing out ends the offer`() = runTest {
         val actions = RecordingAccountLibraryActions()
         val state = MutableStateFlow(AccountLibraryState(phase = AccountSyncPhase.IDLE, userId = "user-1"))
-        val shelf = AccountShelf(actions, AccountResumeOffers(RecordingHostRecords()), state, backgroundScope)
+        val shelf = AccountShelf(actions, RecordingResumeOfferRecords(), state, backgroundScope)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
         runCurrent()
@@ -214,8 +214,9 @@ class AccountShelfTest {
      * category of data.
      *
      * Settling a resume offer (#121) is not on this interface since #147: it is a
-     * host record FastReader keeps, reached through [AccountResumeOffers], whose
-     * one operation writes a book row's note and puts nothing on the wire at all.
+     * host record the host keeps, reached through [ResumeOfferRecords] (FastReader's
+     * `AccountResumeOffers` since #200), whose one operation writes a book row's
+     * note and puts nothing on the wire at all.
      * `AccountSyncEngineTest.a host record is stored verbatim and sends nothing`
      * holds that, and the next test holds that it is the shelf's only other
      * collaborator.
@@ -243,7 +244,7 @@ class AccountShelfTest {
         assertEquals(
             "the one other operation the shelf can reach is settling a resume offer",
             sortedSetOf("settle"),
-            AccountResumeOffers::class.java.declaredMethods
+            ResumeOfferRecords::class.java.declaredMethods
                 .filter { java.lang.reflect.Modifier.isPublic(it.modifiers) && !it.isSynthetic }
                 .map { it.name }
                 .toSortedSet(),
@@ -262,7 +263,7 @@ class AccountShelfTest {
         assertEquals(
             listOf(
                 AccountLibraryActions::class.java.name,
-                AccountResumeOffers::class.java.name,
+                ResumeOfferRecords::class.java.name,
                 kotlinx.coroutines.flow.StateFlow::class.java.name,
                 kotlinx.coroutines.CoroutineScope::class.java.name,
             ),
@@ -275,7 +276,7 @@ class AccountShelfTest {
         undoWindowMs: Long = AccountShelf.DEFAULT_UNDO_WINDOW_MS,
     ) = AccountShelf(
         actions = actions,
-        resumeOffers = AccountResumeOffers(RecordingHostRecords()),
+        resumeOffers = RecordingResumeOfferRecords(),
         state = MutableStateFlow(AccountLibraryState(phase = AccountSyncPhase.IDLE, userId = "user-1")),
         scope = backgroundScope,
         undoWindowMs = undoWindowMs,

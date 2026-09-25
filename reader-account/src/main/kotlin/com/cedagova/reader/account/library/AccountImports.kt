@@ -1,6 +1,7 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
-import com.cedagova.fastreader.library.Book
+import com.cedagova.reader.account.toImportRefusal
+import com.cedagova.reader.account.toOutcome
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.imports.PublicationImportGateway
 import com.cedagova.reader.library.imports.PublicationImportRecord
@@ -35,8 +36,8 @@ import kotlinx.coroutines.sync.withLock
  *
  * ## The consent gate is the whole point
  *
- * This class is the only thing in FastReader that can put a book's bytes on the
- * wire, and it is split into exactly two steps so that the split is visible in
+ * This class is the only thing in this module that can put a book's bytes on
+ * the wire, and it is split into exactly two steps so that the split is visible in
  * the code and not only in a dialog:
  *
  * - [requestAdd] re-reads the account's `reader.publication-import.v1`
@@ -86,13 +87,14 @@ import kotlinx.coroutines.sync.withLock
  * and registers no receiver: polling happens while the app is in the foreground
  * and stops when it is not.
  */
-class AccountImports(
+public class AccountImports(
     /** Null on a build with no stage values: then nothing here can be reached. */
     private val gateway: PublicationImportGateway?,
     private val records: AccountImportRecords,
-    private val sources: DeviceBookSources,
-    /** The catalog's book for an id, or null when this device no longer has it. */
-    private val bookForId: (String) -> Book?,
+    /** The host's device books: the bytes behind a device-book id, or why there are none (#200). */
+    private val sources: DevicePublicationSources,
+    /** The host's device-book id for a content identity, and back (#200). */
+    private val identity: DeviceBookIdentity,
     /** Asks the sync engine for a pass, so the backend's new row reaches the shelf. */
     private val onImportReady: () -> Unit,
     accountState: Flow<AccountLibraryState>,
@@ -107,7 +109,7 @@ class AccountImports(
     private val _state = MutableStateFlow(AccountImportsState.NONE)
 
     /** Every add in flight and the one account-wide verdict, as the shelf reads it. */
-    val state: StateFlow<AccountImportsState> = _state.asStateFlow()
+    public val state: StateFlow<AccountImportsState> = _state.asStateFlow()
 
     /** One job per device book, so two adds never share a cancellation. */
     private val jobs = mutableMapOf<String, Job>()
@@ -163,7 +165,7 @@ class AccountImports(
     }
 
     /** The app came to the foreground: poll again, and pick up anything left in flight. */
-    fun onForeground() {
+    public fun onForeground() {
         foreground.value = true
         refreshOffer()
         resumeStoredImports()
@@ -203,7 +205,7 @@ class AccountImports(
     }
 
     /** The app went away: status reads stop until it is back. */
-    fun onBackground() {
+    public fun onBackground() {
         foreground.value = false
     }
 
@@ -214,7 +216,7 @@ class AccountImports(
      * capability's reason, or in the refusal the policy already implies — shown from the policy's own numbers, with no admission made and
      * no byte sent either way.
      */
-    fun requestAdd(deviceBookId: String) {
+    public fun requestAdd(deviceBookId: String) {
         val gateway = gateway ?: return
         launchFor(deviceBookId) {
             publish(deviceBookId, BookImportState.Checking)
@@ -260,14 +262,14 @@ class AccountImports(
     }
 
     /**
-     * The owner answered yes. This is the only call in FastReader that can send
-     * a book's bytes.
+     * The owner answered yes. This is the only call in this module that can
+     * send a book's bytes.
      *
      * It refuses to act on anything but a [BookImportState.Consent] on screen:
      * a confirm that does not follow a question is a bug, and the answer to a
      * bug is not to upload a book.
      */
-    fun confirmAdd(deviceBookId: String) {
+    public fun confirmAdd(deviceBookId: String) {
         val gateway = gateway ?: return
         if (_state.value.byDeviceBookId[deviceBookId] !is BookImportState.Consent) return
         launchFor(deviceBookId) {
@@ -293,7 +295,7 @@ class AccountImports(
      * network before letting the owner out of a transfer would be the worse
      * failure.
      */
-    fun cancelAdd(deviceBookId: String) {
+    public fun cancelAdd(deviceBookId: String) {
         scope.launch {
             mutex.withLock { jobs.remove(deviceBookId) }?.cancel()
             val record = storedRecordFor(deviceBookId)
@@ -307,7 +309,7 @@ class AccountImports(
     }
 
     /** Puts away a finished verdict — the consent question declined, a refusal read. */
-    fun dismiss(deviceBookId: String) {
+    public fun dismiss(deviceBookId: String) {
         scope.launch { clear(deviceBookId) }
     }
 
@@ -319,7 +321,7 @@ class AccountImports(
      * than resumed: there are no bytes to send, and keeping it would retry for
      * ever.
      */
-    fun resumeStoredImports() {
+    public fun resumeStoredImports() {
         val gateway = gateway ?: return
         scope.launch {
             records.importRecords().forEach { record ->
@@ -513,25 +515,17 @@ class AccountImports(
     }
 
     private suspend fun storedRecordFor(deviceBookId: String): PublicationImportRecord? {
-        val identity = deviceBookId.removePrefix(SHA256_PREFIX).lowercase()
-        return records.importRecords().firstOrNull { it.contentSha256 == identity }
+        val contentSha256 = identity.contentSha256(deviceBookId)
+        return records.importRecords().firstOrNull { it.contentSha256 == contentSha256 }
     }
 
-    private fun deviceBookIdOf(record: PublicationImportRecord): String = SHA256_PREFIX + record.contentSha256
+    private fun deviceBookIdOf(record: PublicationImportRecord): String = identity.deviceBookId(record.contentSha256)
 
     /** The bytes behind [deviceBookId], or null having already published why not. */
     private suspend fun sourceFor(deviceBookId: String): PublicationSource? {
-        val book = bookForId(deviceBookId) ?: run {
-            publish(
-                deviceBookId,
-                BookImportState.Refused(
-                    ImportProblem.SourceUnavailable(PublicationSourceProblem.UNREACHABLE),
-                    retryable = false,
-                ),
-            )
-            return null
-        }
-        return when (val resolved = sources.of(book)) {
+        // A book the host no longer has is the host's UNREACHABLE (#200): the
+        // same refusal this published when the catalog lookup lived here.
+        return when (val resolved = sources.sourceFor(deviceBookId)) {
             is PublicationSourceResult.Ready -> resolved.source
 
             is PublicationSourceResult.Unavailable -> {
@@ -627,44 +621,13 @@ class AccountImports(
         )
     }
 
-    /** One `ReaderAuthException` branch as the state the row shows. Nothing is invented. */
-    private fun refusalFor(error: ReaderAuthException): BookImportState.Refused = when (error) {
-        is ReaderAuthException.NetworkUnavailable ->
-            BookImportState.Refused(ImportProblem.NeedsConnection)
+    /**
+     * One `ReaderAuthException` branch as the state the row shows. Nothing is
+     * invented: the branch is classified once, in `AccountErrors.kt` (#200).
+     */
+    private fun refusalFor(error: ReaderAuthException): BookImportState.Refused = error.toOutcome().toImportRefusal()
 
-        is ReaderAuthException.SignedOut ->
-            BookImportState.Refused(ImportProblem.Api(null), code = error.code, requestId = error.requestId)
-
-        is ReaderAuthException.Forbidden ->
-            BookImportState.Refused(ImportProblem.Api(null), code = error.code, requestId = error.requestId)
-
-        is ReaderAuthException.TryLater ->
-            BookImportState.Refused(ImportProblem.Api(error.status), code = error.code, requestId = error.requestId)
-
-        is ReaderAuthException.ApiError ->
-            BookImportState.Refused(ImportProblem.Api(error.status), code = error.code, requestId = error.requestId)
-
-        is ReaderAuthException.ProviderRejected ->
-            BookImportState.Refused(ImportProblem.Api(error.status), code = error.code)
-
-        is ReaderAuthException.NotConfigured, is ReaderAuthException.ConfigurationMismatch,
-        is ReaderAuthException.SignInUnavailable,
-        ->
-            BookImportState.Refused(ImportProblem.Api(null), retryable = false)
-
-        // The session is kept in memory, so the same import succeeds when repeated (#154).
-        is ReaderAuthException.StorageUnavailable ->
-            BookImportState.Refused(ImportProblem.Api(null), code = "storage_unavailable")
-
-        // The provider's answer could not be read; the session is intact, so repeating the import may succeed (#191).
-        is ReaderAuthException.UnexpectedResponse ->
-            BookImportState.Refused(ImportProblem.Api(null), code = "unexpected_response")
-    }
-
-    companion object {
-
-        /** The catalog's identity prefix (v1 AD-2); the record stores the bare hex. */
-        private const val SHA256_PREFIX: String = "sha256:"
+    public companion object {
 
         /**
          * Growing backoff for status reads, ending at half a minute. The
@@ -672,9 +635,9 @@ class AccountImports(
          * minutes, so the early reads are close together and the tail is there
          * for a queue that is busy.
          */
-        val DEFAULT_POLL_DELAYS_MS: List<Long> = listOf(1_000, 2_000, 4_000, 8_000, 15_000, 30_000)
+        public val DEFAULT_POLL_DELAYS_MS: List<Long> = listOf(1_000, 2_000, 4_000, 8_000, 15_000, 30_000)
 
         /** Roughly a minute of reads per foreground spell, then it waits for the next. */
-        const val DEFAULT_POLL_ATTEMPTS: Int = 8
+        public const val DEFAULT_POLL_ATTEMPTS: Int = 8
     }
 }

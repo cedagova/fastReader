@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
 import com.cedagova.reader.library.sync.AccountHostRecords
 import kotlinx.serialization.KSerializer
@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonElement
  * a reference with both at zero still means "this account's copy is here".
  */
 @Serializable
-data class AccountCopy(
+public data class AccountCopy(
     @SerialName("contentSha256") val contentSha256: String,
     @SerialName("sizeBytes") val sizeBytes: Long = 0,
     @SerialName("placedAtEpochMs") val placedAtEpochMs: Long = 0,
@@ -36,19 +36,19 @@ data class AccountCopy(
  * These say which account books this device holds bytes for; the bytes are
  * [AccountCopyStore]'s and the readable source is the device catalog's.
  */
-interface AccountCopyReferences {
+public interface AccountCopyReferences {
 
     /** The signed-in account's user id, or null when nobody is signed in. */
-    fun accountId(): String?
+    public fun accountId(): String?
 
     /** The content identities the signed-in account has copies of on this device. */
-    suspend fun copyReferences(): List<AccountCopy>
+    public suspend fun copyReferences(): List<AccountCopy>
 
     /** Records [copy], replacing any earlier reference to the same content. */
-    suspend fun putCopyReference(copy: AccountCopy)
+    public suspend fun putCopyReference(copy: AccountCopy)
 
     /** Forgets the reference to [contentSha256]. The bytes are not dropped here. */
-    suspend fun dropCopyReference(contentSha256: String)
+    public suspend fun dropCopyReference(contentSha256: String)
 
     /**
      * Keeps only the references [present] names.
@@ -57,14 +57,14 @@ interface AccountCopyReferences {
      * actually on disk, and a reference to a copy a dead process never finished
      * placing must not outlive it.
      */
-    suspend fun retainCopyReferences(present: Set<String>)
+    public suspend fun retainCopyReferences(present: Set<String>)
 }
 
 /**
  * The copy references, kept as the `copies` host record of the account
  * document (#147).
  *
- * They are FastReader's and not the account's, so `:reader-library`'s engine
+ * They are the host's and not the account's, so `:reader-library`'s engine
  * stores them without reading them — but in the same document and under the
  * same single writer as the queue, because a second writer racing it would be
  * the first way to lose a queued mutation. The key and the element shape are
@@ -76,22 +76,22 @@ interface AccountCopyReferences {
  * While nobody is signed in, reads are empty and writes do nothing (D4 — a copy
  * outlives the session that fetched it; signing back in re-binds it).
  */
-class AccountDocumentCopyReferences(private val records: AccountHostRecords) : AccountCopyReferences {
+public class AccountDocumentCopyReferences(private val records: AccountHostRecords) : AccountCopyReferences {
 
     override fun accountId(): String? = records.accountId()
 
     override suspend fun copyReferences(): List<AccountCopy> = decode(records.hostRecord(KEY))
 
-    override suspend fun putCopyReference(copy: AccountCopy) = update { copies ->
+    override suspend fun putCopyReference(copy: AccountCopy): Unit = update { copies ->
         val index = copies.indexOfFirst { it.contentSha256 == copy.contentSha256 }
         if (index < 0) copies + copy else copies.toMutableList().apply { this[index] = copy }
     }
 
-    override suspend fun dropCopyReference(contentSha256: String) = update { copies ->
+    override suspend fun dropCopyReference(contentSha256: String): Unit = update { copies ->
         copies.filterNot { it.contentSha256 == contentSha256 }
     }
 
-    override suspend fun retainCopyReferences(present: Set<String>) = update { copies ->
+    override suspend fun retainCopyReferences(present: Set<String>): Unit = update { copies ->
         copies.filter { it.contentSha256 in present }
     }
 
@@ -129,9 +129,9 @@ class AccountDocumentCopyReferences(private val records: AccountHostRecords) : A
         }
     }
 
-    companion object {
+    public companion object {
         /** The host record's key: schema 3's own top-level `copies`. */
-        const val KEY: String = "copies"
+        public const val KEY: String = "copies"
 
         private val SERIALIZER: KSerializer<List<AccountCopy>> = ListSerializer(AccountCopy.serializer())
 

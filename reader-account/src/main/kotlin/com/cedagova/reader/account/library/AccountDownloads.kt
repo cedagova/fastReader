@@ -1,6 +1,7 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
-import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.account.toDownloadRefusal
+import com.cedagova.reader.account.toOutcome
 import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.reader.library.sync.AccountLibraryState
@@ -48,7 +49,7 @@ import kotlinx.coroutines.sync.withLock
  * cancels it; the copies already on the device are catalog rows and are not
  * this class's to touch. Nothing here deletes a byte on sign-out.
  */
-class AccountDownloads(
+public class AccountDownloads(
     private val copies: AccountBookCopies,
     /** The account library the shelf renders; the source of the book to download. */
     private val accountState: StateFlow<AccountLibraryState>,
@@ -59,7 +60,7 @@ class AccountDownloads(
     private val _state = MutableStateFlow(AccountDownloadsState.NONE)
 
     /** Every download in flight or refused, as the shelf reads it. */
-    val state: StateFlow<AccountDownloadsState> = _state.asStateFlow()
+    public val state: StateFlow<AccountDownloadsState> = _state.asStateFlow()
 
     private val _opened = MutableStateFlow<String?>(null)
 
@@ -68,7 +69,7 @@ class AccountDownloads(
      * for its host to open it. Null at every other moment, including while a
      * download is running and after every failure.
      */
-    val opened: StateFlow<String?> = _opened.asStateFlow()
+    public val opened: StateFlow<String?> = _opened.asStateFlow()
 
     /** One job per account book, so two downloads never share a cancellation. */
     private val jobs = mutableMapOf<String, Job>()
@@ -88,7 +89,7 @@ class AccountDownloads(
      * downloading is ignored rather than starting a second transfer against a
      * second grant.
      */
-    fun open(accountBookId: String) {
+    public fun open(accountBookId: String) {
         scope.launch {
             val book = accountState.value.books.firstOrNull { it.bookId == accountBookId } ?: return@launch
             val started = mutex.withLock {
@@ -111,7 +112,7 @@ class AccountDownloads(
     }
 
     /** Stops a download. Nothing was placed, so the row is exactly as it was. */
-    fun cancel(accountBookId: String) {
+    public fun cancel(accountBookId: String) {
         scope.launch {
             val job = mutex.withLock {
                 _state.update { it.without(accountBookId) }
@@ -122,7 +123,7 @@ class AccountDownloads(
     }
 
     /** Puts away a refusal that has been read. Sends nothing and downloads nothing. */
-    fun dismiss(accountBookId: String) {
+    public fun dismiss(accountBookId: String) {
         scope.launch { mutex.withLock { _state.update { it.without(accountBookId) } } }
     }
 
@@ -132,12 +133,12 @@ class AccountDownloads(
      * The account is untouched: this is the one removal in the app that costs
      * bytes and nothing else.
      */
-    fun removeCopy(contentSha256: String) {
+    public fun removeCopy(contentSha256: String) {
         scope.launch { copies.remove(contentSha256) }
     }
 
     /** The host has opened [deviceBookId]; stop offering to. */
-    fun opened(deviceBookId: String) {
+    public fun opened(deviceBookId: String) {
         _opened.compareAndSet(deviceBookId, null)
     }
 
@@ -167,7 +168,7 @@ class AccountDownloads(
 }
 
 /** Every download the shelf is showing, keyed by the account's own book id. */
-data class AccountDownloadsState(val byAccountBookId: Map<String, BookDownloadState> = emptyMap()) {
+public data class AccountDownloadsState(val byAccountBookId: Map<String, BookDownloadState> = emptyMap()) {
 
     internal fun with(bookId: String, state: BookDownloadState): AccountDownloadsState =
         copy(byAccountBookId = byAccountBookId + (bookId to state))
@@ -175,8 +176,8 @@ data class AccountDownloadsState(val byAccountBookId: Map<String, BookDownloadSt
     internal fun without(bookId: String): AccountDownloadsState =
         if (bookId in byAccountBookId) copy(byAccountBookId = byAccountBookId - bookId) else this
 
-    companion object {
-        val NONE: AccountDownloadsState = AccountDownloadsState()
+    public companion object {
+        public val NONE: AccountDownloadsState = AccountDownloadsState()
     }
 }
 
@@ -188,10 +189,10 @@ data class AccountDownloadsState(val byAccountBookId: Map<String, BookDownloadSt
  * book with a cover, a position and a **Remove downloaded copy** action, and
  * anything left here would be a second, stale answer to the same question.
  */
-sealed interface BookDownloadState {
+public sealed interface BookDownloadState {
 
     /** The bytes are arriving. [total] is the grant's own declared length, or 0. */
-    data class Downloading(val received: Long = 0, val total: Long = 0) : BookDownloadState {
+    public data class Downloading(val received: Long = 0, val total: Long = 0) : BookDownloadState {
 
         /** Determinate progress, or null while the grant declared no length. */
         val fraction: Float? get() = if (total > 0) (received.toFloat() / total).coerceIn(0f, 1f) else null
@@ -205,7 +206,7 @@ sealed interface BookDownloadState {
      * carried through untouched for the same reason an [AccountSyncError]'s
      * are: the code is what finds a server log.
      */
-    data class Refused(
+    public data class Refused(
         val problem: DownloadProblem,
         val code: String? = null,
         val requestId: String? = null,
@@ -221,7 +222,7 @@ sealed interface BookDownloadState {
  * different thing: the asset, this device, the network, the backend, or the
  * book itself. "Something went wrong" is not one of them.
  */
-enum class DownloadProblem {
+public enum class DownloadProblem {
 
     /** The bytes that arrived are not the book the account holds (REQ-510). */
     TAMPERED,
@@ -239,7 +240,7 @@ enum class DownloadProblem {
     FAILED,
 
     /**
-     * The storage provider sent the download to another origin, and FastReader
+     * The storage provider sent the download to another origin, and this module
      * would not send the book's signed grant there (#142). The same grant
      * would meet the same redirect, so this is not offered again.
      */
@@ -274,31 +275,6 @@ private fun CopyOutcome.refusal(): BookDownloadState.Refused = when (this) {
 
     is CopyOutcome.Unavailable -> BookDownloadState.Refused(DownloadProblem.UNAVAILABLE)
 
-    is CopyOutcome.GrantFailed -> when (val e = error) {
-        is ReaderAuthException.NetworkUnavailable ->
-            BookDownloadState.Refused(DownloadProblem.OFFLINE, retryable = true)
-
-        is ReaderAuthException.TryLater ->
-            BookDownloadState.Refused(
-                problem = DownloadProblem.REFUSED,
-                code = e.code ?: "HTTP ${e.status}",
-                requestId = e.requestId,
-                retryable = true,
-            )
-
-        is ReaderAuthException.Forbidden ->
-            BookDownloadState.Refused(DownloadProblem.REFUSED, code = e.code ?: "403", requestId = e.requestId)
-
-        is ReaderAuthException.SignedOut ->
-            BookDownloadState.Refused(DownloadProblem.REFUSED, code = e.code, requestId = e.requestId)
-
-        is ReaderAuthException.ApiError ->
-            BookDownloadState.Refused(
-                problem = DownloadProblem.REFUSED,
-                code = e.code ?: "HTTP ${e.status}",
-                requestId = e.requestId,
-            )
-
-        else -> BookDownloadState.Refused(DownloadProblem.REFUSED)
-    }
+    // The grant's failure is classified once, in AccountErrors.kt (#200).
+    is CopyOutcome.GrantFailed -> error.toOutcome().toDownloadRefusal()
 }

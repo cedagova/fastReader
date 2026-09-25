@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Empty on purpose. :reader-account adds no permission, no component and no
+  resource: its network use is :reader-library's gateways over the one
+  authenticated client :reader-auth owns, and :reader-auth's manifest is what
+  merges INTERNET into a host. A host that merges this module gains nothing it
+  did not already have.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

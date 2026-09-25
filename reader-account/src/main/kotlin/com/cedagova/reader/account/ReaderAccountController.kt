@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account
+package com.cedagova.reader.account
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.auth.ReaderAuthOperations
@@ -17,17 +17,17 @@ import kotlinx.serialization.json.JsonObject
  * What the account surface can ask for. The controller implements it; the
  * goldens hand the screen an object that does nothing.
  */
-interface ReaderAccountActions {
-    fun requestEmailCode(email: String, newAccount: Boolean)
-    fun verifyEmailCode(email: String, code: String)
-    fun signInWithPassword(email: String, password: String)
-    fun requestRecoveryCode(email: String)
-    fun verifyRecoveryCode(email: String, code: String)
-    fun setPassword(newPassword: String)
-    fun loadCapabilities()
-    fun signOut()
-    fun signOutOtherDevices()
-    fun dismissOutcome()
+public interface ReaderAccountActions {
+    public fun requestEmailCode(email: String, newAccount: Boolean)
+    public fun verifyEmailCode(email: String, code: String)
+    public fun signInWithPassword(email: String, password: String)
+    public fun requestRecoveryCode(email: String)
+    public fun verifyRecoveryCode(email: String, code: String)
+    public fun setPassword(newPassword: String)
+    public fun loadCapabilities()
+    public fun signOut()
+    public fun signOutOtherDevices()
+    public fun dismissOutcome()
 }
 
 /**
@@ -38,7 +38,8 @@ interface ReaderAccountActions {
  * ## What it does not do
  *
  * It classifies no error — each `ReaderAuthException` branch becomes its
- * [AccountOutcome] twin and nothing else — retries nothing, and never re-sends
+ * [AccountOutcome.Failure] twin (`toOutcome`, in `AccountErrors.kt`) and
+ * nothing else — retries nothing, and never re-sends
  * or re-verifies a code: every tap is exactly one gateway call, and a second
  * tap while one is in flight is ignored rather than queued. `NotConfigured`
  * is a state, not an outcome: a controller built with no gateway reports
@@ -55,7 +56,7 @@ interface ReaderAccountActions {
  * the screen, and a code request made before checking the inbox is still the
  * state on screen when the reader comes back.
  */
-class ReaderAccountController(
+public class ReaderAccountController(
     private val gateway: ReaderAuthOperations?,
     missingValues: List<String>,
     private val scope: CoroutineScope,
@@ -66,7 +67,7 @@ class ReaderAccountController(
     private val outcome = MutableStateFlow<AccountOutcome?>(null)
     private val capabilities = MutableStateFlow<LoadedCapabilities?>(null)
 
-    val state: StateFlow<ReaderAccountState> = if (gateway == null) {
+    public val state: StateFlow<ReaderAccountState> = if (gateway == null) {
         MutableStateFlow(ReaderAccountState.NotConfigured(missingValues))
     } else {
         combine(session, activity, outcome, capabilities) { session, activity, outcome, capabilities ->
@@ -98,37 +99,38 @@ class ReaderAccountController(
         }
     }
 
-    override fun requestEmailCode(email: String, newAccount: Boolean) = run(AccountActivity.REQUESTING_CODE) {
+    override fun requestEmailCode(email: String, newAccount: Boolean): Unit = run(AccountActivity.REQUESTING_CODE) {
         it.requestEmailCode(email, createUser = newAccount)
         AccountOutcome.CodeSent
     }
 
-    override fun verifyEmailCode(email: String, code: String) = run(AccountActivity.VERIFYING_CODE) {
+    override fun verifyEmailCode(email: String, code: String): Unit = run(AccountActivity.VERIFYING_CODE) {
         it.verifyEmailCode(email, code)
         null
     }
 
-    override fun signInWithPassword(email: String, password: String) = run(AccountActivity.SIGNING_IN_WITH_PASSWORD) {
-        it.signInWithPassword(email, password)
-        null
-    }
+    override fun signInWithPassword(email: String, password: String): Unit =
+        run(AccountActivity.SIGNING_IN_WITH_PASSWORD) {
+            it.signInWithPassword(email, password)
+            null
+        }
 
-    override fun requestRecoveryCode(email: String) = run(AccountActivity.REQUESTING_RECOVERY_CODE) {
+    override fun requestRecoveryCode(email: String): Unit = run(AccountActivity.REQUESTING_RECOVERY_CODE) {
         it.requestRecoveryCode(email)
         AccountOutcome.RecoveryCodeSent
     }
 
-    override fun verifyRecoveryCode(email: String, code: String) = run(AccountActivity.VERIFYING_RECOVERY_CODE) {
+    override fun verifyRecoveryCode(email: String, code: String): Unit = run(AccountActivity.VERIFYING_RECOVERY_CODE) {
         it.verifyRecoveryCode(email, code)
         null
     }
 
-    override fun setPassword(newPassword: String) = run(AccountActivity.SETTING_PASSWORD) {
+    override fun setPassword(newPassword: String): Unit = run(AccountActivity.SETTING_PASSWORD) {
         it.setPassword(newPassword)
         AccountOutcome.PasswordSet
     }
 
-    override fun loadCapabilities() = run(AccountActivity.LOADING_CAPABILITIES, onFailure = {
+    override fun loadCapabilities(): Unit = run(AccountActivity.LOADING_CAPABILITIES, onFailure = {
         capabilities.value = null
     }) {
         val response = it.capabilitiesResponse()
@@ -139,12 +141,12 @@ class ReaderAccountController(
         null
     }
 
-    override fun signOut() = run(AccountActivity.SIGNING_OUT) {
+    override fun signOut(): Unit = run(AccountActivity.SIGNING_OUT) {
         it.signOut()
         AccountOutcome.SignedOutLocally
     }
 
-    override fun signOutOtherDevices() = run(AccountActivity.SIGNING_OUT_OTHER_DEVICES) {
+    override fun signOutOtherDevices(): Unit = run(AccountActivity.SIGNING_OUT_OTHER_DEVICES) {
         it.signOutOtherDevices()
         AccountOutcome.OtherDevicesSignedOut
     }
@@ -181,25 +183,4 @@ class ReaderAccountController(
     private companion object {
         val pretty = Json { prettyPrint = true }
     }
-}
-
-/**
- * The branch-to-outcome map, total over the sealed class so a branch the
- * library adds later fails to compile here rather than falling into a
- * catch-all. `NotConfigured` cannot reach a controller that has a gateway —
- * the application builds one only for a configured client — but the map
- * stays total; it is reported as a mismatch naming the library's own message.
- */
-internal fun ReaderAuthException.toOutcome(): AccountOutcome = when (this) {
-    is ReaderAuthException.NotConfigured -> AccountOutcome.ConfigurationMismatch(message.orEmpty())
-    is ReaderAuthException.ConfigurationMismatch -> AccountOutcome.ConfigurationMismatch(reason)
-    is ReaderAuthException.SignInUnavailable -> AccountOutcome.SignInUnavailable(reason)
-    is ReaderAuthException.NetworkUnavailable -> AccountOutcome.NetworkUnavailable
-    is ReaderAuthException.TryLater -> AccountOutcome.TryLater(status, code, retryAfter?.inWholeSeconds, requestId)
-    is ReaderAuthException.SignedOut -> AccountOutcome.SessionGone(code, requestId)
-    is ReaderAuthException.Forbidden -> AccountOutcome.Forbidden(code, requestId)
-    is ReaderAuthException.ProviderRejected -> AccountOutcome.ProviderRejected(status, code, description)
-    is ReaderAuthException.ApiError -> AccountOutcome.ApiError(status, code, requestId, description)
-    is ReaderAuthException.StorageUnavailable -> AccountOutcome.StorageUnavailable
-    is ReaderAuthException.UnexpectedResponse -> AccountOutcome.UnexpectedResponse
 }

@@ -154,6 +154,9 @@ dependencies {
     // The EPUB, content and RSVP timing engines (#201): Android-free, and they
     // import nothing from :app.
     implementation(project(":reader-engine"))
+    // The Reader account pipeline and its one assembly call (#200); it brings
+    // :reader-library and :reader-auth with it.
+    implementation(project(":reader-account"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -172,6 +175,7 @@ dependencies {
     // this app defines no fake of a library type.
     testImplementation(testFixtures(project(":reader-auth")))
     testImplementation(testFixtures(project(":reader-library")))
+    testImplementation(testFixtures(project(":reader-account")))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)

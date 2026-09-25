@@ -57,10 +57,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.account.AccountOutcome
-import com.cedagova.fastreader.account.LoadedCapabilities
-import com.cedagova.fastreader.account.ReaderAccountActions
-import com.cedagova.fastreader.account.ReaderAccountState
+import com.cedagova.reader.account.AccountOutcome
+import com.cedagova.reader.account.LoadedCapabilities
+import com.cedagova.reader.account.ReaderAccountActions
+import com.cedagova.reader.account.ReaderAccountState
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
 private val TouchTarget = 48.dp
