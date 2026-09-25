@@ -60,6 +60,13 @@ Every screen has the same four parts:
 `collectAsState()`: a flow is collected only while the screen is at least
 started. `ShellConventionTest` enforces this.
 
+One consequence to keep in mind: an effect keyed on collected state runs when
+that state arrives *while the screen is started*. `LibraryRoute`'s effects —
+opening a finished download, recording a finished book for the account — see a
+change that landed while the app was in the background only when the app
+returns to the foreground, and run then. Saving the reading position does not
+depend on this: `ReaderRoute` writes it on `ON_PAUSE`.
+
 **A `ViewModel` only when the screen owns work** that must survive a
 configuration change but must not outlive the activity. Today that is only the
 reader's parse and playback (`reader/ui/ReaderViewModel.kt`); re-parsing a novel
@@ -111,8 +118,8 @@ There are no flags, no reset block and no precedence order to edit.
   root package only because it is the namespace; they are not code of that
   package.
 
-The graph at #203, each package with what it imports (`com.cedagova.fastreader`
-omitted):
+The graph as of #204, each package with what it imports
+(`com.cedagova.fastreader` omitted):
 
 | Package | Depends on |
 |---|---|
@@ -140,6 +147,13 @@ imports that form it. It is a plain JVM unit test, so it runs:
 
 The main sources are a declared input of the test task, so an import-only
 change cannot leave it up to date.
+
+**It is a guard, not a proof.** The test follows `import` lines only. A
+reference written as a fully qualified name, or a use of another package's
+type that needs no import (a value reached through a member, such as
+`a.b.c`, whose type is never named), is invisible to it. It catches the
+cycles that realistically get written; it does not prove the graph above
+complete.
 
 ## Shared UI primitives and tokens
 
@@ -180,3 +194,15 @@ build a new screen, or copy one into a new client, take these along:
 **The checks.** `ShellConventionTest` fails when a Kotlin file under
 `app/src/main/java/**/ui/` is longer than 600 lines (plan AD-7). It also fails
 when `TouchTarget` is declared anywhere but `Dimens.kt`.
+
+## Compose stability of library types
+
+`:reader-engine` is a plain Kotlin/JVM module built without the Compose
+compiler, so Compose infers every engine type as unstable. The reader's state
+types in `reader/ui/ReaderUiState.kt` carry engine types (`BookContent`,
+tokens, `RemainingTimeIndex`), so a composable taking them cannot skip
+recomposition when its inputs are equal. Nothing visible depends on this
+today. If profiling ever shows it matters, the remedy is a stability
+configuration file in `:app` (`composeCompiler { stabilityConfigurationFiles }`)
+that lists the engine's immutable types — not a Compose dependency in the
+engine, which must stay Android-free.

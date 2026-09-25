@@ -1,5 +1,10 @@
 # Implementation Plan: RSVP fast reader for EPUB books
 
+> **Historical record — delivered.** This plan was carried out and issue #1 is
+> closed. The status line below is the plan's status when it was approved
+> (2026-09-01), kept as written. Module and file names in it predate the
+> library modules; the current map is [docs/architecture.md](../../architecture.md).
+
 - Planning issue: https://github.com/cedagova/fastReader/issues/1
 - Planning PR: https://github.com/cedagova/fastReader/pull/7
 - Status: Ready for implementation

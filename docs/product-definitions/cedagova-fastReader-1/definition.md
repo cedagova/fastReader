@@ -1,5 +1,10 @@
 # Product Definition: RSVP fast reader for EPUB books
 
+> **Historical record — delivered.** This definition was planned and
+> implemented; issue #1 is closed. The status line below is its status when it
+> was approved, kept as written. The current map of the code is
+> [docs/architecture.md](../../architecture.md).
+
 - Product definition issue: https://github.com/cedagova/fastReader/issues/1
 - Product definition PR: https://github.com/cedagova/fastReader/pull/2
 - Requirements brief: https://github.com/cedagova/fastReader/issues/1#issuecomment-5497469653

@@ -95,6 +95,9 @@ What each piece is for:
   carries it. App releases keep their own `v<versionName>` tags.
 - The copy check refuses a module whose `CHANGELOG.md` has no entry for the
   version its build file declares.
+- **Today:** every module is at `0.1.0` and nothing is tagged yet. The first
+  `<module>/v0.1.0` tags are cut once the #211 effort reaches `main`; until
+  then a change amends the untagged `0.1.0` entry instead of bumping.
 
 ## Copying (and updating) into a host
 
@@ -111,9 +114,11 @@ What each piece is for:
    build-logic runs against those plugin classes.
 5. Set `android.useAndroidX=true` in the host's `gradle.properties` — and
    `android.experimental.enableTestFixturesKotlinSupport=true`, which Kotlin
-   in the modules' test fixtures needs — and meet
-   the host obligations in [reader-auth/README.md](../reader-auth/README.md)
-   (backup exclusion, no cleartext in release, its own application id).
+   in the modules' test fixtures needs — and meet every library's host
+   obligations, listed together in
+   [architecture.md](architecture.md#host-obligations-library-by-library)
+   (for `:reader-auth`: configuration, backup exclusion, no cleartext in
+   release, its own application id, the foreground hook).
 6. Read each module's `CHANGELOG.md` between the old and new versions for
    anything the host must change.
 
