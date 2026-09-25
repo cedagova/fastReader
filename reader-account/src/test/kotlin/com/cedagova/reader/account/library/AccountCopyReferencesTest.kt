@@ -1,9 +1,6 @@
 package com.cedagova.reader.account.library
 
-import com.cedagova.reader.library.sync.AccountLibraryLoad
-import com.cedagova.reader.library.sync.FileAccountLibraryStore
 import com.cedagova.reader.library.testing.RecordingHostRecords
-import java.io.File
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -12,20 +9,15 @@ import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
 /**
- * FastReader's own state in the account document, since #147 moved the engine
- * into `:reader-library`: the copy references (schema 3's `copies`) and the
- * answered resume offers (schema 5's `resumeOfferSettledFor`), both host
- * records the engine stores and never reads.
+ * The copy references in the account document (schema 3's `copies`), a host
+ * record `:reader-library`'s engine stores and never reads (#147). The answered
+ * resume offers, the host's other record, are FastReader's and are tested in
+ * `:app` (#200).
  */
-class AccountHostRecordsTest {
-
-    @get:Rule
-    val temporaryFolder = TemporaryFolder()
+class AccountCopyReferencesTest {
 
     private val sha = "b".repeat(64)
 
@@ -114,44 +106,5 @@ class AccountHostRecordsTest {
         assertNull(references.accountId())
         assertEquals(emptyList<AccountCopy>(), references.copyReferences())
         assertTrue(records.writes.isEmpty())
-    }
-
-    /** Settling writes the book row's note and nothing else; an unknown book is skipped. */
-    @Test
-    fun `settling a resume offer notes the change on the row`() = runTest {
-        val records = RecordingHostRecords(knownBooks = setOf("book-1"))
-        val offers = AccountResumeOffers(records)
-
-        offers.settle("book-1", "7:2026-09-20T10:00:00Z")
-        offers.settle("book-1", "7:2026-09-20T10:00:00Z")
-        offers.settle("book-unknown", "7:2026-09-20T10:00:00Z")
-
-        assertEquals(JsonPrimitive("7:2026-09-20T10:00:00Z"), records.books["book-1"]!![AccountResumeOffers.KEY])
-        assertEquals("settling twice writes once", listOf("book-1:${AccountResumeOffers.KEY}"), records.writes)
-        assertNull(records.books["book-unknown"])
-    }
-
-    /**
-     * #147's compatibility promise from FastReader's side: a schema 6 document
-     * FastReader wrote at main `ab175bc`, before the move, loads through
-     * `:reader-library`'s store, and FastReader reads its own copy reference and
-     * its answered resume offer back exactly as it wrote them.
-     */
-    @Test
-    fun `a schema 6 document keeps FastReader's copies and answered offers`() = runTest {
-        val text = javaClass.getResource("/account-library-v6.json")!!.readText()
-        val file = File(temporaryFolder.root, "account-legacy.json").apply { writeText(text) }
-        val document = (FileAccountLibraryStore(file).load() as AccountLibraryLoad.Loaded).document
-
-        val records = RecordingHostRecords(knownBooks = document.books.map { it.bookId }.toSet())
-        records.document.putAll(document.host)
-        document.books.forEach { records.books[it.bookId]!!.putAll(it.host) }
-
-        assertEquals(
-            listOf(AccountCopy(contentSha256 = "a".repeat(64), sizeBytes = 4_096, placedAtEpochMs = 1_700_000_000_000)),
-            AccountDocumentCopyReferences(records).copyReferences(),
-        )
-        assertEquals("9:2026-09-13T08:00:00Z", document.book("book-1")!!.resumeOfferSettledFor)
-        assertNull("an explicit null is still no answer", document.book("book-2")!!.resumeOfferSettledFor)
     }
 }

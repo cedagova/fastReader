@@ -1,7 +1,5 @@
 package com.cedagova.reader.account.library
 
-import com.cedagova.fastreader.library.BookSource
-import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.downloads.AssetDownloadGateway
@@ -24,8 +22,9 @@ import java.io.File
  * 2. stream the bytes under that grant into [AccountCopyStore.place], which
  *    digests them as they land and refuses to place anything whose SHA-256 is
  *    not the account's identity for that book;
- * 3. only once a file has been placed, write the device-catalog row with its
- *    `ACCOUNT_COPY` source, which is what makes it readable;
+ * 3. only once a file has been placed, ask the host's [AccountCopyCatalog] to
+ *    make it readable (FastReader writes its device-catalog row with an
+ *    `ACCOUNT_COPY` source);
  * 4. and then record the account's copy reference.
  *
  * Nothing between steps 1 and 3 can produce a readable book, which is the
@@ -53,7 +52,8 @@ public class AccountBookCopies(
     private val gateway: AssetDownloadGateway?,
     private val store: AccountCopyStore,
     private val references: AccountCopyReferences,
-    private val library: LibraryRepository,
+    /** The host's device catalog: what makes a placed copy readable (#200). */
+    private val catalog: AccountCopyCatalog,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
@@ -118,10 +118,7 @@ public class AccountBookCopies(
      * Returns true when there was a copy to free.
      */
     public suspend fun remove(contentSha256: String): Boolean {
-        val bookId = library.catalog.value.books
-            .firstOrNull { book -> book.sources.any { it.isAccountCopy && it.uri == copyUri(contentSha256) } }
-            ?.id
-        if (bookId != null) library.removeAccountCopy(bookId)
+        catalog.removeAccountCopy(contentSha256)
         references.dropCopyReference(contentSha256)
         return store.delete(contentSha256)
     }
@@ -136,7 +133,7 @@ public class AccountBookCopies(
      */
     public suspend fun reconcile(): Int {
         val discarded = store.discardPartials()
-        library.reconcileAccountCopies { path -> File(path).isFile }
+        catalog.reconcileAccountCopies { path -> File(path).isFile }
         references.retainCopyReferences(store.contents())
         return discarded
     }
@@ -150,7 +147,7 @@ public class AccountBookCopies(
      */
     private suspend fun adopt(book: AccountBook, contentSha256: String, file: File): CopyOutcome {
         val displayName = book.title.ifBlank { contentSha256 } + EPUB_SUFFIX
-        val bookId = library.addAccountCopy(contentSha256, file, displayName)
+        val bookId = catalog.addAccountCopy(contentSha256, file, displayName)
             ?: return CopyOutcome.Unreadable(contentSha256)
         references.putCopyReference(
             AccountCopy(
@@ -161,8 +158,6 @@ public class AccountBookCopies(
         )
         return CopyOutcome.Ready(bookId = bookId, file = file, sizeBytes = file.length())
     }
-
-    private fun copyUri(contentSha256: String): String = BookSource.accountCopyUri(contentSha256)
 
     private companion object {
         /** One spent grant is a TTL; two is the asset. */

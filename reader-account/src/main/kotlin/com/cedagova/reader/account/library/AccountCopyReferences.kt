@@ -64,7 +64,7 @@ public interface AccountCopyReferences {
  * The copy references, kept as the `copies` host record of the account
  * document (#147).
  *
- * They are FastReader's and not the account's, so `:reader-library`'s engine
+ * They are the host's and not the account's, so `:reader-library`'s engine
  * stores them without reading them — but in the same document and under the
  * same single writer as the queue, because a second writer racing it would be
  * the first way to lose a queued mutation. The key and the element shape are

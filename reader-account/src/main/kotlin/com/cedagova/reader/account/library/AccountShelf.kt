@@ -28,10 +28,10 @@ public data class AccountRemoval(val bookId: String, val title: String)
  * The pinned contract gives the removal an `undo_scope` of
  * `immediate_confirmation` and no duration: the scope says the Undo belongs to
  * the confirmation the reader is looking at, and how long that confirmation
- * stays on screen is the client's. So the window is the app's, and it is the
- * *same* window a device removal already offers
- * ([com.cedagova.fastreader.library.LibraryRepository.DEFAULT_UNDO_WINDOW_MS]) —
- * one "immediate confirmation" in this app, not two that differ by screen.
+ * stays on screen is the client's. So the window is the host's: it passes
+ * [undoWindowMs], and FastReader passes the *same* window its device removal
+ * already offers — one "immediate confirmation" in that app, not two that
+ * differ by screen.
  *
  * Undo is a `restore` of the same book through the engine, which queues it like
  * any other mutation: offline it waits, online it goes at once, and either way
@@ -45,8 +45,8 @@ public data class AccountRemoval(val bookId: String, val title: String)
  */
 public class AccountShelf(
     private val actions: AccountLibraryActions,
-    /** The answered resume offers, a host record the engine stores for this app (#147). */
-    private val resumeOffers: AccountResumeOffers,
+    /** Where the host notes an answered resume offer (#147; a host seam since #200). */
+    private val resumeOffers: ResumeOfferRecords,
     /** The account library the engine publishes; the shelf renders exactly this. */
     public val state: StateFlow<AccountLibraryState>,
     private val scope: CoroutineScope,
@@ -137,7 +137,8 @@ public class AccountShelf(
      * Straight through, like the two above it: the engine owns whether this says
      * anything new, and this class owns only the Undo window.
      */
-    public fun recordPosition(bookId: String, position: LocalReadingPosition): Unit = actions.recordPosition(bookId, position)
+    public fun recordPosition(bookId: String, position: LocalReadingPosition): Unit =
+        actions.recordPosition(bookId, position)
 
     /**
      * The reader has answered the resume offer for one remote change (REQ-511).
@@ -168,8 +169,9 @@ public class AccountShelf(
 
     public companion object {
         /**
-         * The confirmation lifetime, matching the device shelf's own undo window
-         * so the two removals behave identically from the reader's side.
+         * The confirmation lifetime when the host names none: FastReader's
+         * device shelf window, which it passes explicitly so the two removals
+         * behave identically from the reader's side.
          */
         public const val DEFAULT_UNDO_WINDOW_MS: Long = 8_000L
     }

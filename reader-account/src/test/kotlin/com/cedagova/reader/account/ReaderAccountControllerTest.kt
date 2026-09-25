@@ -31,7 +31,7 @@ class ReaderAccountControllerTest {
     private val email = "reader@example.test"
 
     private fun TestScope.controller(gateway: ReaderAuthOperations? = this@ReaderAccountControllerTest.gateway) =
-        ReaderAccountController(gateway, ReaderAccountConfiguration.PROPERTY_KEYS, backgroundScope)
+        ReaderAccountController(gateway, MISSING, backgroundScope)
 
     private fun runUnconfined(block: suspend TestScope.() -> Unit) =
         runTest(UnconfinedTestDispatcher(), testBody = block)
@@ -42,11 +42,11 @@ class ReaderAccountControllerTest {
     fun `a controller without a gateway is not configured and names every missing value`() = runUnconfined {
         val controller = controller(gateway = null)
 
-        assertEquals(ReaderAccountState.NotConfigured(ReaderAccountConfiguration.PROPERTY_KEYS), controller.state.value)
+        assertEquals(ReaderAccountState.NotConfigured(MISSING), controller.state.value)
         controller.requestEmailCode(email, newAccount = true)
         controller.loadCapabilities()
         assertEquals("nothing is called when not configured", emptyList<String>(), gateway.calls)
-        assertEquals(ReaderAccountState.NotConfigured(ReaderAccountConfiguration.PROPERTY_KEYS), controller.state.value)
+        assertEquals(ReaderAccountState.NotConfigured(MISSING), controller.state.value)
     }
 
     @Test
@@ -330,6 +330,62 @@ class ReaderAccountControllerTest {
         assertEquals(ReaderAccountState.SignedOut(outcome = AccountOutcome.CodeSent), controller.state.value)
     }
 
+    /**
+     * The privacy statement's claim that FastReader never calls
+     * `upsertProfile` (docs/privacy-statement.md, claim 3), held here rather
+     * than by the controller's type: it keeps the whole `ReaderAuthOperations`
+     * seam of #199. Every action the surface has, signed out and signed in,
+     * succeeding and failing, reaches the library — and never that operation.
+     * [ReaderAccountActions] is pinned so an action added later joins this
+     * list.
+     */
+    @Test
+    fun `no flow of the controller ever calls upsertProfile`() = runUnconfined {
+        assertEquals(
+            "a new action must join the flows below",
+            sortedSetOf(
+                "dismissOutcome",
+                "loadCapabilities",
+                "requestEmailCode",
+                "requestRecoveryCode",
+                "setPassword",
+                "signInWithPassword",
+                "signOut",
+                "signOutOtherDevices",
+                "verifyEmailCode",
+                "verifyRecoveryCode",
+            ),
+            ReaderAccountActions::class.java.declaredMethods.map { it.name }.toSortedSet(),
+        )
+        val controller = controller()
+        val everyAction = listOf<() -> Unit>(
+            { controller.requestEmailCode(email, newAccount = true) },
+            { controller.requestEmailCode(email, newAccount = false) },
+            { controller.verifyEmailCode(email, "123456") },
+            { controller.signInWithPassword(email, "password") },
+            { controller.requestRecoveryCode(email) },
+            { controller.verifyRecoveryCode(email, "654321") },
+            { controller.setPassword("new-password") },
+            { controller.loadCapabilities() },
+            { controller.signOutOtherDevices() },
+            { controller.signOut() },
+            { controller.dismissOutcome() },
+        )
+
+        everyAction.forEach { it() }
+        everyAction.forEach { action ->
+            gateway.nextFailure = ReaderAuthException.ApiError(500, "internal", "r9", "boom")
+            action()
+            gateway.nextFailure = null
+        }
+
+        assertTrue("every flow reached the library", gateway.calls.size >= 2 * (everyAction.size - 1))
+        assertTrue(
+            "FastReader never calls upsertProfile: ${gateway.calls}",
+            gateway.calls.none { it.startsWith("upsertProfile") },
+        )
+    }
+
     @Test
     fun `a new operation clears the previous outcome`() = runUnconfined {
         val controller = controller()
@@ -340,5 +396,10 @@ class ReaderAccountControllerTest {
         controller.requestEmailCode(email, newAccount = false)
 
         assertEquals(AccountOutcome.CodeSent, controller.state.value.outcome)
+    }
+
+    private companion object {
+        /** The keys a build without account values lacks, as the host names them. */
+        val MISSING = listOf("reader.supabaseUrl", "reader.supabasePublishableKey", "reader.apiBaseUrl")
     }
 }

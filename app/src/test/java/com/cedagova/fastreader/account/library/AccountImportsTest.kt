@@ -4,6 +4,13 @@ import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.FakeDocumentGateway
 import com.cedagova.fastreader.library.SourceOrigin
+import com.cedagova.reader.account.library.AccountImports
+import com.cedagova.reader.account.library.AccountImportsState
+import com.cedagova.reader.account.library.BookImportState
+import com.cedagova.reader.account.library.ImportOffer
+import com.cedagova.reader.account.library.ImportProblem
+import com.cedagova.reader.account.library.ImportsOff
+import com.cedagova.reader.account.library.PublicationSourceProblem
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.imports.PublicationImportRecord
 import com.cedagova.reader.library.imports.PublicationImportStep
@@ -69,8 +76,8 @@ class AccountImportsTest {
         AccountImports(
             gateway = gateway,
             records = records,
-            sources = DeviceBookSources(documents),
-            bookForId = catalog::get,
+            sources = DeviceBookSources(documents, catalog::get),
+            identity = CatalogBookIdentity,
             onImportReady = { syncs++ },
             accountState = account,
             scope = scope,

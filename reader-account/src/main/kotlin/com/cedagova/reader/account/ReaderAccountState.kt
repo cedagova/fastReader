@@ -29,8 +29,9 @@ public sealed interface ReaderAccountState {
     }
 
     /**
-     * A build without the stage values: [missingValues] names the absent
-     * `local.properties` keys, every action is absent, and nothing is called.
+     * A build without the account values: [missingValues] names the absent
+     * configuration keys (FastReader's are `local.properties` keys), every
+     * action is absent, and nothing is called.
      * `ReaderAuthException.NotConfigured` is this state, not an error.
      */
     public data class NotConfigured(val missingValues: List<String>) : ReaderAccountState {
@@ -83,9 +84,9 @@ public enum class AccountActivity {
  * What the last operation came back with. The first five are successes the
  * session state alone cannot express; the rest map one-to-one onto the
  * branches of `ReaderAuthException`, carrying the provider's or the backend's
- * code and the backend's request id so the screen can quote them. The app
+ * code and the backend's request id so the screen can quote them. The host
  * classifies nothing itself: [ReaderAccountController] converts each branch
- * to its twin here and does nothing else with it.
+ * to its [Failure] twin here and does nothing else with it.
  */
 public sealed interface AccountOutcome {
 
@@ -103,37 +104,49 @@ public sealed interface AccountOutcome {
     /** Every other device's session was revoked; this one stays. */
     public data object OtherDevicesSignedOut : AccountOutcome
 
+    /**
+     * The members that are `ReaderAuthException` branches: what
+     * `ReaderAuthException.toOutcome()` returns (`AccountErrors.kt`, #200), and
+     * what the download and import rows are projected from, so the three
+     * surfaces classify a failure once.
+     */
+    public sealed interface Failure : AccountOutcome
+
     /** `ReaderAuthException.ProviderRejected`: a wrong code or password, a weak password, an unknown address. */
-    public data class ProviderRejected(val status: Int, val code: String?, val description: String) : AccountOutcome
+    public data class ProviderRejected(val status: Int, val code: String?, val description: String) : Failure
 
     /** `ReaderAuthException.TryLater`: a rate limit or a server failure after the library's one retry; nothing was changed. */
-    public data class TryLater(val status: Int, val code: String?, val retryAfterSeconds: Long?, val requestId: String?) :
-        AccountOutcome
+    public data class TryLater(
+        val status: Int,
+        val code: String?,
+        val retryAfterSeconds: Long?,
+        val requestId: String?,
+    ) : Failure
 
     /** `ReaderAuthException.NetworkUnavailable`: nothing was sent and nothing was cleared. */
-    public data object NetworkUnavailable : AccountOutcome
+    public data object NetworkUnavailable : Failure
 
     /** `ReaderAuthException.ConfigurationMismatch`: refused before any provider call, with the library's reason. */
-    public data class ConfigurationMismatch(val reason: String) : AccountOutcome
+    public data class ConfigurationMismatch(val reason: String) : Failure
 
     /** `ReaderAuthException.SignInUnavailable`: the server does not allow this sign-in now (#160); nothing was sent. */
-    public data class SignInUnavailable(val reason: String) : AccountOutcome
+    public data class SignInUnavailable(val reason: String) : Failure
 
     /** `ReaderAuthException.SignedOut`: the server rejected the session and the library cleared it. Shown once. */
-    public data class SessionGone(val code: String?, val requestId: String?) : AccountOutcome
+    public data class SessionGone(val code: String?, val requestId: String?) : Failure
 
     /** `ReaderAuthException.Forbidden`: authenticated but not allowed; the session is intact. */
-    public data class Forbidden(val code: String?, val requestId: String?) : AccountOutcome
+    public data class Forbidden(val code: String?, val requestId: String?) : Failure
 
     /** `ReaderAuthException.ApiError`: any other reader-api answer, with its code and request id; the session is intact. */
     public data class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String) :
-        AccountOutcome
+        Failure
 
     /** `ReaderAuthException.StorageUnavailable`: signed in for this run, but the device could not save the session. */
-    public data object StorageUnavailable : AccountOutcome
+    public data object StorageUnavailable : Failure
 
     /** `ReaderAuthException.UnexpectedResponse`: the sign-in service's answer could not be read (#191); nothing was changed. */
-    public data object UnexpectedResponse : AccountOutcome
+    public data object UnexpectedResponse : Failure
 }
 
 /** A `reader.capabilities.v1` document as returned, pretty-printed, and the request id of the call that fetched it (REQ-407). */

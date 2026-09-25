@@ -1,6 +1,7 @@
 package com.cedagova.reader.account.library
 
-import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.account.toDownloadRefusal
+import com.cedagova.reader.account.toOutcome
 import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.reader.library.sync.AccountLibraryState
@@ -239,7 +240,7 @@ public enum class DownloadProblem {
     FAILED,
 
     /**
-     * The storage provider sent the download to another origin, and FastReader
+     * The storage provider sent the download to another origin, and this module
      * would not send the book's signed grant there (#142). The same grant
      * would meet the same redirect, so this is not offered again.
      */
@@ -274,31 +275,6 @@ private fun CopyOutcome.refusal(): BookDownloadState.Refused = when (this) {
 
     is CopyOutcome.Unavailable -> BookDownloadState.Refused(DownloadProblem.UNAVAILABLE)
 
-    is CopyOutcome.GrantFailed -> when (val e = error) {
-        is ReaderAuthException.NetworkUnavailable ->
-            BookDownloadState.Refused(DownloadProblem.OFFLINE, retryable = true)
-
-        is ReaderAuthException.TryLater ->
-            BookDownloadState.Refused(
-                problem = DownloadProblem.REFUSED,
-                code = e.code ?: "HTTP ${e.status}",
-                requestId = e.requestId,
-                retryable = true,
-            )
-
-        is ReaderAuthException.Forbidden ->
-            BookDownloadState.Refused(DownloadProblem.REFUSED, code = e.code ?: "403", requestId = e.requestId)
-
-        is ReaderAuthException.SignedOut ->
-            BookDownloadState.Refused(DownloadProblem.REFUSED, code = e.code, requestId = e.requestId)
-
-        is ReaderAuthException.ApiError ->
-            BookDownloadState.Refused(
-                problem = DownloadProblem.REFUSED,
-                code = e.code ?: "HTTP ${e.status}",
-                requestId = e.requestId,
-            )
-
-        else -> BookDownloadState.Refused(DownloadProblem.REFUSED)
-    }
+    // The grant's failure is classified once, in AccountErrors.kt (#200).
+    is CopyOutcome.GrantFailed -> error.toOutcome().toDownloadRefusal()
 }

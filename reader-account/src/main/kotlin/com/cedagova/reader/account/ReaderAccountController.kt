@@ -38,7 +38,8 @@ public interface ReaderAccountActions {
  * ## What it does not do
  *
  * It classifies no error — each `ReaderAuthException` branch becomes its
- * [AccountOutcome] twin and nothing else — retries nothing, and never re-sends
+ * [AccountOutcome.Failure] twin (`toOutcome`, in `AccountErrors.kt`) and
+ * nothing else — retries nothing, and never re-sends
  * or re-verifies a code: every tap is exactly one gateway call, and a second
  * tap while one is in flight is ignored rather than queued. `NotConfigured`
  * is a state, not an outcome: a controller built with no gateway reports
@@ -108,10 +109,11 @@ public class ReaderAccountController(
         null
     }
 
-    override fun signInWithPassword(email: String, password: String): Unit = run(AccountActivity.SIGNING_IN_WITH_PASSWORD) {
-        it.signInWithPassword(email, password)
-        null
-    }
+    override fun signInWithPassword(email: String, password: String): Unit =
+        run(AccountActivity.SIGNING_IN_WITH_PASSWORD) {
+            it.signInWithPassword(email, password)
+            null
+        }
 
     override fun requestRecoveryCode(email: String): Unit = run(AccountActivity.REQUESTING_RECOVERY_CODE) {
         it.requestRecoveryCode(email)
@@ -181,25 +183,4 @@ public class ReaderAccountController(
     private companion object {
         val pretty = Json { prettyPrint = true }
     }
-}
-
-/**
- * The branch-to-outcome map, total over the sealed class so a branch the
- * library adds later fails to compile here rather than falling into a
- * catch-all. `NotConfigured` cannot reach a controller that has a gateway —
- * the application builds one only for a configured client — but the map
- * stays total; it is reported as a mismatch naming the library's own message.
- */
-internal fun ReaderAuthException.toOutcome(): AccountOutcome = when (this) {
-    is ReaderAuthException.NotConfigured -> AccountOutcome.ConfigurationMismatch(message.orEmpty())
-    is ReaderAuthException.ConfigurationMismatch -> AccountOutcome.ConfigurationMismatch(reason)
-    is ReaderAuthException.SignInUnavailable -> AccountOutcome.SignInUnavailable(reason)
-    is ReaderAuthException.NetworkUnavailable -> AccountOutcome.NetworkUnavailable
-    is ReaderAuthException.TryLater -> AccountOutcome.TryLater(status, code, retryAfter?.inWholeSeconds, requestId)
-    is ReaderAuthException.SignedOut -> AccountOutcome.SessionGone(code, requestId)
-    is ReaderAuthException.Forbidden -> AccountOutcome.Forbidden(code, requestId)
-    is ReaderAuthException.ProviderRejected -> AccountOutcome.ProviderRejected(status, code, description)
-    is ReaderAuthException.ApiError -> AccountOutcome.ApiError(status, code, requestId, description)
-    is ReaderAuthException.StorageUnavailable -> AccountOutcome.StorageUnavailable
-    is ReaderAuthException.UnexpectedResponse -> AccountOutcome.UnexpectedResponse
 }

@@ -51,8 +51,8 @@ class ReaderAccountManifestTest {
         val included = Regex("""include\("([^"]+)"\)""").findAll(settings).map { it.groupValues[1] }.toList()
         // The exact module list, so a module reappearing (or the retired host
         // returning) is a deliberate edit here. :reader-library joined in #112,
-        // :reader-engine in #201.
-        assertEquals(listOf(":app", ":reader-auth", ":reader-library", ":reader-engine"), included)
+        // :reader-engine in #201, :reader-account in #200.
+        assertEquals(listOf(":app", ":reader-auth", ":reader-library", ":reader-engine", ":reader-account"), included)
     }
 
     /**

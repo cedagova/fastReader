@@ -1,5 +1,6 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.account.library.ResumeOfferRecords
 import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.reader.library.sync.AccountHostRecords
 import kotlinx.serialization.json.JsonPrimitive
@@ -32,10 +33,13 @@ val AccountBook.resumeOfferSettledFor: String?
  * [resumeOfferSettledFor] host record through the engine's single writer and
  * that is all. A book the account has no row for is skipped rather than
  * invented — there is nothing to have been offered for.
+ *
+ * FastReader's [ResumeOfferRecords], the shelf's host seam in `:reader-account`
+ * (#200): whether a reader is offered a resume at all is this app's UX policy.
  */
-class AccountResumeOffers(private val records: AccountHostRecords) {
+class AccountResumeOffers(private val records: AccountHostRecords) : ResumeOfferRecords {
 
-    suspend fun settle(bookId: String, changeKey: String) {
+    override suspend fun settle(bookId: String, changeKey: String) {
         records.updateBookHostRecord(bookId, KEY) { JsonPrimitive(changeKey) }
     }
 
