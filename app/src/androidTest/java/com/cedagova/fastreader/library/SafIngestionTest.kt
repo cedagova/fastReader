@@ -209,3 +209,5 @@ class SafIngestionTest {
         val FILES_COLLECTION = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
     }
 }
+
+private val brokenOnPurpose: Int = thisSymbolDoesNotExist()
