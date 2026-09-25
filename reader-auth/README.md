@@ -38,6 +38,11 @@ contract's constants live in `ReaderAuthPolicy`, and the unit tests under
 pin each rule; the real Keystore path and the stage flow are proven on an
 emulator from FastReader, the library's host (`docs/evidence/100/`).
 
+A host takes this module as a source copy at a tag `reader-auth/v<version>`
+(#207): [docs/library-consumption.md](../docs/library-consumption.md) lists
+what to copy and how. The version is `version` in `build.gradle.kts`, and
+[CHANGELOG.md](CHANGELOG.md) records what changed between two versions.
+
 ## What the library declares for its hosts
 
 `src/main/AndroidManifest.xml` declares `android.permission.INTERNET`. It is

@@ -153,6 +153,17 @@ should.
 Drift is a proposal to Chunipers (reader-api #511 / #512), never a local
 workaround.
 
+## Taking it into another repository
+
+A host copies this directory, with `:reader-auth` and the shared build pieces,
+at a tag `reader-library/v<version>`: the copy set, the steps and the check are
+in [docs/library-consumption.md](../docs/library-consumption.md) (#207). The
+version is `version` in `build.gradle.kts`; [CHANGELOG.md](CHANGELOG.md) says
+what changed between two versions, and every change to this module adds an
+entry. `consumer-rules.pro` keeps this module's own `@Serializable` types for
+a shrinking host, and `scripts/library-copy-check.sh` proves it keeps them
+without `:reader-auth`'s rules.
+
 ## Running its tests
 
 ```bash

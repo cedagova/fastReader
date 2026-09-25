@@ -2,9 +2,10 @@
 # defines (docs/agent-first-development.md): isolated tests, the rendered-UI
 # golden diff, and static analysis. It also builds what ships: the release
 # variant's R8 minification (the step that applies every keep rule, the app's
-# and each library's consumer rules) and the compile of every instrumented-test
-# source set. Any failure turns the run red, and scripts/release.sh refuses to
-# publish a commit this workflow has not passed on.
+# and each library's consumer rules), the libraries as a source copy in a
+# standalone host, and the compile of every instrumented-test source set. Any
+# failure turns the run red, and scripts/release.sh refuses to publish a commit
+# this workflow has not passed on.
 #
 # The golden step is a hard gate: tolerances are never loosened to make this job
 # pass. See docs/agent-first-development.md for the platform the goldens are
@@ -81,6 +82,15 @@ jobs:
       - name: R8 release minification
         if: ${{ !cancelled() }}
         run: ./gradlew --no-daemon :app:minifyReleaseWithR8
+
+      # The libraries as another repository takes them: a source copy
+      # (docs/library-consumption.md). The script copies the listed files and
+      # catalog entries into a throwaway standalone project, runs its minified
+      # build and the copied contract tests, and fails if a library's own keep
+      # rules no longer keep its serialized types under R8.
+      - name: Library copy check
+        if: ${{ !cancelled() }}
+        run: scripts/library-copy-check.sh --no-daemon
 
       # Instrumented tests run on a device, which this job has not; compiling
       # every module's androidTest sources still catches a source that no
