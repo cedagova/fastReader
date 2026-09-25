@@ -1,9 +1,9 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
-import com.cedagova.fastreader.epub.ArchiveOpen
-import com.cedagova.fastreader.epub.ArchiveReadStrategy
-import com.cedagova.fastreader.epub.EpubArchives
-import com.cedagova.fastreader.epub.EpubFixtures
+import com.cedagova.reader.engine.epub.ArchiveOpen
+import com.cedagova.reader.engine.epub.ArchiveReadStrategy
+import com.cedagova.reader.engine.epub.EpubArchives
+import com.cedagova.reader.engine.epub.EpubFixtures
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -225,11 +225,11 @@ class ReaderOpenCostTest {
         return readSoFar()
     }
 
-    private fun strategyFor(source: com.cedagova.fastreader.epub.EpubByteSource): ArchiveReadStrategy =
+    private fun strategyFor(source: com.cedagova.reader.engine.epub.EpubByteSource): ArchiveReadStrategy =
         (EpubArchives.open(source) as ArchiveOpen.Opened).archive.use { it.strategy }
 
     private suspend fun parsed(
-        source: com.cedagova.fastreader.epub.EpubByteSource,
+        source: com.cedagova.reader.engine.epub.EpubByteSource,
         identity: BookIdentity? = this.identity,
     ): BookContent {
         val result = pipeline.parse(source, identity)

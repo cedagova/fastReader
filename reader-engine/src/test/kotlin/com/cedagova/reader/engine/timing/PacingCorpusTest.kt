@@ -1,13 +1,13 @@
-package com.cedagova.fastreader.timing
+package com.cedagova.reader.engine.timing
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.ContentBlock
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.content.Tokenizer
-import com.cedagova.fastreader.content.WordClass
-import com.cedagova.fastreader.content.WordClassifier
-import com.cedagova.fastreader.content.WordToken
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.ContentBlock
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.content.Tokenizer
+import com.cedagova.reader.engine.content.WordClass
+import com.cedagova.reader.engine.content.WordClassifier
+import com.cedagova.reader.engine.content.WordToken
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

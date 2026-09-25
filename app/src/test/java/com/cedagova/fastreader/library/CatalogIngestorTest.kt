@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.store.CoverStore
+import com.cedagova.reader.engine.epub.EpubFixtures
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -271,7 +271,7 @@ class CatalogIngestorTest {
             covers = covers,
             inspect = { source ->
                 inspections++
-                com.cedagova.fastreader.epub.EpubInspector.inspect(source)
+                com.cedagova.reader.engine.epub.EpubInspector.inspect(source)
             },
             clock = { now },
         )
@@ -371,7 +371,7 @@ class CatalogIngestorTest {
             covers = covers,
             inspect = { source ->
                 inspections++
-                com.cedagova.fastreader.epub.EpubInspector.inspect(source)
+                com.cedagova.reader.engine.epub.EpubInspector.inspect(source)
             },
             clock = { now },
         )

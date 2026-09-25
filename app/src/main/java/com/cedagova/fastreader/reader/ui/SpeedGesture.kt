@@ -2,7 +2,7 @@ package com.cedagova.fastreader.reader.ui
 
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.timing.RsvpTiming
 import kotlin.math.roundToInt
 
 /*

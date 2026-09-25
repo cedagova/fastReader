@@ -2,7 +2,7 @@ package com.cedagova.fastreader.reader.ui
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.content.ContentFailureReason
+import com.cedagova.reader.engine.content.ContentFailureReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

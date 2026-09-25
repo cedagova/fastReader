@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 /**
  * A book's content-derived identity: the SHA-256 of the whole file, as

@@ -1,11 +1,11 @@
 package com.cedagova.fastreader.external
 
-import com.cedagova.fastreader.content.BookDigest
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.library.DocumentGateway
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.reader.BookOrigin
+import com.cedagova.reader.engine.content.BookDigest
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.epub.EpubByteSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

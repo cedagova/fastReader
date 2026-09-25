@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.reader.ReaderFixtures
+import com.cedagova.reader.engine.content.BookContent
 import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
 import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
 import com.cedagova.reader.library.model.PORTABLE_SEMANTICS_VERSION

@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking

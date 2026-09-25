@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.epub
+package com.cedagova.reader.engine.epub
 
 /**
  * Result of inspecting one candidate EPUB file.

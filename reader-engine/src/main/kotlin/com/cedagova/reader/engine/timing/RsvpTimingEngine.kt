@@ -1,9 +1,9 @@
-package com.cedagova.fastreader.timing
+package com.cedagova.reader.engine.timing
 
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.content.WordClass
-import com.cedagova.fastreader.content.WordToken
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.content.WordClass
+import com.cedagova.reader.engine.content.WordToken
 import kotlin.math.roundToLong
 
 /**
@@ -78,7 +78,7 @@ import kotlin.math.roundToLong
  *    engine a new one on the next token. Nothing is cached, nothing restarts,
  *    and because the ramp is a multiplier on the *current* target the pacing
  *    changes without a discontinuity (REQ-012).
- * 5. **Every token gets a duration**, including [com.cedagova.fastreader.content.SkipMarkerToken];
+ * 5. **Every token gets a duration**, including [com.cedagova.reader.engine.content.SkipMarkerToken];
  *    the scheduler needs no type switch.
  */
 public object RsvpTimingEngine {

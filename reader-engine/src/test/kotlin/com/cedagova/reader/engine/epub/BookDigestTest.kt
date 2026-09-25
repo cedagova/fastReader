@@ -1,7 +1,7 @@
-package com.cedagova.fastreader.epub
+package com.cedagova.reader.engine.epub
 
-import com.cedagova.fastreader.content.BookDigest
-import com.cedagova.fastreader.content.ContentFixtures
+import com.cedagova.reader.engine.content.BookDigest
+import com.cedagova.reader.engine.content.ContentFixtures
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

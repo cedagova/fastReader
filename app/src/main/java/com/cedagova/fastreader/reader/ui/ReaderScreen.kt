@@ -103,9 +103,9 @@ import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ResumeOffer
 import com.cedagova.fastreader.settings.CueSettings
-import com.cedagova.fastreader.timing.RsvpTiming
 import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WidthAware
+import com.cedagova.reader.engine.timing.RsvpTiming
 import kotlin.math.roundToInt
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
@@ -943,7 +943,7 @@ private fun ColumnScope.FullSurface(content: @Composable () -> Unit) {
  * The paragraph is rebuilt from each token's own text and the exact separator that
  * followed it, so it reads as the book sets it — `—¿Quién teme a la máquina?
  * —preguntó ella—.`, not the bare word list increment 002 showed here. That is
- * the whole reason [com.cedagova.fastreader.content.WordToken] carries its
+ * the whole reason [com.cedagova.reader.engine.content.WordToken] carries its
  * punctuation: a paused reader is reading prose, and prose without its
  * punctuation is materially harder to pick a thread up from.
  */

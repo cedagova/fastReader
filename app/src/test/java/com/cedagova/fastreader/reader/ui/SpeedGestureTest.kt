@@ -1,6 +1,6 @@
 package com.cedagova.fastreader.reader.ui
 
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.timing.RsvpTiming
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

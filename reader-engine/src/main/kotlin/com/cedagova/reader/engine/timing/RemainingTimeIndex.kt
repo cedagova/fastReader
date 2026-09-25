@@ -1,6 +1,6 @@
-package com.cedagova.fastreader.timing
+package com.cedagova.reader.engine.timing
 
-import com.cedagova.fastreader.content.BookContent
+import com.cedagova.reader.engine.content.BookContent
 
 /**
  * Time remaining at the current speed (REQ-017), in constant time per word.
@@ -39,7 +39,7 @@ public class RemainingTimeIndex private constructor(
 
     /**
      * The book's mean multiplier at [pauseStrength] — `suffix[0] / tokens` — which
-     * is [com.cedagova.fastreader.timing.TimingSettings.meanMultiplier] for this
+     * is [com.cedagova.reader.engine.timing.TimingSettings.meanMultiplier] for this
      * book (#81). The same sweep that answers "how long is left" answers "how much
      * slower than the dial does this book run", so the reader gets both for one
      * pass. `1.0` for an empty stream, and never below `1.0`: every multiplier the
@@ -99,7 +99,7 @@ public class RemainingTimeIndex private constructor(
          * it is private there. [REFERENCE] disables the ramp as well, so the two
          * agree even if that private constant ever moves.
          */
-        private val STEADY_REFERENCE = com.cedagova.fastreader.timing.TimingState(
+        private val STEADY_REFERENCE = com.cedagova.reader.engine.timing.TimingState(
             elapsedPlaybackMillis = RsvpTiming.RAMP_DURATION_MILLIS,
             reorientationPending = false,
         )

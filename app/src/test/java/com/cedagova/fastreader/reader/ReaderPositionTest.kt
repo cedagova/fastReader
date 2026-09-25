@@ -1,12 +1,12 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContentResult
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.content.ContentPipelineVersion
-import com.cedagova.fastreader.content.EpubContentPipeline
-import com.cedagova.fastreader.content.TokenPosition
-import com.cedagova.fastreader.epub.EpubFixtures
+import com.cedagova.reader.engine.content.BookContentResult
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.content.ContentPipelineVersion
+import com.cedagova.reader.engine.content.EpubContentPipeline
+import com.cedagova.reader.engine.content.TokenPosition
+import com.cedagova.reader.engine.epub.EpubFixtures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -105,7 +105,7 @@ class ReaderPositionTest {
         val reopened = ReaderSession(
             content = book,
             index = stored.resolveIndex(book),
-            settings = com.cedagova.fastreader.timing.TimingSettings(wpm = stored.wpm),
+            settings = com.cedagova.reader.engine.timing.TimingSettings(wpm = stored.wpm),
         )
 
         assertEquals(31, reopened.index)

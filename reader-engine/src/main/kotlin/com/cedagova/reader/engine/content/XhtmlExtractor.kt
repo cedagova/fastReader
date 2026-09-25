@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 /**
  * One block of a content document, in reading order.

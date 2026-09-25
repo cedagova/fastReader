@@ -2,15 +2,15 @@ package com.cedagova.fastreader.reader
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.BookContentResult
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.reader.ui.ReaderBookView
 import com.cedagova.fastreader.reader.ui.ReaderUiState
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RsvpTiming
-import com.cedagova.fastreader.timing.TimingSettings
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.BookContentResult
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.content.EpubContentPipeline
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RsvpTiming
+import com.cedagova.reader.engine.timing.TimingSettings
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

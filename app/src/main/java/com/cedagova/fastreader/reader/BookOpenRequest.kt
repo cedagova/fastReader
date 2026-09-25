@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.epub.EpubByteSource
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.epub.EpubByteSource
 
 /**
  * Where the book being opened came from, and therefore what the app may do with

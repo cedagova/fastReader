@@ -1,11 +1,11 @@
-package com.cedagova.fastreader.timing
+package com.cedagova.reader.engine.timing
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.BookContentResult
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.content.EpubContentPipeline
-import com.cedagova.fastreader.content.WordToken
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.BookContentResult
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.content.EpubContentPipeline
+import com.cedagova.reader.engine.content.WordToken
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest

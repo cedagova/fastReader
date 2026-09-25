@@ -1,13 +1,13 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.Chapter
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RsvpTiming
-import com.cedagova.fastreader.timing.RsvpTimingEngine
-import com.cedagova.fastreader.timing.TimingSettings
-import com.cedagova.fastreader.timing.TimingState
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.Chapter
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RsvpTiming
+import com.cedagova.reader.engine.timing.RsvpTimingEngine
+import com.cedagova.reader.engine.timing.TimingSettings
+import com.cedagova.reader.engine.timing.TimingState
 
 /**
  * The reader's state machine (LEAF203): where in the book we are, whether the

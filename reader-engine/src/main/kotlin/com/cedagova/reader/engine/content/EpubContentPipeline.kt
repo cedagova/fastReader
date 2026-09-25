@@ -1,11 +1,11 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
-import com.cedagova.fastreader.epub.ArchiveOpen
-import com.cedagova.fastreader.epub.EpubArchive
-import com.cedagova.fastreader.epub.EpubArchives
-import com.cedagova.fastreader.epub.EpubByteSource
-import com.cedagova.fastreader.epub.EpubPaths
-import com.cedagova.fastreader.epub.OpfDocument
+import com.cedagova.reader.engine.epub.ArchiveOpen
+import com.cedagova.reader.engine.epub.EpubArchive
+import com.cedagova.reader.engine.epub.EpubArchives
+import com.cedagova.reader.engine.epub.EpubByteSource
+import com.cedagova.reader.engine.epub.EpubPaths
+import com.cedagova.reader.engine.epub.OpfDocument
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers

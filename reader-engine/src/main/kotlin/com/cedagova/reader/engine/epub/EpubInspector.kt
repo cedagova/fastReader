@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.epub
+package com.cedagova.reader.engine.epub
 
 import org.w3c.dom.Element
 
@@ -237,7 +237,7 @@ internal class OpfDocument(
          * individual front-matter pages — `cover`, `title-page`, `copyright-page`
          * — and a list of what to skip is a weaker statement than a pointer at
          * what to start from: it says nothing about the pages it does not
-         * mention. [com.cedagova.fastreader.content.FrontMatterDetector] wants one
+         * mention. [com.cedagova.reader.engine.content.FrontMatterDetector] wants one
          * unambiguous answer or none.
          */
         private fun resolveGuideText(opfPath: String, elements: List<Element>): String? = elements

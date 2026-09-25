@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
@@ -8,7 +8,7 @@ import java.nio.charset.CodingErrorAction
  * A deliberately small, lenient scanner over EPUB markup.
  *
  * Why not a DOM parser: the package document is well-formed XML and
- * [com.cedagova.fastreader.epub.SafeXml] handles it, but *content* documents are
+ * [com.cedagova.reader.engine.epub.SafeXml] handles it, but *content* documents are
  * the sloppy part of a real library. They carry `&nbsp;` with no DTD in reach
  * (external entity loading is off, as it must be for untrusted files), stray
  * `<br>`, mismatched tags, and EPUB 2 files that are HTML wearing an XHTML

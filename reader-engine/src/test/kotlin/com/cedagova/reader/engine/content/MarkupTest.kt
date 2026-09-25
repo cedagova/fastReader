@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 import java.nio.charset.Charset
 import org.junit.Assert.assertEquals

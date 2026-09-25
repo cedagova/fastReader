@@ -28,8 +28,6 @@ import com.cedagova.fastreader.R
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.PortableReadingPosition
 import com.cedagova.fastreader.account.library.resumeOfferSettledFor
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.external.ExternalOpen
 import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.LibraryRepository
@@ -46,6 +44,8 @@ import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ReaderViewModel
 import com.cedagova.fastreader.reader.ResumeOffer
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.TokenPosition
 import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.RemoteReadingPosition
 import kotlin.math.roundToInt

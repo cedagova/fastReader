@@ -3,8 +3,6 @@ package com.cedagova.fastreader.reader.ui
 import com.cedagova.fastreader.account.library.AccountResumeOffers
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.RecordingHostRecords
-import com.cedagova.fastreader.content.TokenPosition
-import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.CatalogIngestor
 import com.cedagova.fastreader.library.FakeDocumentGateway
 import com.cedagova.fastreader.library.LibraryRepository
@@ -12,6 +10,8 @@ import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderPosition
+import com.cedagova.reader.engine.content.TokenPosition
+import com.cedagova.reader.engine.epub.EpubFixtures
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.reader.library.sync.AccountLibraryActions

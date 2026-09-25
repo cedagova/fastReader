@@ -1,13 +1,13 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.content.BookContentResult
-import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.content.EpubContentPipeline
-import com.cedagova.fastreader.epub.ArchiveOpen
-import com.cedagova.fastreader.epub.ArchiveReadStrategy
-import com.cedagova.fastreader.epub.EpubArchives
-import com.cedagova.fastreader.epub.EpubFixtures
-import com.cedagova.fastreader.epub.FileEpubByteSource
+import com.cedagova.reader.engine.content.BookContentResult
+import com.cedagova.reader.engine.content.BookIdentity
+import com.cedagova.reader.engine.content.EpubContentPipeline
+import com.cedagova.reader.engine.epub.ArchiveOpen
+import com.cedagova.reader.engine.epub.ArchiveReadStrategy
+import com.cedagova.reader.engine.epub.EpubArchives
+import com.cedagova.reader.engine.epub.EpubFixtures
+import com.cedagova.reader.engine.epub.FileEpubByteSource
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest

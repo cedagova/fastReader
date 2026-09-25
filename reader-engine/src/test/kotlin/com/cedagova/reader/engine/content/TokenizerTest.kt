@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 /**
  * The bounded word heuristics the timing engine needs.

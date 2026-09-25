@@ -1,6 +1,6 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
-import com.cedagova.fastreader.epub.EpubByteSource
+import com.cedagova.reader.engine.epub.EpubByteSource
 import java.security.MessageDigest
 
 /**

@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.epub
+package com.cedagova.reader.engine.epub
 
 import java.io.ByteArrayInputStream
 import javax.xml.XMLConstants

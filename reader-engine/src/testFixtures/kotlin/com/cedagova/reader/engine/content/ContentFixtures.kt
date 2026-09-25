@@ -1,8 +1,8 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
-import com.cedagova.fastreader.epub.EpubByteSource
-import com.cedagova.fastreader.epub.EpubFixtures
-import com.cedagova.fastreader.epub.TestByteChannel
+import com.cedagova.reader.engine.epub.EpubByteSource
+import com.cedagova.reader.engine.epub.EpubFixtures
+import com.cedagova.reader.engine.epub.TestByteChannel
 import java.io.ByteArrayInputStream
 import java.nio.charset.Charset
 

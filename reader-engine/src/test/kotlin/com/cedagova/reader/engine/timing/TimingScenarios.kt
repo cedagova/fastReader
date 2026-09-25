@@ -1,11 +1,11 @@
-package com.cedagova.fastreader.timing
+package com.cedagova.reader.engine.timing
 
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.SkipKind
-import com.cedagova.fastreader.content.SkipMarkerToken
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.content.WordClass
-import com.cedagova.fastreader.content.WordToken
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.SkipKind
+import com.cedagova.reader.engine.content.SkipMarkerToken
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.content.WordClass
+import com.cedagova.reader.engine.content.WordToken
 
 /**
  * The canonical duration table.

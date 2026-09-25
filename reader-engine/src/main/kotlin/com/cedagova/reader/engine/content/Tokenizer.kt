@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 /**
  * Turns extracted blocks into the word/marker stream.

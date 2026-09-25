@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 /**
  * Where a book's body starts, when the book says so plainly enough to act on

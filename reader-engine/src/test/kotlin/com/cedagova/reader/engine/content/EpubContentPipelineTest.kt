@@ -1,6 +1,6 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
-import com.cedagova.fastreader.epub.EpubFixtures
+import com.cedagova.reader.engine.epub.EpubFixtures
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest

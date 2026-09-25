@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.epub
+package com.cedagova.reader.engine.epub
 
 /**
  * The entries of one archive, however they had to be reached.

@@ -1,6 +1,6 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
-import com.cedagova.fastreader.epub.EpubPaths
+import com.cedagova.reader.engine.epub.EpubPaths
 
 /**
  * Chapter titles, read from whichever table of contents the book carries.

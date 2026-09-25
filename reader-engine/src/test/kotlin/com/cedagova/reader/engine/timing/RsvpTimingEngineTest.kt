@@ -1,10 +1,10 @@
-package com.cedagova.fastreader.timing
+package com.cedagova.reader.engine.timing
 
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.content.WordClass
-import com.cedagova.fastreader.timing.TimingScenarios.skipMarker
-import com.cedagova.fastreader.timing.TimingScenarios.word
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.content.WordClass
+import com.cedagova.reader.engine.timing.TimingScenarios.skipMarker
+import com.cedagova.reader.engine.timing.TimingScenarios.word
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

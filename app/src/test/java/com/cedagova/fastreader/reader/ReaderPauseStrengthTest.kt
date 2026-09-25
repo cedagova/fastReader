@@ -1,15 +1,15 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.reader.ui.ReaderUiState
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RemainingTimeIndex
-import com.cedagova.fastreader.timing.RsvpTimingEngine
-import com.cedagova.fastreader.timing.TimingSettings
-import com.cedagova.fastreader.timing.TimingState
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.content.EpubContentPipeline
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RemainingTimeIndex
+import com.cedagova.reader.engine.timing.RsvpTimingEngine
+import com.cedagova.reader.engine.timing.TimingSettings
+import com.cedagova.reader.engine.timing.TimingState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

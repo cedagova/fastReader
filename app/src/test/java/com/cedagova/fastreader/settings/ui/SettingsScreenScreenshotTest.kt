@@ -15,8 +15,8 @@ import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
-import com.cedagova.fastreader.timing.PauseStrength
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.engine.timing.PauseStrength
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test

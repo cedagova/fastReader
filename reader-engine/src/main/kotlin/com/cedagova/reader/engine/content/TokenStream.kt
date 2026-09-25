@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.content
+package com.cedagova.reader.engine.content
 
 /*
  * The token stream model (AD-4) — the reader's internal contract.
@@ -300,7 +300,7 @@ public data class BookContent(
      * directory's per-entry names, uncompressed sizes and CRC-32 values.
      *
      * Not an identity and never a key — see
-     * [com.cedagova.fastreader.epub.StructuralFingerprint]. It exists so a stored
+     * [com.cedagova.reader.engine.epub.StructuralFingerprint]. It exists so a stored
      * position can be checked against the bytes actually opened, which
      * [bookDigest] can no longer do now that identity is handed to the reader
      * rather than derived from the file (AD-8).

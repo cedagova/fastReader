@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.timing
+package com.cedagova.reader.engine.timing
 
 import kotlinx.serialization.Serializable
 

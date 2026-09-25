@@ -1,11 +1,11 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.epub.EpubByteSource
-import com.cedagova.fastreader.epub.EpubInspection
-import com.cedagova.fastreader.epub.EpubInspector
-import com.cedagova.fastreader.epub.EpubRejectReason
-import com.cedagova.fastreader.epub.FileEpubByteSource
 import com.cedagova.fastreader.library.store.CoverStore
+import com.cedagova.reader.engine.epub.EpubByteSource
+import com.cedagova.reader.engine.epub.EpubInspection
+import com.cedagova.reader.engine.epub.EpubInspector
+import com.cedagova.reader.engine.epub.EpubRejectReason
+import com.cedagova.reader.engine.epub.FileEpubByteSource
 import java.io.File
 
 /** What one ingestion pass changed. */
