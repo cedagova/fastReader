@@ -9,6 +9,8 @@
 plugins {
     // The copied app convention, as a Reader client applies it.
     id("conventions.android.application")
+    // For the isolation canary (canary/IsolationCanary.kt) only.
+    alias(libs.plugins.kotlin.serialization)
 }
 
 fun listed(name: String): List<String> = rootProject.file(name).readLines().map(String::trim).filter(String::isNotEmpty)

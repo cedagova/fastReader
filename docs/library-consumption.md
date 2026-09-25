@@ -114,7 +114,8 @@ What each piece is for:
    build-logic runs against those plugin classes.
 5. Set `android.useAndroidX=true` in the host's `gradle.properties` — and
    `android.experimental.enableTestFixturesKotlinSupport=true`, which Kotlin
-   in the modules' test fixtures needs — and meet every library's host
+   in the modules' test fixtures needs (the copied build-logic stops the
+   build with this fix named when it is missing) — and meet every library's host
    obligations, listed together in
    [architecture.md](architecture.md#host-obligations-library-by-library)
    (for `:reader-auth`: configuration, backup exclusion, no cleartext in

@@ -323,6 +323,9 @@ run_release list-query-fails
 expect_guard_failure "list-query-fails" "could not list the published releases"
 GH_LIST=ok
 
+run_release target-not-a-commit --target no-such-ref
+expect_guard_failure "target-not-a-commit" "target no-such-ref is not a commit in this repository"
+
 GH_RUNS=fail
 run_release checks-query-fails
 expect_guard_failure "checks-query-fails" "could not read the hosted checks"

@@ -148,10 +148,26 @@ class ReaderLibraryContractTest {
         ReaderAssetGrantResponse.serializer() to "ReaderAssetGrantResponse",
     )
 
+    /**
+     * The models this module sends, each encoded with [ReaderLibraryJson]: a field
+     * the schema requires must survive that encoding (a defaulted one would be
+     * dropped if the JSON ever stopped encoding defaults).
+     */
+    private val sent: Set<KSerializer<*>> = setOf(
+        PutReaderProgressRequest.serializer(),
+        ReaderEpubLocatorV1.serializer(),
+        ReaderPortableLocationV1.serializer(),
+        ReaderPortablePublicationV1.serializer(),
+        ReaderSyncMutationBatchRequest.serializer(),
+        ReaderSyncMutationEnvelope.serializer(),
+        CreatePublicationImportRequest.serializer(),
+        CancelPublicationImportRequest.serializer(),
+    )
+
     /** The shared checker over this module's models, every one of them a whole shape. */
     private val checker = contract.checker(
         pinned.map { (serializer, schema) ->
-            ReaderApiContract.Pin(serializer, schema)
+            ReaderApiContract.Pin(serializer, schema, sentWith = ReaderLibraryJson.takeIf { serializer in sent })
         },
     )
 

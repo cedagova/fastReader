@@ -59,7 +59,7 @@ class ReaderAuthContractTest {
      * caught by [every model the module sends or reads is pinned to a schema].
      */
     private val pins: List<Pin> = listOf(
-        Pin(ReaderProfileUpdate.serializer(), "PutReaderProfileRequest", Fit.WHOLE),
+        Pin(ReaderProfileUpdate.serializer(), "PutReaderProfileRequest", Fit.WHOLE, sentWith = ReaderApiClient.json),
         Pin(PreAuthDocument.serializer(), "ReaderPreAuthResponse", Fit.READ_SUBSET),
         Pin(PreAuthDocument.Compatibility.serializer(), "ReaderPreAuthCompatibility", Fit.READ_SUBSET),
         Pin(PreAuthDocument.AccountEntry.serializer(), "ReaderPreAuthAccountEntry", Fit.READ_SUBSET),
@@ -262,6 +262,30 @@ class ReaderAuthContractTest {
             undecodable.any { it.contains("postAuth") && it.contains("no default") },
         )
 
+        // A field the schema requires, defaulted in the model and sent with a JSON
+        // that leaves defaults out, never reaches the server.
+        val omitsDefaults = Json { ignoreUnknownKeys = true }
+        val dropped = checker.violations(
+            DefaultedProgressRequest.serializer().descriptor,
+            "PutReaderProgressRequest",
+            Fit.WHOLE,
+            sentWith = omitsDefaults,
+        )
+        assertTrue(
+            "a required field dropped by encodeDefaults = false went unnoticed: $dropped",
+            dropped.any { it.contains("progress_percent") && it.contains("encodeDefaults") },
+        )
+        // The same model is sound when the default is written out after all.
+        assertEquals(
+            emptyList<String>(),
+            checker.violations(
+                DefaultedProgressRequest.serializer().descriptor,
+                "PutReaderProgressRequest",
+                Fit.WHOLE,
+                sentWith = Json(omitsDefaults) { encodeDefaults = true },
+            ).filter { it.contains("encodeDefaults") },
+        )
+
         // And the checker is not simply always angry: the real models are clean.
         assertEquals(
             emptyList<String>(),
@@ -338,5 +362,15 @@ class ReaderAuthContractTest {
     private data class UndecodablePreAuth(
         val configuration: PreAuthDocument.Configuration = PreAuthDocument.Configuration(),
         val postAuth: PreAuthDocument.PostAuth?,
+    )
+
+    /**
+     * `progress_percent` is required by the schema but defaulted here: a JSON
+     * that leaves defaults out sends the request without it whenever it is 0.
+     */
+    @Serializable
+    private data class DefaultedProgressRequest(
+        @SerialName("progress_percent") val progressPercent: Double = 0.0,
+        val location: JsonObject,
     )
 }
