@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.reader.auth.FakeCipher
 import com.cedagova.reader.auth.session
+import io.github.jan.supabase.auth.user.UserSession
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
@@ -91,7 +92,7 @@ class FileSessionStoreTest {
     fun `a saved session loads back intact`() = runTest {
         store.save(stored)
 
-        val loaded = store.load()
+        val loaded = store.load()?.value
 
         assertNotNull(loaded)
         assertEquals(stored.accessToken, loaded!!.accessToken)
@@ -176,7 +177,7 @@ class FileSessionStoreTest {
         }
 
         assertEquals("two saves shared a temp file: $temporaries", saves, temporaries.map { it.name }.toSet().size)
-        val loaded = runBlocking { store.load() }
+        val loaded = runBlocking { store.load()?.value }
         assertNotNull("the raced file did not load", loaded)
         assertTrue(loaded!!.accessToken in sessions.map { it.accessToken })
         assertEquals(listOf(FileSessionStore.FILE_NAME), store.file.parentFile!!.list()!!.toList())
@@ -204,7 +205,7 @@ class FileSessionStoreTest {
         }
 
         assertTrue(before.contentEquals(store.file.readBytes()))
-        assertEquals(stored.accessToken, store.load()?.accessToken)
+        assertEquals(stored.accessToken, store.load()?.value?.accessToken)
         assertEquals(
             "the failed save left a temp file",
             listOf(FileSessionStore.FILE_NAME),
@@ -222,6 +223,9 @@ class FileSessionStoreTest {
 
         assertEquals(emptyList<String>(), store.file.parentFile!!.list()!!.toList())
     }
+
+    /** The store holds the module's opaque [StoredSession]; these tests speak the provider record it wraps. */
+    private suspend fun SessionStore.save(session: UserSession) = save(StoredSession(session))
 
     private fun ByteArray.containsSlice(needle: ByteArray): Boolean {
         if (needle.isEmpty() || needle.size > size) return false

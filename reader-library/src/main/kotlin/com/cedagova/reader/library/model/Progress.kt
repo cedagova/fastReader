@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonObject
 
 /** `GET /v1/reader/progress` — every reading position the account holds. */
 @Serializable
-data class ReaderProgressListResponse(
+public data class ReaderProgressListResponse(
     @SerialName("request_id") val requestId: String,
     @SerialName("progress") val progress: List<ReaderProgress> = emptyList(),
     @SerialName("contract_version") val contractVersion: String = ReaderLibraryResponse.CONTRACT_VERSION,
@@ -29,7 +29,7 @@ data class ReaderProgressListResponse(
  * server fault to be seen, not a shape to paper over.
  */
 @Serializable
-data class ReaderProgress(
+public data class ReaderProgress(
     @SerialName("book_id") val bookId: String,
     /** 0-100 inclusive, as the document declares it. */
     @SerialName("progress_percent") val progressPercent: Double,
@@ -57,7 +57,7 @@ data class ReaderProgress(
  * `publication_id` differs from the envelope's `resource_id` — and constants.
  */
 @Serializable
-data class PutReaderProgressRequest(
+internal data class PutReaderProgressRequest(
     /** 0-100 inclusive. FastReader sends the whole percent the reader is shown. */
     @SerialName("progress_percent") val progressPercent: Double,
     @SerialName("location") val location: ReaderPortableLocationV1,
@@ -77,7 +77,7 @@ data class PutReaderProgressRequest(
  * reader-api requires [locator]'s `format` to equal [publication]'s.
  */
 @Serializable
-data class ReaderPortableLocationV1(
+public data class ReaderPortableLocationV1(
     @SerialName("contract_version") val contractVersion: String = PORTABLE_SEMANTICS_VERSION,
     @SerialName("publication") val publication: ReaderPortablePublicationV1,
     @SerialName("locator") val locator: JsonObject,
@@ -98,15 +98,15 @@ data class ReaderPortableLocationV1(
  * checks against the document's own enums.
  */
 @Serializable
-data class ReaderPortablePublicationV1(
+public data class ReaderPortablePublicationV1(
     @SerialName("publication_id") val publicationId: String,
     @SerialName("format") val format: String,
     @SerialName("media_type") val mediaType: String,
     @SerialName("source") val source: String,
 ) {
-    companion object {
+    public companion object {
         /** An EPUB the account holds, identified by the account's book id. */
-        fun accountEpub(bookId: String): ReaderPortablePublicationV1 = ReaderPortablePublicationV1(
+        public fun accountEpub(bookId: String): ReaderPortablePublicationV1 = ReaderPortablePublicationV1(
             publicationId = bookId,
             format = LOCATOR_FORMAT_EPUB,
             mediaType = MEDIA_TYPE_EPUB,
@@ -129,7 +129,7 @@ data class ReaderPortablePublicationV1(
  * into, and a fabricated one would be a precision this app does not have (A2).
  */
 @Serializable
-data class ReaderEpubLocatorV1(
+internal data class ReaderEpubLocatorV1(
     @SerialName("format") val format: String = LOCATOR_FORMAT_EPUB,
     @SerialName("href") val href: String? = null,
     @SerialName("progression") val progression: Double? = null,
@@ -138,13 +138,13 @@ data class ReaderEpubLocatorV1(
 )
 
 /** The `reader.portable-semantics.v1` constant every portable locator carries. */
-const val PORTABLE_SEMANTICS_VERSION: String = "reader.portable-semantics.v1"
+public const val PORTABLE_SEMANTICS_VERSION: String = "reader.portable-semantics.v1"
 
 /** The locator format discriminator for an EPUB. The only one FastReader writes. */
-const val LOCATOR_FORMAT_EPUB: String = "epub"
+public const val LOCATOR_FORMAT_EPUB: String = "epub"
 
 /** `ReaderPortablePublicationV1.media_type` for an EPUB; the document requires it to agree with `format`. */
-const val MEDIA_TYPE_EPUB: String = "application/epub+zip"
+public const val MEDIA_TYPE_EPUB: String = "application/epub+zip"
 
 /** `ReaderPortablePublicationV1.source` for a publication the account holds. */
-const val PUBLICATION_SOURCE_ACCOUNT: String = "account"
+public const val PUBLICATION_SOURCE_ACCOUNT: String = "account"

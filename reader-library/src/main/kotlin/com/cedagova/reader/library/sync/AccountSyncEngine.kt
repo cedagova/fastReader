@@ -44,41 +44,41 @@ import kotlinx.serialization.json.buildJsonObject
  * about the session. [Loading] means the stored session has not been read yet,
  * so nothing changes.
  */
-sealed interface AccountSession {
+public sealed interface AccountSession {
 
     /** The stored session has not been read yet. */
-    data object Loading : AccountSession
+    public data object Loading : AccountSession
 
     /** The host carries no service values, so there is no account to sync. */
-    data object NotConfigured : AccountSession
+    public data object NotConfigured : AccountSession
 
     /** Nobody is signed in. */
-    data object SignedOut : AccountSession
+    public data object SignedOut : AccountSession
 
     /** [userId] is the provider subject the session reports. */
-    data class SignedIn(val userId: String) : AccountSession
+    public data class SignedIn(val userId: String) : AccountSession
 }
 
 /** The account-library actions a host's shelf performs (LEAF703). */
-interface AccountLibraryActions {
+public interface AccountLibraryActions {
 
     /** The reader asked for a refresh. */
-    fun refresh()
+    public fun refresh()
 
     /** Remove [bookId] from the account library. */
-    fun removeFromAccount(bookId: String)
+    public fun removeFromAccount(bookId: String)
 
     /** The contract's immediate Undo of a removal: a `restore` of the same book. */
-    fun undoRemove(bookId: String)
+    public fun undoRemove(bookId: String)
 
     /** The book was opened: `reading`, and this device's clock as the last-opened time. */
-    fun recordOpened(bookId: String)
+    public fun recordOpened(bookId: String)
 
     /** The book was finished. */
-    fun recordFinished(bookId: String)
+    public fun recordFinished(bookId: String)
 
     /** Any other library status the shelf sets. */
-    fun recordStatus(bookId: String, status: ReaderLibraryStatus)
+    public fun recordStatus(bookId: String, status: ReaderLibraryStatus)
 
     /**
      * Publishes the portable position of an account book (REQ-511, AD-25).
@@ -93,7 +93,7 @@ interface AccountLibraryActions {
      * like one that moves forwards: `causal-progress-can-move-backward`, and the
      * backend's admission order decides who wins.
      */
-    fun recordPosition(bookId: String, position: LocalReadingPosition)
+    public fun recordPosition(bookId: String, position: LocalReadingPosition)
 }
 
 /**
@@ -108,19 +108,19 @@ interface AccountLibraryActions {
  * has exactly one writer, and a second one racing it would be the first way to
  * lose a queued mutation.
  */
-interface AccountImportRecords {
+public interface AccountImportRecords {
 
     /** The signed-in account's user id, or null when nobody is signed in. */
-    fun accountId(): String?
+    public fun accountId(): String?
 
     /** Every import this device has started for the signed-in account and not finished. */
-    suspend fun importRecords(): List<PublicationImportRecord>
+    public suspend fun importRecords(): List<PublicationImportRecord>
 
     /** Stores [record], replacing any earlier state of the same import. */
-    suspend fun putImportRecord(record: PublicationImportRecord)
+    public suspend fun putImportRecord(record: PublicationImportRecord)
 
     /** Forgets the import [clientImportId] names. */
-    suspend fun dropImportRecord(clientImportId: String)
+    public suspend fun dropImportRecord(clientImportId: String)
 }
 
 /**
@@ -131,7 +131,7 @@ interface AccountImportRecords {
  * is read back. Either way the record would be stored and then silently lost, so
  * the write is refused instead. [bookLevel] says which level the key was for.
  */
-class ReservedHostRecordKeyException(val key: String, val bookLevel: Boolean) :
+public class ReservedHostRecordKeyException(public val key: String, public val bookLevel: Boolean) :
     IllegalArgumentException(
         "\"$key\" is reserved by the account document ${if (bookLevel) "for a book row" else "at the top level"}; " +
             "a host record under it would be lost",
@@ -174,13 +174,13 @@ class ReservedHostRecordKeyException(val key: String, val bookLevel: Boolean) :
  * `host` — is refused with [ReservedHostRecordKeyException] before anything is
  * written (#149), because a record under it would be stored and then lost.
  */
-interface AccountHostRecords {
+public interface AccountHostRecords {
 
     /** The signed-in account's user id, or null when nobody is signed in. */
-    fun accountId(): String?
+    public fun accountId(): String?
 
     /** The document-level host record [key], or null when there is none or nobody is signed in. */
-    suspend fun hostRecord(key: String): JsonElement?
+    public suspend fun hostRecord(key: String): JsonElement?
 
     /**
      * Replaces the document-level host record [key] with what [transform]
@@ -190,7 +190,7 @@ interface AccountHostRecords {
      * engine. Throws [ReservedHostRecordKeyException] when [key] is in
      * [AccountLibraryCodec.RESERVED_DOCUMENT_KEYS].
      */
-    suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?)
+    public suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?)
 
     /**
      * Replaces the host record [key] on [bookId]'s row with what [transform]
@@ -201,7 +201,7 @@ interface AccountHostRecords {
      * engine. Throws [ReservedHostRecordKeyException] when [key] is in
      * [AccountLibraryCodec.RESERVED_BOOK_KEYS].
      */
-    suspend fun updateBookHostRecord(bookId: String, key: String, transform: (JsonElement?) -> JsonElement?)
+    public suspend fun updateBookHostRecord(bookId: String, key: String, transform: (JsonElement?) -> JsonElement?)
 }
 
 /**
@@ -252,7 +252,7 @@ interface AccountHostRecords {
  * backend no longer accepts arrives as `ReaderAuthException.SignedOut` and
  * ends in the same state, with the backend's reason shown once.
  */
-class AccountSyncEngine(
+public class AccountSyncEngine(
     private val gateway: ReaderLibraryGateway?,
     private val stores: AccountLibraryStores,
     accountState: Flow<AccountSession>,
@@ -282,7 +282,7 @@ class AccountSyncEngine(
     private val _state = MutableStateFlow(AccountLibraryState.SIGNED_OUT)
 
     /** The account library as the shelf builds from it. */
-    val state: StateFlow<AccountLibraryState> = _state.asStateFlow()
+    public val state: StateFlow<AccountLibraryState> = _state.asStateFlow()
 
     /** Written only under [mutex]; volatile because [accountId] reads it without the lock. */
     @Volatile
@@ -387,16 +387,17 @@ class AccountSyncEngine(
     }
 
     /** Run one sync. Safe to call from any trigger; concurrent calls queue on the same lock. */
-    fun requestSync(trigger: AccountSyncTrigger) {
+    public fun requestSync(trigger: AccountSyncTrigger) {
         checkNotInHostCallback()
         scope.launch { sync(trigger) }
     }
 
-    override fun refresh() = requestSync(AccountSyncTrigger.MANUAL_REFRESH)
+    override fun refresh(): Unit = requestSync(AccountSyncTrigger.MANUAL_REFRESH)
 
-    override fun removeFromAccount(bookId: String) = enqueue(bookId, ReaderMutationKind.DELETE, JsonObject(emptyMap()))
+    override fun removeFromAccount(bookId: String): Unit =
+        enqueue(bookId, ReaderMutationKind.DELETE, JsonObject(emptyMap()))
 
-    override fun undoRemove(bookId: String) = enqueue(bookId, ReaderMutationKind.RESTORE, JsonObject(emptyMap()))
+    override fun undoRemove(bookId: String): Unit = enqueue(bookId, ReaderMutationKind.RESTORE, JsonObject(emptyMap()))
 
     override fun recordOpened(bookId: String) {
         val at = now()
@@ -407,7 +408,7 @@ class AccountSyncEngine(
         enqueue(bookId, ReaderMutationKind.UPSERT, payload)
     }
 
-    override fun recordFinished(bookId: String) = recordStatus(bookId, ReaderLibraryStatus.FINISHED)
+    override fun recordFinished(bookId: String): Unit = recordStatus(bookId, ReaderLibraryStatus.FINISHED)
 
     override fun recordStatus(bookId: String, status: ReaderLibraryStatus) {
         val payload = buildJsonObject { put("status", JsonPrimitive(status.wireName())) }

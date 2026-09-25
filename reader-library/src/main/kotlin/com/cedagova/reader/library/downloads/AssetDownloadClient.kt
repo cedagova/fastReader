@@ -46,10 +46,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * fetched and blessed its own download would be one place to get wrong instead
  * of two to agree.
  */
-class AssetDownloadClient internal constructor(private val http: HttpClient) : Closeable {
+public class AssetDownloadClient internal constructor(private val http: HttpClient) : Closeable {
 
     /** The production client: OkHttp, the same engine `:reader-auth` uses, and nothing else. */
-    constructor() : this(httpClient(OkHttp.create()))
+    public constructor() : this(httpClient(OkHttp.create()))
 
     /**
      * Fetch the grant's object and write every byte to [sink], in order.
@@ -68,7 +68,7 @@ class AssetDownloadClient internal constructor(private val http: HttpClient) : C
      * @throws IllegalArgumentException when the grant is not a readable
      *   download — a caller bug refused before a request exists.
      */
-    suspend fun download(
+    public suspend fun download(
         grant: ReaderAssetGrant,
         sink: OutputStream,
         onProgress: (written: Long, total: Long) -> Unit = { _, _ -> },
@@ -164,7 +164,7 @@ class AssetDownloadClient internal constructor(private val http: HttpClient) : C
         }
     }
 
-    companion object {
+    public companion object {
         /**
          * The grant is spent: its signature expired, or the object is gone
          * (401/403/404/410). The answer is to ask reader-api for a fresh grant —
@@ -182,7 +182,8 @@ class AssetDownloadClient internal constructor(private val http: HttpClient) : C
         private const val MAX_REDIRECTS = 10
 
         /** The client tests drive: the real client over a mock engine, same code path. */
-        fun createForTests(engine: HttpClientEngine): AssetDownloadClient = AssetDownloadClient(httpClient(engine))
+        public fun createForTests(engine: HttpClientEngine): AssetDownloadClient =
+            AssetDownloadClient(httpClient(engine))
 
         /**
          * The transport. Its timeouts are deliberately not `:reader-auth`'s 10 s:
@@ -219,7 +220,7 @@ class AssetDownloadClient internal constructor(private val http: HttpClient) : C
  * things about them, and none of them is "show the provider's error text": a
  * provider message can carry a signed URL, so only the status travels.
  */
-sealed class AssetDownloadException(message: String, cause: Throwable? = null) : Exception(message, cause) {
+public sealed class AssetDownloadException(message: String, cause: Throwable? = null) : Exception(message, cause) {
 
     /**
      * The grant is spent: the signature expired or the object moved
@@ -227,16 +228,17 @@ sealed class AssetDownloadException(message: String, cause: Throwable? = null) :
      * a new attempt, which is exactly what the TTL assumption in the plan says
      * a long download on a phone network will need.
      */
-    class GrantRejected(val status: Int) : AssetDownloadException("the storage grant was rejected ($status)")
+    public class GrantRejected(public val status: Int) :
+        AssetDownloadException("the storage grant was rejected ($status)")
 
     /** The provider refused outright (for example 416). Retrying the same grant will not help. */
-    class Refused(val status: Int) : AssetDownloadException("the provider refused the download ($status)")
+    public class Refused(public val status: Int) : AssetDownloadException("the provider refused the download ($status)")
 
     /** The connection failed, stalled, or the provider is unwell. A later attempt may work. */
-    class Unavailable(reason: Throwable) : AssetDownloadException("the download connection failed", reason)
+    public class Unavailable(reason: Throwable) : AssetDownloadException("the download connection failed", reason)
 
     /** The provider answered in a way the grant does not allow — a short or over-long body. */
-    class Protocol(message: String) : AssetDownloadException(message)
+    public class Protocol(message: String) : AssetDownloadException(message)
 
     /**
      * The provider redirected to a different origin (host, port or scheme),
@@ -244,5 +246,5 @@ sealed class AssetDownloadException(message: String, cause: Throwable? = null) :
      * target travels in this error: it can carry a signed URL. Retrying the
      * same grant would meet the same redirect, so this is not a retry case.
      */
-    class ForeignRedirect : AssetDownloadException("the provider redirected the download to another origin")
+    public class ForeignRedirect : AssetDownloadException("the provider redirected the download to another origin")
 }

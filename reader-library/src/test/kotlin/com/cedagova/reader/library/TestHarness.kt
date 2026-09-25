@@ -5,8 +5,7 @@ import com.cedagova.reader.auth.ReaderAuthConfig
 import com.cedagova.reader.auth.ReaderClock
 import com.cedagova.reader.auth.RetryWaiter
 import com.cedagova.reader.auth.session.SessionStore
-import io.github.jan.supabase.auth.user.UserInfo
-import io.github.jan.supabase.auth.user.UserSession
+import com.cedagova.reader.auth.session.StoredSession
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
@@ -51,28 +50,25 @@ class RecordingWaiter : RetryWaiter {
     }
 }
 
-class InMemorySessionStore(initial: UserSession? = null) : SessionStore {
-    @Volatile var session: UserSession? = initial
-    override suspend fun save(session: UserSession) {
+class InMemorySessionStore(initial: StoredSession? = null) : SessionStore {
+    @Volatile var session: StoredSession? = initial
+    override suspend fun save(session: StoredSession) {
         this.session = session
     }
-    override suspend fun load(): UserSession? = session
+    override suspend fun load(): StoredSession? = session
     override suspend fun clear() {
         session = null
     }
 }
 
-fun user(id: String = "user-1", email: String = "reader@example.test") =
-    UserInfo(aud = "authenticated", id = id, email = email)
-
-fun session(accessToken: String = "access-1", refreshToken: String = "refresh-1", expiresAt: Instant) = UserSession(
-    accessToken = accessToken,
-    refreshToken = refreshToken,
-    expiresIn = 3600,
-    tokenType = "bearer",
-    user = user(),
-    expiresAt = expiresAt,
-)
+fun session(accessToken: String = "access-1", refreshToken: String = "refresh-1", expiresAt: Instant) =
+    StoredSession.forTests(
+        accessToken = accessToken,
+        refreshToken = refreshToken,
+        expiresAt = expiresAt,
+        userId = "user-1",
+        email = "reader@example.test",
+    )
 
 fun sessionJson(accessToken: String, refreshToken: String) = """
     {"access_token":"$accessToken","refresh_token":"$refreshToken","token_type":"bearer","expires_in":3600,

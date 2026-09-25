@@ -51,10 +51,10 @@ import kotlin.math.min
  * Bytes come from the caller's [PublicationSource] one chunk at a time; nothing
  * is copied or buffered whole.
  */
-class PublicationTransferClient internal constructor(private val http: HttpClient) : Closeable {
+public class PublicationTransferClient internal constructor(private val http: HttpClient) : Closeable {
 
     /** The production client: OkHttp, the same engine `:reader-auth` uses, and nothing else. */
-    constructor() : this(httpClient(OkHttp.create()))
+    public constructor() : this(httpClient(OkHttp.create()))
 
     /**
      * The TUS creation `POST`. Returns the resumable upload's absolute URL.
@@ -67,7 +67,7 @@ class PublicationTransferClient internal constructor(private val http: HttpClien
      * is refused with [PublicationTransferException.ForeignLocation]: every
      * later `HEAD` and `PATCH` carries the grant's headers to it (#142).
      */
-    suspend fun create(grant: PublicationTransferGrant): String {
+    public suspend fun create(grant: PublicationTransferGrant): String {
         require(grant.protocol == PublicationTransferGrant.PROTOCOL_TUS) {
             "this client speaks tus, not '${grant.protocol}'"
         }
@@ -89,7 +89,7 @@ class PublicationTransferClient internal constructor(private val http: HttpClien
     }
 
     /** The `HEAD` that recovers the provider's durable offset for a resumable upload. */
-    suspend fun offset(grant: PublicationTransferGrant, location: String): Long {
+    public suspend fun offset(grant: PublicationTransferGrant, location: String): Long {
         val response = send(HttpMethod.Head, location, grant, offset = null)
         return response.uploadOffset()
     }
@@ -101,7 +101,7 @@ class PublicationTransferClient internal constructor(private val http: HttpClien
      * — offset plus what was sent — because a 204 is the provider saying it
      * stored the body.
      */
-    suspend fun patch(grant: PublicationTransferGrant, location: String, offset: Long, chunk: ByteArray): Long {
+    public suspend fun patch(grant: PublicationTransferGrant, location: String, offset: Long, chunk: ByteArray): Long {
         require(chunk.isNotEmpty()) { "a PATCH carries bytes" }
         require(chunk.size <= grant.chunkSizeBytes) {
             "a chunk is at most the grant's ${grant.chunkSizeBytes} bytes, not ${chunk.size}"
@@ -125,7 +125,7 @@ class PublicationTransferClient internal constructor(private val http: HttpClien
      * [onProgress] is called after each confirmed chunk with the offset the
      * provider acknowledged, never with a local guess.
      */
-    suspend fun transfer(
+    public suspend fun transfer(
         grant: PublicationTransferGrant,
         location: String,
         source: PublicationSource,
@@ -218,13 +218,13 @@ class PublicationTransferClient internal constructor(private val http: HttpClien
     private fun HttpResponse.uploadOffset(): Long = headers[HEADER_UPLOAD_OFFSET]?.toLongOrNull()
         ?: throw PublicationTransferException.Protocol("the response carried no Upload-Offset")
 
-    companion object {
-        const val TUS_VERSION: String = "1.0.0"
-        const val TUS_CONTENT_TYPE: String = "application/offset+octet-stream"
-        const val HEADER_TUS_RESUMABLE: String = "Tus-Resumable"
-        const val HEADER_UPLOAD_OFFSET: String = "Upload-Offset"
-        const val HEADER_UPLOAD_LENGTH: String = "Upload-Length"
-        const val HEADER_UPLOAD_METADATA: String = "Upload-Metadata"
+    public companion object {
+        public const val TUS_VERSION: String = "1.0.0"
+        public const val TUS_CONTENT_TYPE: String = "application/offset+octet-stream"
+        public const val HEADER_TUS_RESUMABLE: String = "Tus-Resumable"
+        public const val HEADER_UPLOAD_OFFSET: String = "Upload-Offset"
+        public const val HEADER_UPLOAD_LENGTH: String = "Upload-Length"
+        public const val HEADER_UPLOAD_METADATA: String = "Upload-Metadata"
 
         /** The signed-route marker the contract and reader-api's functional tests both assert. */
         private const val SIGNED_SUFFIX = "/sign"
@@ -241,7 +241,7 @@ class PublicationTransferClient internal constructor(private val http: HttpClien
         private const val READ_BUFFER_BYTES = 64 * 1024
 
         /** The client tests drive: a real client over a mock engine, same code path. */
-        fun createForTests(engine: HttpClientEngine): PublicationTransferClient =
+        public fun createForTests(engine: HttpClientEngine): PublicationTransferClient =
             PublicationTransferClient(httpClient(engine))
 
         /**
@@ -339,10 +339,11 @@ class PublicationTransferClient internal constructor(private val http: HttpClien
  * things about them, and none of them is "show the provider's error text": a
  * provider message can carry a signed URL, so only the status travels.
  */
-sealed class PublicationTransferException(message: String, cause: Throwable? = null) : Exception(message, cause) {
+public sealed class PublicationTransferException(message: String, cause: Throwable? = null) :
+    Exception(message, cause) {
 
     /** The provider's confirmed offset when this was thrown, once the transfer knows it. */
-    open val offset: Long = 0
+    public open val offset: Long = 0
 
     /** The same failure, carrying the offset the transfer had reached. */
     internal open fun withOffset(offset: Long): PublicationTransferException = this
@@ -353,19 +354,19 @@ sealed class PublicationTransferException(message: String, cause: Throwable? = n
      * fresh grant and start a fresh transfer — never to fall back to the
      * session's bearer, which the provider would not accept anyway.
      */
-    class GrantRejected(val status: Int, override val offset: Long = 0) :
+    public class GrantRejected(public val status: Int, override val offset: Long = 0) :
         PublicationTransferException("the storage grant was rejected ($status)") {
         override fun withOffset(offset: Long) = GrantRejected(status, offset)
     }
 
     /** 409/412: the provider is not at the offset we sent. Re-`HEAD` and continue. */
-    class OffsetMismatch(val status: Int, override val offset: Long = 0) :
+    public class OffsetMismatch(public val status: Int, override val offset: Long = 0) :
         PublicationTransferException("the provider disagrees about the upload offset ($status)") {
         override fun withOffset(offset: Long) = OffsetMismatch(status, offset)
     }
 
     /** The provider refused outright (for example 413, above its effective limit). */
-    class Refused(val status: Int, override val offset: Long = 0) :
+    public class Refused(public val status: Int, override val offset: Long = 0) :
         PublicationTransferException("the provider refused the transfer ($status)") {
         override fun withOffset(offset: Long) = Refused(status, offset)
     }
@@ -374,13 +375,13 @@ sealed class PublicationTransferException(message: String, cause: Throwable? = n
      * The connection failed or the provider is unwell. Everything already
      * acknowledged is still there: the import resumes from its durable offset.
      */
-    class Unavailable(private val reason: Throwable, override val offset: Long = 0) :
+    public class Unavailable(private val reason: Throwable, override val offset: Long = 0) :
         PublicationTransferException("the transfer connection failed", reason) {
         override fun withOffset(offset: Long) = Unavailable(reason, offset)
     }
 
     /** The provider answered in a way TUS does not allow. Not resumable by retrying blindly. */
-    class Protocol(message: String) : PublicationTransferException(message)
+    public class Protocol(message: String) : PublicationTransferException(message)
 
     /**
      * The upload's `Location` is on another origin (host, port or scheme) than
@@ -389,5 +390,6 @@ sealed class PublicationTransferException(message: String, cause: Throwable? = n
      * The location is not one to keep, and the same provider would hand back
      * the same one, so this is a refusal rather than an interruption.
      */
-    class ForeignLocation : PublicationTransferException("the upload location is on another origin than the grant")
+    public class ForeignLocation :
+        PublicationTransferException("the upload location is on another origin than the grant")
 }

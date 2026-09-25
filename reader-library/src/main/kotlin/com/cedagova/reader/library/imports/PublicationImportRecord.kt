@@ -48,7 +48,7 @@ import kotlinx.serialization.Serializable
  * and a resume gets fresh ones by replaying the idempotent admission.
  */
 @Serializable
-data class PublicationImportRecord(
+public data class PublicationImportRecord(
     /** Stable across app death, derived from content identity and account. */
     @SerialName("client_import_id") val clientImportId: String,
     /** The account this import belongs to; the store is per-account, this makes [derive] checkable. */
@@ -84,18 +84,19 @@ data class PublicationImportRecord(
      * `GRANTED`, so `upload_consent = true` cannot be reached by forgetting
      * something — see [UploadConsent].
      */
-    fun admissionRequest(consent: UploadConsent): CreatePublicationImportRequest = CreatePublicationImportRequest(
-        clientImportId = clientImportId,
-        sourceFormat = sourceFormat,
-        sourceMimeType = sourceMimeType,
-        sizeBytes = sizeBytes,
-        sha256 = contentSha256,
-        uploadConsent = consent == UploadConsent.GRANTED,
-        originalFileName = originalFileName,
-    )
+    public fun admissionRequest(consent: UploadConsent): CreatePublicationImportRequest =
+        CreatePublicationImportRequest(
+            clientImportId = clientImportId,
+            sourceFormat = sourceFormat,
+            sourceMimeType = sourceMimeType,
+            sizeBytes = sizeBytes,
+            sha256 = contentSha256,
+            uploadConsent = consent == UploadConsent.GRANTED,
+            originalFileName = originalFileName,
+        )
 
     /** This record with the backend's own answer folded in. */
-    fun withImport(admitted: PublicationImport): PublicationImportRecord = copy(
+    public fun withImport(admitted: PublicationImport): PublicationImportRecord = copy(
         importId = admitted.id,
         status = admitted.status,
         failureCategory = admitted.failure?.category,
@@ -105,31 +106,31 @@ data class PublicationImportRecord(
     )
 
     /** This record with the admission answer folded in (the record, and the grant's expiry). */
-    fun withAdmission(admission: PublicationImportAdmissionResponse): PublicationImportRecord =
+    public fun withAdmission(admission: PublicationImportAdmissionResponse): PublicationImportRecord =
         withImport(admission.importRecord).let { updated ->
             admission.transferGrant?.let { updated.copy(grantExpiresAt = it.expiresAt) } ?: updated
         }
 
     /** A transfer that has just been created at [location]; nothing confirmed yet. */
-    fun transferringAt(location: String, grant: PublicationTransferGrant): PublicationImportRecord =
+    public fun transferringAt(location: String, grant: PublicationTransferGrant): PublicationImportRecord =
         copy(transferLocation = location, grantExpiresAt = grant.expiresAt, uploadedOffset = 0)
 
     /** The provider confirmed [offset]. Never moves backwards. */
-    fun confirmedOffset(offset: Long): PublicationImportRecord =
+    public fun confirmedOffset(offset: Long): PublicationImportRecord =
         if (offset <= uploadedOffset) this else copy(uploadedOffset = offset)
 
     /** The resumable upload is gone or its signature is spent; the next attempt creates a new one. */
-    fun withoutTransfer(): PublicationImportRecord =
+    public fun withoutTransfer(): PublicationImportRecord =
         copy(transferLocation = null, grantExpiresAt = null, uploadedOffset = 0)
 
-    companion object {
+    public companion object {
         /**
          * The `client_import_id` prefix. It names the protocol and its version,
          * never the app: `:reader-library` is liftable (AD-19), and an id that
          * said "fastreader" would make every account row carry the name of one
          * client forever.
          */
-        const val CLIENT_IMPORT_ID_PREFIX: String = "reader-import-v1-"
+        public const val CLIENT_IMPORT_ID_PREFIX: String = "reader-import-v1-"
 
         /** The separator between the two halves of the derived identity. */
         private const val IDENTITY_SEPARATOR: String = "/"
@@ -147,7 +148,7 @@ data class PublicationImportRecord(
          * so the separator cannot be used to make two different pairs hash the
          * same way.
          */
-        fun derive(accountId: String, contentSha256: String): String {
+        public fun derive(accountId: String, contentSha256: String): String {
             require(accountId.isNotBlank()) { "an import id is derived from a real account" }
             val normalized = normalizeSha256(contentSha256)
             val digest = MessageDigest.getInstance("SHA-256")
@@ -156,7 +157,7 @@ data class PublicationImportRecord(
         }
 
         /** A fresh record for [source] in [accountId], before anything has been sent. */
-        fun forSource(
+        public fun forSource(
             accountId: String,
             source: PublicationSource,
             sourceFormat: PublicationFormat,
@@ -174,7 +175,7 @@ data class PublicationImportRecord(
         }
 
         /** Bare lowercase hex, whichever of the contract's two spellings came in. */
-        fun normalizeSha256(value: String): String {
+        public fun normalizeSha256(value: String): String {
             val bare = value.removePrefix("sha256:").lowercase()
             require(HEX_64.matches(bare)) { "a content sha256 is 64 hex characters" }
             return bare

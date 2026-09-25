@@ -9,7 +9,7 @@ import kotlinx.serialization.json.JsonObject
  * `reader.sync.v1` and `reader.publication-import.v1` — and ignores the rest.
  */
 @Serializable
-data class ReaderCapabilityEntry(
+internal data class ReaderCapabilityEntry(
     @SerialName("key") val key: ReaderCapabilityKey = ReaderCapabilityKey.UNKNOWN,
     @SerialName("availability") val availability: ReaderCapabilityAvailability = ReaderCapabilityAvailability.UNKNOWN,
     @SerialName("reason") val reason: ReaderCapabilityReason = ReaderCapabilityReason.UNKNOWN,
@@ -19,7 +19,7 @@ data class ReaderCapabilityEntry(
 
 /** A capability's quota, when it has one. `reader.sync.v1` does not. */
 @Serializable
-data class ReaderCapabilityQuota(
+public data class ReaderCapabilityQuota(
     @SerialName("limit") val limit: Long,
     @SerialName("used") val used: Long,
     @SerialName("remaining") val remaining: Long,
@@ -34,7 +34,7 @@ data class ReaderCapabilityQuota(
  * as an error: an older or differently configured server simply does not offer
  * the capability, and the caller defers sync with that reason shown.
  */
-data class ReaderSyncCapability(
+public data class ReaderSyncCapability(
     val availability: ReaderCapabilityAvailability,
     val reason: ReaderCapabilityReason,
     val quota: ReaderCapabilityQuota? = null,
@@ -43,9 +43,9 @@ data class ReaderSyncCapability(
 ) {
     val isAvailable: Boolean get() = availability == ReaderCapabilityAvailability.AVAILABLE
 
-    companion object {
+    public companion object {
         /** What a document without a `reader.sync.v1` entry reads as. */
-        val UNDECLARED: ReaderSyncCapability = ReaderSyncCapability(
+        public val UNDECLARED: ReaderSyncCapability = ReaderSyncCapability(
             availability = ReaderCapabilityAvailability.UNAVAILABLE,
             reason = ReaderCapabilityReason.UNKNOWN,
             quota = null,
@@ -70,7 +70,7 @@ data class ReaderSyncCapability(
  * attempt. Admission stays authoritative — this only decides whether the action
  * is offered.
  */
-data class ReaderPublicationImportCapability(
+public data class ReaderPublicationImportCapability(
     val availability: ReaderCapabilityAvailability,
     val reason: ReaderCapabilityReason,
     /** How many `reader.publication-import.v1` entries the document carried. */
@@ -79,9 +79,9 @@ data class ReaderPublicationImportCapability(
     val isAvailable: Boolean
         get() = entries == 1 && availability == ReaderCapabilityAvailability.AVAILABLE
 
-    companion object {
+    public companion object {
         /** A document with no entry at all, or one with more than one: never permission. */
-        fun undeclared(entries: Int): ReaderPublicationImportCapability = ReaderPublicationImportCapability(
+        public fun undeclared(entries: Int): ReaderPublicationImportCapability = ReaderPublicationImportCapability(
             availability = ReaderCapabilityAvailability.UNAVAILABLE,
             reason = ReaderCapabilityReason.UNKNOWN,
             entries = entries,

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 /** A sign-in method the pre-auth document can turn on or off (#160). */
-enum class SignInMethod {
+public enum class SignInMethod {
     /** The emailed six-digit code (`authentication.emailOtp`). */
     EMAIL_CODE,
 
@@ -24,7 +24,7 @@ enum class SignInMethod {
  * makes the document uncacheable instead of unparseable.
  */
 @Serializable
-data class PreAuthDocument(
+public data class PreAuthDocument(
     val schemaVersion: String? = null,
     val generatedAt: String? = null,
     val freshUntil: String? = null,
@@ -35,7 +35,7 @@ data class PreAuthDocument(
     val postAuth: PostAuth? = null,
 ) {
     @Serializable
-    data class Compatibility(
+    public data class Compatibility(
         val status: String? = null,
         val requestedVersion: String? = null,
         val minimumVersion: String? = null,
@@ -43,14 +43,14 @@ data class PreAuthDocument(
     )
 
     @Serializable
-    data class AccountEntry(
+    public data class AccountEntry(
         val availability: String? = null,
         val reason: String? = null,
         val retryable: Boolean = false,
     )
 
     @Serializable
-    data class Configuration(
+    public data class Configuration(
         val revision: String? = null,
         val validUntil: String? = null,
         val client: Client? = null,
@@ -58,10 +58,10 @@ data class PreAuthDocument(
     )
 
     @Serializable
-    data class Client(val applicationId: String? = null)
+    public data class Client(val applicationId: String? = null)
 
     @Serializable
-    data class Authentication(
+    public data class Authentication(
         val kind: String? = null,
         val authorityOrigin: String? = null,
         val publicClientId: String? = null,
@@ -70,7 +70,7 @@ data class PreAuthDocument(
     )
 
     @Serializable
-    data class PostAuth(val schemaVersion: String? = null, val path: String? = null)
+    public data class PostAuth(val schemaVersion: String? = null, val path: String? = null)
 
     /**
      * The sign-in methods the server has turned on for this client; a host
@@ -119,7 +119,7 @@ data class PreAuthDocument(
      * (CONTRACT.md, "Bootstrap and first calls"). The publishable key is never
      * echoed into the reason.
      */
-    fun mismatch(config: ReaderAuthConfig): String? {
+    public fun mismatch(config: ReaderAuthConfig): String? {
         val status = compatibility?.status
         if (status != COMPATIBLE) return "compatibility status is ${status ?: "missing"}, not $COMPATIBLE"
         val configuration = configuration
@@ -141,15 +141,15 @@ data class PreAuthDocument(
         return null
     }
 
-    companion object {
-        const val COMPATIBLE: String = "compatible"
-        const val AVAILABLE: String = "available"
+    public companion object {
+        public const val COMPATIBLE: String = "compatible"
+        public const val AVAILABLE: String = "available"
         private const val PASSWORD_PROVIDER = "password"
 
         private fun instant(value: String?): Instant? = value?.let { runCatching { Instant.parse(it) }.getOrNull() }
 
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun parse(body: JsonObject): PreAuthDocument = json.decodeFromJsonElement(serializer(), body)
+        public fun parse(body: JsonObject): PreAuthDocument = json.decodeFromJsonElement(serializer(), body)
     }
 }

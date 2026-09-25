@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
  * the contract puts the `PUT` before the first `GET`.
  */
 @Serializable
-data class ReaderProfileUpdate(
+public data class ReaderProfileUpdate(
     @SerialName("display_name") val displayName: String? = null,
     @SerialName("avatar_url") val avatarUrl: String? = null,
     @SerialName("native_language") val nativeLanguage: String? = null,

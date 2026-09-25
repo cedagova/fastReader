@@ -38,7 +38,7 @@ import kotlin.time.Instant
  * backoff and foreground-only rule are the host's policy, and
  * [refresh] is the one call it needs.
  */
-class PublicationImportEngine(
+public class PublicationImportEngine(
     private val operations: ReaderLibraryOperations,
     private val transfer: PublicationTransferClient,
     private val clock: ReaderClock = ReaderClock.System,
@@ -51,7 +51,7 @@ class PublicationImportEngine(
      * `GET` and never an admission: nothing about this file is announced to the
      * account until the policy says it could be admitted.
      */
-    suspend fun start(
+    public suspend fun start(
         accountId: String,
         source: PublicationSource,
         consent: UploadConsent,
@@ -77,7 +77,7 @@ class PublicationImportEngine(
      * inside its grant window is `HEAD`ed and resumed from the provider's own
      * offset, and anything else starts a fresh transfer.
      */
-    suspend fun resume(
+    public suspend fun resume(
         record: PublicationImportRecord,
         source: PublicationSource,
         consent: UploadConsent,
@@ -88,7 +88,7 @@ class PublicationImportEngine(
     }
 
     /** One status read. The host decides when to make it; this makes it. */
-    suspend fun refresh(record: PublicationImportRecord): PublicationImportRecord {
+    public suspend fun refresh(record: PublicationImportRecord): PublicationImportRecord {
         val importId = record.importId ?: return record
         return record.withImport(operations.importRecord(importId).importRecord)
     }
@@ -99,7 +99,7 @@ class PublicationImportEngine(
      * A record that was never admitted has nothing to cancel and is simply
      * reported cancelled; the backend never heard of it.
      */
-    suspend fun cancel(
+    public suspend fun cancel(
         record: PublicationImportRecord,
         reason: String = CancelPublicationImportRequest.DEFAULT_REASON,
     ): PublicationImportRecord {
@@ -118,7 +118,7 @@ class PublicationImportEngine(
      * Pure and public: LEAF802 shows the same answer on the shelf row before the
      * owner is ever asked for consent, from the same code that enforces it.
      */
-    fun refuse(policy: PublicationImportPolicyResponse, source: PublicationSource): PublicationImportRefusal? {
+    public fun refuse(policy: PublicationImportPolicyResponse, source: PublicationSource): PublicationImportRefusal? {
         if (!policy.enabled) return PublicationImportRefusal.ImportsDisabled(policy.requestId)
         if (source.sizeBytes <= 0) return PublicationImportRefusal.SourceEmpty
         val format = policy.formatForMimeType(source.mimeType)
@@ -328,16 +328,16 @@ class PublicationImportEngine(
  * Where one attempt got to. Four answers, and a host does something different
  * with each of them.
  */
-sealed interface PublicationImportStep {
+public sealed interface PublicationImportStep {
 
     /** The record as it now stands; always safe to persist, always safe to resume from. */
-    val record: PublicationImportRecord?
+    public val record: PublicationImportRecord?
 
     /**
      * The policy already said no, and nothing was admitted or sent. The device
      * book is untouched because it was never involved (REQ-507).
      */
-    data class Refused(val refusal: PublicationImportRefusal) : PublicationImportStep {
+    public data class Refused(val refusal: PublicationImportRefusal) : PublicationImportStep {
         override val record: PublicationImportRecord? get() = null
     }
 
@@ -346,7 +346,7 @@ sealed interface PublicationImportStep {
      * finished — it is `verifying_upload`, `queued` or `processing` — and the
      * host polls [PublicationImportEngine.refresh] until it is terminal.
      */
-    data class Transferred(override val record: PublicationImportRecord) : PublicationImportStep
+    public data class Transferred(override val record: PublicationImportRecord) : PublicationImportStep
 
     /**
      * The transfer stopped part-way. [record] carries the last offset the
@@ -357,10 +357,10 @@ sealed interface PublicationImportStep {
      * sends anything, so nothing already stored is re-sent and nothing is
      * skipped — that guarantee comes from the `HEAD`, not from this number.
      */
-    data class Interrupted(override val record: PublicationImportRecord, val cause: Throwable? = null) :
+    public data class Interrupted(override val record: PublicationImportRecord, val cause: Throwable? = null) :
         PublicationImportStep
 
     /** The import ended badly. [category] is the backend's own classification. */
-    data class Failed(override val record: PublicationImportRecord, val category: PublicationFailureCategory) :
+    public data class Failed(override val record: PublicationImportRecord, val category: PublicationFailureCategory) :
         PublicationImportStep
 }

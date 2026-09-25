@@ -11,21 +11,21 @@ import kotlinx.serialization.json.JsonObject
  * `ReaderLibraryResponse` schema by `ReaderLibraryContractTest`.
  */
 @Serializable
-data class ReaderLibraryResponse(
+public data class ReaderLibraryResponse(
     /** Echoed `X-Request-ID`; the id to quote when reading a server log. */
     @SerialName("request_id") val requestId: String,
     @SerialName("items") val items: List<ReaderLibraryItem> = emptyList(),
     @SerialName("contract_version") val contractVersion: String = CONTRACT_VERSION,
 ) {
-    companion object {
+    public companion object {
         /** The document's constant for the reader payload family. */
-        const val CONTRACT_VERSION: String = "reader.v1"
+        public const val CONTRACT_VERSION: String = "reader.v1"
     }
 }
 
 /** One row of the account library: the book, its files, and the account's state for it. */
 @Serializable
-data class ReaderLibraryItem(
+public data class ReaderLibraryItem(
     @SerialName("book") val book: ReaderBook,
     @SerialName("status") val status: ReaderLibraryStatus = ReaderLibraryStatus.UNKNOWN,
     @SerialName("created_at") val createdAt: String,
@@ -37,7 +37,7 @@ data class ReaderLibraryItem(
 
 /** The book itself: the canonical id the sync protocol keys on, and its metadata. */
 @Serializable
-data class ReaderBook(
+public data class ReaderBook(
     /** The canonical account-side UUID. Content identity is the asset checksum, not this. */
     @SerialName("id") val id: String,
     @SerialName("title") val title: String,
@@ -54,7 +54,7 @@ data class ReaderBook(
  * (AD-23): a device book and an account book are the same row when these agree.
  */
 @Serializable
-data class ReaderBookAsset(
+public data class ReaderBookAsset(
     @SerialName("asset_id") val assetId: String,
     @SerialName("book_id") val bookId: String,
     @SerialName("kind") val kind: ReaderBookAssetKind = ReaderBookAssetKind.UNKNOWN,
@@ -70,4 +70,4 @@ data class ReaderBookAsset(
 )
 
 /** The empty document every optional free-form object defaults to. */
-val EMPTY_JSON_OBJECT: JsonObject = JsonObject(emptyMap())
+internal val EMPTY_JSON_OBJECT: JsonObject = JsonObject(emptyMap())

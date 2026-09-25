@@ -17,7 +17,7 @@ package com.cedagova.reader.auth
  * @property clientVersion the `clientVersion` query value on bootstrap and
  *   capabilities.
  */
-data class ReaderAuthConfig(
+public data class ReaderAuthConfig(
     val supabaseUrl: String,
     val publishableKey: String,
     val readerApiBaseUrl: String,

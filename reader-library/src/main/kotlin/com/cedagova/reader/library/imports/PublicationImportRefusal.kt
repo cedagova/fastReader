@@ -18,13 +18,13 @@ import com.cedagova.reader.library.model.PublicationFormat
  * Every bound quoted here is read from the policy on this attempt. Nothing in
  * this file is a constant.
  */
-sealed interface PublicationImportRefusal {
+public sealed interface PublicationImportRefusal {
 
     /**
      * The category a host renders this as, or null when the refusal is not a
      * failure of *this file* at all.
      */
-    val category: PublicationFailureCategory?
+    public val category: PublicationFailureCategory?
 
     /**
      * `enabled: false` — this deployment admits no imports from anyone.
@@ -32,7 +32,7 @@ sealed interface PublicationImportRefusal {
      * Not a failure of the book: the action itself is off, and a host hides it
      * with the reason rather than offering something that cannot work.
      */
-    data class ImportsDisabled(
+    public data class ImportsDisabled(
         /** reader-api's echoed request id, for reading a server log against what the screen showed. */
         val requestId: String,
     ) : PublicationImportRefusal {
@@ -40,7 +40,7 @@ sealed interface PublicationImportRefusal {
     }
 
     /** The policy lists no format for this source's MIME type. */
-    data class FormatNotSupported(
+    public data class FormatNotSupported(
         val mimeType: String,
         /** Every MIME type the policy did declare, in its own order. */
         val supportedMimeTypes: List<String>,
@@ -50,14 +50,14 @@ sealed interface PublicationImportRefusal {
     }
 
     /** Above the cap this format publishes. [maxSourceBytes] is the policy's number, quoted. */
-    data class TooLarge(val format: PublicationFormat, val sizeBytes: Long, val maxSourceBytes: Long) :
+    public data class TooLarge(val format: PublicationFormat, val sizeBytes: Long, val maxSourceBytes: Long) :
         PublicationImportRefusal {
         override val category: PublicationFailureCategory
             get() = PublicationFailureCategory.TOO_LARGE
     }
 
     /** A zero-byte source. `size_bytes` is `> 0` in the contract; there is nothing to send. */
-    data object SourceEmpty : PublicationImportRefusal {
+    public data object SourceEmpty : PublicationImportRefusal {
         override val category: PublicationFailureCategory
             get() = PublicationFailureCategory.MALFORMED
     }

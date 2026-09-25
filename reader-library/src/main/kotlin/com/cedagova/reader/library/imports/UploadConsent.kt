@@ -17,7 +17,7 @@ package com.cedagova.reader.library.imports
  * `ReaderLibraryClient.admitImport`, which refuses to put a request on the wire
  * whose `upload_consent` is not `true`.
  */
-enum class UploadConsent {
+public enum class UploadConsent {
     /** The owner said yes, to this file, in this account, on purpose. */
     GRANTED,
 }

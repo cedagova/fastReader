@@ -26,25 +26,25 @@ import java.nio.channels.SeekableByteChannel
  * says here fails verification at the backend, which is the right place: the
  * backend never takes an uploader's word for a digest.
  */
-interface PublicationSource {
+public interface PublicationSource {
 
     /** The exact byte length of the file. */
-    val sizeBytes: Long
+    public val sizeBytes: Long
 
     /** The whole-file SHA-256, lowercase hex, with or without the `sha256:` prefix. */
-    val sha256: String
+    public val sha256: String
 
     /** The source MIME type, matched against the policy's declared types. */
-    val mimeType: String
+    public val mimeType: String
 
     /** The original file name, for the account's own record; null when there is none. */
-    val fileName: String?
+    public val fileName: String?
 
     /** A fresh stream over the whole file, positioned at zero. Callers close it. */
     @Throws(IOException::class)
-    fun open(): InputStream
+    public fun open(): InputStream
 
     /** A random-access view of the same bytes, or null when this source cannot seek. */
     @Throws(IOException::class)
-    fun openChannel(): SeekableByteChannel? = null
+    public fun openChannel(): SeekableByteChannel? = null
 }

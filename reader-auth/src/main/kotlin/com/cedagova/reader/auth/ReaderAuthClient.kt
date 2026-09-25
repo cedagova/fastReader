@@ -53,14 +53,14 @@ import kotlinx.serialization.json.jsonPrimitive
  * Every operation throws a [ReaderAuthException] on failure, so a host renders
  * one closed set of outcomes and never parses a message.
  */
-class ReaderAuthClient internal constructor(
-    val config: ReaderAuthConfig,
+public class ReaderAuthClient internal constructor(
+    public val config: ReaderAuthConfig,
     internal val supabase: SupabaseClient,
     private val store: SessionStore,
     private val sessions: StoreSessionManager,
     private val refresher: SessionRefresher,
     /** The reader-api client, for any further route a host needs. */
-    val api: ReaderApiClient,
+    public val api: ReaderApiClient,
     private val clock: ReaderClock = ReaderClock.System,
 ) {
     private val auth: Auth get() = supabase.auth
@@ -72,13 +72,13 @@ class ReaderAuthClient internal constructor(
     private class VerifiedPreAuth(val document: PreAuthDocument, val lifetime: PreAuthDocument.Lifetime)
 
     /** The stored session as a host renders it; emits on every change. */
-    val sessionState: Flow<ReaderSessionState> = auth.sessionStatus.map { it.toState() }
+    public val sessionState: Flow<ReaderSessionState> = auth.sessionStatus.map { it.toState() }
 
     /** The current [sessionState] value without collecting. */
-    fun currentState(): ReaderSessionState = auth.sessionStatus.value.toState()
+    public fun currentState(): ReaderSessionState = auth.sessionStatus.value.toState()
 
     /** Suspends until the stored session has been read (or found absent). */
-    suspend fun awaitReady() = auth.awaitInitialization()
+    public suspend fun awaitReady(): Unit = auth.awaitInitialization()
 
     // ---- Bootstrap ---------------------------------------------------------------------------
 
@@ -97,7 +97,7 @@ class ReaderAuthClient internal constructor(
      * `staleUntil`; after that the failure is thrown. A document that fails a
      * check is never kept.
      */
-    suspend fun bootstrap(): PreAuthDocument = bootstrapLock.withLock {
+    public suspend fun bootstrap(): PreAuthDocument = bootstrapLock.withLock {
         val kept = verifiedPreAuth
         val now = clock.now()
         if (kept != null && now < kept.lifetime.freshUntil) return kept.document
@@ -137,7 +137,7 @@ class ReaderAuthClient internal constructor(
      * [createUser] true is sign-up (a new address gets an account); false
      * refuses an unknown address.
      */
-    suspend fun requestEmailCode(email: String, createUser: Boolean) {
+    public suspend fun requestEmailCode(email: String, createUser: Boolean) {
         ensureBootstrapped(SignInMethod.EMAIL_CODE)
         providerCall {
             auth.signInWith(OTP) {
@@ -154,7 +154,7 @@ class ReaderAuthClient internal constructor(
      * automatically — a wrong or expired code is [ReaderAuthException.ProviderRejected],
      * and a provider 429 is [ReaderAuthException.TryLater].
      */
-    suspend fun verifyEmailCode(
+    public suspend fun verifyEmailCode(
         email: String,
         code: String,
         purpose: EmailCodePurpose = EmailCodePurpose.SIGN_IN,
@@ -164,7 +164,7 @@ class ReaderAuthClient internal constructor(
     }
 
     /** Password sign-in. */
-    suspend fun signInWithPassword(email: String, password: String): ReaderSessionState.SignedIn {
+    public suspend fun signInWithPassword(email: String, password: String): ReaderSessionState.SignedIn {
         ensureBootstrapped(SignInMethod.PASSWORD)
         refresher.withoutRefresh {
             provider {
@@ -178,13 +178,13 @@ class ReaderAuthClient internal constructor(
     }
 
     /** Code-based recovery, step one: ask the provider to email a recovery code. */
-    suspend fun requestRecoveryCode(email: String) {
+    public suspend fun requestRecoveryCode(email: String) {
         ensureBootstrapped(SignInMethod.PASSWORD)
         providerCall { auth.resetPasswordForEmail(email) }
     }
 
     /** Code-based recovery, step two: the recovery code yields a session; then call [setPassword]. */
-    suspend fun verifyRecoveryCode(email: String, code: String): ReaderSessionState.SignedIn {
+    public suspend fun verifyRecoveryCode(email: String, code: String): ReaderSessionState.SignedIn {
         ensureBootstrapped(SignInMethod.PASSWORD)
         return verify(OtpType.Email.RECOVERY, email, code)
     }
@@ -196,7 +196,7 @@ class ReaderAuthClient internal constructor(
      * finishes first, and none can land between the SDK reading the session
      * and saving it back, which would restore the spent refresh token.
      */
-    suspend fun setPassword(newPassword: String) {
+    public suspend fun setPassword(newPassword: String) {
         refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
         refresher.withoutRefresh {
             // A sign-out may have run while this call waited for the mutex.
@@ -208,13 +208,13 @@ class ReaderAuthClient internal constructor(
     // ---- Protected calls ---------------------------------------------------------------------
 
     /** The first authenticated call after sign-in. */
-    suspend fun capabilities(): JsonObject = api.capabilities()
+    public suspend fun capabilities(): JsonObject = api.capabilities()
 
     /** [capabilities], with the request id the successful call carried beside the document (#100). */
-    suspend fun capabilitiesResponse(): ReaderApiResponse = api.capabilitiesResponse()
+    public suspend fun capabilitiesResponse(): ReaderApiResponse = api.capabilitiesResponse()
 
     /** The profile upsert that precedes any profile read. */
-    suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = api.upsertProfile(update)
+    public suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = api.upsertProfile(update)
 
     /**
      * What a host calls when it returns to the foreground: refreshes the
@@ -232,7 +232,7 @@ class ReaderAuthClient internal constructor(
      * `SignedIn` for this process. A host that needs the
      * failure itself gets it from its next protected call.
      */
-    suspend fun onForeground(): ReaderSessionState {
+    public suspend fun onForeground(): ReaderSessionState {
         try {
             refresher.sessionForRequest()
         } catch (e: ReaderAuthException) {
@@ -250,7 +250,7 @@ class ReaderAuthClient internal constructor(
      * waits for any refresh in flight and blocks the next one, so a refresh
      * that started a moment earlier cannot re-save a session afterwards.
      */
-    suspend fun signOut() = refresher.withoutRefresh {
+    public suspend fun signOut(): Unit = refresher.withoutRefresh {
         store.clear()
         try {
             auth.signOut(SignOutScope.LOCAL)
@@ -264,13 +264,13 @@ class ReaderAuthClient internal constructor(
     }
 
     /** Revokes every other device's session (`others` scope); this device stays signed in. */
-    suspend fun signOutOtherDevices() {
+    public suspend fun signOutOtherDevices() {
         refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
         providerCall { auth.signOut(SignOutScope.OTHERS) }
     }
 
     /** Releases the provider SDK's resources; the stored session is untouched. */
-    suspend fun close() = supabase.close()
+    public suspend fun close(): Unit = supabase.close()
 
     // ---- Internals ---------------------------------------------------------------------------
 
@@ -365,7 +365,7 @@ class ReaderAuthClient internal constructor(
     }
 
     /** Which OTP type verifies an emailed code. */
-    enum class EmailCodePurpose(internal val otpType: OtpType.Email) {
+    public enum class EmailCodePurpose(internal val otpType: OtpType.Email) {
         /** `email`: a sign-in code, and also a sign-up code — the provider accepts either under this type. */
         SIGN_IN(OtpType.Email.EMAIL),
 
@@ -373,10 +373,10 @@ class ReaderAuthClient internal constructor(
         SIGN_UP(OtpType.Email.SIGNUP),
     }
 
-    companion object {
+    public companion object {
 
         /** [ReaderAuthException.SignInUnavailable.reason] when the server has turned the method off. */
-        const val METHOD_DISABLED: String = "method_disabled"
+        public const val METHOD_DISABLED: String = "method_disabled"
 
         /**
          * The production client: Keystore-encrypted store under the no-backup
@@ -384,7 +384,7 @@ class ReaderAuthClient internal constructor(
          * [ReaderAuthException.NotConfigured] instead of calling anything when a
          * service value is blank.
          */
-        fun create(context: Context, config: ReaderAuthConfig): ReaderAuthClient {
+        public fun create(context: Context, config: ReaderAuthConfig): ReaderAuthClient {
             if (!config.isConfigured) throw ReaderAuthException.NotConfigured()
             val store =
                 FileSessionStore(FileSessionStore.directoryIn(context.applicationContext), KeystoreSessionCipher())
@@ -409,7 +409,7 @@ class ReaderAuthClient internal constructor(
          * [ReaderAuthException.NotConfigured] is still thrown for a blank
          * service value exactly as [create] throws it.
          */
-        fun createForTests(
+        public fun createForTests(
             config: ReaderAuthConfig,
             store: SessionStore,
             engine: HttpClientEngine,

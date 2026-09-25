@@ -153,11 +153,13 @@ internal object AccountCanonicalPayload {
  * serializer's own descriptor rather than restated here — so a `@SerialName`
  * that changes in `:reader-library` changes this too, instead of drifting.
  */
-fun ReaderLibraryStatus.wireName(): String = ReaderLibraryStatus.serializer().descriptor.getElementName(ordinal)
+public fun ReaderLibraryStatus.wireName(): String = ReaderLibraryStatus.serializer().descriptor.getElementName(ordinal)
 
-fun ReaderCoverStatus.wireName(): String = ReaderCoverStatus.serializer().descriptor.getElementName(ordinal)
+public fun ReaderCoverStatus.wireName(): String = ReaderCoverStatus.serializer().descriptor.getElementName(ordinal)
 
-fun ReaderSyncRejectionCode.wireName(): String = ReaderSyncRejectionCode.serializer().descriptor.getElementName(ordinal)
+public fun ReaderSyncRejectionCode.wireName(): String =
+    ReaderSyncRejectionCode.serializer().descriptor.getElementName(ordinal)
 
 /** The reason a capability document states, as the shelf quotes it. */
-fun ReaderCapabilityReason.wireName(): String = ReaderCapabilityReason.serializer().descriptor.getElementName(ordinal)
+public fun ReaderCapabilityReason.wireName(): String =
+    ReaderCapabilityReason.serializer().descriptor.getElementName(ordinal)
