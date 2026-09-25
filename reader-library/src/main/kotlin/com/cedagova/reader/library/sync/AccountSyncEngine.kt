@@ -1,17 +1,12 @@
 package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.auth.ReaderAuthException
-import com.cedagova.reader.library.ReaderLibraryClient
 import com.cedagova.reader.library.imports.PublicationImportRecord
 import com.cedagova.reader.library.model.ReaderCapabilityReason
-import com.cedagova.reader.library.model.ReaderDeltaStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.model.ReaderMutationKind
-import com.cedagova.reader.library.model.ReaderPortableLocationV1
 import com.cedagova.reader.library.model.ReaderResourceType
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchRequest
-import com.cedagova.reader.library.model.ReaderSyncMutationResult
-import com.cedagova.reader.library.model.ReaderSyncStatus
 import java.io.IOException
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
@@ -31,178 +26,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-
-/**
- * Who is signed in, as the engine needs to know it (D4).
- *
- * The host maps its own session state onto this; the engine reads nothing else
- * about the session. [Loading] means the stored session has not been read yet,
- * so nothing changes.
- */
-public sealed interface AccountSession {
-
-    /** The stored session has not been read yet. */
-    public data object Loading : AccountSession
-
-    /** The host carries no service values, so there is no account to sync. */
-    public data object NotConfigured : AccountSession
-
-    /** Nobody is signed in. */
-    public data object SignedOut : AccountSession
-
-    /** [userId] is the provider subject the session reports. */
-    public data class SignedIn(val userId: String) : AccountSession
-}
-
-/** The account-library actions a host's shelf performs (LEAF703). */
-public interface AccountLibraryActions {
-
-    /** The reader asked for a refresh. */
-    public fun refresh()
-
-    /** Remove [bookId] from the account library. */
-    public fun removeFromAccount(bookId: String)
-
-    /** The contract's immediate Undo of a removal: a `restore` of the same book. */
-    public fun undoRemove(bookId: String)
-
-    /** The book was opened: `reading`, and this device's clock as the last-opened time. */
-    public fun recordOpened(bookId: String)
-
-    /** The book was finished. */
-    public fun recordFinished(bookId: String)
-
-    /** Any other library status the shelf sets. */
-    public fun recordStatus(bookId: String, status: ReaderLibraryStatus)
-
-    /**
-     * Publishes the portable position of an account book (REQ-511, AD-25).
-     *
-     * [bookId] is the **account's** book id. A device book the account does not
-     * hold has no account id to resolve, so nothing is published for it — the
-     * caller's `accountBookIdForDevice` returns null and this is never reached.
-     *
-     * Called only when the position writer flushes for a non-word event and the
-     * section or the whole percent changed since the last publish; never on the
-     * per-word throttle. A position that moves *backwards* is published exactly
-     * like one that moves forwards: `causal-progress-can-move-backward`, and the
-     * backend's admission order decides who wins.
-     */
-    public fun recordPosition(bookId: String, position: LocalReadingPosition)
-}
-
-/**
- * The account document's import records, as the add-to-account flow uses them
- * (LEAF802, AD-26).
- *
- * A separate interface rather than more methods on [AccountLibraryActions]
- * because the two answer different questions: those are *mutations of the
- * account's library* that queue and are admitted; these are this device's own
- * memory of an upload in flight, which the backend never sees. It is served by
- * [AccountSyncEngine] all the same, and for one reason — the account document
- * has exactly one writer, and a second one racing it would be the first way to
- * lose a queued mutation.
- */
-public interface AccountImportRecords {
-
-    /** The signed-in account's user id, or null when nobody is signed in. */
-    public fun accountId(): String?
-
-    /** Every import this device has started for the signed-in account and not finished. */
-    public suspend fun importRecords(): List<PublicationImportRecord>
-
-    /** Stores [record], replacing any earlier state of the same import. */
-    public suspend fun putImportRecord(record: PublicationImportRecord)
-
-    /** Forgets the import [clientImportId] names. */
-    public suspend fun dropImportRecord(clientImportId: String)
-}
-
-/**
- * A host record was given a key the account document reserves (#149).
- *
- * [key] is either one the schema declares at that level — which would win over
- * the record when the document is written — or `host`, which is dropped when it
- * is read back. Either way the record would be stored and then silently lost, so
- * the write is refused instead. [bookLevel] says which level the key was for.
- */
-public class ReservedHostRecordKeyException(public val key: String, public val bookLevel: Boolean) :
-    IllegalArgumentException(
-        "\"$key\" is reserved by the account document ${if (bookLevel) "for a book row" else "at the top level"}; " +
-            "a host record under it would be lost",
-    )
-
-/**
- * The host's own records in the account document (#147).
- *
- * A host keeps a little state of its own beside the account's — FastReader
- * keeps its verified-copy references and the resume offers a reader answered —
- * and it has to be written by the same single writer as everything else in the
- * document, because a second writer racing it would be the first way to lose a
- * queued mutation. These are that writer's host-facing half: values the engine
- * stores verbatim and never reads, never queues and never sends.
- *
- * Every update runs under the engine's lock, so a read-modify-write here is
- * atomic with every other write to the document. An update while nobody is
- * signed in does nothing; an update that changes nothing writes nothing. Neither
- * publishes a new state: a host record changes no row the account describes.
- *
- * **A `transform` must not call back into the engine** (#149) — not this
- * interface, not [AccountImportRecords], not [AccountLibraryActions], not
- * [AccountSyncEngine.requestSync]. It runs while the engine holds its lock, and
- * that lock is not re-entrant: a callback that waits on the engine from inside
- * a transform would wait for ever. [AccountSyncEngine] detects the call made
- * from the transform's own thread and throws [IllegalStateException] instead of
- * hanging; one handed to another thread and awaited is not detectable, and is a
- * deadlock. Compute what the transform needs *before* calling the update, and
- * act on its outcome *after* it returns.
- *
- * **A `transform` must be pure** (#149): a function of its argument, with no
- * side effects. The guard is a flag on the transform's thread, so a side effect
- * that synchronously resumes another coroutine on that thread — completing a
- * deferred, emitting to a flow collected on `Dispatchers.Unconfined`, a nested
- * `runBlocking` that drains the thread's event loop — would run that coroutine
- * inside the flag, and an engine call it makes would throw although it is not
- * the transform's own.
- *
- * A key the document reserves — one its schema declares at that level, or
- * `host` — is refused with [ReservedHostRecordKeyException] before anything is
- * written (#149), because a record under it would be stored and then lost.
- */
-public interface AccountHostRecords {
-
-    /** The signed-in account's user id, or null when nobody is signed in. */
-    public fun accountId(): String?
-
-    /** The document-level host record [key], or null when there is none or nobody is signed in. */
-    public suspend fun hostRecord(key: String): JsonElement?
-
-    /**
-     * Replaces the document-level host record [key] with what [transform]
-     * returns for its current value; null removes it.
-     *
-     * [transform] runs under the engine's lock and must not call back into the
-     * engine. Throws [ReservedHostRecordKeyException] when [key] is in
-     * [AccountLibraryCodec.RESERVED_DOCUMENT_KEYS].
-     */
-    public suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?)
-
-    /**
-     * Replaces the host record [key] on [bookId]'s row with what [transform]
-     * returns for its current value; null removes it. A book the account has no
-     * row for is skipped rather than invented.
-     *
-     * [transform] runs under the engine's lock and must not call back into the
-     * engine. Throws [ReservedHostRecordKeyException] when [key] is in
-     * [AccountLibraryCodec.RESERVED_BOOK_KEYS].
-     */
-    public suspend fun updateBookHostRecord(bookId: String, key: String, transform: (JsonElement?) -> JsonElement?)
-}
 
 /**
  * The account library: one store per account, and the foreground-driven engine
@@ -267,17 +94,8 @@ public class AccountSyncEngine(
 
     private val mutex = Mutex()
 
-    /**
-     * True on the thread that is running a host's `transform`, for as long as it
-     * runs (#149).
-     *
-     * A transform is a plain function called under [mutex], which is not
-     * re-entrant, so anything it does that waits on the engine — a `runBlocking`
-     * around one of the suspend calls here — would wait for ever. The transform
-     * cannot suspend, so it runs start to finish on the thread that set this,
-     * and every public entry point checks it and fails instead of hanging.
-     */
-    private val inHostCallback = ThreadLocal.withInitial { false }
+    /** Refuses a call back into the engine from a host's `transform` (#149). */
+    private val hostCallbacks = HostCallbackGuard()
 
     private val _state = MutableStateFlow(AccountLibraryState.SIGNED_OUT)
 
@@ -294,7 +112,7 @@ public class AccountSyncEngine(
      * [signIn] and [signOut] only.
      */
     @Volatile
-    private var owner: Owner = Owner.Unresolved
+    private var owner: ChangeOwner = ChangeOwner.Unresolved
 
     /**
      * The first session the engine settles on: its user id, or null for nobody
@@ -330,45 +148,13 @@ public class AccountSyncEngine(
      */
     private val published = mutableMapOf<String, Pair<String?, Int>>()
 
-    /**
-     * A `reading_progress` record this app could not place on a book, kept until
-     * the next settled state has surfaced it once.
-     *
-     * The same shape as [pendingSessionGone] and for the same reason: the record
-     * is noticed while the stream is being read, and the state that reports it is
-     * published after. Without this the mapping derivation could be wrong for as
-     * long as nobody happened to look — see
-     * [AccountSyncError.UnrecognizedProgressRecord].
-     */
-    private var progressMismatch: AccountSyncError.UnrecognizedProgressRecord? = null
+    /** Adopts the backend's canonical state; holds an unplaced progress record until it is surfaced. */
+    private val adoption = CanonicalStateAdoption()
 
-    private class ActiveAccount(
-        val userId: String,
-        val store: AccountLibraryStore,
-        var document: AccountLibraryDocument,
-    )
-
-    /** Whose change a queued change is, decided when it is asked for (#162). */
-    private sealed interface Owner {
-        /** No session has been read yet (`Loading`): the first one decides. */
-        data object Unresolved : Owner
-
-        /** Nobody is signed in: there is no account to hold the change. */
-        data object Nobody : Owner
-
-        data class User(val userId: String) : Owner
+    /** One run's exchange with the backend: drain, then stream read or bootstrap. */
+    private val exchange = AccountLibraryExchange(adoption) { trigger ->
+        publish(AccountSyncPhase.BOOTSTRAPPING, trigger)
     }
-
-    /** One own write as it was asked for, before it reaches the outbox. */
-    private class QueuedChange(
-        val owner: Owner,
-        val bookId: String,
-        val kind: ReaderMutationKind,
-        val payload: JsonObject,
-        val resourceType: ReaderResourceType,
-        /** AD-25's key, for a position only: recorded once the entry is persisted (#163). */
-        val publishKey: Pair<String?, Int>?,
-    )
 
     init {
         scope.launch { runQueue() }
@@ -388,7 +174,7 @@ public class AccountSyncEngine(
 
     /** Run one sync. Safe to call from any trigger; concurrent calls queue on the same lock. */
     public fun requestSync(trigger: AccountSyncTrigger) {
-        checkNotInHostCallback()
+        hostCallbacks.checkNotInHostCallback()
         scope.launch { sync(trigger) }
     }
 
@@ -452,7 +238,7 @@ public class AccountSyncEngine(
     // ---------------------------------------------------------- import records
 
     override fun accountId(): String? {
-        checkNotInHostCallback()
+        hostCallbacks.checkNotInHostCallback()
         return active?.userId
     }
 
@@ -495,7 +281,7 @@ public class AccountSyncEngine(
         locked {
             val account = active ?: return@locked
             val host = account.document.host
-            val updated = host.withRecord(key, hostCallback { transform(host[key]) })
+            val updated = host.withRecord(key, hostCallbacks.hostCallback { transform(host[key]) })
             if (updated == host) return@locked
             persistQuietly(account, account.document.copy(host = updated))
         }
@@ -506,7 +292,7 @@ public class AccountSyncEngine(
         locked {
             val account = active ?: return@locked
             val existing = account.document.book(bookId) ?: return@locked
-            val updated = existing.host.withRecord(key, hostCallback { transform(existing.host[key]) })
+            val updated = existing.host.withRecord(key, hostCallbacks.hostCallback { transform(existing.host[key]) })
             if (updated == existing.host) return@locked
             persistQuietly(account, account.document.withBook(existing.copy(host = updated)))
         }
@@ -515,25 +301,9 @@ public class AccountSyncEngine(
     private fun JsonObject.withRecord(key: String, value: JsonElement?): JsonObject =
         if (value == null) JsonObject(this - key) else JsonObject(this + (key to value))
 
-    private inline fun <T> hostCallback(block: () -> T): T {
-        inHostCallback.set(true)
-        try {
-            return block()
-        } finally {
-            inHostCallback.set(false)
-        }
-    }
-
-    private fun checkNotInHostCallback() {
-        check(!inHostCallback.get()) {
-            "an AccountHostRecords transform must not call back into AccountSyncEngine: it runs under the " +
-                "engine's lock, which is not re-entrant"
-        }
-    }
-
     /** [block] under the engine's lock, from a public entry point: refused inside a host callback. */
     private suspend inline fun <T> locked(crossinline block: suspend () -> T): T {
-        checkNotInHostCallback()
+        hostCallbacks.checkNotInHostCallback()
         return mutex.withLock { block() }
     }
 
@@ -549,7 +319,7 @@ public class AccountSyncEngine(
      */
     private suspend fun persistQuietly(account: ActiveAccount, document: AccountLibraryDocument) {
         try {
-            persist(account, document)
+            account.persist(document)
         } catch (e: IOException) {
             publish(
                 AccountSyncPhase.DEFERRED,
@@ -561,20 +331,6 @@ public class AccountSyncEngine(
 
     // ---------------------------------------------------------------- sessions
 
-    private sealed interface SessionTarget {
-        /** Nobody is signed in. [notConfigured] separates "no stage values" from "signed out". */
-        data class None(val notConfigured: Boolean) : SessionTarget
-        data class User(val userId: String) : SessionTarget
-    }
-
-    /** `Loading` is not a target: the stored session has not been read, so nothing changes yet. */
-    private fun targetOf(state: AccountSession): SessionTarget? = when (state) {
-        AccountSession.Loading -> null
-        AccountSession.NotConfigured -> SessionTarget.None(notConfigured = true)
-        AccountSession.SignedOut -> SessionTarget.None(notConfigured = false)
-        is AccountSession.SignedIn -> SessionTarget.User(state.userId)
-    }
-
     /**
      * D4: stop reading the store, keep the file, delete nothing. A session the
      * backend rejected shows its reason here, once.
@@ -582,7 +338,7 @@ public class AccountSyncEngine(
     private suspend fun signOut(notConfigured: Boolean) {
         mutex.withLock {
             active = null
-            owner = Owner.Nobody
+            owner = ChangeOwner.Nobody
             firstSession.complete(null)
             capabilityConfirmed = false
             // This device's memory of what it last published goes with the
@@ -590,7 +346,7 @@ public class AccountSyncEngine(
             // rather than suppressing it because some earlier account was at the
             // same percent of some other book.
             published.clear()
-            progressMismatch = null
+            adoption.forgetProgressMismatch()
             val reason = pendingSessionGone ?: if (notConfigured) AccountSyncError.NotConfigured else null
             pendingSessionGone = null
             publish(AccountSyncPhase.SIGNED_OUT, trigger = null, error = reason)
@@ -599,13 +355,13 @@ public class AccountSyncEngine(
 
     private suspend fun signIn(userId: String) {
         val opened = mutex.withLock {
-            owner = Owner.User(userId)
+            owner = ChangeOwner.User(userId)
             firstSession.complete(userId)
             capabilityConfirmed = false
             pendingSessionGone = null
             // What an earlier session published says nothing about this one.
             published.clear()
-            withContext(ioDispatcher) { discardOtherAccountQueues(userId) }
+            withContext(ioDispatcher) { stores.discardOtherAccountQueues(userId) }
             val store = stores.forUser(userId)
             when (val load = withContext(ioDispatcher) { store.load() }) {
                 is AccountLibraryLoad.Blocked -> {
@@ -628,7 +384,7 @@ public class AccountSyncEngine(
                     } else {
                         AccountLibraryDocument(userId = userId)
                     }
-                    active = ActiveAccount(userId, store, document)
+                    active = ActiveAccount(userId, store, document, ioDispatcher)
                     publish(
                         phase = if (!document.loadsShelf) {
                             AccountSyncPhase.IDLE
@@ -642,26 +398,6 @@ public class AccountSyncEngine(
             }
         }
         if (opened) sync(AccountSyncTrigger.SIGN_IN)
-    }
-
-    /**
-     * D4's one destructive clause: the held queue of every *other* account on
-     * this device is discarded when a different user id signs in. Their rows
-     * are left alone — the backend holds those, and a re-bootstrap would fetch
-     * them again anyway; the queue is the only thing nothing else can replace.
-     */
-    private fun discardOtherAccountQueues(userId: String) {
-        stores.exceptUser(userId).forEach { store ->
-            val load = store.load()
-            if (load is AccountLibraryLoad.Loaded && load.document.outbox.isNotEmpty()) {
-                try {
-                    store.save(load.document.copy(outbox = emptyList()))
-                } catch (error: IOException) {
-                    // Nothing is lost by leaving it: this account never reads that
-                    // document, and the next sign-in to it tries again.
-                }
-            }
-        }
     }
 
     // -------------------------------------------------------------------- sync
@@ -690,9 +426,9 @@ public class AccountSyncEngine(
                 }
 
                 publish(AccountSyncPhase.SYNCING, trigger)
-                val drained = drainOutbox(account, gateway)
+                val drained = exchange.drainOutbox(account, gateway)
                 if (account.document.bootstrapped) {
-                    readDeltas(account, gateway, trigger)
+                    exchange.readDeltas(account, gateway, trigger)
                 } else {
                     // Either the first read of the account, or the repair a refused
                     // change is owed (#151): the drain cleared the cursor in the same
@@ -702,11 +438,11 @@ public class AccountSyncEngine(
                     // refused row and re-applies every change still queued. A repair
                     // over a populated shelf corrects it rather than loading it, so it
                     // does not announce a bootstrap.
-                    bootstrap(account, gateway, trigger, announce = account.document.loadsShelf)
+                    exchange.bootstrap(account, gateway, trigger, announce = account.document.loadsShelf)
                 }
                 // A rejection the backend stated outranks a record this app could
                 // not place; both are surfaced, a rejection first.
-                publish(AccountSyncPhase.IDLE, trigger, error = drained.rejection ?: takeProgressMismatch())
+                publish(AccountSyncPhase.IDLE, trigger, error = drained.rejection ?: adoption.takeProgressMismatch())
             } catch (e: ReaderAuthException) {
                 onFailure(e, trigger)
             } catch (e: IOException) {
@@ -739,218 +475,6 @@ public class AccountSyncEngine(
         publish(phase, trigger, error = syncError)
     }
 
-    /**
-     * Sends every queued mutation, oldest first, and adopts each result.
-     *
-     * The store is rewritten after every batch, so what it holds is always
-     * exactly what has not been admitted: a process death mid-drain loses no
-     * entry, and the entries it does still hold carry their original
-     * idempotency keys, so the next attempt is a replay rather than a second
-     * admission.
-     *
-     * Returns the last rejection the backend reported, so the caller can
-     * surface its code — a rejection is not a failure of the run.
-     *
-     * A non-retryable refusal of a library change clears the cursor in the very
-     * save that drops the entry (#151). The refusal carries `{}`, so only a read
-     * of the account can undo its optimistic row; recording that owed read in
-     * the document rather than in memory is what keeps it owed when the read
-     * fails or the process dies before it — the next run finds no cursor and
-     * bootstraps, whatever happened in between. No schema change: a missing
-     * cursor already means "read the lists".
-     */
-    private suspend fun drainOutbox(account: ActiveAccount, gateway: ReaderLibraryGateway): DrainOutcome {
-        val pending = account.document.outbox
-        if (pending.isEmpty()) return DrainOutcome(rejection = null)
-
-        val kept = mutableListOf<AccountOutboxEntry>()
-        var rejection: AccountSyncError.Rejected? = null
-        var index = 0
-        while (index < pending.size) {
-            val batch = pending.subList(index, minOf(index + MAX_BATCH, pending.size))
-            val response = try {
-                gateway.applyMutations(batch.map { it.toEnvelope() })
-            } catch (e: ReaderAuthException) {
-                // Nothing in this batch was admitted: keep it, and everything
-                // after it, under the same keys.
-                persist(account, account.document.copy(outbox = kept + pending.drop(index)))
-                throw e
-            }
-            val byKey = response.results.associateBy { it.idempotencyKey }
-            var document = account.document
-            for (entry in batch) {
-                val result = byKey[entry.idempotencyKey]
-                if (result == null) {
-                    // No answer for this envelope: keep it and retry under the
-                    // same key, which the backend will replay if it did admit it.
-                    kept += entry
-                    continue
-                }
-                document = adopt(document, result)
-                if (result.status == ReaderSyncStatus.REJECTED) {
-                    val retryable = result.rejection?.retryable == true
-                    result.rejection?.let { rejection = it.toSyncError(result.resourceId) }
-                    if (retryable) {
-                        kept += entry
-                    } else if (entry.resourceType.isLibraryItem()) {
-                        // Dropped for good, and its optimistic row with it: a
-                        // refusal carries `{}`, so nothing here can say what the
-                        // row was before. The repair read does (#151), and the
-                        // cleared cursor owes it durably, saved with the drop
-                        // below. A refused position changed no row, so it needs none.
-                        document = document.copy(cursor = null)
-                    }
-                }
-            }
-            index += batch.size
-            persist(account, document.copy(outbox = kept + pending.drop(index)))
-        }
-        return DrainOutcome(rejection = rejection)
-    }
-
-    /** What one drain of the outbox reports to the run that made it. */
-    private class DrainOutcome(
-        /** The last rejection the backend stated, surfaced with its own code. */
-        val rejection: AccountSyncError.Rejected?,
-    )
-
-    /**
-     * True when a bootstrap would load the shelf rather than correct it: no row
-     * is held yet. A document without a cursor but with rows is owed the repair
-     * read after a refusal (#151), which keeps the shelf on screen.
-     */
-    private val AccountLibraryDocument.loadsShelf: Boolean
-        get() = !bootstrapped && books.isEmpty()
-
-    /**
-     * Reads the account's lists and takes the stream's head as the cursor.
-     *
-     * The head is read *first*, on purpose: a change admitted between the head
-     * read and the lists is then still after the stored cursor and arrives with
-     * the next delta read. Reading it afterwards would place the cursor past a
-     * change the lists never showed, and that change would be lost. `latest_cursor`
-     * is present in every delta answer, an expired one included, so the head read
-     * asks for one change and uses nothing but that field.
-     *
-     * ## A merge, not a rebuild (#151)
-     *
-     * The snapshot is merged into the stored rows, because the stored rows carry
-     * what no list read can state:
-     *
-     * - a book the lists still return keeps its host records and its known
-     *   revision ([AccountBook.of]); every field the lists state is theirs;
-     * - a book the lists no longer return is gone from the account, so its row
-     *   goes — host records with it;
-     * - every change still queued in the outbox is re-applied on top, in queue
-     *   order ([withQueuedIntents]), which is client contract §7.2 step 5:
-     *   "reconcile the saved outbox against this canonical state". The queue
-     *   itself is untouched — same entries, same idempotency keys — so nothing is
-     *   re-sent or re-minted.
-     *
-     * The document's own host records, import records and outbox are carried
-     * through as they stand. [announce] is false for the repair read after a
-     * refusal: the shelf is not being loaded, only corrected, so it stays in the
-     * syncing phase.
-     */
-    private suspend fun bootstrap(
-        account: ActiveAccount,
-        gateway: ReaderLibraryGateway,
-        trigger: AccountSyncTrigger,
-        announce: Boolean = true,
-    ) {
-        if (announce) publish(AccountSyncPhase.BOOTSTRAPPING, trigger)
-        val head = gateway.deltas(ReaderLibraryClient.FIRST_CURSOR, HEAD_LIMIT)
-        val library = gateway.library()
-        val positions = gateway.progress().progress.associateBy { it.bookId }
-        val stored = account.document
-        val books = library.items.map { item ->
-            val row = AccountBook.of(item, held = stored.book(item.book.id))
-            positions[row.bookId]?.let { progress ->
-                // The bootstrap's second list is keyed by `book_id`, which the
-                // document marks required on `ReaderProgress` — so unlike the
-                // stream there is nothing to derive here, and the portable
-                // location is read through the same seam the stream uses (#120, #139).
-                //
-                // A list read carries no revision. When it returns the very record
-                // this device already held — same server `updated_at` — the stored
-                // revision stands, and so does the mark that the record is this
-                // device's own (#140); a re-bootstrap must not turn this device's
-                // own position into "another device's". A different record keeps
-                // neither.
-                val held = stored.book(row.bookId)
-                    ?.takeIf { it.remotePosition?.updatedAt == progress.updatedAt }
-                val remote = AccountCanonicalPayload.remotePosition(
-                    position = PortableProgress.positionOf(
-                        buildJsonObject {
-                            put(
-                                "location",
-                                Json.encodeToJsonElement(ReaderPortableLocationV1.serializer(), progress.location),
-                            )
-                            put("progress_percent", JsonPrimitive(progress.progressPercent))
-                            put("updated_at", JsonPrimitive(progress.updatedAt))
-                            progress.chapterTitle?.let { put("chapter_title", JsonPrimitive(it)) }
-                        },
-                    ),
-                    existing = held?.remotePosition,
-                    revision = null,
-                    serverAdmittedAt = null,
-                )
-                row.copy(
-                    progressPercent = progress.progressPercent,
-                    progressUpdatedAt = progress.updatedAt,
-                    remotePosition = remote,
-                    ownPositionChangeKey = held?.ownPositionChangeKey?.takeIf { it == remote.changeKey },
-                )
-            } ?: row
-        }
-        persist(account, stored.copy(books = books, cursor = head.latestCursor).withQueuedIntents())
-    }
-
-    /** Reads the stream from the stored cursor until `has_more` is false. */
-    private suspend fun readDeltas(
-        account: ActiveAccount,
-        gateway: ReaderLibraryGateway,
-        trigger: AccountSyncTrigger,
-    ) {
-        val stored = account.document.cursor
-        if (stored == null || !CURSOR.matches(stored)) {
-            // A cursor this client cannot send is no cursor: start over rather
-            // than hand `:reader-library` a value it refuses.
-            bootstrap(account, gateway, trigger)
-            return
-        }
-        var cursor: String = stored
-        while (true) {
-            val response = gateway.deltas(cursor, ReaderLibraryClient.DEFAULT_DELTA_LIMIT)
-            if (response.rebootstrapRequired ||
-                response.status == ReaderDeltaStatus.CURSOR_EXPIRED ||
-                response.status == ReaderDeltaStatus.CURSOR_INVALID
-            ) {
-                bootstrap(account, gateway, trigger)
-                return
-            }
-            var document = account.document
-            for (change in response.changes) {
-                document = applyCanonical(
-                    document = document,
-                    resourceType = change.resourceType,
-                    resourceId = change.resourceId,
-                    kind = change.kind,
-                    payload = change.canonicalPayload,
-                    revision = change.revision,
-                    serverAdmittedAt = change.serverAdmittedAt,
-                    origin = CanonicalOrigin.STREAM,
-                )
-            }
-            val next = response.nextCursor ?: response.latestCursor
-            persist(account, document.copy(cursor = next))
-            // A page that says there is more but does not advance would loop for
-            // ever; stop and let the next trigger try again.
-            if (!response.hasMore || next == cursor) break
-            cursor = next
-        }
-    }
-
     // ------------------------------------------------------------- own writes
 
     /**
@@ -980,7 +504,7 @@ public class AccountSyncEngine(
         resourceType: ReaderResourceType = ReaderResourceType.LIBRARY_ITEM,
         publishKey: Pair<String?, Int>? = null,
     ) {
-        checkNotInHostCallback()
+        hostCallbacks.checkNotInHostCallback()
         val sent = changes.trySend(QueuedChange(owner, bookId, kind, payload, resourceType, publishKey))
         // An unlimited channel that is never closed takes every element.
         check(sent.isSuccess) { "the engine's change queue refused a change" }
@@ -1040,9 +564,9 @@ public class AccountSyncEngine(
      */
     private suspend fun queue(change: QueuedChange): Boolean {
         val userId = when (val owner = change.owner) {
-            Owner.Unresolved -> firstSession.await()
-            Owner.Nobody -> null
-            is Owner.User -> owner.userId
+            ChangeOwner.Unresolved -> firstSession.await()
+            ChangeOwner.Nobody -> null
+            is ChangeOwner.User -> owner.userId
         } ?: return false
         return mutex.withLock {
             val account = active
@@ -1059,9 +583,9 @@ public class AccountSyncEngine(
     private suspend fun queueActive(account: ActiveAccount, change: QueuedChange): Boolean {
         // AD-25's guard, under the lock that also clears it (#163).
         if (change.publishKey != null && published[change.bookId] == change.publishKey) return false
-        val document = account.document.queuing(change)
+        val document = account.document.queuing(change, newIdempotencyKey, now)
         try {
-            persist(account, document)
+            account.persist(document)
         } catch (e: IOException) {
             publish(
                 AccountSyncPhase.DEFERRED,
@@ -1099,7 +623,7 @@ public class AccountSyncEngine(
                         if (stored.userId.isNotEmpty() && stored.userId != userId) {
                             "the stored account library belongs to another account"
                         } else {
-                            store.save(stored.copy(userId = userId).queuing(change))
+                            store.save(stored.copy(userId = userId).queuing(change, newIdempotencyKey, now))
                             null
                         }
                     }
@@ -1117,289 +641,7 @@ public class AccountSyncEngine(
         }
     }
 
-    /** This document with [change] appended to its outbox and its intent on the row. */
-    private fun AccountLibraryDocument.queuing(change: QueuedChange): AccountLibraryDocument {
-        val existing = book(change.bookId)
-        val entry = AccountOutboxEntry(
-            idempotencyKey = newIdempotencyKey(),
-            resourceType = change.resourceType,
-            resourceId = change.bookId,
-            mutationKind = change.kind,
-            // The revision of the resource this envelope is about, which
-            // for a position is the *progress* resource's own and not the
-            // library item's — two resources whose revisions have nothing
-            // to do with each other. 0 for one this device has never seen,
-            // which is what the contract asks for.
-            baseRevision = when (change.resourceType) {
-                ReaderResourceType.READING_PROGRESS -> existing?.remotePosition?.revision ?: 0
-                else -> existing?.revision ?: 0
-            },
-            payload = change.payload,
-            clientCreatedAt = now(),
-        )
-        val queued = copy(outbox = outbox + entry)
-        return if (existing != null) queued.withBook(intentOf(entry, existing)) else queued
-    }
-
-    /**
-     * The row as [entry]'s queued intent leaves it: what the shelf shows while
-     * the change waits to be admitted.
-     *
-     * A pure function of the stored entry, so the intent applied when the change
-     * is queued and the intent re-applied on top of a re-bootstrap's snapshot
-     * (#151) are one and the same. A removal takes the row off the shelf, an Undo
-     * puts it back, a status upsert sets the status and, when the payload names
-     * one, the last-opened time. A position changes no library row — its
-     * account-side record arrives with the backend's answer.
-     */
-    private fun intentOf(entry: AccountOutboxEntry, book: AccountBook): AccountBook {
-        if (!entry.resourceType.isLibraryItem()) return book
-        return when (entry.mutationKind) {
-            ReaderMutationKind.DELETE -> book.copy(removed = true)
-
-            ReaderMutationKind.RESTORE -> book.copy(removed = false)
-
-            ReaderMutationKind.UPSERT -> {
-                val status = (entry.payload["status"] as? JsonPrimitive)?.content
-                    ?.let { wire -> ReaderLibraryStatus.entries.firstOrNull { it.wireName() == wire } }
-                book.copy(
-                    status = status ?: book.status,
-                    lastOpenedAt = if (entry.payload.containsKey("last_opened_at")) {
-                        (entry.payload["last_opened_at"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-                    } else {
-                        book.lastOpenedAt
-                    },
-                )
-            }
-
-            ReaderMutationKind.UNKNOWN -> book
-        }
-    }
-
-    /**
-     * Every queued change's intent, re-applied in queue order on top of this
-     * document's rows (client contract §7.2 step 5, #151). A change for a book
-     * the account holds no row for invents none, exactly as queueing it did not.
-     */
-    private fun AccountLibraryDocument.withQueuedIntents(): AccountLibraryDocument =
-        outbox.fold(this) { document, entry ->
-            document.book(entry.resourceId)?.let { document.withBook(intentOf(entry, it)) } ?: document
-        }
-
-    private fun ReaderResourceType.isLibraryItem(): Boolean =
-        this == ReaderResourceType.LIBRARY_ITEM || this == ReaderResourceType.BOOK
-
-    // ------------------------------------------------------------- adoption
-
-    /**
-     * Adopts one mutation result. A rejection carries an empty canonical
-     * payload by contract and changes no row here — a non-retryable one is
-     * undone by the repair read the drain asks for (#151); everything else — `applied`,
-     * `replayed`, `superseded` and `conflict` alike — is adopted as it stands,
-     * unless its revision is older than the one already stored (§7.3, #147: a
-     * late answer never moves a book's state backwards).
-     *
-     * `applied` and `replayed` are the backend admitting *this device's own*
-     * mutation, so for a position they are recorded as this device's own
-     * (#140). `superseded` and `conflict` carry the position that beat it —
-     * somebody else's — and are adopted without that mark.
-     */
-    private fun adopt(document: AccountLibraryDocument, result: ReaderSyncMutationResult): AccountLibraryDocument {
-        if (result.status == ReaderSyncStatus.REJECTED) return document
-        val payload = result.canonicalPayload.takeIf { it.isNotEmpty() }
-            ?: result.conflict?.canonicalPayload
-            ?: result.canonicalPayload
-        return applyCanonical(
-            document = document,
-            resourceType = result.resourceType,
-            resourceId = result.resourceId,
-            kind = result.mutationKind,
-            payload = payload,
-            revision = result.revision ?: result.conflict?.remoteRevision,
-            serverAdmittedAt = result.serverAdmittedAt,
-            origin = when (result.status) {
-                ReaderSyncStatus.APPLIED, ReaderSyncStatus.REPLAYED -> CanonicalOrigin.ADMITTED_HERE
-                else -> CanonicalOrigin.RESULT
-            },
-        )
-    }
-
-    /** Where a canonical payload came from, which decides the two rules below that differ by source. */
-    private enum class CanonicalOrigin {
-        /** This device's own mutation, `applied` or `replayed`: the canonical result is this device's write. */
-        ADMITTED_HERE,
-
-        /**
-         * Any other mutation result — `superseded` or `conflict` — adopted as it
-         * stands. Its mutation kind is this device's request, not the outcome, so
-         * a library item's presence is read from the canonical payload ([present]).
-         */
-        RESULT,
-
-        /** A change read from the account's change stream, which names no originating client. */
-        STREAM,
-    }
-
-    private fun applyCanonical(
-        document: AccountLibraryDocument,
-        resourceType: ReaderResourceType,
-        resourceId: String,
-        kind: ReaderMutationKind,
-        payload: JsonObject,
-        revision: Long?,
-        /** The server's admission time for this change, when it came from the stream. */
-        serverAdmittedAt: String? = null,
-        origin: CanonicalOrigin,
-    ): AccountLibraryDocument = when (resourceType) {
-        ReaderResourceType.LIBRARY_ITEM, ReaderResourceType.BOOK -> {
-            val existing = document.book(resourceId)
-            if (existing != null && revision != null && !replaces(revision, existing.revision, origin)) {
-                // Client contract §7.3 (#147, #149): a stream change is applied only
-                // when its revision is strictly newer than the stored one, and a
-                // mutation result only when it is not older. An older answer — a late
-                // `replayed` result, an out-of-order delivery — must not move the row
-                // back or take it off the shelf; an equal-revision stream change is
-                // the state this device already holds, and applying it would revert
-                // a local intent still queued in the outbox (a pending removal would
-                // reappear). A *result* at an equal revision is different (§7.4): it
-                // is the backend's verdict on this device's own queued mutation, and
-                // it is what discards an optimistic row the backend did not keep
-                // (`superseded`, `conflict`).
-                document
-            } else if (present(kind, payload, origin)) {
-                val row = AccountCanonicalPayload.libraryItem(existing, resourceId, payload, revision)
-                document.withBook(row.copy(removed = false))
-            } else {
-                existing
-                    ?.let { document.withBook(it.copy(removed = true, revision = revision ?: it.revision)) }
-                    ?: document
-            }
-        }
-
-        // Which book a position record is about is a *derivation*, not a fact the
-        // document states, so it goes through the one seam that owns it and a
-        // record this app cannot place becomes a visible outcome rather than a
-        // dropped one (REQ-511).
-        ReaderResourceType.READING_PROGRESS ->
-            when (
-                val record = PortableProgress.recordFor(
-                    resourceId = resourceId,
-                    payload = payload,
-                    knownBook = { document.book(it) != null },
-                )
-            ) {
-                is ProgressRecord.Recognized -> {
-                    val existing = document.book(record.bookId)
-                    val stored = existing?.remotePosition
-                    if (existing != null && stored != null && revision != null && revision <= stored.revision) {
-                        // Client contract §7.3: a result or stream change is applied
-                        // only when its revision is newer than the one this device
-                        // already holds for the resource — whatever its source
-                        // (#147: a late `replayed` result used to overwrite a newer
-                        // position the stream had delivered). The stream names no
-                        // originating client, so this is also what recognises this
-                        // device's own admitted position coming back to it (#140):
-                        // it carries the very revision §7.4 stored when the result
-                        // was adopted. An admitted result at the *same* revision is
-                        // that same record, so it is still marked as this device's.
-                        if (origin == CanonicalOrigin.ADMITTED_HERE && revision == stored.revision &&
-                            existing.ownPositionChangeKey != stored.changeKey
-                        ) {
-                            document.withBook(existing.copy(ownPositionChangeKey = stored.changeKey))
-                        } else {
-                            document
-                        }
-                    } else {
-                        AccountCanonicalPayload.readingProgress(
-                            existing = existing,
-                            payload = payload,
-                            position = record.position,
-                            revision = revision,
-                            serverAdmittedAt = serverAdmittedAt,
-                        )
-                            ?.let { row ->
-                                if (origin == CanonicalOrigin.ADMITTED_HERE) {
-                                    row.copy(ownPositionChangeKey = row.remotePosition?.changeKey)
-                                } else {
-                                    row
-                                }
-                            }
-                            ?.let(document::withBook)
-                            ?: document
-                    }
-                }
-
-                is ProgressRecord.Unrecognized -> {
-                    progressMismatch = AccountSyncError.UnrecognizedProgressRecord(
-                        resourceId = record.resourceId,
-                        payloadBookId = record.payloadBookId,
-                        reason = record.reason,
-                    )
-                    document
-                }
-            }
-
-        // profile, settings, note and bookmark are never sent and never shown.
-        ReaderResourceType.PROFILE,
-        ReaderResourceType.SETTINGS,
-        ReaderResourceType.NOTE,
-        ReaderResourceType.BOOKMARK,
-        ReaderResourceType.UNKNOWN,
-        -> document
-    }
-
-    /**
-     * Whether the canonical state of a library item is a live membership (true)
-     * or the tombstone (false).
-     *
-     * A stream change and this device's own admitted mutation say it with their
-     * kind: the stream's `kind` is the canonical change kind, and an `applied` or
-     * `replayed` result is the backend doing exactly what was asked. A
-     * `superseded` or `conflict` result is the backend's verdict *against* the
-     * mutation, so its kind is this device's request, not the outcome (§7.4,
-     * #149): presence comes from the canonical payload the backend returned. The
-     * backend's canonical state for a removed membership is the empty object
-     * (reader-api `publication_membership.py`, `_structural_conflict` at
-     * `909174af`), and a live one is the item's body — so a queued removal the
-     * backend answered with the live book ends on the shelf, and a queued upsert
-     * answered with a tombstone ends off it.
-     */
-    private fun present(kind: ReaderMutationKind, payload: JsonObject, origin: CanonicalOrigin): Boolean =
-        when (origin) {
-            CanonicalOrigin.RESULT -> payload.isNotEmpty()
-            CanonicalOrigin.ADMITTED_HERE, CanonicalOrigin.STREAM -> kind != ReaderMutationKind.DELETE
-        }
-
-    /**
-     * Whether a library item's canonical state at [incoming] replaces the one
-     * stored at [stored] (§7.3, §7.4): a stream change must be strictly newer, a
-     * mutation result must be equal or newer.
-     */
-    private fun replaces(incoming: Long, stored: Long, origin: CanonicalOrigin): Boolean = when (origin) {
-        CanonicalOrigin.STREAM -> incoming > stored
-        CanonicalOrigin.ADMITTED_HERE, CanonicalOrigin.RESULT -> incoming >= stored
-    }
-
     // -------------------------------------------------------------- plumbing
-
-    /**
-     * The unplaceable progress record, if one arrived, and clears it.
-     *
-     * Taken rather than read so it is reported once per occurrence: the next
-     * settled state after a clean run says nothing, which is what makes the
-     * report mean "this happened just now" rather than "this happened once".
-     */
-    private fun takeProgressMismatch(): AccountSyncError.UnrecognizedProgressRecord? {
-        val mismatch = progressMismatch
-        progressMismatch = null
-        return mismatch
-    }
-
-    private suspend fun persist(account: ActiveAccount, document: AccountLibraryDocument) {
-        val stamped = document.copy(userId = account.userId)
-        withContext(ioDispatcher) { account.store.save(stamped) }
-        account.document = stamped
-    }
 
     private fun publish(
         phase: AccountSyncPhase,
@@ -1418,15 +660,5 @@ public class AccountSyncEngine(
             capabilityReason = capabilityReason,
             lastTrigger = trigger,
         )
-    }
-
-    private companion object {
-        val MAX_BATCH: Int = ReaderSyncMutationBatchRequest.MAX_MUTATIONS
-
-        /** The head read wants `latest_cursor` and nothing else, so it asks for one change. */
-        const val HEAD_LIMIT: Int = ReaderLibraryClient.MIN_DELTA_LIMIT
-
-        /** The shape `:reader-library` accepts as a cursor. */
-        val CURSOR = Regex("^[0-9]+$")
     }
 }
