@@ -9,8 +9,8 @@ import com.cedagova.fastreader.content.Token
 import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderSession
-import com.cedagova.fastreader.reader.RemainingTimeIndex
 import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.fastreader.timing.RemainingTimeIndex
 import kotlin.math.roundToInt
 
 /**

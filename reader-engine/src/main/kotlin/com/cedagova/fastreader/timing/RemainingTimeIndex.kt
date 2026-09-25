@@ -1,10 +1,6 @@
-package com.cedagova.fastreader.reader
+package com.cedagova.fastreader.timing
 
 import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.timing.PauseStrength
-import com.cedagova.fastreader.timing.RsvpTiming
-import com.cedagova.fastreader.timing.RsvpTimingEngine
-import com.cedagova.fastreader.timing.TimingSettings
 
 /**
  * Time remaining at the current speed (REQ-017), in constant time per word.

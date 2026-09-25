@@ -6,7 +6,6 @@ import com.cedagova.fastreader.content.Boundary
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.WordToken
-import com.cedagova.fastreader.reader.RemainingTimeIndex
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest

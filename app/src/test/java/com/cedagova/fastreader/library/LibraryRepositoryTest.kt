@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.library
 
+import com.cedagova.fastreader.content.BookDigest
 import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.epub.BookDigest
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore

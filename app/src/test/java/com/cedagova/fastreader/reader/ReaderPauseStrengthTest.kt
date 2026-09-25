@@ -6,6 +6,7 @@ import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.reader.ui.ReaderUiState
 import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.fastreader.timing.RemainingTimeIndex
 import com.cedagova.fastreader.timing.RsvpTimingEngine
 import com.cedagova.fastreader.timing.TimingSettings
 import com.cedagova.fastreader.timing.TimingState

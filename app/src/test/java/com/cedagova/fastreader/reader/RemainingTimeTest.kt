@@ -5,6 +5,7 @@ import com.cedagova.fastreader.content.Boundary
 import com.cedagova.fastreader.content.WordClass
 import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.fastreader.timing.RemainingTimeIndex
 import com.cedagova.fastreader.timing.RsvpTimingEngine
 import com.cedagova.fastreader.timing.TimingSettings
 import kotlin.math.abs

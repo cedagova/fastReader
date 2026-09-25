@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.external
 
+import com.cedagova.fastreader.content.BookDigest
 import com.cedagova.fastreader.content.BookIdentity
-import com.cedagova.fastreader.epub.BookDigest
 import com.cedagova.fastreader.epub.EpubByteSource
 import com.cedagova.fastreader.library.DocumentGateway
 import com.cedagova.fastreader.library.LibraryRepository

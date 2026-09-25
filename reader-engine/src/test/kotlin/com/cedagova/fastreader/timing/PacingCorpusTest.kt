@@ -8,7 +8,6 @@ import com.cedagova.fastreader.content.Tokenizer
 import com.cedagova.fastreader.content.WordClass
 import com.cedagova.fastreader.content.WordClassifier
 import com.cedagova.fastreader.content.WordToken
-import com.cedagova.fastreader.reader.RemainingTimeIndex
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

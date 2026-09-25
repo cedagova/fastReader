@@ -155,7 +155,7 @@ enum class PauseStrength(val extraPauseScale: Double) {
  * unpunctuated sentence at the same setting average the same speed.
  *
  * [meanMultiplier] is that measurement, made by
- * [com.cedagova.fastreader.reader.RemainingTimeIndex] at the current
+ * [RemainingTimeIndex] at the current
  * [pauseStrength] and handed here by the session. It is not persisted — it is a
  * property of the open book, not of the reader — and it defaults to `1.0`, so
  * a settings value built without a book (the index's own reference build, a
