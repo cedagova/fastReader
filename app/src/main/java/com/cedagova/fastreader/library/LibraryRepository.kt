@@ -1,12 +1,12 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.epub.EpubByteSource
-import com.cedagova.fastreader.epub.FileEpubByteSource
 import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeMirror
+import com.cedagova.reader.engine.epub.EpubByteSource
+import com.cedagova.reader.engine.epub.FileEpubByteSource
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException

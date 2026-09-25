@@ -1,0 +1,569 @@
+public final class com/cedagova/reader/engine/content/BookContent {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/cedagova/reader/engine/content/FrontMatter;I)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/cedagova/reader/engine/content/FrontMatter;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun chapterAt (I)Lcom/cedagova/reader/engine/content/Chapter;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Lcom/cedagova/reader/engine/content/FrontMatter;
+	public final fun component8 ()I
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/cedagova/reader/engine/content/FrontMatter;I)Lcom/cedagova/reader/engine/content/BookContent;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/BookContent;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/cedagova/reader/engine/content/FrontMatter;IILjava/lang/Object;)Lcom/cedagova/reader/engine/content/BookContent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBookDigest ()Ljava/lang/String;
+	public final fun getChapters ()Ljava/util/List;
+	public final fun getFrontMatter ()Lcom/cedagova/reader/engine/content/FrontMatter;
+	public final fun getGaps ()Ljava/util/List;
+	public final fun getLanguage ()Ljava/lang/String;
+	public final fun getPipelineVersion ()I
+	public final fun getStructuralFingerprint ()Ljava/lang/String;
+	public final fun getTokens ()Ljava/util/List;
+	public final fun getTotalTokens ()I
+	public final fun getTotalWords ()I
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public final fun paragraphStart (I)I
+	public final fun positionAt (I)Lcom/cedagova/reader/engine/content/TokenPosition;
+	public final fun progressFraction (I)F
+	public final fun sentenceStart (I)I
+	public fun toString ()Ljava/lang/String;
+	public final fun wordsRemaining (I)I
+}
+
+public abstract interface class com/cedagova/reader/engine/content/BookContentResult {
+}
+
+public final class com/cedagova/reader/engine/content/BookContentResult$Failed : com/cedagova/reader/engine/content/BookContentResult {
+	public fun <init> (Lcom/cedagova/reader/engine/content/ContentFailureReason;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/cedagova/reader/engine/content/ContentFailureReason;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/cedagova/reader/engine/content/ContentFailureReason;Ljava/lang/String;)Lcom/cedagova/reader/engine/content/BookContentResult$Failed;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/BookContentResult$Failed;Lcom/cedagova/reader/engine/content/ContentFailureReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/BookContentResult$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getReason ()Lcom/cedagova/reader/engine/content/ContentFailureReason;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/BookContentResult$Parsed : com/cedagova/reader/engine/content/BookContentResult {
+	public fun <init> (Lcom/cedagova/reader/engine/content/BookContent;)V
+	public final fun component1 ()Lcom/cedagova/reader/engine/content/BookContent;
+	public final fun copy (Lcom/cedagova/reader/engine/content/BookContent;)Lcom/cedagova/reader/engine/content/BookContentResult$Parsed;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/BookContentResult$Parsed;Lcom/cedagova/reader/engine/content/BookContent;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/BookContentResult$Parsed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContent ()Lcom/cedagova/reader/engine/content/BookContent;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/BookDigest {
+	public static final field INSTANCE Lcom/cedagova/reader/engine/content/BookDigest;
+	public final fun of-4nnQhPU (Lcom/cedagova/reader/engine/epub/EpubByteSource;)Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/BookIdentity {
+	public static final field Companion Lcom/cedagova/reader/engine/content/BookIdentity$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/BookIdentity;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/BookIdentity$Companion {
+	public final fun ofSha256Hex-YKkN0VE (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/Boundary : java/lang/Enum {
+	public static final field CLAUSE Lcom/cedagova/reader/engine/content/Boundary;
+	public static final field HEADING Lcom/cedagova/reader/engine/content/Boundary;
+	public static final field NONE Lcom/cedagova/reader/engine/content/Boundary;
+	public static final field PARAGRAPH Lcom/cedagova/reader/engine/content/Boundary;
+	public static final field SENTENCE Lcom/cedagova/reader/engine/content/Boundary;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/Boundary;
+	public static fun values ()[Lcom/cedagova/reader/engine/content/Boundary;
+}
+
+public final class com/cedagova/reader/engine/content/Chapter {
+	public fun <init> (ILjava/lang/String;Lcom/cedagova/reader/engine/content/ChapterTitleSource;IILjava/lang/String;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lcom/cedagova/reader/engine/content/ChapterTitleSource;
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()Ljava/lang/String;
+	public final fun contains (I)Z
+	public final fun copy (ILjava/lang/String;Lcom/cedagova/reader/engine/content/ChapterTitleSource;IILjava/lang/String;)Lcom/cedagova/reader/engine/content/Chapter;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/Chapter;ILjava/lang/String;Lcom/cedagova/reader/engine/content/ChapterTitleSource;IILjava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/Chapter;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEndTokenIndex ()I
+	public final fun getIndex ()I
+	public final fun getSpinePath ()Ljava/lang/String;
+	public final fun getStartTokenIndex ()I
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun getTitleSource ()Lcom/cedagova/reader/engine/content/ChapterTitleSource;
+	public final fun getTokenCount ()I
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/ChapterTitleSource : java/lang/Enum {
+	public static final field FALLBACK Lcom/cedagova/reader/engine/content/ChapterTitleSource;
+	public static final field HEADING Lcom/cedagova/reader/engine/content/ChapterTitleSource;
+	public static final field TOC Lcom/cedagova/reader/engine/content/ChapterTitleSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/ChapterTitleSource;
+	public static fun values ()[Lcom/cedagova/reader/engine/content/ChapterTitleSource;
+}
+
+public abstract interface class com/cedagova/reader/engine/content/ContentBlock {
+}
+
+public final class com/cedagova/reader/engine/content/ContentBlock$Paragraph : com/cedagova/reader/engine/content/ContentBlock {
+	public fun <init> (Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun copy (Ljava/lang/String;Z)Lcom/cedagova/reader/engine/content/ContentBlock$Paragraph;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/ContentBlock$Paragraph;Ljava/lang/String;ZILjava/lang/Object;)Lcom/cedagova/reader/engine/content/ContentBlock$Paragraph;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isHeading ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/ContentBlock$Skip : com/cedagova/reader/engine/content/ContentBlock {
+	public fun <init> (Lcom/cedagova/reader/engine/content/SkipKind;Ljava/lang/String;)V
+	public final fun component1 ()Lcom/cedagova/reader/engine/content/SkipKind;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lcom/cedagova/reader/engine/content/SkipKind;Ljava/lang/String;)Lcom/cedagova/reader/engine/content/ContentBlock$Skip;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/ContentBlock$Skip;Lcom/cedagova/reader/engine/content/SkipKind;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/ContentBlock$Skip;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKind ()Lcom/cedagova/reader/engine/content/SkipKind;
+	public final fun getLabel ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/ContentFailureReason : java/lang/Enum {
+	public static final field CORRUPT_ARCHIVE Lcom/cedagova/reader/engine/content/ContentFailureReason;
+	public static final field INVALID_STRUCTURE Lcom/cedagova/reader/engine/content/ContentFailureReason;
+	public static final field NO_READABLE_CONTENT Lcom/cedagova/reader/engine/content/ContentFailureReason;
+	public static final field UNREADABLE_SOURCE Lcom/cedagova/reader/engine/content/ContentFailureReason;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/ContentFailureReason;
+	public static fun values ()[Lcom/cedagova/reader/engine/content/ContentFailureReason;
+}
+
+public final class com/cedagova/reader/engine/content/ContentGap {
+	public fun <init> (Ljava/lang/String;ILcom/cedagova/reader/engine/content/GapReason;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()Lcom/cedagova/reader/engine/content/GapReason;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;ILcom/cedagova/reader/engine/content/GapReason;Ljava/lang/String;)Lcom/cedagova/reader/engine/content/ContentGap;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/ContentGap;Ljava/lang/String;ILcom/cedagova/reader/engine/content/GapReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/ContentGap;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChapterIndex ()I
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getReason ()Lcom/cedagova/reader/engine/content/GapReason;
+	public final fun getSpinePath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/ContentPipelineVersion {
+	public static final field CURRENT I
+	public static final field INSTANCE Lcom/cedagova/reader/engine/content/ContentPipelineVersion;
+}
+
+public final class com/cedagova/reader/engine/content/ContentProgress {
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Lcom/cedagova/reader/engine/content/ContentProgress;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/ContentProgress;IIILjava/lang/Object;)Lcom/cedagova/reader/engine/content/ContentProgress;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompletedItems ()I
+	public final fun getFraction ()F
+	public final fun getTotalItems ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/EpubContentPipeline {
+	public fun <init> ()V
+	public fun <init> (Lkotlinx/coroutines/CoroutineDispatcher;)V
+	public synthetic fun <init> (Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun parse-uZfnOuA (Lcom/cedagova/reader/engine/epub/EpubByteSource;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun parse-uZfnOuA$default (Lcom/cedagova/reader/engine/content/EpubContentPipeline;Lcom/cedagova/reader/engine/epub/EpubByteSource;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/engine/content/FrontMatter {
+	public fun <init> (IILjava/lang/String;Lcom/cedagova/reader/engine/content/FrontMatterSource;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lcom/cedagova/reader/engine/content/FrontMatterSource;
+	public final fun copy (IILjava/lang/String;Lcom/cedagova/reader/engine/content/FrontMatterSource;)Lcom/cedagova/reader/engine/content/FrontMatter;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/FrontMatter;IILjava/lang/String;Lcom/cedagova/reader/engine/content/FrontMatterSource;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/FrontMatter;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBodyChapterTitle ()Ljava/lang/String;
+	public final fun getFirstBodyChapterIndex ()I
+	public final fun getSource ()Lcom/cedagova/reader/engine/content/FrontMatterSource;
+	public final fun getStartTokenIndex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/FrontMatterSource : java/lang/Enum {
+	public static final field GUIDE Lcom/cedagova/reader/engine/content/FrontMatterSource;
+	public static final field LANDMARKS Lcom/cedagova/reader/engine/content/FrontMatterSource;
+	public static final field TITLES Lcom/cedagova/reader/engine/content/FrontMatterSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/FrontMatterSource;
+	public static fun values ()[Lcom/cedagova/reader/engine/content/FrontMatterSource;
+}
+
+public final class com/cedagova/reader/engine/content/GapReason : java/lang/Enum {
+	public static final field MISSING_FROM_ARCHIVE Lcom/cedagova/reader/engine/content/GapReason;
+	public static final field NO_TEXT Lcom/cedagova/reader/engine/content/GapReason;
+	public static final field UNREADABLE Lcom/cedagova/reader/engine/content/GapReason;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/GapReason;
+	public static fun values ()[Lcom/cedagova/reader/engine/content/GapReason;
+}
+
+public final class com/cedagova/reader/engine/content/SkipKind : java/lang/Enum {
+	public static final field IMAGE Lcom/cedagova/reader/engine/content/SkipKind;
+	public static final field MISSING_CONTENT Lcom/cedagova/reader/engine/content/SkipKind;
+	public static final field TABLE Lcom/cedagova/reader/engine/content/SkipKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/SkipKind;
+	public static fun values ()[Lcom/cedagova/reader/engine/content/SkipKind;
+}
+
+public final class com/cedagova/reader/engine/content/SkipMarkerToken : com/cedagova/reader/engine/content/Token {
+	public fun <init> (ILcom/cedagova/reader/engine/content/SkipKind;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/lang/String;)V
+	public synthetic fun <init> (ILcom/cedagova/reader/engine/content/SkipKind;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/cedagova/reader/engine/content/SkipKind;
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()Lcom/cedagova/reader/engine/content/Boundary;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun copy (ILcom/cedagova/reader/engine/content/SkipKind;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/lang/String;)Lcom/cedagova/reader/engine/content/SkipMarkerToken;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/SkipMarkerToken;ILcom/cedagova/reader/engine/content/SkipKind;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/SkipMarkerToken;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getBoundary ()Lcom/cedagova/reader/engine/content/Boundary;
+	public fun getChapterIndex ()I
+	public fun getDisplayText ()Ljava/lang/String;
+	public fun getGapAfter ()Ljava/lang/String;
+	public fun getIndex ()I
+	public final fun getKind ()Lcom/cedagova/reader/engine/content/SkipKind;
+	public final fun getLabel ()Ljava/lang/String;
+	public fun getParagraphIndex ()I
+	public fun getSentenceIndex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/engine/content/Token {
+	public abstract fun getBoundary ()Lcom/cedagova/reader/engine/content/Boundary;
+	public abstract fun getChapterIndex ()I
+	public abstract fun getDisplayText ()Ljava/lang/String;
+	public fun getGapAfter ()Ljava/lang/String;
+	public abstract fun getIndex ()I
+	public abstract fun getParagraphIndex ()I
+	public abstract fun getSentenceIndex ()I
+}
+
+public final class com/cedagova/reader/engine/content/Token$DefaultImpls {
+	public static fun getGapAfter (Lcom/cedagova/reader/engine/content/Token;)Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/TokenPosition {
+	public fun <init> (Ljava/lang/String;II)V
+	public synthetic fun <init> (Ljava/lang/String;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun copy (Ljava/lang/String;II)Lcom/cedagova/reader/engine/content/TokenPosition;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/TokenPosition;Ljava/lang/String;IIILjava/lang/Object;)Lcom/cedagova/reader/engine/content/TokenPosition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBookDigest ()Ljava/lang/String;
+	public final fun getPipelineVersion ()I
+	public final fun getTokenIndex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/content/Tokenizer {
+	public static final field INSTANCE Lcom/cedagova/reader/engine/content/Tokenizer;
+	public final fun tokenize (Ljava/util/List;ILcom/cedagova/reader/engine/content/Tokenizer$StreamState;)Ljava/util/List;
+}
+
+public final class com/cedagova/reader/engine/content/Tokenizer$StreamState {
+	public fun <init> ()V
+	public fun <init> (III)V
+	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getNextIndex ()I
+	public final fun getParagraphIndex ()I
+	public final fun getSentenceIndex ()I
+	public final fun setNextIndex (I)V
+	public final fun setParagraphIndex (I)V
+	public final fun setSentenceIndex (I)V
+}
+
+public final class com/cedagova/reader/engine/content/WordClass : java/lang/Enum {
+	public static final field ABBREVIATION Lcom/cedagova/reader/engine/content/WordClass;
+	public static final field ALL_CAPS Lcom/cedagova/reader/engine/content/WordClass;
+	public static final field BREATH Lcom/cedagova/reader/engine/content/WordClass;
+	public static final field LONG Lcom/cedagova/reader/engine/content/WordClass;
+	public static final field NUMBER Lcom/cedagova/reader/engine/content/WordClass;
+	public static final field RARE Lcom/cedagova/reader/engine/content/WordClass;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/content/WordClass;
+	public static fun values ()[Lcom/cedagova/reader/engine/content/WordClass;
+}
+
+public final class com/cedagova/reader/engine/content/WordToken : com/cedagova/reader/engine/content/Token {
+	public fun <init> (ILjava/lang/String;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/util/Set;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;)V
+	public synthetic fun <init> (ILjava/lang/String;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/util/Set;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Ljava/lang/Integer;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6 ()Lcom/cedagova/reader/engine/content/Boundary;
+	public final fun component7 ()Ljava/util/Set;
+	public final fun component8 ()Z
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (ILjava/lang/String;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/util/Set;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;)Lcom/cedagova/reader/engine/content/WordToken;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/content/WordToken;ILjava/lang/String;IIILcom/cedagova/reader/engine/content/Boundary;Ljava/util/Set;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/cedagova/reader/engine/content/WordToken;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getBoundary ()Lcom/cedagova/reader/engine/content/Boundary;
+	public fun getChapterIndex ()I
+	public final fun getClasses ()Ljava/util/Set;
+	public final fun getCoreEnd ()I
+	public final fun getCoreStart ()I
+	public fun getDisplayText ()Ljava/lang/String;
+	public fun getGapAfter ()Ljava/lang/String;
+	public fun getIndex ()I
+	public final fun getLeading ()Ljava/lang/String;
+	public fun getParagraphIndex ()I
+	public fun getSentenceIndex ()I
+	public final fun getSpan ()Ljava/lang/Integer;
+	public final fun getText ()Ljava/lang/String;
+	public final fun getTrailing ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun isHeading ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/engine/epub/EpubByteSource {
+	public abstract fun open ()Ljava/io/InputStream;
+	public fun openChannel ()Ljava/nio/channels/SeekableByteChannel;
+}
+
+public final class com/cedagova/reader/engine/epub/EpubByteSource$DefaultImpls {
+	public static fun openChannel (Lcom/cedagova/reader/engine/epub/EpubByteSource;)Ljava/nio/channels/SeekableByteChannel;
+}
+
+public final class com/cedagova/reader/engine/epub/EpubCover {
+	public fun <init> (Ljava/lang/String;[B)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBytes ()[B
+	public final fun getMediaType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/cedagova/reader/engine/epub/EpubInspection {
+	public abstract fun getContentDigest ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/epub/EpubInspection$Readable : com/cedagova/reader/engine/epub/EpubInspection {
+	public fun <init> (Ljava/lang/String;Lcom/cedagova/reader/engine/epub/EpubMetadata;Lcom/cedagova/reader/engine/epub/EpubCover;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/cedagova/reader/engine/epub/EpubMetadata;
+	public final fun component3 ()Lcom/cedagova/reader/engine/epub/EpubCover;
+	public final fun copy (Ljava/lang/String;Lcom/cedagova/reader/engine/epub/EpubMetadata;Lcom/cedagova/reader/engine/epub/EpubCover;)Lcom/cedagova/reader/engine/epub/EpubInspection$Readable;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/epub/EpubInspection$Readable;Ljava/lang/String;Lcom/cedagova/reader/engine/epub/EpubMetadata;Lcom/cedagova/reader/engine/epub/EpubCover;ILjava/lang/Object;)Lcom/cedagova/reader/engine/epub/EpubInspection$Readable;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getContentDigest ()Ljava/lang/String;
+	public final fun getCover ()Lcom/cedagova/reader/engine/epub/EpubCover;
+	public final fun getMetadata ()Lcom/cedagova/reader/engine/epub/EpubMetadata;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/epub/EpubInspection$Rejected : com/cedagova/reader/engine/epub/EpubInspection {
+	public fun <init> (Ljava/lang/String;Lcom/cedagova/reader/engine/epub/EpubRejectReason;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Lcom/cedagova/reader/engine/epub/EpubRejectReason;Ljava/lang/String;)Lcom/cedagova/reader/engine/epub/EpubInspection$Rejected;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/epub/EpubInspection$Rejected;Ljava/lang/String;Lcom/cedagova/reader/engine/epub/EpubRejectReason;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/engine/epub/EpubInspection$Rejected;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getContentDigest ()Ljava/lang/String;
+	public final fun getDetail ()Ljava/lang/String;
+	public final fun getReason ()Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/epub/EpubInspector {
+	public static final field INSTANCE Lcom/cedagova/reader/engine/epub/EpubInspector;
+	public final fun inspect (Lcom/cedagova/reader/engine/epub/EpubByteSource;)Lcom/cedagova/reader/engine/epub/EpubInspection;
+}
+
+public final class com/cedagova/reader/engine/epub/EpubMetadata {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/cedagova/reader/engine/epub/EpubMetadata;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/epub/EpubMetadata;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cedagova/reader/engine/epub/EpubMetadata;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAuthor ()Ljava/lang/String;
+	public final fun getLanguage ()Ljava/lang/String;
+	public final fun getPublicationId ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/epub/EpubRejectReason : java/lang/Enum {
+	public static final field CORRUPT_ARCHIVE Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+	public static final field DRM_PROTECTED Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+	public static final field INVALID_STRUCTURE Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+	public static final field UNREADABLE Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+	public static fun values ()[Lcom/cedagova/reader/engine/epub/EpubRejectReason;
+}
+
+public final class com/cedagova/reader/engine/epub/FileEpubByteSource : com/cedagova/reader/engine/epub/EpubByteSource {
+	public fun <init> (Ljava/io/File;)V
+	public fun open ()Ljava/io/InputStream;
+	public fun openChannel ()Ljava/nio/channels/SeekableByteChannel;
+}
+
+public final class com/cedagova/reader/engine/timing/PauseStrength : java/lang/Enum {
+	public static final field Companion Lcom/cedagova/reader/engine/timing/PauseStrength$Companion;
+	public static final field NORMAL Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public static final field OFF Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public static final field STRONG Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public static final field SUBTLE Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getExtraPauseScale ()D
+	public static fun valueOf (Ljava/lang/String;)Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public static fun values ()[Lcom/cedagova/reader/engine/timing/PauseStrength;
+}
+
+public final class com/cedagova/reader/engine/timing/PauseStrength$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class com/cedagova/reader/engine/timing/RemainingTimeIndex {
+	public static final field Companion Lcom/cedagova/reader/engine/timing/RemainingTimeIndex$Companion;
+	public final fun getMeanMultiplier ()D
+	public final fun getPauseStrength ()Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public final fun millisAfter (ILcom/cedagova/reader/engine/timing/TimingSettings;)J
+}
+
+public final class com/cedagova/reader/engine/timing/RemainingTimeIndex$Companion {
+	public final fun build (Lcom/cedagova/reader/engine/content/BookContent;Lcom/cedagova/reader/engine/timing/PauseStrength;)Lcom/cedagova/reader/engine/timing/RemainingTimeIndex;
+}
+
+public final class com/cedagova/reader/engine/timing/RsvpTiming {
+	public static final field BREATH_MULTIPLIER D
+	public static final field CLAUSE_MULTIPLIER D
+	public static final field DEFAULT_WPM I
+	public static final field EMPHASIS_MULTIPLIER D
+	public static final field HEADING_MULTIPLIER D
+	public static final field INSTANCE Lcom/cedagova/reader/engine/timing/RsvpTiming;
+	public static final field MAX_WPM I
+	public static final field MILLIS_PER_MINUTE D
+	public static final field MIN_WPM I
+	public static final field PARAGRAPH_MULTIPLIER D
+	public static final field RAMP_DURATION_MILLIS J
+	public static final field RAMP_START_SPEED_FRACTION D
+	public static final field REORIENTATION_MULTIPLIER D
+	public static final field SENTENCE_MULTIPLIER D
+	public static final field SPAN_FULL_PAUSE_WORDS I
+}
+
+public final class com/cedagova/reader/engine/timing/RsvpTimingEngine {
+	public static final field INSTANCE Lcom/cedagova/reader/engine/timing/RsvpTimingEngine;
+	public final fun durationMillis (Lcom/cedagova/reader/engine/content/Token;Lcom/cedagova/reader/engine/timing/TimingSettings;Lcom/cedagova/reader/engine/timing/TimingState;)J
+	public final fun estimatedMillis (Ljava/lang/Iterable;Lcom/cedagova/reader/engine/timing/TimingSettings;)J
+	public final fun plainWordMillis (Lcom/cedagova/reader/engine/timing/TimingSettings;Lcom/cedagova/reader/engine/timing/TimingState;)J
+	public final fun rampSpeedFraction (Lcom/cedagova/reader/engine/timing/TimingSettings;Lcom/cedagova/reader/engine/timing/TimingState;)D
+}
+
+public final class com/cedagova/reader/engine/timing/TimingSettings {
+	public fun <init> ()V
+	public fun <init> (ILcom/cedagova/reader/engine/timing/PauseStrength;ZD)V
+	public synthetic fun <init> (ILcom/cedagova/reader/engine/timing/PauseStrength;ZDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public final fun component3 ()Z
+	public final fun component4 ()D
+	public final fun copy (ILcom/cedagova/reader/engine/timing/PauseStrength;ZD)Lcom/cedagova/reader/engine/timing/TimingSettings;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/timing/TimingSettings;ILcom/cedagova/reader/engine/timing/PauseStrength;ZDILjava/lang/Object;)Lcom/cedagova/reader/engine/timing/TimingSettings;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEffectiveMeanMultiplier ()D
+	public final fun getEffectiveWpm ()I
+	public final fun getMeanMultiplier ()D
+	public final fun getPauseStrength ()Lcom/cedagova/reader/engine/timing/PauseStrength;
+	public final fun getRampEnabled ()Z
+	public final fun getTargetWordMillis ()D
+	public final fun getWpm ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/timing/TimingState {
+	public static final field Companion Lcom/cedagova/reader/engine/timing/TimingState$Companion;
+	public fun <init> ()V
+	public fun <init> (JZ)V
+	public synthetic fun <init> (JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun afterShowing (J)Lcom/cedagova/reader/engine/timing/TimingState;
+	public final fun component1 ()J
+	public final fun component2 ()Z
+	public final fun copy (JZ)Lcom/cedagova/reader/engine/timing/TimingState;
+	public static synthetic fun copy$default (Lcom/cedagova/reader/engine/timing/TimingState;JZILjava/lang/Object;)Lcom/cedagova/reader/engine/timing/TimingState;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getElapsedPlaybackMillis ()J
+	public final fun getReorientationPending ()Z
+	public fun hashCode ()I
+	public final fun reorienting ()Lcom/cedagova/reader/engine/timing/TimingState;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cedagova/reader/engine/timing/TimingState$Companion {
+	public final fun getAT_PLAYBACK_START ()Lcom/cedagova/reader/engine/timing/TimingState;
+}
+

@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.library.store
 
-import com.cedagova.fastreader.content.ContentPipelineVersion
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.content.ContentPipelineVersion
+import com.cedagova.reader.engine.timing.RsvpTiming
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.floatOrNull

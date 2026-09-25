@@ -2,15 +2,15 @@ package com.cedagova.fastreader.reader.ui
 
 import androidx.annotation.StringRes
 import com.cedagova.fastreader.R
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.ContentFailureReason
-import com.cedagova.fastreader.content.SkipMarkerToken
-import com.cedagova.fastreader.content.Token
-import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderSession
-import com.cedagova.fastreader.reader.RemainingTimeIndex
-import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.ContentFailureReason
+import com.cedagova.reader.engine.content.SkipMarkerToken
+import com.cedagova.reader.engine.content.Token
+import com.cedagova.reader.engine.content.WordToken
+import com.cedagova.reader.engine.timing.PauseStrength
+import com.cedagova.reader.engine.timing.RemainingTimeIndex
 import kotlin.math.roundToInt
 
 /**

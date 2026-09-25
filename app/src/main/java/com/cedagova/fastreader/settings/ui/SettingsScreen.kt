@@ -63,7 +63,7 @@ import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
-import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.reader.engine.timing.PauseStrength
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
 private val TouchTarget = 48.dp

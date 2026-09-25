@@ -1,9 +1,9 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.content.ContentPipelineVersion
 import com.cedagova.fastreader.library.store.CatalogSchema
 import com.cedagova.fastreader.settings.ReaderSettings
-import com.cedagova.fastreader.timing.RsvpTiming
+import com.cedagova.reader.engine.content.ContentPipelineVersion
+import com.cedagova.reader.engine.timing.RsvpTiming
 import kotlinx.serialization.Serializable
 
 /**

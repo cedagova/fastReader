@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.CatalogIngestor
 import com.cedagova.fastreader.library.FakeDocumentGateway
@@ -10,6 +9,7 @@ import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.engine.epub.EpubFixtures
 import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.downloads.AssetDownloadGateway
 import com.cedagova.reader.library.model.ReaderAssetDirection

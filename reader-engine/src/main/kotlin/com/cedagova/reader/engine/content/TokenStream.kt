@@ -1,0 +1,415 @@
+package com.cedagova.reader.engine.content
+
+/*
+ * The token stream model (AD-4) — the reader's internal contract.
+ *
+ * The EPUB content pipeline produces it; the timing engine (LEAF202), the reader
+ * screen (LEAF203) and persistence (LEAF204) consume it. Everything downstream
+ * addresses content by [Token.index], so this file defines what a position
+ * *means*.
+ *
+ * Two rules the consumers depend on:
+ *
+ * 1. **Deterministic.** The same EPUB bytes always produce the same tokens in the
+ *    same order with the same indices. That is what makes a stored position
+ *    survive closing the book, and it is why every heuristic here is a fixed
+ *    rule rather than anything adaptive.
+ * 2. **Contiguous.** Indices run `0 until totalTokens` with no gaps, so progress
+ *    is index arithmetic and no consumer has to search.
+ *
+ * Changing how tokens are produced moves every stored position, so
+ * [ContentPipelineVersion.CURRENT] is bumped whenever that happens and persisted
+ * alongside a position under the AD-3 migration rule.
+ */
+
+/** Version of the tokenization rules. Bump when a change would move stored positions. */
+public object ContentPipelineVersion {
+    public const val CURRENT: Int = 1
+}
+
+/**
+ * What follows a token, as a pause the timing engine applies *after* showing it.
+ *
+ * Ordinal order is deliberate: it runs weakest to strongest, so when a word ends
+ * a sentence *and* its paragraph the pipeline keeps the stronger one with
+ * `maxOf`. The multipliers themselves belong to LEAF202; this enum only says
+ * which break happened.
+ */
+public enum class Boundary {
+    /** Ordinary word break. */
+    NONE,
+
+    /** Comma, semicolon, colon, or a dash used as dialogue/aside punctuation. */
+    CLAUSE,
+
+    /** Sentence-final punctuation, including a Spanish `¿…?` or `¡…!` closing mark. */
+    SENTENCE,
+
+    /** Last token of a paragraph or list item. */
+    PARAGRAPH,
+
+    /** Last token of a heading. */
+    HEADING,
+}
+
+/**
+ * Bounded, no-NLP word properties the timing engine slows down for.
+ *
+ * Research pins the effect (long/number/rare ≈ 1.5×, abbreviations exempt from
+ * the sentence pause) but not the detection, so each rule below is deliberately
+ * mechanical and stated in one place.
+ */
+public enum class WordClass {
+    /** Longer than [WordClassifier.LONG_WORD_MIN_LENGTH] characters. */
+    LONG,
+
+    /** Contains at least one digit — "1984", "3.5", "XIV2". */
+    NUMBER,
+
+    /** Two or more letters, none of them lowercase — "NASA", "URSS". */
+    ALL_CAPS,
+
+    /** Occurs once in the whole book and is not short: rare *for this book*. */
+    RARE,
+
+    /** "Sr.", "Dr.", "J." — the trailing period does not end a sentence. */
+    ABBREVIATION,
+
+    /**
+     * A breath hold (#81): the word before a conjunction or relative pronoun once
+     * a long run of words has gone by with no punctuation, or the last word of a
+     * run that has gone on too long regardless. Text-to-speech systems insert
+     * these phrase breaks where writers left no commas; without them a long
+     * unpunctuated sentence streams as a volley. Marked by the tokenizer from
+     * the sequence, not by [WordClassifier] from the word, and never a reset of
+     * the word's [WordToken.span].
+     */
+    BREATH,
+}
+
+/** Why a piece of content is represented by a marker instead of its words. */
+public enum class SkipKind {
+    /** An `<img>`, `<svg>` or `<figure>` image the reader cannot stream as words. */
+    IMAGE,
+
+    /** A `<table>`: skipped whole, because reading cells aloud in order is nonsense. */
+    TABLE,
+
+    /**
+     * A spine item the book declares but the file does not contain, or that could
+     * not be decoded. A download interrupted mid-book lands here.
+     */
+    MISSING_CONTENT,
+}
+
+/**
+ * One position in the stream.
+ *
+ * [displayText] is what the reader shows for this token — a word, or the marker
+ * label for skipped content — so the renderer needs no type switch to draw it.
+ */
+public sealed interface Token {
+    public val index: Int
+    public val chapterIndex: Int
+
+    /** Global paragraph ordinal, for paragraph-level navigation. */
+    public val paragraphIndex: Int
+
+    /** Global sentence ordinal, for sentence-level navigation. */
+    public val sentenceIndex: Int
+
+    /** The pause that applies *after* this token. */
+    public val boundary: Boundary
+
+    public val displayText: String
+
+    /**
+     * What separates this token from the next one in the source text.
+     *
+     * Normally a single space. It is `""` where the book glued two tokens
+     * together (`the thing—a very odd one`), and it carries the odd free-standing
+     * mark (`he left — and never returned`). Concatenating
+     * `displayText + gapAfter` across a paragraph reproduces the paragraph.
+     */
+    public val gapAfter: String get() = " "
+}
+
+/**
+ * A single word of book text.
+ *
+ * ## Why punctuation is carried, not discarded
+ *
+ * [text] is the word's letters and digits alone — that is what the pivot cue
+ * aligns on and what [WordClass] describes. The marks around it are kept
+ * separately so the book can be rendered as written:
+ *
+ * - [leading] is punctuation glued to the front of the word with no space between
+ *   — Spanish `¿`/`¡`, an opening quote, a dialogue dash;
+ * - [trailing] is punctuation glued to the end — a full stop, `?`, a closing
+ *   dash;
+ * - [gapAfter] is whatever separates this token's [trailing] from the next
+ *   token's [leading], normally a single space.
+ *
+ * Concatenating `leading + text + trailing + gapAfter` across a paragraph
+ * reproduces its source text exactly, which is what makes the paused context view
+ * read like the book instead of like a word list. Increment 002 dropped these
+ * runs, so `—¿Quién teme a la máquina? —preguntó ella—.` was shown as
+ * "Quién teme a la máquina preguntó ella".
+ *
+ * None of this moves a stored position: the same words still produce the same
+ * token count in the same order with the same indices, so
+ * [ContentPipelineVersion.CURRENT] does not change. The same holds for [span]
+ * (#81): it is a per-token annotation, not a change to what the tokens are.
+ */
+public data class WordToken(
+    override val index: Int,
+    /** The word itself: letters and digits, no surrounding punctuation. */
+    val text: String,
+    override val chapterIndex: Int,
+    override val paragraphIndex: Int,
+    override val sentenceIndex: Int,
+    override val boundary: Boundary,
+    val classes: Set<WordClass> = emptySet(),
+    /** True for every word inside an `<h1>`–`<h6>`, so the reader can style it. */
+    val isHeading: Boolean = false,
+    /** Punctuation attached to the front of [text] with no space between. */
+    val leading: String = "",
+    /** Punctuation attached to the end of [text] with no space between. */
+    val trailing: String = "",
+    /** What separates this token from the next one's [leading]. Normally `" "`. */
+    override val gapAfter: String = " ",
+    /**
+     * How many words this one closes: the count since the previous token whose
+     * boundary was [Boundary.CLAUSE] or stronger, counting this word (#81). A
+     * word right after a comma has span 1; the full stop after "Yes." has span 1
+     * too, and the timing engine scales the pause it carries by that span, so a
+     * pause is proportional to the text it wraps up. Emphasis words do not reset
+     * it, and neither does a breath hold: the span is about punctuation and only
+     * punctuation, and it is a property of the text, not of any setting.
+     *
+     * `null` when the stream was built by hand rather than by the tokenizer —
+     * the settings preview, test streams — and the engine then applies the full
+     * research pause, exactly as it did before spans existed.
+     */
+    val span: Int? = null,
+) : Token {
+
+    /** The word as the book prints it, punctuation included. */
+    override val displayText: String get() = if (leading.isEmpty() && trailing.isEmpty()) {
+        text
+    } else {
+        leading + text + trailing
+    }
+
+    /** Offset in [displayText] where [text] starts — the pivot cue measures from here. */
+    val coreStart: Int get() = leading.length
+
+    /** Offset in [displayText] just past [text]. */
+    val coreEnd: Int get() = leading.length + text.length
+}
+
+/**
+ * Content that exists in the book but cannot be streamed as words.
+ *
+ * REQ-015 requires the reader to be told the content was there rather than
+ * silently dropping it, so this is a real token: it occupies a position and the
+ * timing engine gives it a duration like any other.
+ */
+public data class SkipMarkerToken(
+    override val index: Int,
+    val kind: SkipKind,
+    override val chapterIndex: Int,
+    override val paragraphIndex: Int,
+    override val sentenceIndex: Int,
+    override val boundary: Boundary = Boundary.PARAGRAPH,
+    /** Plain-language label, already reader-facing: `[image skipped]`. */
+    val label: String,
+) : Token {
+    override val displayText: String get() = label
+}
+
+/** Where a chapter's title came from, which the reader may want to present differently. */
+public enum class ChapterTitleSource {
+    /** The EPUB 3 nav document or the EPUB 2 NCX. */
+    TOC,
+
+    /** The first heading inside the spine item. */
+    HEADING,
+
+    /** Neither existed: a positional fallback such as "Section 4". */
+    FALLBACK,
+}
+
+/**
+ * One chapter, in book order.
+ *
+ * Front and back matter are chapters too: a cover page, a dedication or a
+ * colophon keeps its spine position rather than being filtered out, because the
+ * reader streams the book as written.
+ */
+public data class Chapter(
+    val index: Int,
+    val title: String,
+    val titleSource: ChapterTitleSource,
+    val startTokenIndex: Int,
+    /** Exclusive. Equal to [startTokenIndex] for a chapter that produced no tokens. */
+    val endTokenIndex: Int,
+    /** Zip path of the spine item this chapter came from. */
+    val spinePath: String,
+) {
+    val tokenCount: Int get() = endTokenIndex - startTokenIndex
+
+    val isEmpty: Boolean get() = tokenCount == 0
+
+    public operator fun contains(tokenIndex: Int): Boolean = tokenIndex >= startTokenIndex && tokenIndex < endTokenIndex
+}
+
+/** A spine item the pipeline could not turn into words, kept so the PR-level state is honest. */
+public data class ContentGap(val spinePath: String, val chapterIndex: Int, val reason: GapReason, val detail: String)
+
+public enum class GapReason {
+    /** Declared in the spine, absent from the archive — the interrupted-download case. */
+    MISSING_FROM_ARCHIVE,
+
+    /** Present but unreadable: oversized, or bytes that decode to nothing usable. */
+    UNREADABLE,
+
+    /** Read fine and simply had no text — a page that is only an image, for instance. */
+    NO_TEXT,
+}
+
+/**
+ * A stored reading position.
+ *
+ * Both other fields exist because an index alone is meaningless later: it is only
+ * valid for the same book ([bookDigest], the content-derived identity from AD-2)
+ * parsed by the same rules ([pipelineVersion], AD-3).
+ */
+public data class TokenPosition(
+    val bookDigest: String,
+    val tokenIndex: Int,
+    val pipelineVersion: Int = ContentPipelineVersion.CURRENT,
+)
+
+/** A parsed book: the whole token stream plus everything the reader needs about it. */
+public data class BookContent(
+    /** Content-derived book identity (AD-2), the same digest the catalog stores. */
+    val bookDigest: String,
+    /**
+     * What this parse read, structurally (AD-18): a digest over the archive
+     * directory's per-entry names, uncompressed sizes and CRC-32 values.
+     *
+     * Not an identity and never a key — see
+     * [com.cedagova.reader.engine.epub.StructuralFingerprint]. It exists so a stored
+     * position can be checked against the bytes actually opened, which
+     * [bookDigest] can no longer do now that identity is handed to the reader
+     * rather than derived from the file (AD-8).
+     *
+     * Null when the open produced none: a source that fell back to the streaming
+     * archive, or a book built by anything other than the EPUB pipeline. Null
+     * means *no guard*, never a mismatch.
+     */
+    val structuralFingerprint: String? = null,
+    /** BCP-47 language from the package document, when it declares one. */
+    val language: String?,
+    val tokens: List<Token>,
+    val chapters: List<Chapter>,
+    /** Spine items that produced no words, in book order. Empty for an intact book. */
+    val gaps: List<ContentGap> = emptyList(),
+    /**
+     * Where this book's body starts, when its leading spine items are front
+     * matter and the book says so clearly enough to act on (REQ-202). Null for a
+     * book that opens on its first chapter, and for every book this cannot be
+     * sure about — see [FrontMatterDetector].
+     */
+    val frontMatter: FrontMatter? = null,
+    val pipelineVersion: Int = ContentPipelineVersion.CURRENT,
+) {
+    /** Total positions, and therefore the denominator of progress. */
+    val totalTokens: Int get() = tokens.size
+
+    /**
+     * Words only, excluding skip markers.
+     *
+     * This is the input to time-remaining math: at `wpm` words per minute an
+     * unmodulated stream of `n` words takes `n / wpm` minutes, and LEAF202 adds
+     * its pause multipliers on top.
+     */
+    val totalWords: Int = tokens.count { it is WordToken }
+
+    val isEmpty: Boolean get() = tokens.isEmpty()
+
+    /** Fraction read once [tokenIndex] has been shown, clamped to `0f..1f`. */
+    public fun progressFraction(tokenIndex: Int): Float {
+        if (tokens.isEmpty()) return 0f
+        val shown = (tokenIndex + 1).coerceIn(0, tokens.size)
+        return shown.toFloat() / tokens.size
+    }
+
+    /** Words still to come after [tokenIndex], the numerator of time remaining. */
+    public fun wordsRemaining(tokenIndex: Int): Int {
+        if (tokenIndex < 0) return totalWords
+        var remaining = 0
+        for (position in (tokenIndex + 1) until tokens.size) {
+            if (tokens[position] is WordToken) remaining++
+        }
+        return remaining
+    }
+
+    public fun chapterAt(tokenIndex: Int): Chapter? = chapters.firstOrNull { tokenIndex in it }
+
+    /** The token that starts the sentence [tokenIndex] belongs to — "back one sentence". */
+    public fun sentenceStart(tokenIndex: Int): Int = boundedStartOf(tokenIndex) { it.sentenceIndex }
+
+    /** The token that starts the paragraph [tokenIndex] belongs to — "back one paragraph". */
+    public fun paragraphStart(tokenIndex: Int): Int = boundedStartOf(tokenIndex) { it.paragraphIndex }
+
+    private inline fun boundedStartOf(tokenIndex: Int, ordinal: (Token) -> Int): Int {
+        if (tokens.isEmpty()) return 0
+        val from = tokenIndex.coerceIn(0, tokens.lastIndex)
+        val target = ordinal(tokens[from])
+        var start = from
+        while (start > 0 && ordinal(tokens[start - 1]) == target) start--
+        return start
+    }
+
+    public fun positionAt(tokenIndex: Int): TokenPosition =
+        TokenPosition(bookDigest, tokenIndex.coerceIn(0, maxOf(0, tokens.lastIndex)), pipelineVersion)
+}
+
+/** Why a book could not be turned into a token stream at all. */
+public enum class ContentFailureReason {
+    /** The bytes could not be read from their source. */
+    UNREADABLE_SOURCE,
+
+    /** Not a readable zip archive, or damaged partway through. */
+    CORRUPT_ARCHIVE,
+
+    /** A readable zip that is not a usable EPUB: no container, no package document, no spine. */
+    INVALID_STRUCTURE,
+
+    /** Structurally fine, but not one spine item yielded readable text. */
+    NO_READABLE_CONTENT,
+}
+
+/** Parsing one book either produces content or a typed, non-throwing failure. */
+public sealed interface BookContentResult {
+
+    public data class Parsed(val content: BookContent) : BookContentResult
+
+    public data class Failed(
+        val reason: ContentFailureReason,
+        /** Plain language, safe to show the reader. */
+        val detail: String,
+    ) : BookContentResult
+}
+
+/**
+ * Parse progress for the reader's book-open loading state (LEAF203).
+ *
+ * Reported per spine item, which is the only unit whose cost is knowable before
+ * the file is read.
+ */
+public data class ContentProgress(val completedItems: Int, val totalItems: Int) {
+    val fraction: Float get() = if (totalItems <= 0) 0f else completedItems.toFloat() / totalItems
+}

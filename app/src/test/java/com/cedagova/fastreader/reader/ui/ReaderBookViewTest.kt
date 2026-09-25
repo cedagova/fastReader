@@ -1,13 +1,13 @@
 package com.cedagova.fastreader.reader.ui
 
-import com.cedagova.fastreader.content.BookContent
-import com.cedagova.fastreader.content.Boundary
-import com.cedagova.fastreader.content.Chapter
-import com.cedagova.fastreader.content.ChapterTitleSource
-import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderSession
+import com.cedagova.reader.engine.content.BookContent
+import com.cedagova.reader.engine.content.Boundary
+import com.cedagova.reader.engine.content.Chapter
+import com.cedagova.reader.engine.content.ChapterTitleSource
+import com.cedagova.reader.engine.content.WordToken
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

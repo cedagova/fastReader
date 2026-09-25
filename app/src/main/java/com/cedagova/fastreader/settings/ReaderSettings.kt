@@ -1,6 +1,6 @@
 package com.cedagova.fastreader.settings
 
-import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.reader.engine.timing.PauseStrength
 import kotlinx.serialization.Serializable
 
 /**

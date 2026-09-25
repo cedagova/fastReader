@@ -1,6 +1,6 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.content.BookContent
+import com.cedagova.reader.engine.content.BookContent
 import com.cedagova.reader.library.sync.LocalReadingPosition
 import com.cedagova.reader.library.sync.RemoteReadingPosition
 import kotlin.math.roundToInt

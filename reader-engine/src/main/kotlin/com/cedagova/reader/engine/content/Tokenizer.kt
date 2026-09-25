@@ -1,0 +1,291 @@
+package com.cedagova.reader.engine.content
+
+/**
+ * Turns extracted blocks into the word/marker stream.
+ *
+ * Word splitting is Unicode-aware through [Char.isLetterOrDigit] rather than an
+ * `a-z` range, which is the whole of what REQ-019 needs for accents and `ñ`:
+ * "máquina" is one word, and "¿Cómo" is the word "Cómo" preceded by punctuation
+ * the stream never shows.
+ *
+ * Punctuation is attributed to the word *before* it, by scanning the run of
+ * non-word characters that follows each word and keeping the strongest break in
+ * it. That one rule is what makes Spanish dialogue work with no special case: in
+ * `—¿Cómo estás? —preguntó él.` the run after "estás" holds both the `?` and the
+ * dialogue dash, so that word ends a sentence, and "él." ends the next one.
+ */
+public object Tokenizer {
+
+    /** Characters that end a sentence. Spanish `¿ ¡` open one, so they are not here. */
+    private const val SENTENCE_PUNCTUATION = ".!?…"
+
+    /**
+     * Characters that break a clause.
+     *
+     * The dashes matter for Spanish: an em or en dash opens a line of dialogue and
+     * encloses the attribution inside it, so research's "comma/semicolon/colon/
+     * dash → 2.0×" gives REQ-019's dialogue-dash behavior directly.
+     */
+    private const val CLAUSE_PUNCTUATION = ",;:—–―‒-"
+
+    /** Word-internal marks: apostrophes in "don't" / "l'aube", hyphens in "así-así". */
+    private const val WORD_INTERNAL = "'’‘‑-"
+
+    /**
+     * Separators that stay inside a number when digits sit on both sides.
+     *
+     * Both are needed and both are already punctuation elsewhere: English writes
+     * `3.5` and Spanish writes `3,5`, so without this the same number splits into
+     * two one-character tokens with a fabricated sentence or clause break between
+     * its halves — and the `NUMBER` class stops describing the token it exists for.
+     */
+    private const val DIGIT_SEPARATORS = ".,"
+
+    /**
+     * Splits [blocks] into tokens, continuing the counters in [state] so every
+     * spine item of a book contributes to one stream.
+     */
+    public fun tokenize(blocks: List<ContentBlock>, chapterIndex: Int, state: StreamState): List<Token> {
+        val tokens = ArrayList<Token>()
+        for (block in blocks) {
+            when (block) {
+                is ContentBlock.Skip -> {
+                    // A marker is its own paragraph: the reader sees it alone and the
+                    // timing engine gives it a paragraph-length pause.
+                    state.paragraphIndex++
+                    state.sentenceIndex++
+                    tokens += SkipMarkerToken(
+                        index = state.nextIndex++,
+                        kind = block.kind,
+                        chapterIndex = chapterIndex,
+                        paragraphIndex = state.paragraphIndex,
+                        sentenceIndex = state.sentenceIndex,
+                        label = block.label,
+                    )
+                }
+
+                is ContentBlock.Paragraph -> tokens += tokenizeParagraph(block, chapterIndex, state)
+            }
+        }
+        return tokens
+    }
+
+    private fun tokenizeParagraph(
+        block: ContentBlock.Paragraph,
+        chapterIndex: Int,
+        state: StreamState,
+    ): List<WordToken> {
+        val text = block.text
+        val words = ArrayList<WordToken>()
+        var index = 0
+        var leading = ""
+
+        while (index < text.length) {
+            val runStart = index
+            while (index < text.length && !text[index].isLetterOrDigit()) index++
+            if (index >= text.length) break
+
+            val run = text.substring(runStart, index)
+            if (words.isEmpty()) {
+                // Nothing precedes this word, so the whole glued run — a dialogue
+                // dash, a `¿`, an opening quote — belongs in front of it.
+                leading = run.takeLastWhile { !it.isSpaceLike() }
+            } else {
+                val previous = words.last()
+                val boundary = maxOf(previous.boundary, boundaryIn(text, runStart, index))
+                val trailing = run.gluedPrefix()
+                leading = run.gluedSuffix()
+                words[words.lastIndex] = previous.copy(
+                    boundary = boundary,
+                    trailing = trailing,
+                    gapAfter = run.substring(trailing.length, run.length - leading.length),
+                )
+                if (boundary >= Boundary.SENTENCE) state.sentenceIndex++
+            }
+
+            val wordStart = index
+            index = wordEnd(text, wordStart)
+
+            if (words.isEmpty()) {
+                state.paragraphIndex++
+                state.sentenceIndex++
+            }
+
+            words += WordToken(
+                index = state.nextIndex++,
+                text = text.substring(wordStart, index),
+                chapterIndex = chapterIndex,
+                paragraphIndex = state.paragraphIndex,
+                sentenceIndex = state.sentenceIndex,
+                boundary = Boundary.NONE,
+                isHeading = block.isHeading,
+                leading = leading,
+            )
+        }
+
+        if (words.isEmpty()) return emptyList()
+
+        // Punctuation after the final word, then the block's own closing pause.
+        val tail = text.indexOfLast { it.isLetterOrDigit() } + 1
+        val last = words.last()
+        val closing = if (block.isHeading) Boundary.HEADING else Boundary.PARAGRAPH
+        words[words.lastIndex] = last.copy(
+            boundary = maxOf(maxOf(last.boundary, boundaryIn(text, tail, text.length)), closing),
+            trailing = text.substring(tail).gluedPrefix(),
+            gapAfter = "",
+        )
+        annotateSpans(words)
+        annotateBreaths(words)
+        return words
+    }
+
+    /**
+     * Marks breath holds (#81): after [WordClassifier.BREATH_MIN_RUN] words with
+     * no punctuation, the word before a conjunction or relative pronoun gets
+     * [WordClass.BREATH]; after [WordClassifier.BREATH_MAX_RUN] the current word
+     * gets it whatever comes next. A boundary or a hold starts the count over.
+     *
+     * The count is its own thing and never touches [WordToken.span]: a breath
+     * is a rest inside a sentence, not a place the sentence ended, so the full
+     * stop that follows still closes the whole span and earns its whole pause.
+     */
+    private fun annotateBreaths(words: MutableList<WordToken>) {
+        var run = 0
+        for (position in words.indices) {
+            val word = words[position]
+            if (word.boundary >= Boundary.CLAUSE) {
+                run = 0
+                continue
+            }
+            run++
+            val next = words.getOrNull(position + 1)
+            val breathHere = run >= WordClassifier.BREATH_MAX_RUN ||
+                (run >= WordClassifier.BREATH_MIN_RUN && next != null && WordClassifier.isBreathWord(next.text))
+            if (breathHere) {
+                words[position] = word.copy(classes = word.classes + WordClass.BREATH)
+                run = 0
+            }
+        }
+    }
+
+    /**
+     * Stamps every word with its [WordToken.span]: words since the previous clause
+     * or stronger boundary, this one included (#81).
+     *
+     * A separate pass, because boundaries are attributed *backwards* — a word
+     * learns it ends a clause only when the next word's punctuation run is read —
+     * so the count is only known once the paragraph is complete. A paragraph
+     * always ends on at least a [Boundary.PARAGRAPH], so no span crosses one.
+     */
+    private fun annotateSpans(words: MutableList<WordToken>) {
+        var span = 0
+        for (position in words.indices) {
+            span++
+            words[position] = words[position].copy(span = span)
+            if (words[position].boundary >= Boundary.CLAUSE) span = 0
+        }
+    }
+
+    /**
+     * Splitting one run of punctuation between the word before it and the word
+     * after it.
+     *
+     * The run `? —` in `—¿Quién teme a la máquina? —preguntó ella—.` holds both
+     * the question mark that closes one clause and the dash that opens the next,
+     * and the space between them says which is which: whatever is glued to the
+     * preceding word ([gluedPrefix]) closes it, whatever is glued to the following
+     * word ([gluedSuffix]) opens that one, and the middle is the gap. A run with
+     * no space at all — the em dash in `the thing—a very odd one` — is entirely
+     * the preceding word's, which is what keeps the two halves glued when the
+     * paragraph is put back together.
+     */
+    private fun String.gluedPrefix(): String = takeWhile { !it.isSpaceLike() }
+
+    private fun String.gluedSuffix(): String {
+        val prefix = gluedPrefix()
+        if (prefix.length == length) return ""
+        return takeLastWhile { !it.isSpaceLike() }
+    }
+
+    /**
+     * The end of the word starting at [start].
+     *
+     * Trailing apostrophes and hyphens are given back to the punctuation run — an
+     * em-dash-delimited aside must not glue a dash onto a word — and a period is
+     * pulled *in* when it abbreviates, so "Sr." is one token whose period does not
+     * end a sentence, and "U.S.A." stays whole rather than becoming three tokens.
+     */
+    private fun wordEnd(text: String, start: Int): Int {
+        var end = runEnd(text, start)
+        // "No. 5" abbreviates "number"; the bare adverb "No." does not, so the
+        // digit has to actually be there.
+        if (end < text.length && text[end] == '.' &&
+            WordClassifier.isNumberingAbbreviation(text.substring(start, end)) &&
+            nextVisibleIsDigit(text, end + 1)
+        ) {
+            return end + 1
+        }
+        while (end < text.length && text[end] == '.' &&
+            WordClassifier.isAbbreviation(text.substring(start, end + 1))
+        ) {
+            val afterPeriod = end + 1
+            val continued = runEnd(text, afterPeriod)
+            end = if (continued > afterPeriod) continued else return afterPeriod
+        }
+        return end
+    }
+
+    /** One run of word characters, without trailing internal marks. */
+    private fun runEnd(text: String, start: Int): Int {
+        var end = start
+        while (end < text.length) {
+            when {
+                text[end].isWordChar() -> end++
+                isInteriorDigitSeparator(text, end) -> end++
+                else -> break
+            }
+        }
+        while (end > start && text[end - 1] in WORD_INTERNAL) end--
+        return end
+    }
+
+    /** True for the `.` in `3.5` and the `,` in `3,5`, and for nothing else. */
+    private fun isInteriorDigitSeparator(text: String, position: Int): Boolean = text[position] in DIGIT_SEPARATORS &&
+        position > 0 &&
+        text[position - 1].isDigit() &&
+        text.getOrNull(position + 1)?.isDigit() == true
+
+    private fun nextVisibleIsDigit(text: String, from: Int): Boolean {
+        var index = from
+        while (index < text.length && text[index].isSpaceLike()) index++
+        return text.getOrNull(index)?.isDigit() == true
+    }
+
+    /** The strongest break inside `text[from until to]`. */
+    private fun boundaryIn(text: String, from: Int, to: Int): Boundary {
+        var boundary = Boundary.NONE
+        for (position in from until minOf(to, text.length)) {
+            val char = text[position]
+            boundary = when (char) {
+                in SENTENCE_PUNCTUATION -> maxOf(boundary, Boundary.SENTENCE)
+                in CLAUSE_PUNCTUATION -> maxOf(boundary, Boundary.CLAUSE)
+                else -> boundary
+            }
+        }
+        return boundary
+    }
+
+    private fun Char.isWordChar(): Boolean = isLetterOrDigit() || this in WORD_INTERNAL
+
+    /**
+     * Counters carried across spine items.
+     *
+     * Paragraph and sentence ordinals are global, so LEAF203's "back one sentence"
+     * keeps working across a chapter boundary with no extra lookup.
+     */
+    public class StreamState(
+        public var nextIndex: Int = 0,
+        public var paragraphIndex: Int = -1,
+        public var sentenceIndex: Int = -1,
+    )
+}

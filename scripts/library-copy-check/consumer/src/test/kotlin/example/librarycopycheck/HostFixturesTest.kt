@@ -5,6 +5,9 @@ import com.cedagova.reader.auth.testing.CAPABILITIES
 import com.cedagova.reader.auth.testing.CAPABILITIES_BODY
 import com.cedagova.reader.auth.testing.FakeReaderAuthOperations
 import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.engine.content.BookContentResult
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.content.EpubContentPipeline
 import com.cedagova.reader.library.testing.FakeReaderLibraryGateway
 import com.cedagova.reader.library.testing.ReaderLibraryHarness
 import kotlinx.coroutines.test.runTest
@@ -42,5 +45,11 @@ class HostFixturesTest {
             harness.close()
         }
         assertEquals("access-1", harness.servers.requestsTo("/v1/reader/capabilities").single().bearer)
+    }
+
+    @Test
+    fun `the engine parses its own fixture book`() = runTest {
+        val result = EpubContentPipeline().parse(ContentFixtures.source(ContentFixtures.englishNovel()))
+        assertTrue((result as BookContentResult.Parsed).content.tokens.isNotEmpty())
     }
 }

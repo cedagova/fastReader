@@ -8,8 +8,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.cedagova.fastreader.content.ContentFailureReason
-import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderSession
 import com.cedagova.fastreader.reader.ResumeOffer
@@ -17,6 +15,8 @@ import com.cedagova.fastreader.settings.CueSettings
 import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.engine.content.ContentFailureReason
+import com.cedagova.reader.engine.content.WordToken
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Rule
 import org.junit.Test

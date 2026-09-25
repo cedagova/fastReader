@@ -27,6 +27,7 @@ the check builds.
 #   the check proves those rules suffice on their own.
 module reader-auth
 module reader-library com.cedagova.reader.library
+module reader-engine com.cedagova.reader.engine
 
 # path <file or directory>
 #   Shared build pieces the modules need, copied verbatim.
@@ -47,7 +48,7 @@ test reader-library *ContractTest
 # fixtures <module>...
 #   Listed modules whose test fixtures (src/testFixtures, copied with the
 #   module) a host's unit tests use (#199); the check runs a host test on them.
-fixtures reader-auth reader-library
+fixtures reader-auth reader-library reader-engine
 
 # versions | libraries | plugins <keys...>
 #   The gradle/libs.versions.toml entries the copied build files and
@@ -57,9 +58,10 @@ versions coroutines serialization supabase ktor
 versions junit robolectric androidxTestCore androidxTestJunit
 libraries android-gradlePlugin kotlin-gradlePlugin spotless-gradlePlugin
 libraries kotlinx-coroutines-android kotlinx-serialization-json
+libraries kotlinx-coroutines-core kotlinx-serialization-core
 libraries supabase-bom supabase-auth ktor-client-core ktor-client-okhttp
 libraries junit robolectric androidx-test-core androidx-test-ext-junit kotlinx-coroutines-test ktor-client-mock
-plugins android-library kotlin-serialization spotless
+plugins android-library kotlin-serialization spotless kotlin-jvm
 ```
 <!-- copy-set:end -->
 
@@ -71,8 +73,9 @@ What each piece is for:
 | `reader-auth/contracts/` | The one pinned reader-api contract document, its `.sha256` and `PINNED.md` (identity and update procedure, #208). Both libraries' contract tests read it from the filesystem. |
 | `reader-auth/src/contractTest/` | The shared contract checker. `:reader-auth`'s test source set includes it, and `:reader-library`'s build adds `../reader-auth/src/contractTest/kotlin` to its own, so the two module directories stay siblings. |
 | `reader-library/` | The account-library client and sync engine. |
-| Test fixtures (`src/testFixtures/` of both modules) | The one test-fixture surface (#199): the scripted doubles of the modules' interfaces, the one mock reader-api/identity-provider server and a real client over it. A host's tests take them with `testImplementation(testFixtures(project(":reader-auth")))` (and `":reader-library"`); a host writes no fake of a library type. |
-| `build-logic/` | The convention plugins every module applies (`conventions.android.library`; the app and root conventions come along in the same build). |
+| `reader-engine/` | The EPUB, content and RSVP timing engines: a plain Kotlin/JVM module, no Android dependency (#201). |
+| Test fixtures (`src/testFixtures/` of the listed modules) | The one test-fixture surface (#199): the scripted doubles of the modules' interfaces, the one mock reader-api/identity-provider server and a real client over it. A host's tests take them with `testImplementation(testFixtures(project(":reader-auth")))` (and `":reader-library"`); a host writes no fake of a library type. `:reader-engine`'s are its EPUB and content fixture books (#201). |
+| `build-logic/` | The convention plugins every module applies (`conventions.android.library`, `conventions.kotlin.library` for the JVM `reader-engine`; the app and root conventions come along in the same build). |
 | `.editorconfig` | The ktlint rules the conventions' formatter reads from the root. |
 | Catalog entries | SDK levels, JVM target and tool versions build-logic reads, the Gradle plugins it compiles against, and every dependency the two build files declare. |
 
@@ -100,8 +103,8 @@ What each piece is for:
    build output or `local.properties`.
 3. Merge the listed catalog lines into the host's `gradle/libs.versions.toml`.
 4. In the host's settings, `includeBuild("build-logic")` inside
-   `pluginManagement` and `include(":reader-auth", ":reader-library")`; in the
-   host's root build file, declare the three listed plugins `apply false` so
+   `pluginManagement` and `include(":reader-auth", ":reader-library", ":reader-engine")`; in the
+   host's root build file, declare the four listed plugins `apply false` so
    build-logic runs against those plugin classes.
 5. Set `android.useAndroidX=true` in the host's `gradle.properties` — and
    `android.experimental.enableTestFixturesKotlinSupport=true`, which Kotlin
@@ -128,6 +131,10 @@ rule of its own for them:
 - `:reader-auth` keeps the same members for every `@Serializable` class
   (its own and the identity provider SDK's) plus the JSON element
   serializers; see the file.
+- `:reader-engine` keeps the same members for its `@Serializable` types
+  (package `com.cedagova.reader.engine`). As a plain JVM library it has no
+  `consumerProguardFiles`: its rules ship inside its jar, in
+  `src/main/resources/META-INF/proguard/reader-engine.pro`, where R8 reads them.
 
 Today the serialization runtime's jar embeds the same rules for every package,
 so nothing breaks without the modules' rules. The modules still carry their

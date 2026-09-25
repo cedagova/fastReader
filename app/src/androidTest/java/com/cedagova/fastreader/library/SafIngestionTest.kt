@@ -11,9 +11,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
-import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.store.CoverStore
+import com.cedagova.reader.engine.epub.EpubFixtures
 import java.io.File
 import java.util.regex.Pattern
 import org.junit.After

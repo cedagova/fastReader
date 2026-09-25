@@ -1,8 +1,8 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.WordToken
-import com.cedagova.fastreader.timing.RsvpTimingEngine
-import com.cedagova.fastreader.timing.TimingSettings
+import com.cedagova.reader.engine.content.WordToken
+import com.cedagova.reader.engine.timing.RsvpTimingEngine
+import com.cedagova.reader.engine.timing.TimingSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame

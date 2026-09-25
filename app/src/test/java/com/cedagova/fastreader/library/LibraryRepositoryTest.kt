@@ -1,8 +1,5 @@
 package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.content.ContentFixtures
-import com.cedagova.fastreader.epub.BookDigest
-import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.store.CatalogLoad
 import com.cedagova.fastreader.library.store.CatalogStore
 import com.cedagova.fastreader.library.store.CoverStore
@@ -11,7 +8,10 @@ import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.settings.PivotColor
 import com.cedagova.fastreader.settings.ReaderSettings
 import com.cedagova.fastreader.settings.ThemeChoice
-import com.cedagova.fastreader.timing.PauseStrength
+import com.cedagova.reader.engine.content.BookDigest
+import com.cedagova.reader.engine.content.ContentFixtures
+import com.cedagova.reader.engine.epub.EpubFixtures
+import com.cedagova.reader.engine.timing.PauseStrength
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
