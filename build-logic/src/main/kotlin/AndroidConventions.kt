@@ -57,9 +57,9 @@ internal fun Project.configureAndroidModule(android: CommonExtension) {
         // They are declared here rather than left at their defaults so that
         // the gate is a property of this repository and survives a lint
         // baseline, a severity default changing between AGP versions, or a
-        // future `lint.xml`. `lint` runs on every push and pull request
-        // (.github/workflows/checks.yml), and `abortOnError` makes a finding
-        // a red run rather than a warning somebody reads later.
+        // future `lint.xml`. `lint` runs on every pull-request commit and every
+        // `main` commit (.github/workflows/checks.yml), and `abortOnError`
+        // makes a finding a red run rather than a warning somebody reads later.
         //
         // The escape hatch, when a string genuinely must not be translated, is
         // `translatable="false"` on that string in `values/strings.xml` — a
