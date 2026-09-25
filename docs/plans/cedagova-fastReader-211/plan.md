@@ -2,7 +2,7 @@
 
 - Planning issue: https://github.com/cedagova/fastReader/issues/211
 - Planning PR: https://github.com/cedagova/fastReader/pull/212
-- Status: Review
+- Status: Ready for implementation
 - Root classification: EFFORT
 - Delivery topology: COLLECTOR
 - Planner: Planning lead (Claude)
@@ -509,6 +509,13 @@ classification is `EFFORT`, not `ALREADY_SATISFIED`.
 
 ## Publication verification
 
-Pending until content review: `plan validate --phase review-ready` on the
-candidate head; after approval, leaf-body refinement, `plan reconcile-graph`
-and `plan verify-graph` results are recorded here.
+- Content review: CHANGES_REQUESTED at `5baa044` (review 5319155014),
+  addressed at `0b951ae`; content APPROVED at `0b951ae` (review 5319185666),
+  semantic `sha256:2148db38eb84c9bc3a302c2e365df3c00a709344ae7ecae42ec7c8dd93dffa88`.
+- Published 2026-09-25: root #211 refined as `GROUP` / `COLLECTOR`; leaves
+  #198–#210 refined in place (audit record preserved verbatim, planning
+  metadata prepended, leaf contract appended). No new issues.
+- `plan validate --phase publication-ready`: valid, 14 rows, EFFORT/COLLECTOR.
+- `plan reconcile-graph`: 13 existing native children kept under #211;
+  missing blocked-by edges added per the manifest.
+- `plan verify-graph`: valid, 14 rows, 0 retained outcomes.
