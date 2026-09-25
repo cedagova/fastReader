@@ -5,6 +5,10 @@ import com.cedagova.fastreader.library.BookContentStatus
 import com.cedagova.fastreader.library.BookFolder
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.Catalog
+import com.cedagova.fastreader.library.CatalogCodec
+import com.cedagova.fastreader.library.CatalogDecoding
+import com.cedagova.fastreader.library.CatalogLoad
+import com.cedagova.fastreader.library.FileCatalogStore
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.SourceOrigin
 import com.cedagova.fastreader.settings.FontSize

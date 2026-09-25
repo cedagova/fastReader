@@ -1,5 +1,7 @@
 package com.cedagova.fastreader.library
 
+import kotlinx.serialization.Serializable
+
 /**
  * Where the app opens (REQ-009).
  *
@@ -20,7 +22,13 @@ sealed interface LaunchDestination {
     data class Library(val blocked: ResumeBlocked? = null) : LaunchDestination
 }
 
-/** A last-read book that could not be resumed, and why. */
+/**
+ * A last-read book that could not be resumed, and why.
+ *
+ * Serializable because the library destination carries it through saved
+ * instance state (`docs/app-shell.md`).
+ */
+@Serializable
 data class ResumeBlocked(val bookId: String, val reason: ResumeBlockedReason)
 
 /** Why reading did not resume. One case per book state the library can show. */

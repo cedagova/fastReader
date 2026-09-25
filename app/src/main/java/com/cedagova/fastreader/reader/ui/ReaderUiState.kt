@@ -172,7 +172,7 @@ class ReaderBookView(
      * materially sooner than the same book read with `strong`. Changing the
      * setting mid-book therefore has to build a new view rather than leave a
      * stale estimate on screen — see
-     * [com.cedagova.fastreader.reader.ReaderViewModel.setPauseStrength].
+     * [com.cedagova.fastreader.reader.ui.ReaderViewModel.setPauseStrength].
      */
     val pauseStrength: PauseStrength = PauseStrength.NORMAL,
 ) {

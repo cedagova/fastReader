@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
  * duplicate them in a second place that could drift from the first; the next write
  * encodes them from the data class itself, because the codec encodes defaults.
  *
- * The step still has to exist: [CatalogCodec] refuses a document it cannot walk
+ * The step still has to exist: [com.cedagova.fastreader.library.CatalogCodec] refuses a document it cannot walk
  * forward one version at a time, which is what stops a gap in the chain from being
  * mistaken for an intact library. So this is a deliberate identity step, and
  * `CatalogStoreTest` proves a real v2 document loads with its books and positions

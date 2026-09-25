@@ -34,7 +34,7 @@ import kotlinx.serialization.json.JsonObject
  * removals, the last-read book and the per-book front-matter record all pass
  * through unchanged. The step is total — a `readingStates` value that is not an
  * object, or an entry inside it that is not an object, falls through untouched
- * rather than throwing, because a throw here escapes [CatalogCodec.decode]'s
+ * rather than throwing, because a throw here escapes [com.cedagova.fastreader.library.CatalogCodec.decode]'s
  * guard and would set aside the reader's whole library over one malformed entry.
  */
 internal object ContentFingerprintV7Migration : CatalogMigration {

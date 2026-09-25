@@ -4,7 +4,6 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -13,7 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
-import com.cedagova.fastreader.library.LibraryGraph
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.fastreader.settings.AppVersion
 import com.cedagova.fastreader.settings.RELEASES_URL
 import com.cedagova.fastreader.settings.ReaderSettings
@@ -50,16 +50,15 @@ import com.cedagova.reader.account.summary
  */
 @Composable
 fun SettingsRoute(
-    graph: LibraryGraph,
+    repository: LibraryRepository,
     readerAccount: ReaderAccountController,
     onBack: () -> Unit,
     onOpenReaderAccount: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val repository = graph.repository
-    val settings by repository.settings.collectAsState()
-    val persistenceFailure by repository.persistenceFailure.collectAsState()
-    val accountState by readerAccount.state.collectAsState()
+    val settings by repository.settings.collectAsStateWithLifecycle()
+    val persistenceFailure by repository.persistenceFailure.collectAsStateWithLifecycle()
+    val accountState by readerAccount.state.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val version = remember(context) { AppVersion.of(context) }

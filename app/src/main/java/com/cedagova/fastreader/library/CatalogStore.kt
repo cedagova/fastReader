@@ -1,6 +1,5 @@
-package com.cedagova.fastreader.library.store
+package com.cedagova.fastreader.library
 
-import com.cedagova.fastreader.library.Catalog
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException

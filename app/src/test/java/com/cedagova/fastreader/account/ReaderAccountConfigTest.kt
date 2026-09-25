@@ -3,9 +3,10 @@ package com.cedagova.fastreader.account
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cedagova.fastreader.AppGraph
 import com.cedagova.fastreader.BuildConfig
-import com.cedagova.fastreader.FastReaderApplication
 import com.cedagova.fastreader.app.repositoryFile
+import com.cedagova.fastreader.appGraph
 import com.cedagova.reader.account.ReaderAccountState
 import com.cedagova.reader.auth.ReaderAuthClient
 import com.cedagova.reader.auth.ReaderAuthConfig
@@ -34,12 +35,11 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35])
 class ReaderAccountConfigTest {
 
-    private val app: FastReaderApplication =
-        ApplicationProvider.getApplicationContext<Application>() as FastReaderApplication
+    private val graph: AppGraph = ApplicationProvider.getApplicationContext<Application>().appGraph
 
     @Test
     fun `the build config values become the module configuration with the android client identity`() {
-        val config = app.readerAccountConfig
+        val config = graph.readerAccountConfig
 
         assertEquals(BuildConfig.READER_SUPABASE_URL, config.supabaseUrl)
         assertEquals(BuildConfig.READER_SUPABASE_PUBLISHABLE_KEY, config.publishableKey)
@@ -57,14 +57,14 @@ class ReaderAccountConfigTest {
         assertFalse(blank.isConfigured)
         assertEquals(ReaderAccountConfiguration.PROPERTY_KEYS, ReaderAccountConfiguration.missingValues(blank))
         try {
-            ReaderAuthClient.create(app, blank)
+            ReaderAuthClient.create(ApplicationProvider.getApplicationContext(), blank)
             error("expected NotConfigured")
         } catch (e: ReaderAuthException.NotConfigured) {
             // The contract's refusal: nothing was called.
         }
-        if (!app.readerAccountConfig.isConfigured) {
-            assertNull(app.readerAuth)
-            assertTrue(app.readerAccount.state.value is ReaderAccountState.NotConfigured)
+        if (!graph.readerAccountConfig.isConfigured) {
+            assertNull(graph.readerAuth)
+            assertTrue(graph.readerAccount.account.state.value is ReaderAccountState.NotConfigured)
         }
     }
 
