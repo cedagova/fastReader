@@ -1,6 +1,7 @@
 package com.cedagova.fastreader.account
 
 import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.auth.ReaderAuthOperations
 import com.cedagova.reader.auth.ReaderSessionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,7 +56,7 @@ interface ReaderAccountActions {
  * state on screen when the reader comes back.
  */
 class ReaderAccountController(
-    private val gateway: ReaderAccountGateway?,
+    private val gateway: ReaderAuthOperations?,
     missingValues: List<String>,
     private val scope: CoroutineScope,
 ) : ReaderAccountActions {
@@ -130,7 +131,7 @@ class ReaderAccountController(
     override fun loadCapabilities() = run(AccountActivity.LOADING_CAPABILITIES, onFailure = {
         capabilities.value = null
     }) {
-        val response = it.capabilities()
+        val response = it.capabilitiesResponse()
         capabilities.value = LoadedCapabilities(
             document = pretty.encodeToString(JsonObject.serializer(), response.document),
             requestId = response.requestId,
@@ -160,7 +161,7 @@ class ReaderAccountController(
     private fun run(
         what: AccountActivity,
         onFailure: () -> Unit = {},
-        block: suspend (ReaderAccountGateway) -> AccountOutcome?,
+        block: suspend (ReaderAuthOperations) -> AccountOutcome?,
     ) {
         val gateway = gateway ?: return
         if (!activity.compareAndSet(null, what)) return

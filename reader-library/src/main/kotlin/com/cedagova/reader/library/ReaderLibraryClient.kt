@@ -2,6 +2,7 @@ package com.cedagova.reader.library
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.auth.api.ReaderApiClient
+import com.cedagova.reader.auth.api.ReaderApiOperations
 import com.cedagova.reader.library.model.CancelPublicationImportRequest
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
@@ -31,7 +32,8 @@ import kotlinx.serialization.json.jsonObject
  * owns.
  *
  * It holds no session, no token, no refresh and no retry of its own. Every call
- * goes through [ReaderApiClient], so the bearer, `X-Reader-Client`,
+ * goes through [ReaderApiOperations] — in production the [ReaderApiClient]
+ * `ReaderAuthClient.api` holds (#199) — so the bearer, `X-Reader-Client`,
  * `X-Request-ID`, the 10 s timeout, the single-flight refresh and the whole
  * error policy are `:reader-auth`'s, unchanged — which is exactly why tokens
  * never leave that module.
@@ -41,11 +43,11 @@ import kotlinx.serialization.json.jsonObject
  * and `ReaderLibraryContractTest` fails the build when a model and that
  * document disagree.
  */
-public class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOperations {
+public class ReaderLibraryClient(private val api: ReaderApiOperations) : ReaderLibraryOperations {
 
     /**
      * The one JSON body builder: a request model in, the object
-     * [ReaderApiClient.post] puts on the wire out.
+     * [ReaderApiOperations.post] puts on the wire out.
      */
     private fun <T> body(serializer: KSerializer<T>, value: T): JsonObject =
         ReaderLibraryJson.encodeToJsonElement(serializer, value).jsonObject

@@ -62,7 +62,7 @@ public class ReaderAuthClient internal constructor(
     /** The reader-api client, for any further route a host needs. */
     public val api: ReaderApiClient,
     private val clock: ReaderClock = ReaderClock.System,
-) {
+) : ReaderAuthOperations {
     private val auth: Auth get() = supabase.auth
     private val bootstrapLock = Mutex()
 
@@ -72,13 +72,13 @@ public class ReaderAuthClient internal constructor(
     private class VerifiedPreAuth(val document: PreAuthDocument, val lifetime: PreAuthDocument.Lifetime)
 
     /** The stored session as a host renders it; emits on every change. */
-    public val sessionState: Flow<ReaderSessionState> = auth.sessionStatus.map { it.toState() }
+    override val sessionState: Flow<ReaderSessionState> = auth.sessionStatus.map { it.toState() }
 
     /** The current [sessionState] value without collecting. */
-    public fun currentState(): ReaderSessionState = auth.sessionStatus.value.toState()
+    override fun currentState(): ReaderSessionState = auth.sessionStatus.value.toState()
 
     /** Suspends until the stored session has been read (or found absent). */
-    public suspend fun awaitReady(): Unit = auth.awaitInitialization()
+    override suspend fun awaitReady(): Unit = auth.awaitInitialization()
 
     // ---- Bootstrap ---------------------------------------------------------------------------
 
@@ -97,7 +97,7 @@ public class ReaderAuthClient internal constructor(
      * `staleUntil`; after that the failure is thrown. A document that fails a
      * check is never kept.
      */
-    public suspend fun bootstrap(): PreAuthDocument = bootstrapLock.withLock {
+    override suspend fun bootstrap(): PreAuthDocument = bootstrapLock.withLock {
         val kept = verifiedPreAuth
         val now = clock.now()
         if (kept != null && now < kept.lifetime.freshUntil) return kept.document
@@ -137,7 +137,7 @@ public class ReaderAuthClient internal constructor(
      * [createUser] true is sign-up (a new address gets an account); false
      * refuses an unknown address.
      */
-    public suspend fun requestEmailCode(email: String, createUser: Boolean) {
+    override suspend fun requestEmailCode(email: String, createUser: Boolean) {
         ensureBootstrapped(SignInMethod.EMAIL_CODE)
         providerCall {
             auth.signInWith(OTP) {
@@ -154,17 +154,17 @@ public class ReaderAuthClient internal constructor(
      * automatically — a wrong or expired code is [ReaderAuthException.ProviderRejected],
      * and a provider 429 is [ReaderAuthException.TryLater].
      */
-    public suspend fun verifyEmailCode(
+    override suspend fun verifyEmailCode(
         email: String,
         code: String,
-        purpose: EmailCodePurpose = EmailCodePurpose.SIGN_IN,
+        purpose: EmailCodePurpose,
     ): ReaderSessionState.SignedIn {
         ensureBootstrapped(SignInMethod.EMAIL_CODE)
         return verify(purpose.otpType, email, code)
     }
 
     /** Password sign-in. */
-    public suspend fun signInWithPassword(email: String, password: String): ReaderSessionState.SignedIn {
+    override suspend fun signInWithPassword(email: String, password: String): ReaderSessionState.SignedIn {
         ensureBootstrapped(SignInMethod.PASSWORD)
         refresher.withoutRefresh {
             provider {
@@ -178,13 +178,13 @@ public class ReaderAuthClient internal constructor(
     }
 
     /** Code-based recovery, step one: ask the provider to email a recovery code. */
-    public suspend fun requestRecoveryCode(email: String) {
+    override suspend fun requestRecoveryCode(email: String) {
         ensureBootstrapped(SignInMethod.PASSWORD)
         providerCall { auth.resetPasswordForEmail(email) }
     }
 
     /** Code-based recovery, step two: the recovery code yields a session; then call [setPassword]. */
-    public suspend fun verifyRecoveryCode(email: String, code: String): ReaderSessionState.SignedIn {
+    override suspend fun verifyRecoveryCode(email: String, code: String): ReaderSessionState.SignedIn {
         ensureBootstrapped(SignInMethod.PASSWORD)
         return verify(OtpType.Email.RECOVERY, email, code)
     }
@@ -196,7 +196,7 @@ public class ReaderAuthClient internal constructor(
      * finishes first, and none can land between the SDK reading the session
      * and saving it back, which would restore the spent refresh token.
      */
-    public suspend fun setPassword(newPassword: String) {
+    override suspend fun setPassword(newPassword: String) {
         refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
         refresher.withoutRefresh {
             // A sign-out may have run while this call waited for the mutex.
@@ -208,13 +208,13 @@ public class ReaderAuthClient internal constructor(
     // ---- Protected calls ---------------------------------------------------------------------
 
     /** The first authenticated call after sign-in. */
-    public suspend fun capabilities(): JsonObject = api.capabilities()
+    override suspend fun capabilities(): JsonObject = api.capabilities()
 
     /** [capabilities], with the request id the successful call carried beside the document (#100). */
-    public suspend fun capabilitiesResponse(): ReaderApiResponse = api.capabilitiesResponse()
+    override suspend fun capabilitiesResponse(): ReaderApiResponse = api.capabilitiesResponse()
 
     /** The profile upsert that precedes any profile read. */
-    public suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = api.upsertProfile(update)
+    override suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = api.upsertProfile(update)
 
     /**
      * What a host calls when it returns to the foreground: refreshes the
@@ -232,7 +232,7 @@ public class ReaderAuthClient internal constructor(
      * `SignedIn` for this process. A host that needs the
      * failure itself gets it from its next protected call.
      */
-    public suspend fun onForeground(): ReaderSessionState {
+    override suspend fun onForeground(): ReaderSessionState {
         try {
             refresher.sessionForRequest()
         } catch (e: ReaderAuthException) {
@@ -250,7 +250,7 @@ public class ReaderAuthClient internal constructor(
      * waits for any refresh in flight and blocks the next one, so a refresh
      * that started a moment earlier cannot re-save a session afterwards.
      */
-    public suspend fun signOut(): Unit = refresher.withoutRefresh {
+    override suspend fun signOut(): Unit = refresher.withoutRefresh {
         store.clear()
         try {
             auth.signOut(SignOutScope.LOCAL)
@@ -264,7 +264,7 @@ public class ReaderAuthClient internal constructor(
     }
 
     /** Revokes every other device's session (`others` scope); this device stays signed in. */
-    public suspend fun signOutOtherDevices() {
+    override suspend fun signOutOtherDevices() {
         refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
         providerCall { auth.signOut(SignOutScope.OTHERS) }
     }
@@ -392,35 +392,12 @@ public class ReaderAuthClient internal constructor(
         }
 
         /**
-         * The same client a host gets from [create], wired to a caller-supplied
-         * [engine] and [store] instead of OkHttp and the Keystore (#112).
-         *
-         * It exists because a module layered on this one — `:reader-library` —
-         * has to prove its operations against the *real* call policy: the
-         * bearer, the single-flight refresh and every 401/403/429/502 branch
-         * are this module's behaviour, and a hand-written double of
-         * [ReaderApiClient] would prove none of it. Every constructor here is
-         * `internal`, so without this seam such a test could only be written
-         * inside this module, where the code under test does not live.
-         *
-         * It is for tests. Nothing about the returned client differs from a
-         * production one — this is [build] with no defaults changed — but a
-         * real host has no reason to choose its own engine, and
-         * [ReaderAuthException.NotConfigured] is still thrown for a blank
-         * service value exactly as [create] throws it.
-         */
-        public fun createForTests(
-            config: ReaderAuthConfig,
-            store: SessionStore,
-            engine: HttpClientEngine,
-            clock: ReaderClock = ReaderClock.System,
-            waiter: RetryWaiter = RetryWaiter.Delay,
-            requestIds: () -> String = { UUID.randomUUID().toString().lowercase() },
-        ): ReaderAuthClient = build(config, store, engine, clock, waiter, requestIds)
-
-        /**
-         * The wiring shared by production and tests. The three SDK defaults the
-         * contract overrides are set here and pinned by `SdkDefaultsTest`:
+         * The wiring shared by production and tests: [create] passes the
+         * Keystore store and OkHttp, and the test fixtures
+         * (`src/testFixtures`, `ReaderAuthHarness`) pass an in-memory store and
+         * a mock engine to this same function, so a test drives exactly the
+         * production client (#199). The three SDK defaults the contract
+         * overrides are set here and pinned by `SdkDefaultsTest`:
          *
          * - the session manager is [StoreSessionManager] over the module's
          *   [SessionStore], never the SDK's plaintext `SharedPreferences`

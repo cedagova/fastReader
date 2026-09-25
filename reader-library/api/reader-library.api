@@ -18,7 +18,7 @@ public final class com/cedagova/reader/library/ReaderLibraryClient : com/cedagov
 	public static final field PROGRESS_PATH Ljava/lang/String;
 	public static final field PUBLICATION_IMPORT_CAPABILITY_KEY Ljava/lang/String;
 	public static final field SYNC_CAPABILITY_KEY Ljava/lang/String;
-	public fun <init> (Lcom/cedagova/reader/auth/api/ReaderApiClient;)V
+	public fun <init> (Lcom/cedagova/reader/auth/api/ReaderApiOperations;)V
 	public fun admitImport (Lcom/cedagova/reader/library/model/CreatePublicationImportRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun applyMutations (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun assetDownloadGrant (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -66,7 +66,6 @@ public final class com/cedagova/reader/library/downloads/AssetDownloadClient : j
 }
 
 public final class com/cedagova/reader/library/downloads/AssetDownloadClient$Companion {
-	public final fun createForTests (Lio/ktor/client/engine/HttpClientEngine;)Lcom/cedagova/reader/library/downloads/AssetDownloadClient;
 }
 
 public abstract class com/cedagova/reader/library/downloads/AssetDownloadException : java/lang/Exception {
@@ -95,6 +94,22 @@ public final class com/cedagova/reader/library/downloads/AssetDownloadException$
 	public fun <init> (Ljava/lang/Throwable;)V
 }
 
+public abstract interface class com/cedagova/reader/library/downloads/AssetDownloadGateway {
+	public abstract fun download (Lcom/cedagova/reader/library/model/ReaderAssetGrant;Ljava/io/OutputStream;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun download$default (Lcom/cedagova/reader/library/downloads/AssetDownloadGateway;Lcom/cedagova/reader/library/model/ReaderAssetGrant;Ljava/io/OutputStream;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun downloadGrant (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/library/downloads/AssetDownloadGateway$DefaultImpls {
+	public static synthetic fun download$default (Lcom/cedagova/reader/library/downloads/AssetDownloadGateway;Lcom/cedagova/reader/library/model/ReaderAssetGrant;Ljava/io/OutputStream;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/library/downloads/ReaderApiAssetDownloadGateway : com/cedagova/reader/library/downloads/AssetDownloadGateway {
+	public fun <init> (Lcom/cedagova/reader/library/ReaderLibraryOperations;Lcom/cedagova/reader/library/downloads/AssetDownloadClient;)V
+	public fun download (Lcom/cedagova/reader/library/model/ReaderAssetGrant;Ljava/io/OutputStream;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun downloadGrant (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
 public final class com/cedagova/reader/library/imports/PublicationImportEngine {
 	public fun <init> (Lcom/cedagova/reader/library/ReaderLibraryOperations;Lcom/cedagova/reader/library/imports/PublicationTransferClient;Lcom/cedagova/reader/auth/ReaderClock;)V
 	public synthetic fun <init> (Lcom/cedagova/reader/library/ReaderLibraryOperations;Lcom/cedagova/reader/library/imports/PublicationTransferClient;Lcom/cedagova/reader/auth/ReaderClock;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -106,6 +121,23 @@ public final class com/cedagova/reader/library/imports/PublicationImportEngine {
 	public static synthetic fun resume$default (Lcom/cedagova/reader/library/imports/PublicationImportEngine;Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun start (Ljava/lang/String;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun start$default (Lcom/cedagova/reader/library/imports/PublicationImportEngine;Ljava/lang/String;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract interface class com/cedagova/reader/library/imports/PublicationImportGateway {
+	public abstract fun cancel (Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun importCapability (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun importPolicy (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun refresh (Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun refuse (Lcom/cedagova/reader/library/model/PublicationImportPolicyResponse;Lcom/cedagova/reader/library/imports/PublicationSource;)Lcom/cedagova/reader/library/imports/PublicationImportRefusal;
+	public abstract fun resume (Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun resume$default (Lcom/cedagova/reader/library/imports/PublicationImportGateway;Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun start (Ljava/lang/String;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun start$default (Lcom/cedagova/reader/library/imports/PublicationImportGateway;Ljava/lang/String;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/cedagova/reader/library/imports/PublicationImportGateway$DefaultImpls {
+	public static synthetic fun resume$default (Lcom/cedagova/reader/library/imports/PublicationImportGateway;Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static synthetic fun start$default (Lcom/cedagova/reader/library/imports/PublicationImportGateway;Ljava/lang/String;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class com/cedagova/reader/library/imports/PublicationImportRecord {
@@ -316,7 +348,6 @@ public final class com/cedagova/reader/library/imports/PublicationTransferClient
 }
 
 public final class com/cedagova/reader/library/imports/PublicationTransferClient$Companion {
-	public final fun createForTests (Lio/ktor/client/engine/HttpClientEngine;)Lcom/cedagova/reader/library/imports/PublicationTransferClient;
 }
 
 public abstract class com/cedagova/reader/library/imports/PublicationTransferException : java/lang/Exception {
@@ -361,6 +392,17 @@ public final class com/cedagova/reader/library/imports/PublicationTransferExcept
 	public synthetic fun <init> (Ljava/lang/Throwable;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun getOffset ()J
 	public synthetic fun withOffset$reader_library (J)Lcom/cedagova/reader/library/imports/PublicationTransferException;
+}
+
+public final class com/cedagova/reader/library/imports/ReaderApiPublicationImportGateway : com/cedagova/reader/library/imports/PublicationImportGateway {
+	public fun <init> (Lcom/cedagova/reader/library/ReaderLibraryOperations;Lcom/cedagova/reader/library/imports/PublicationImportEngine;)V
+	public fun cancel (Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun importCapability (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun importPolicy (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun refresh (Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun refuse (Lcom/cedagova/reader/library/model/PublicationImportPolicyResponse;Lcom/cedagova/reader/library/imports/PublicationSource;)Lcom/cedagova/reader/library/imports/PublicationImportRefusal;
+	public fun resume (Lcom/cedagova/reader/library/imports/PublicationImportRecord;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun start (Ljava/lang/String;Lcom/cedagova/reader/library/imports/PublicationSource;Lcom/cedagova/reader/library/imports/UploadConsent;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class com/cedagova/reader/library/imports/UploadConsent : java/lang/Enum {

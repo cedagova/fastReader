@@ -240,10 +240,6 @@ public class PublicationTransferClient internal constructor(private val http: Ht
 
         private const val READ_BUFFER_BYTES = 64 * 1024
 
-        /** The client tests drive: a real client over a mock engine, same code path. */
-        public fun createForTests(engine: HttpClientEngine): PublicationTransferClient =
-            PublicationTransferClient(httpClient(engine))
-
         /**
          * The transport. Its timeouts are deliberately not `:reader-auth`'s 10 s:
          * that is a bound for a small JSON round trip, and this sends megabytes.

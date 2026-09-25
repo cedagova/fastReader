@@ -2,7 +2,6 @@ package com.cedagova.fastreader.reader.ui
 
 import com.cedagova.fastreader.account.library.AccountResumeOffers
 import com.cedagova.fastreader.account.library.AccountShelf
-import com.cedagova.fastreader.account.library.RecordingHostRecords
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.CatalogIngestor
@@ -19,6 +18,8 @@ import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.AccountRemotePosition
 import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.reader.library.sync.LocalReadingPosition
+import com.cedagova.reader.library.testing.RecordingAccountLibraryActions
+import com.cedagova.reader.library.testing.RecordingHostRecords
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -102,7 +103,7 @@ class CatalogPositionsTest {
         val repository = repository(backgroundScope)
         repository.addPickedBooks(listOf("doc://a"))
         val bookId = repository.catalog.value.books.single().id
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = AccountShelf(
             resumeOffers = AccountResumeOffers(RecordingHostRecords()),
             actions = actions,
@@ -129,7 +130,7 @@ class CatalogPositionsTest {
         val repository = repository(backgroundScope)
         repository.addPickedBooks(listOf("doc://a"))
         val bookId = repository.catalog.value.books.single().id
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = AccountShelf(
             resumeOffers = AccountResumeOffers(RecordingHostRecords()),
             actions = actions,
@@ -163,7 +164,7 @@ class CatalogPositionsTest {
         val repository = repository(backgroundScope)
         repository.addPickedBooks(listOf("doc://a"))
         val bookId = repository.catalog.value.books.single().id
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = AccountShelf(
             resumeOffers = AccountResumeOffers(RecordingHostRecords()),
             actions = actions,
@@ -424,31 +425,10 @@ class CatalogPositionsTest {
             repository,
             AccountShelf(
                 resumeOffers = AccountResumeOffers(RecordingHostRecords()),
-                actions = RecordingActions(),
+                actions = RecordingAccountLibraryActions(),
                 state = MutableStateFlow(state),
                 scope = backgroundScope,
             ),
         )
-    }
-
-    /** Only the position action is recorded; the rest are the shelf's and not this test's. */
-    private class RecordingActions : AccountLibraryActions {
-        val positions = mutableListOf<Pair<String, LocalReadingPosition>>()
-
-        override fun refresh() = Unit
-
-        override fun removeFromAccount(bookId: String) = Unit
-
-        override fun undoRemove(bookId: String) = Unit
-
-        override fun recordOpened(bookId: String) = Unit
-
-        override fun recordFinished(bookId: String) = Unit
-
-        override fun recordStatus(bookId: String, status: ReaderLibraryStatus) = Unit
-
-        override fun recordPosition(bookId: String, position: LocalReadingPosition) {
-            positions += bookId to position
-        }
     }
 }

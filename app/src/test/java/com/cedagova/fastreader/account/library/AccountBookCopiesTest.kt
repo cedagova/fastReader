@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.account.AssetDownloadGateway
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.CatalogIngestor
@@ -12,10 +11,12 @@ import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.downloads.AssetDownloadException
+import com.cedagova.reader.library.downloads.AssetDownloadGateway
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetMethod
 import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.testing.FakeAssetDownloadGateway
 import java.io.File
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -38,7 +39,7 @@ import org.junit.rules.TemporaryFolder
  * (#118, REQ-510, D2, AD-24).
  *
  * The store, the ingestor, the catalog codec and the repository are the
- * production classes; only [ScriptedDownloads] stands in for reader-api and the
+ * production classes; only [FakeAssetDownloadGateway] stands in for reader-api and the
  * storage provider, and it stands in for them the way they behave — a grant
  * with a TTL, and a signature that can be spent.
  */
@@ -63,7 +64,7 @@ class AccountBookCopiesTest {
 
     @Test
     fun `a downloaded book is verified, placed and readable as a device book`() = runTest {
-        val downloads = ScriptedDownloads(bytes)
+        val downloads = FakeAssetDownloadGateway(bytes)
         val library = repository(backgroundScope)
         val copies = copies(downloads, library)
         val progress = mutableListOf<Pair<Long, Long>>()
@@ -113,7 +114,7 @@ class AccountBookCopiesTest {
         library.addPickedBooks(listOf("doc://a"))
         assertEquals(1, library.catalog.value.books.size)
 
-        val ready = copies(ScriptedDownloads(bytes), library).download(book) as CopyOutcome.Ready
+        val ready = copies(FakeAssetDownloadGateway(bytes), library).download(book) as CopyOutcome.Ready
 
         assertEquals("one book, not two", 1, library.catalog.value.books.size)
         val sources = library.catalog.value.book(ready.bookId)!!.sources
@@ -128,7 +129,7 @@ class AccountBookCopiesTest {
         val tampered = bytes.copyOf().also { it[it.size / 2] = (it[it.size / 2] + 1).toByte() }
         val library = repository(backgroundScope)
         val store = store()
-        val copies = copies(ScriptedDownloads(tampered), library, store)
+        val copies = copies(FakeAssetDownloadGateway(tampered), library, store)
 
         val outcome = copies.download(book)
 
@@ -142,7 +143,7 @@ class AccountBookCopiesTest {
 
     @Test
     fun `a grant reader-api will not issue is reported unchanged, and nothing is placed`() = runTest {
-        val downloads = ScriptedDownloads(bytes).apply {
+        val downloads = FakeAssetDownloadGateway(bytes).apply {
             grantFailure = ReaderAuthException.NetworkUnavailable(java.io.IOException("offline"))
         }
         val library = repository(backgroundScope)
@@ -158,7 +159,7 @@ class AccountBookCopiesTest {
 
     @Test
     fun `a full disk is reported as no storage, with nothing placed`() = runTest {
-        val downloads = ScriptedDownloads(bytes).apply {
+        val downloads = FakeAssetDownloadGateway(bytes).apply {
             transportFailure = java.io.IOException("No space left on device")
         }
         val library = repository(backgroundScope)
@@ -173,7 +174,7 @@ class AccountBookCopiesTest {
 
     @Test
     fun `an account book with no asset or no identity is never fetched`() = runTest {
-        val downloads = ScriptedDownloads(bytes)
+        val downloads = FakeAssetDownloadGateway(bytes)
         val copies = copies(downloads, repository(backgroundScope))
 
         assertTrue(copies.download(book.copy(assetId = null)) is CopyOutcome.Unavailable)
@@ -193,7 +194,7 @@ class AccountBookCopiesTest {
      */
     @Test
     fun `a grant spent mid-download is re-fetched once and the copy still lands`() = runTest {
-        val downloads = ScriptedDownloads(bytes).apply { rejectAttempts = 1 }
+        val downloads = FakeAssetDownloadGateway(bytes).apply { rejectAttempts = 1 }
         val library = repository(backgroundScope)
         val store = store()
 
@@ -209,7 +210,7 @@ class AccountBookCopiesTest {
     /** Two rejections is the asset, not the signature: reported, not retried forever. */
     @Test
     fun `a grant rejected twice is reported rather than retried again`() = runTest {
-        val downloads = ScriptedDownloads(bytes).apply { rejectAttempts = Int.MAX_VALUE }
+        val downloads = FakeAssetDownloadGateway(bytes).apply { rejectAttempts = Int.MAX_VALUE }
         val library = repository(backgroundScope)
         val store = store()
 
@@ -228,7 +229,7 @@ class AccountBookCopiesTest {
     fun `removing a copy deletes the file and the source, and the row with it`() = runTest {
         val library = repository(backgroundScope)
         val store = store()
-        val copies = copies(ScriptedDownloads(bytes), library, store)
+        val copies = copies(FakeAssetDownloadGateway(bytes), library, store)
         val ready = copies.download(book) as CopyOutcome.Ready
 
         assertTrue(copies.remove(digest))
@@ -247,7 +248,7 @@ class AccountBookCopiesTest {
         val library = repository(backgroundScope)
         library.addPickedBooks(listOf("doc://a"))
         val store = store()
-        val copies = copies(ScriptedDownloads(bytes), library, store)
+        val copies = copies(FakeAssetDownloadGateway(bytes), library, store)
         val ready = copies.download(book) as CopyOutcome.Ready
 
         copies.remove(digest)
@@ -266,7 +267,7 @@ class AccountBookCopiesTest {
     @Test
     fun `freeing a copy keeps the reading position`() = runTest {
         val library = repository(backgroundScope)
-        val copies = copies(ScriptedDownloads(bytes), library)
+        val copies = copies(FakeAssetDownloadGateway(bytes), library)
         val ready = copies.download(book) as CopyOutcome.Ready
         library.updateReadingState(
             ready.bookId,
@@ -284,7 +285,7 @@ class AccountBookCopiesTest {
     fun `the start-up sweep discards partials and reconciles rows and references`() = runTest {
         val library = repository(backgroundScope)
         val store = store()
-        val copies = copies(ScriptedDownloads(bytes), library, store)
+        val copies = copies(FakeAssetDownloadGateway(bytes), library, store)
         val ready = copies.download(book) as CopyOutcome.Ready
 
         // A dead process's partial, and a copy the system reclaimed.
@@ -310,7 +311,7 @@ class AccountBookCopiesTest {
         library.addPickedBooks(listOf("doc://a"))
         val before = library.catalog.value
 
-        assertEquals(0, copies(ScriptedDownloads(bytes), library).reconcile())
+        assertEquals(0, copies(FakeAssetDownloadGateway(bytes), library).reconcile())
 
         assertEquals(before, library.catalog.value)
     }
@@ -345,59 +346,6 @@ class AccountBookCopiesTest {
 
     private fun sha256(value: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(value).joinToString("") { "%02x".format(it) }
-
-    /**
-     * reader-api and the storage provider, as the download path sees them.
-     *
-     * The grant is re-minted on every ask, which is what makes "the expiry cost
-     * one more grant" countable; [rejectAttempts] spends the signature the way a
-     * TTL does.
-     */
-    private class ScriptedDownloads(private val body: ByteArray) : AssetDownloadGateway {
-
-        val grants = mutableListOf<String>()
-        var fetches: Int = 0
-
-        /** reader-api refuses to issue a grant at all. */
-        var grantFailure: ReaderAuthException? = null
-
-        /** The provider rejects the signature on this many attempts, then serves. */
-        var rejectAttempts: Int = 0
-
-        /** The sink refuses the bytes — a full disk, for instance. */
-        var transportFailure: Throwable? = null
-
-        override suspend fun downloadGrant(assetId: String): ReaderAssetGrant {
-            grantFailure?.let { throw it }
-            grants += assetId
-            return ReaderAssetGrant(
-                assetId = assetId,
-                bookId = "22222222-2222-2222-2222-222222222222",
-                direction = ReaderAssetDirection.DOWNLOAD,
-                method = ReaderAssetMethod.GET,
-                url = "https://storage.test/object/$assetId?token=signed-${grants.size}",
-                expiresAt = "2026-09-21T12:00:00Z",
-                checksum = "sha256:" + MessageDigest.getInstance("SHA-256")
-                    .digest(body).joinToString("") { "%02x".format(it) },
-                sizeBytes = body.size.toLong(),
-                uploadStatus = "ready",
-                headers = mapOf("x-signature" to "test-signature-not-a-credential"),
-            )
-        }
-
-        override suspend fun download(
-            grant: ReaderAssetGrant,
-            sink: OutputStream,
-            onProgress: (written: Long, total: Long) -> Unit,
-        ): Long {
-            fetches++
-            if (fetches <= rejectAttempts) throw AssetDownloadException.GrantRejected(403)
-            transportFailure?.let { throw it }
-            sink.write(body)
-            onProgress(body.size.toLong(), grant.sizeBytes)
-            return body.size.toLong()
-        }
-    }
 
     /** The account document's copy half, recorded rather than persisted. */
     private class RecordingCopyReferences : AccountCopyReferences {

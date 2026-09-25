@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.account.FakePublicationImportGateway
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.FakeDocumentGateway
@@ -18,6 +17,8 @@ import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 import com.cedagova.reader.library.sync.AccountImportRecords
 import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.AccountSyncPhase
+import com.cedagova.reader.library.testing.FakePublicationImportGateway
+import com.cedagova.reader.library.testing.InMemoryImportRecords
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -48,7 +49,7 @@ class AccountImportsTest {
 
     private val gateway = FakePublicationImportGateway()
     private val documents = FakeDocumentGateway()
-    private val records = FakeImportRecords()
+    private val records = InMemoryImportRecords()
     private val account = MutableStateFlow(signedIn())
 
     /**
@@ -501,25 +502,6 @@ class AccountImportsTest {
     private fun readyRecord() = record(PublicationImportStatus.READY)
 
     private fun signedIn() = AccountLibraryState(phase = AccountSyncPhase.IDLE, userId = "user-1")
-
-    /** The account document's import section, in memory. */
-    private class FakeImportRecords : AccountImportRecords {
-        val stored = mutableListOf<PublicationImportRecord>()
-        var signedIn: String? = "user-1"
-
-        override fun accountId(): String? = signedIn
-
-        override suspend fun importRecords(): List<PublicationImportRecord> = stored.toList()
-
-        override suspend fun putImportRecord(record: PublicationImportRecord) {
-            val index = stored.indexOfFirst { it.clientImportId == record.clientImportId }
-            if (index < 0) stored += record else stored[index] = record
-        }
-
-        override suspend fun dropImportRecord(clientImportId: String) {
-            stored.removeAll { it.clientImportId == clientImportId }
-        }
-    }
 
     private companion object {
         const val FICCIONES_HEX = "f1cc10e500000000000000000000000000000000000000000000000000000000"

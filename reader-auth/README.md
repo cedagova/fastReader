@@ -38,6 +38,38 @@ contract's constants live in `ReaderAuthPolicy`, and the unit tests under
 pin each rule; the real Keystore path and the stage flow are proven on an
 emulator from FastReader, the library's host (`docs/evidence/100/`).
 
+## Substituting it in a host's tests
+
+A host holds `ReaderAuthOperations` — the interface `ReaderAuthClient`
+implements — wherever it wants to swap the module out, and takes the module's
+test fixtures (`src/testFixtures/`, package `com.cedagova.reader.auth.testing`,
+#199) instead of writing its own:
+
+```kotlin
+testImplementation(testFixtures(project(":reader-auth")))
+```
+
+- `FakeReaderAuthOperations`: a scripted double — records each call, throws a
+  scripted `ReaderAuthException`, parks on a gate, flips its session state
+  the way the client does.
+- `ReaderAuthHarness`: the real client over `FakeServers`, the one mock
+  identity-provider and reader-api server, with an in-memory session store —
+  for code that must be proven against the real call policy. `FakeServers`,
+  `FakeClock`, `RecordingWaiter`, `TestSession` and the document builders
+  (`preAuthJson`, `sessionJson`, `apiError`, …) come with it, and
+  `:reader-library`'s fixtures build on them.
+
+Kotlin in test fixtures needs `android.experimental.enableTestFixturesKotlinSupport=true`
+in the host's `gradle.properties`.
+
+Session storage is **not** a host seam. `SessionStore` and `StoredSession`
+are internal: the storage rules (Keystore encryption, the no-backup
+directory, clearing on sign-out and on a rejected token) are this module's to
+keep, a host store would be one more place a token could be written in the
+clear, and no public type carries a token. The production API has no
+test-only entry point; the fixtures reach the module's internal wiring the
+way its own tests do.
+
 A host takes this module as a source copy at a tag `reader-auth/v<version>`
 (#207): [docs/library-consumption.md](../docs/library-consumption.md) lists
 what to copy and how. The version is `version` in `build.gradle.kts`, and

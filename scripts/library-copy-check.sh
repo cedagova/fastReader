@@ -10,8 +10,9 @@
 #   2. assembles a throwaway standalone Gradle project in a fresh temp dir:
 #      the copy set's tracked files, a catalog holding ONLY the catalog entries
 #      the copy set lists, and the host template in scripts/library-copy-check/;
-#   3. runs that host's minified release build (R8) and the copied tests the
-#      copy set names, with the serialization runtime's embedded keep rules
+#   3. runs that host's minified release build (R8), the copied tests the
+#      copy set names and, when the copy set lists test fixtures, the host's
+#      own unit test against them (#199), with the serialization runtime's embedded keep rules
 #      ignored and the consumer rules of every module that does not keep its
 #      own serialized types emptied in the copy;
 #   4. reads R8's mapping and fails unless every @Serializable type of each
@@ -59,6 +60,7 @@ versions=()
 libraries=()
 plugins=()
 test_tasks=()
+fixture_modules=()
 while read -r kind rest; do
   fields=()
   [[ -n "$rest" ]] && read -r -a fields <<<"$rest"
@@ -78,11 +80,20 @@ while read -r kind rest; do
       [[ ${#fields[@]} -eq 2 ]] || die "copy-set entry 'test ${rest}': expected 'test <module> <test class pattern>'"
       test_tasks+=(":${fields[0]}:testDebugUnitTest" --tests "${fields[1]}")
       ;;
+    fixtures) fixture_modules+=("${fields[@]}") ;;
     *) die "unknown copy-set entry '$kind' in $doc" ;;
   esac
 done <<<"$copy_set"
 [[ ${#modules[@]} -gt 0 ]] || die "the copy set lists no module"
 [[ ${#self_kept[@]} -gt 0 ]] || die "the copy set names no module that keeps its own serialized types"
+for fixture in ${fixture_modules[@]+"${fixture_modules[@]}"}; do
+  listed_module=false
+  for module in "${modules[@]}"; do [[ "$module" == "$fixture" ]] && listed_module=true; done
+  $listed_module || die "copy-set entry 'fixtures $fixture': not a listed module"
+  [[ -d "$repo/$fixture/src/testFixtures" ]] || die "copy-set entry 'fixtures $fixture': $fixture has no src/testFixtures"
+done
+# The host's unit test against the fixtures (scripts/library-copy-check/consumer/src/test).
+if [[ ${#fixture_modules[@]} -gt 0 ]]; then test_tasks+=(":consumer:testDebugUnitTest"); fi
 
 for module in "${modules[@]}"; do
   build_file="$repo/$module/build.gradle.kts"
@@ -150,6 +161,7 @@ awk -v want_versions="${versions[*]-}" -v want_libraries="${libraries[*]-}" -v w
 
 cp -R "$template/." "$work/"
 printf '%s\n' "${modules[@]}" >"$work/copied-modules.txt"
+printf '%s\n' ${fixture_modules[@]+"${fixture_modules[@]}"} >"$work/fixture-modules.txt"
 
 # The host's rules: keep every @Serializable class of each self-keeping module,
 # as a host that reaches all of them does, and nothing else about them. R8

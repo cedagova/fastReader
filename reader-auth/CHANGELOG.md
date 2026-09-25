@@ -19,6 +19,16 @@ stands after these changes, which had no version of their own:
 - The public surface is explicit-API and recorded in `api/reader-auth.api`;
   the provider SDK's session type is wrapped in the module's own
   `StoredSession` (#198).
+- Host seams and test fixtures (#199): `ReaderAuthClient` implements
+  `ReaderAuthOperations` and `ReaderApiClient` implements
+  `ReaderApiOperations`, the interfaces a host holds to substitute them. The
+  test fixtures in `src/testFixtures/` (`com.cedagova.reader.auth.testing`)
+  ship the one mock server (`FakeServers`), `ReaderAuthHarness` (the real
+  client over it) and `FakeReaderAuthOperations`. Removed:
+  `ReaderAuthClient.createForTests` and `StoredSession.forTests` — use
+  `ReaderAuthHarness`. `SessionStore` and `StoredSession` are internal:
+  session storage is not a host seam. Ktor is no longer in the surface (an
+  `implementation` dependency).
 - The one pinned reader-api contract document in `contracts/` and the shared
   contract checker in `src/contractTest/`, which `:reader-library` uses too
   (#208).

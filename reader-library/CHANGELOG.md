@@ -25,3 +25,12 @@ changes, which had no version of their own, plus one addition:
 - Contract-tested against the one pinned reader-api document in
   `../reader-auth/contracts/` (#208).
 - Shared build conventions from `build-logic` (#205).
+- Host seams and test fixtures (#199): `AssetDownloadGateway` and
+  `PublicationImportGateway` (with `ReaderApiAssetDownloadGateway` and
+  `ReaderApiPublicationImportGateway`) are the module's own interfaces;
+  `ReaderLibraryClient` takes `:reader-auth`'s `ReaderApiOperations`. The test
+  fixtures in `src/testFixtures/` (`com.cedagova.reader.library.testing`)
+  ship the scripted doubles and `ReaderLibraryHarness`. Removed:
+  `AssetDownloadClient.createForTests` and
+  `PublicationTransferClient.createForTests` — use the fixtures'
+  `assetDownloadClientOver` and `publicationTransferClientOver`.

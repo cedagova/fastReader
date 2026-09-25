@@ -2,6 +2,7 @@ package com.cedagova.reader.library
 
 import com.cedagova.reader.auth.contract.ReaderApiContract
 import com.cedagova.reader.auth.contract.primitive
+import com.cedagova.reader.auth.testing.recorded
 import com.cedagova.reader.library.model.CancelPublicationImportRequest
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
