@@ -232,7 +232,7 @@ for entry in "${self_kept[@]}"; do
       printf "library-copy-check: %s: %d serialized types keep their serializer lookup under R8\n", module, count
     }
   ' "$outputs/seeds.txt" "$outputs/mapping.txt" ||
-    die "$module does not keep its own serialized types under R8 (above); fix $module/consumer-rules.pro"
+    die "$module does not keep its own serialized types under R8 (above); fix its consumer rules ($module/consumer-rules.pro, or src/main/resources/META-INF/proguard/ for a JVM module)"
 done
 
 say "OK: the copy set builds and shrinks as a standalone host"

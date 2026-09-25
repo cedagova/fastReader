@@ -25,12 +25,12 @@ Imports run one way only: `timing` → `content` → `epub`.
 
 | Package | What it holds | Start here |
 | --- | --- | --- |
-| `com.cedagova.fastreader.epub` | Archive access and inspection: central-directory or streaming zip reads, safe XML, metadata and cover, the structural fingerprint that guards a stored position. | `EpubInspector.inspect`, `EpubByteSource`, `FileEpubByteSource`, `EpubArchives.open` |
-| `com.cedagova.fastreader.content` | XHTML → token stream: markup scanning, front matter, TOC titles, tokenizer and word classes; the book's identity. | `EpubContentPipeline.parse` → `BookContentResult`; `BookIdentity`, `BookDigest.of`; `Tokenizer.tokenize` for text that is already in blocks |
-| `com.cedagova.fastreader.timing` | RSVP pacing: per-token duration, ramp-up, pause strength, and the remaining-time index that also yields a book's mean multiplier. | `RsvpTimingEngine`, `TimingSettings`, `RemainingTimeIndex.build` |
+| `com.cedagova.reader.engine.epub` | Archive access and inspection: central-directory or streaming zip reads, safe XML, metadata and cover, the structural fingerprint that guards a stored position. | `EpubInspector.inspect`, `EpubByteSource`, `FileEpubByteSource` |
+| `com.cedagova.reader.engine.content` | XHTML → token stream: markup scanning, front matter, TOC titles, tokenizer and word classes; the book's identity. | `EpubContentPipeline.parse` → `BookContentResult`; `BookIdentity`, `BookDigest.of`; `Tokenizer.tokenize` for text that is already in blocks |
+| `com.cedagova.reader.engine.timing` | RSVP pacing: per-token duration, ramp-up, pause strength, and the remaining-time index that also yields a book's mean multiplier. | `RsvpTimingEngine`, `TimingSettings`, `RemainingTimeIndex.build` |
 
-The packages keep the `com.cedagova.fastreader` names they had in `:app`; the
-move changed no caller's import.
+In `:app` they were `com.cedagova.fastreader.{epub,content,timing}`; the move
+renamed them to the library naming of `:reader-auth` and `:reader-library`.
 
 ## What it is not
 

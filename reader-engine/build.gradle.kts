@@ -6,8 +6,8 @@
 // they live here as a plain Kotlin/JVM module: the Android SDK is not on the
 // compile classpath, and nothing here depends on :app.
 //
-// The packages keep their original `com.cedagova.fastreader.*` names: the move
-// is behavior-neutral and every caller's import stays as it was.
+// Packages: com.cedagova.reader.engine.{epub,content,timing}, the library
+// naming of :reader-auth and :reader-library (no FastReader symbol).
 //
 // The public surface is recorded in api/reader-engine.api and checked by
 // `./gradlew check` (build-logic); each `api` dependency below says why a type

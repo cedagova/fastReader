@@ -27,7 +27,7 @@ the check builds.
 #   the check proves those rules suffice on their own.
 module reader-auth
 module reader-library com.cedagova.reader.library
-module reader-engine com.cedagova.fastreader.timing
+module reader-engine com.cedagova.reader.engine
 
 # path <file or directory>
 #   Shared build pieces the modules need, copied verbatim.
@@ -124,7 +124,7 @@ rule of its own for them:
   (its own and the identity provider SDK's) plus the JSON element
   serializers; see the file.
 - `:reader-engine` keeps the same members for its `@Serializable` types
-  (package `com.cedagova.fastreader.timing`). As a plain JVM library it has no
+  (package `com.cedagova.reader.engine`). As a plain JVM library it has no
   `consumerProguardFiles`: its rules ship inside its jar, in
   `src/main/resources/META-INF/proguard/reader-engine.pro`, where R8 reads them.
 

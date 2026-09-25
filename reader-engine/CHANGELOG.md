@@ -14,13 +14,16 @@ unchanged (#201, A197-F004). Tokenizer output and
 
 - `epub`, `content` and `timing` as a plain Kotlin/JVM module with no Android
   dependency, built by `conventions.kotlin.library` (build-logic).
+- Packages renamed from `com.cedagova.fastreader.{epub,content,timing}` to
+  `com.cedagova.reader.engine.{epub,content,timing}`; a host changes its
+  imports. Nothing persisted names a package: `PauseStrength` is stored by
+  value.
 - `BookDigest` is now in `content` (was `epub`), so `epub` imports nothing from
   `content`.
 - `RemainingTimeIndex` is now in `timing` (was `:app`'s `reader` package).
 - The public surface is explicit-API and recorded in `api/reader-engine.api`.
-  `Tokenizer`, `ContentBlock`, `EpubArchives`, `ArchiveOpen`, `EpubArchive`,
-  `ArchiveRead` and `ArchiveReadStrategy`, internal while the engines were in
-  `:app`, are public because the host's tests use them.
+  `Tokenizer` and `ContentBlock`, internal while the engines were in `:app`,
+  are public because the host's on-device tests use them.
 - Keep rules for the module's `@Serializable` types ship in the jar
   (`META-INF/proguard/reader-engine.pro`).
 - EPUB and content test fixtures are published as the module's test fixtures.
