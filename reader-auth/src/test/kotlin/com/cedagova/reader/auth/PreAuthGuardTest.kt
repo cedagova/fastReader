@@ -1,5 +1,14 @@
 package com.cedagova.reader.auth
 
+import com.cedagova.reader.auth.testing.FakeServers
+import com.cedagova.reader.auth.testing.InMemorySessionStore
+import com.cedagova.reader.auth.testing.OTP
+import com.cedagova.reader.auth.testing.PRE_AUTH
+import com.cedagova.reader.auth.testing.PUBLISHABLE_KEY
+import com.cedagova.reader.auth.testing.RECOVER
+import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.auth.testing.preAuthJson
+import com.cedagova.reader.auth.testing.testConfig
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

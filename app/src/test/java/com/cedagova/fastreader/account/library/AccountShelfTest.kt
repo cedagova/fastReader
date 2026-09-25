@@ -5,6 +5,8 @@ import com.cedagova.reader.library.sync.AccountLibraryActions
 import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.reader.library.sync.LocalReadingPosition
+import com.cedagova.reader.library.testing.RecordingAccountLibraryActions
+import com.cedagova.reader.library.testing.RecordingHostRecords
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -29,7 +31,7 @@ class AccountShelfTest {
 
     @Test
     fun `removing sends the delete at once and offers undo`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
@@ -41,7 +43,7 @@ class AccountShelfTest {
 
     @Test
     fun `the offer lasts the confirmation lifetime and then stops`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
@@ -59,7 +61,7 @@ class AccountShelfTest {
 
     @Test
     fun `undo sends the contract's restore and ends the offer`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
@@ -78,7 +80,7 @@ class AccountShelfTest {
 
     @Test
     fun `undo with nothing on offer sends nothing`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions)
 
         shelf.undoRemove()
@@ -89,7 +91,7 @@ class AccountShelfTest {
 
     @Test
     fun `a second removal supersedes the first offer`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
@@ -121,7 +123,7 @@ class AccountShelfTest {
      */
     @Test
     fun `a zero window closes the offer in the same tick without deadlocking`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions, undoWindowMs = 0)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
@@ -143,7 +145,7 @@ class AccountShelfTest {
      */
     @Test
     fun `a zero window closes the offer even when the timer runs eagerly`() = runTest(UnconfinedTestDispatcher()) {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions, undoWindowMs = 0)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
@@ -159,7 +161,7 @@ class AccountShelfTest {
 
     @Test
     fun `a second removal supersedes the first even with a zero window`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val shelf = shelf(actions, undoWindowMs = 0)
 
         shelf.removeFromAccount("acc-1", "Ficciones")
@@ -182,7 +184,7 @@ class AccountShelfTest {
 
     @Test
     fun `signing out ends the offer`() = runTest {
-        val actions = RecordingActions()
+        val actions = RecordingAccountLibraryActions()
         val state = MutableStateFlow(AccountLibraryState(phase = AccountSyncPhase.IDLE, userId = "user-1"))
         val shelf = AccountShelf(actions, AccountResumeOffers(RecordingHostRecords()), state, backgroundScope)
 
@@ -278,37 +280,4 @@ class AccountShelfTest {
         scope = backgroundScope,
         undoWindowMs = undoWindowMs,
     )
-
-    /** Every library operation the shelf can reach, in the order it asked for them. */
-    private class RecordingActions : AccountLibraryActions {
-        val calls = mutableListOf<String>()
-
-        override fun refresh() {
-            calls += "refresh"
-        }
-
-        override fun removeFromAccount(bookId: String) {
-            calls += "remove:$bookId"
-        }
-
-        override fun undoRemove(bookId: String) {
-            calls += "undo:$bookId"
-        }
-
-        override fun recordOpened(bookId: String) {
-            calls += "opened:$bookId"
-        }
-
-        override fun recordFinished(bookId: String) {
-            calls += "finished:$bookId"
-        }
-
-        override fun recordPosition(bookId: String, position: LocalReadingPosition) {
-            calls += "position:$bookId:${position.href}:${position.percent}"
-        }
-
-        override fun recordStatus(bookId: String, status: ReaderLibraryStatus) {
-            calls += "status:$bookId:$status"
-        }
-    }
 }

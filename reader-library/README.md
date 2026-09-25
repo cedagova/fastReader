@@ -28,7 +28,7 @@ engine built on them (see below). The operations are exactly the ones
 
 `ReaderLibraryOperations` is the interface; `ReaderLibraryClient` is the one
 implementation, constructed with the `ReaderApiClient` a `ReaderAuthClient`
-exposes. There is no generic `call(path, body)` on it: every request this module
+exposes (it takes `:reader-auth`'s `ReaderApiOperations` interface, #199). There is no generic `call(path, body)` on it: every request this module
 sends to reader-api is one of the operations above.
 
 ## Packages
@@ -38,8 +38,8 @@ sends to reader-api is one of the operations above.
 | `com.cedagova.reader.library` | `ReaderLibraryOperations`, `ReaderLibraryClient` and the JSON setup: the typed reader-api operations above. |
 | `…library.model` | The hand-written request and response models, checked against the pinned contract (see below). |
 | `…library.sync` | The account sync engine (see below). |
-| `…library.imports` | Publication import: `PublicationImportEngine` runs one add from policy to completion over a caller-held `PublicationImportRecord`; `PublicationTransferClient` is the TUS upload to the storage provider, with no session and no bearer; `UploadConsent`, `PublicationSource` and `PublicationImportRefusal` are its inputs and local refusals. |
-| `…library.downloads` | `AssetDownloadClient`: fetches a book's bytes from the provider URL an `assetDownloadGrant` returns, sending only the grant's signed headers — no session, no bearer. Checking the digest and placing the file are the host's. |
+| `…library.imports` | Publication import: `PublicationImportEngine` runs one add from policy to completion over a caller-held `PublicationImportRecord`; `PublicationTransferClient` is the TUS upload to the storage provider, with no session and no bearer; `UploadConsent`, `PublicationSource` and `PublicationImportRefusal` are its inputs and local refusals. `PublicationImportGateway` is the seam a host holds (production: `ReaderApiPublicationImportGateway`, #199). |
+| `…library.downloads` | `AssetDownloadClient`: fetches a book's bytes from the provider URL an `assetDownloadGrant` returns, sending only the grant's signed headers — no session, no bearer. Checking the digest and placing the file are the host's. `AssetDownloadGateway` is the seam a host holds: the grant from reader-api and the bytes from the session-less transport, as two methods over two clients (production: `ReaderApiAssetDownloadGateway`, #199). |
 
 ## What it is not
 
@@ -164,6 +164,30 @@ entry. `consumer-rules.pro` keeps this module's own `@Serializable` types for
 a shrinking host, and `scripts/library-copy-check.sh` proves it keeps them
 without `:reader-auth`'s rules.
 
+## Substituting it in a host's tests
+
+A host holds the module's interfaces — `ReaderLibraryOperations`,
+`ReaderLibraryGateway`, `PublicationImportGateway`, `AssetDownloadGateway`
+and the sync engine's `AccountLibraryActions`, `AccountHostRecords` and
+`AccountImportRecords` — and takes the module's test fixtures
+(`src/testFixtures/`, package `com.cedagova.reader.library.testing`, #199)
+instead of writing its own doubles:
+
+```kotlin
+testImplementation(testFixtures(project(":reader-library")))  // brings :reader-auth's fixtures too
+```
+
+- Scripted doubles: `FakeReaderLibraryGateway`, `FakePublicationImportGateway`
+  (its `refuse` is the real engine's), `FakeAssetDownloadGateway`,
+  `RecordingAccountLibraryActions`, `RecordingHostRecords` and
+  `InMemoryImportRecords`.
+- `ReaderLibraryHarness`: a signed-in `ReaderLibraryClient` over the real
+  `ReaderAuthClient` and `:reader-auth`'s one mock server, so a host's code is
+  proven against the real call policy.
+- `assetDownloadClientOver(engine)` and `publicationTransferClientOver(engine)`:
+  the production transfer clients over a mock storage provider (they replace
+  the former `createForTests`).
+
 ## Running its tests
 
 ```bash
@@ -176,7 +200,7 @@ kinds of double:
 
 - **reader-api operations** (`ReaderLibraryClientTest`, and the import
   lifecycle in `PublicationImportEngineTest`) drive a **real** `ReaderAuthClient`
-  over a Ktor mock engine — real bearer, real single-flight refresh, real
+  over a Ktor mock engine (`ReaderLibraryHarness` from the test fixtures) — real bearer, real single-flight refresh, real
   401/403/429/502 policy — so the module is proved to inherit that behaviour
   rather than restate it.
 - **Storage transfers** (`PublicationTransferClientTest`,

@@ -1,6 +1,7 @@
 package com.cedagova.reader.library.downloads
 
-import com.cedagova.reader.library.Recorded
+import com.cedagova.reader.auth.testing.Recorded
+import com.cedagova.reader.auth.testing.recorded
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetMethod
@@ -91,7 +92,7 @@ class FakeObjectStorage(private val body: ByteArray) {
     var redirectTo: String? = null
 
     val engine = MockEngine { data ->
-        val recorded = data.record()
+        val recorded = data.recorded()
         requests += recorded
         val reject = rejectWith
         val redirect = redirectTo
@@ -112,17 +113,4 @@ class FakeObjectStorage(private val body: ByteArray) {
             )
         }
     }
-
-    private suspend fun HttpRequestData.record(): Recorded = Recorded(
-        method = method.value,
-        host = url.host,
-        path = url.encodedPath,
-        query = url.encodedQuery,
-        headers = headers.entries().associate { (k, v) -> k to v.joinToString(",") },
-        body = try {
-            body.toByteArray().decodeToString()
-        } catch (e: Exception) {
-            ""
-        },
-    )
 }

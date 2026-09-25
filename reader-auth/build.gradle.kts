@@ -23,6 +23,14 @@ version = "0.1.0"
 android {
     namespace = "com.cedagova.reader.auth"
 
+    // src/testFixtures: the module's reusable test fixtures (#199). A host
+    // takes them as a testFixtures dependency on this module (README.md).
+    // Kotlin in test fixtures needs the gradle.properties flag
+    // android.experimental.enableTestFixturesKotlinSupport (docs/library-consumption.md).
+    testFixtures {
+        enable = true
+    }
+
     defaultConfig {
         // What a shrinking host must keep for this module's dependencies; see
         // the file for why.
@@ -64,11 +72,20 @@ dependencies {
     api(libs.kotlinx.serialization.json)
     // api: ReaderAuthClient.sessionState is a Flow.
     api(libs.kotlinx.coroutines.android)
-    // api, for one reason that is due to go: ReaderAuthClient.createForTests
-    // takes a Ktor HttpClientEngine so a layered module's tests can run the
-    // real call policy over a mock engine. The library-owned test seams of
-    // #199 (A197-F002) replace it; then this returns to implementation.
-    api(libs.ktor.client.core)
+    // Implementation: since #199 no Ktor type is in the surface. The mock
+    // engine the tests drive the client over is handed to the internal wiring
+    // by the test fixtures below, which see the module's internals.
+    implementation(libs.ktor.client.core)
+
+    // The test fixtures (#199, A197-F002): what a host, :reader-library and
+    // this module's own tests use to test against the client — one mock
+    // reader-api and identity-provider server, a real client over it, and a
+    // scripted double of ReaderAuthOperations. The mock engine is `api` there
+    // because the server's responders are written against it.
+    testFixturesApi(libs.ktor.client.mock)
+    testFixturesImplementation(platform(libs.supabase.bom))
+    testFixturesImplementation(libs.supabase.auth)
+    testFixturesImplementation(libs.ktor.client.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

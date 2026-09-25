@@ -1,6 +1,7 @@
 package com.cedagova.reader.library.imports
 
 import com.cedagova.reader.library.model.PublicationTransferGrant
+import com.cedagova.reader.library.testing.publicationTransferClientOver
 import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
@@ -24,7 +25,7 @@ class PublicationTransferClientTest {
 
     private val bytes = publicationBytes(SIZE)
     private val storage = FakeStorage()
-    private val client = PublicationTransferClient.createForTests(storage.engine)
+    private val client = publicationTransferClientOver(storage.engine)
 
     private fun grant(
         chunkSizeBytes: Long = CHUNK,
@@ -132,7 +133,7 @@ class PublicationTransferClientTest {
 
         // A new process, a new client, the same location: exactly what a resume
         // after app death has to work with.
-        val resumed = PublicationTransferClient.createForTests(storage.engine)
+        val resumed = publicationTransferClientOver(storage.engine)
         val from = resumed.offset(grant, location)
         assertEquals(KEPT.toLong(), from)
 

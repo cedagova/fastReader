@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.reader.auth.FakeCipher
-import com.cedagova.reader.auth.session
+import com.cedagova.reader.auth.testing.session
 import io.github.jan.supabase.auth.user.UserSession
 import java.io.File
 import java.io.IOException

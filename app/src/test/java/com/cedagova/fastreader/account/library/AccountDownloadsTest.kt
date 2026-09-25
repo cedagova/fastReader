@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.fastreader.account.AssetDownloadGateway
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.CatalogIngestor
 import com.cedagova.fastreader.library.FakeDocumentGateway
@@ -9,12 +8,14 @@ import com.cedagova.fastreader.library.store.CoverStore
 import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.downloads.AssetDownloadException
+import com.cedagova.reader.library.downloads.AssetDownloadGateway
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetMethod
 import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.AccountSyncPhase
+import com.cedagova.reader.library.testing.FakeAssetDownloadGateway
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
@@ -44,7 +45,7 @@ import org.junit.rules.TemporaryFolder
  *
  * Everything here is production code but the network: the copy store, the
  * ingestor, the catalog codec and `LibraryRepository` are the real ones, and
- * only [ScriptedDownloads] stands in for reader-api and the storage provider.
+ * only [FakeAssetDownloadGateway] stands in for reader-api and the storage provider.
  * That is deliberate — the claim this leaf has to hold is about what is on the
  * device after each outcome, and a mocked store would prove nothing about it.
  *
@@ -93,7 +94,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `a download opens the book only once the copy is verified and placed`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
 
@@ -114,7 +115,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `the row shows the transfer while it runs`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.holdAfterProgress = CompletableDeferred()
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -136,7 +137,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `a second tap while one is running does not start a second download`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.holdAfterProgress = CompletableDeferred()
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -156,7 +157,8 @@ class AccountDownloadsTest {
 
     @Test
     fun `tampered bytes are refused with the reason and nothing opens`() = runTest {
-        val transport = ScriptedDownloads("not the book the account holds".toByteArray())
+        val transport =
+            FakeAssetDownloadGateway("not the book the account holds".toByteArray(), bookId = ACCOUNT_BOOK_ID)
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
 
@@ -179,7 +181,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `a full disk is said plainly and can be tried again`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.transportFailure = IOException("write failed: ENOSPC (No space left on device)")
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -197,7 +199,7 @@ class AccountDownloadsTest {
     /** #142: a redirect off the grant's origin is its own sentence, and not offered again. */
     @Test
     fun `a download redirected to another origin is refused as redirected and nothing opens`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.transportFailure = AssetDownloadException.ForeignRedirect()
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -215,7 +217,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `no network is said as being offline, not as a failure`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.grantFailure = ReaderAuthException.NetworkUnavailable(IOException("unreachable"))
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -232,7 +234,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `a backend that will not hand the book over is quoted with its own code`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.grantFailure = ReaderAuthException.Forbidden("asset.not_yours", "01JB7Q4KQZ8X")
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -249,7 +251,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `an account book with no file to fetch says so rather than failing`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         account.value = account.value.copy(books = listOf(book.copy(assetId = null)))
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -265,7 +267,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `putting a refusal away clears it and downloads nothing`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.grantFailure = ReaderAuthException.Forbidden("asset.not_yours", null)
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -283,7 +285,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `cancelling a download leaves this device exactly as it was`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.holdAfterProgress = CompletableDeferred()
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -302,7 +304,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `freeing a copy frees the bytes and tells the account nothing`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
         downloads.open(ACCOUNT_BOOK_ID)
@@ -325,7 +327,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `signing out stops a download and clears the shelf, and deletes nothing`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         transport.holdAfterProgress = CompletableDeferred()
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
@@ -342,7 +344,7 @@ class AccountDownloadsTest {
 
     @Test
     fun `a copy already on the device after sign-out is still a readable device book`() = runTest {
-        val transport = ScriptedDownloads(bytes)
+        val transport = FakeAssetDownloadGateway(bytes, bookId = ACCOUNT_BOOK_ID)
         val library = repository(appScope())
         val downloads = downloads(transport, library, appScope())
         downloads.open(ACCOUNT_BOOK_ID)
@@ -398,59 +400,6 @@ class AccountDownloadsTest {
 
     private fun sha256(value: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(value).joinToString("") { "%02x".format(it) }
-
-    /**
-     * reader-api and the storage provider, as the download path sees them.
-     *
-     * [holdAfterProgress] is what makes a transfer observable: it reports half
-     * the body and then waits, so a test can look at the row *while* bytes are
-     * arriving instead of only at what the download left behind.
-     */
-    private class ScriptedDownloads(private val body: ByteArray) : AssetDownloadGateway {
-
-        val grants = mutableListOf<String>()
-        var fetches: Int = 0
-        var grantFailure: ReaderAuthException? = null
-        var transportFailure: Throwable? = null
-
-        /** Completed by the test to let a held transfer finish. */
-        var holdAfterProgress: CompletableDeferred<Unit>? = null
-
-        override suspend fun downloadGrant(assetId: String): ReaderAssetGrant {
-            grantFailure?.let { throw it }
-            grants += assetId
-            return ReaderAssetGrant(
-                assetId = assetId,
-                bookId = ACCOUNT_BOOK_ID,
-                direction = ReaderAssetDirection.DOWNLOAD,
-                method = ReaderAssetMethod.GET,
-                url = "https://storage.test/object/$assetId?token=signed-${grants.size}",
-                expiresAt = "2026-09-21T12:00:00Z",
-                checksum = "sha256:" + MessageDigest.getInstance("SHA-256")
-                    .digest(body).joinToString("") { "%02x".format(it) },
-                sizeBytes = body.size.toLong(),
-                uploadStatus = "ready",
-                headers = mapOf("x-signature" to "test-signature-not-a-credential"),
-            )
-        }
-
-        override suspend fun download(
-            grant: ReaderAssetGrant,
-            sink: OutputStream,
-            onProgress: (written: Long, total: Long) -> Unit,
-        ): Long {
-            fetches++
-            transportFailure?.let { throw it }
-            val hold = holdAfterProgress
-            if (hold != null) {
-                onProgress(body.size.toLong() / 2, grant.sizeBytes)
-                hold.await()
-            }
-            sink.write(body)
-            onProgress(body.size.toLong(), grant.sizeBytes)
-            return body.size.toLong()
-        }
-    }
 
     /** The account document's copy half, recorded rather than persisted. */
     private class RecordingCopyReferences : AccountCopyReferences {

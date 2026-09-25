@@ -8,6 +8,9 @@ import com.cedagova.reader.auth.contract.ReaderApiContract
 import com.cedagova.reader.auth.contract.ReaderApiContract.Fit
 import com.cedagova.reader.auth.contract.ReaderApiContract.Pin
 import com.cedagova.reader.auth.contract.primitive
+import com.cedagova.reader.auth.testing.json
+import com.cedagova.reader.auth.testing.recorded
+import com.cedagova.reader.auth.testing.session
 import java.io.File
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

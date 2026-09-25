@@ -1,10 +1,9 @@
 package com.cedagova.reader.library.sync
 
 import com.cedagova.reader.auth.ReaderAuthException
-import com.cedagova.reader.library.Harness
+import com.cedagova.reader.auth.testing.apiError
+import com.cedagova.reader.auth.testing.json
 import com.cedagova.reader.library.LIBRARY
-import com.cedagova.reader.library.apiError
-import com.cedagova.reader.library.json
 import com.cedagova.reader.library.model.ReaderBook
 import com.cedagova.reader.library.model.ReaderBookAsset
 import com.cedagova.reader.library.model.ReaderBookAssetKind
@@ -32,6 +31,8 @@ import com.cedagova.reader.library.model.ReaderSyncMutationResult
 import com.cedagova.reader.library.model.ReaderSyncRejection
 import com.cedagova.reader.library.model.ReaderSyncRejectionCode
 import com.cedagova.reader.library.model.ReaderSyncStatus
+import com.cedagova.reader.library.testing.FakeReaderLibraryGateway
+import com.cedagova.reader.library.testing.ReaderLibraryHarness
 import io.ktor.http.HttpStatusCode
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -901,7 +902,7 @@ class AccountSyncEngineTest {
         signIn("user-1")
 
         // The failure the real reader-api client produces for this answer (#158).
-        val api = Harness()
+        val api = ReaderLibraryHarness()
         api.servers.on(LIBRARY) {
             json(apiError("reader_sync.unavailable", "req-503", retryable = true), HttpStatusCode.ServiceUnavailable)
         }
@@ -932,7 +933,7 @@ class AccountSyncEngineTest {
         val engine = engine()
         signIn("user-1")
 
-        val api = Harness()
+        val api = ReaderLibraryHarness()
         api.servers.on(LIBRARY) {
             json(
                 apiError("publication_import.admissions_disabled", "req-off", retryable = false),
