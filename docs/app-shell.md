@@ -103,22 +103,25 @@ There are no flags, no reset block and no precedence order to edit.
   root package only because it is the namespace; they are not code of that
   package.
 
-The graph at #202, each package with what it imports (`com.cedagova.fastreader`
+The graph at #203, each package with what it imports (`com.cedagova.fastreader`
 omitted):
 
 | Package | Depends on |
 |---|---|
-| (root) | the packages it wires: every one below except `reader` and `ui` |
-| `settings.ui` | `library`, `reader.ui`, `settings` |
-| `reader.ui` | `account.library`, `external`, `library`, `library.saf`, `library.ui`, `reader`, `settings`, `ui` |
-| `library.ui` | `library`, `library.saf`, `library.store`, `settings`, `ui` |
+| (root) | the packages it wires: every one below except `reader`, `reader.catalog`, `ui` and `ui.components` |
+| `settings.ui` | `library`, `reader.ui`, `settings`, `ui.components`, `ui.theme` |
+| `reader.ui` | `account.library`, `external`, `library`, `library.saf`, `library.ui`, `reader`, `reader.catalog`, `settings`, `ui`, `ui.components`, `ui.theme` |
+| `reader.catalog` | `account.library`, `library`, `library.ui`, `reader` |
+| `library.ui` | `library`, `library.saf`, `library.store`, `settings`, `ui`, `ui.components`, `ui.theme` |
 | `external` | `library`, `reader` |
 | `account.library` | `library` |
 | `library.saf` | `library` |
 | `library` | `library.store`, `settings` |
-| `crash.ui` | `crash` |
+| `crash.ui` | `crash`, `ui.components`, `ui.theme` |
+| `account.ui` | `ui.components`, `ui.theme` |
+| `ui.components` | `ui.theme` |
 | `ui.theme` | `settings` |
-| `account`, `account.ui`, `crash`, `library.store`, `reader`, `settings`, `ui` | nothing in `:app` |
+| `account`, `crash`, `library.store`, `reader`, `settings`, `ui` | nothing in `:app` |
 
 **The check.** `PackageGraphTest` (`app/src/test/.../app/`) reads the `import`
 lines of `app/src/main/java` and fails on any cycle, naming the files and
@@ -129,3 +132,43 @@ imports that form it. It is a plain JVM unit test, so it runs:
 
 The main sources are a declared input of the test task, so an import-only
 change cannot leave it up to date.
+
+## Shared UI primitives and tokens
+
+Every screen draws with one component and token layer (A197-F006, #203). To
+build a new screen, or copy one into a new client, take these along:
+
+- **Tokens** (`ui/theme/Dimens.kt`):
+  - `Spacing` is the spacing scale, from `XXSmall` (2 dp) to `XXLarge` (24 dp).
+    `Spacing.Large` (16 dp) is the screens' gutter.
+  - `Sizes.TouchTarget` (48 dp) is the smallest control the app draws. It is
+    declared nowhere else.
+  - `Sizes.Icon` and `Sizes.ListRowMinHeight` cover the other shared sizes.
+  - A value only one component uses stays a named constant beside that
+    component, such as the reader's control-column widths.
+- **Components** (`ui/components/`):
+  - `Banner` is the full-width strip, in one of three tones: problem, notice
+    or progress. `ProblemBanner` is the "your change was not kept" banner used
+    by the library, the reader and settings.
+  - `UndoBar` is the bottom bar that offers a take-back.
+  - `ConfirmDialog` is the two-button question before a removal, an upload or
+    a crash report leaving the device.
+  - `BackButton` is the top bar's way back.
+  - `SectionHeading`, `ChoiceRow`, `OptionChip`, `SwitchRow` and
+    `CheckboxRow` are the settings-style rows. Each row owns its one
+    accessibility description.
+- **Screen files are split by section.** For example, the library screen is
+  `LibraryScreen.kt` (the entry and its dialogs' state), plus:
+  - `LibraryHeader.kt`, `LibraryBanners.kt` and `LibraryBookList.kt`;
+  - `LibraryAccountSlots.kt` and `LibraryAccountDialogs.kt` for the account
+    UI.
+
+  Pieces a section file shares with the entry are `internal`. The rest stay
+  `private`.
+- **Adapters are not UI.** `reader.catalog` holds `CatalogBooks` and
+  `CatalogPositions`, the reader's view of the library store. The reader's
+  Route builds them; they hold no Compose code.
+
+**The checks.** `ShellConventionTest` fails when a Kotlin file under
+`app/src/main/java/**/ui/` is longer than 600 lines (plan AD-7). It also fails
+when `TouchTarget` is declared anywhere but `Dimens.kt`.

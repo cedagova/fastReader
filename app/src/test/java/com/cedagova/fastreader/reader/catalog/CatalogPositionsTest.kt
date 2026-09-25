@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.reader.ui
+package com.cedagova.fastreader.reader.catalog
 
 import com.cedagova.fastreader.account.library.AccountResumeOffers
 import com.cedagova.fastreader.library.CatalogIngestor

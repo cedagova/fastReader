@@ -9,17 +9,11 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -32,15 +26,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.R
 import com.cedagova.fastreader.library.FolderStatus
-
-/** Android's accessibility minimum for an interactive control (REQ-060, REQ-301). */
-private val TouchTarget = 48.dp
+import com.cedagova.fastreader.ui.components.BackButton
+import com.cedagova.fastreader.ui.components.ConfirmDialog
+import com.cedagova.fastreader.ui.theme.Sizes
+import com.cedagova.fastreader.ui.theme.Spacing
 
 /** Everything the folder list renders, so a golden can drive every state directly. */
 data class FolderListUiState(
@@ -82,18 +75,7 @@ fun FolderListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.folders_title)) },
                 navigationIcon = {
-                    val back = stringResource(R.string.folders_back)
-                    // Sized explicitly: an IconButton's own box is 40 dp, which is
-                    // under REQ-301's minimum however comfortable it looks.
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier
-                            .size(TouchTarget)
-                            .semantics { contentDescription = back }
-                            .testTag("folders_back"),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                    }
+                    BackButton(stringResource(R.string.folders_back), onBack, tag = "folders_back")
                 },
             )
         },
@@ -103,18 +85,21 @@ fun FolderListScreen(
                 Text(
                     text = stringResource(R.string.folders_empty),
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp).testTag("folders_empty"),
+                    modifier = Modifier.padding(
+                        horizontal = Spacing.Large,
+                        vertical = Spacing.XXLarge,
+                    ).testTag("folders_empty"),
                 )
             } else {
                 Text(
                     text = stringResource(R.string.folders_intro),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = Spacing.Large, vertical = Spacing.Medium),
                 )
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().testTag("folders_list"),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(bottom = Spacing.XXLarge),
                 ) {
                     items(items = state.folders, key = { it.id }) { folder ->
                         FolderRow(folder = folder, onRemove = { onRemoveRequest(folder) })
@@ -142,8 +127,8 @@ private fun FolderRow(folder: LibraryFolderItem, onRemove: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 72.dp)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .defaultMinSize(minHeight = Sizes.ListRowMinHeight)
+            .padding(horizontal = Spacing.Large, vertical = Spacing.Medium)
             .testTag("folders_row_${folder.id}"),
         verticalAlignment = Alignment.Top,
     ) {
@@ -163,22 +148,22 @@ private fun FolderRow(folder: LibraryFolderItem, onRemove: () -> Unit) {
                 text = pluralStringResource(R.plurals.folders_book_count, folder.bookCount, folder.bookCount),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.XSmall),
             )
             folder.problem()?.let { problem ->
                 Text(
                     text = problem,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = Spacing.XSmall),
                 )
             }
         }
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(Spacing.Small))
         TextButton(
             onClick = onRemove,
             modifier = Modifier
-                .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
+                .defaultMinSize(minWidth = Sizes.TouchTarget, minHeight = Sizes.TouchTarget)
                 .testTag("folders_remove_${folder.id}")
                 .semantics { contentDescription = removeLabel },
         ) {
@@ -190,53 +175,30 @@ private fun FolderRow(folder: LibraryFolderItem, onRemove: () -> Unit) {
 @Composable
 private fun RemoveFolderDialog(folder: LibraryFolderItem, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val count = folder.removedBookCount
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("folders_remove_dialog"),
-        title = {
+    ConfirmDialog(
+        title = stringResource(R.string.folders_remove_title, folder.displayName),
+        confirmLabel = stringResource(R.string.folders_remove_confirm),
+        dismissLabel = stringResource(R.string.folders_remove_cancel),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        tag = "folders_remove_dialog",
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.Small)) {
             Text(
-                text = stringResource(R.string.folders_remove_title, folder.displayName),
-                modifier = Modifier.semantics { heading() },
+                text = if (count == 0) {
+                    stringResource(R.string.folders_remove_none)
+                } else {
+                    pluralStringResource(R.plurals.folders_remove_count, count, count)
+                },
+                style = MaterialTheme.typography.bodyLarge,
             )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = if (count == 0) {
-                        stringResource(R.string.folders_remove_none)
-                    } else {
-                        pluralStringResource(R.plurals.folders_remove_count, count, count)
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = stringResource(R.string.folders_remove_kept),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                modifier = Modifier
-                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
-                    .testTag("folders_remove_dialog_confirm"),
-            ) {
-                Text(stringResource(R.string.folders_remove_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .defaultMinSize(minWidth = TouchTarget, minHeight = TouchTarget)
-                    .testTag("folders_remove_dialog_cancel"),
-            ) {
-                Text(stringResource(R.string.folders_remove_cancel))
-            }
-        },
-    )
+            Text(
+                text = stringResource(R.string.folders_remove_kept),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /** The problem sentence for a folder that is not currently readable, or null. */
