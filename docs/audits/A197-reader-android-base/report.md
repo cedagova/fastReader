@@ -2,7 +2,7 @@
 
 - Audit ID: `A197`
 - Audit key: `reader-android-base-readiness-20260924`
-- Status: Decision ready
+- Status: Complete
 - Dossier PR: https://github.com/cedagova/fastReader/pull/197
 - Started: 2026-09-24
 - Decision owner: cedagova (Cesar Gonzalez)
@@ -131,30 +131,30 @@ None.
 
 | ID | Title | Decision | Confidence | Review | Planning readiness | Outcome issue | Outcome umbrella |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `A197-F001` | The Reader libraries' public API is accidental: provider and transport types leak and nothing checks the surface | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F002` | A host cannot substitute or test against the libraries without writing its own seams and fakes | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F003` | About 2,070 lines of general Reader-client logic live in `:app`, where a second client must rewrite them | Candidate | Medium | Corroborated | Ready | Not required | Not required |
-| `A197-F004` | The EPUB and tokenizer engines are Android-free but trapped in `:app` behind a package cycle | Candidate | High | Challenged | Ready | Not required | Not required |
-| `A197-F005` | The app shell has no copyable wiring, state-holder or navigation convention | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F006` | Screen files are god-sized and the design system is colours only, so UI primitives are copied per screen | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F007` | `LibraryRepository` owns about nine unrelated concerns | Candidate | Medium | Corroborated | Ready | Not required | Not required |
-| `A197-F008` | Build settings are copied into every module and static analysis is thin | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F009` | CI never builds what ships, and the release script runs no gates and hides a failed query | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F010` | The libraries have no recorded consumption mode, version or self-sufficient shrink rules | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F011` | The reader-api contract gate covers `:reader-library` only | Candidate | High | Corroborated | Ready | Not required | Not required |
-| `A197-F012` | There is no tracked map of the codebase for a new client, and several docs contradict the code | Candidate | High | Challenged | Ready | Not required | Not required |
-| `A197-F013` | `AccountSyncEngine.kt` is one 1,431-line file with about ten responsibilities | Candidate | Medium | Corroborated | Ready | Not required | Not required |
+| `A197-F001` | The Reader libraries' public API is accidental: provider and transport types leak and nothing checks the surface | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/198 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F002` | A host cannot substitute or test against the libraries without writing its own seams and fakes | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/199 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F003` | About 2,070 lines of general Reader-client logic live in `:app`, where a second client must rewrite them | Accepted | Medium | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/200 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F004` | The EPUB and tokenizer engines are Android-free but trapped in `:app` behind a package cycle | Accepted | High | Challenged | Ready | https://github.com/cedagova/fastReader/issues/201 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F005` | The app shell has no copyable wiring, state-holder or navigation convention | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/202 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F006` | Screen files are god-sized and the design system is colours only, so UI primitives are copied per screen | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/203 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F007` | `LibraryRepository` owns about nine unrelated concerns | Accepted | Medium | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/204 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F008` | Build settings are copied into every module and static analysis is thin | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/205 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F009` | CI never builds what ships, and the release script runs no gates and hides a failed query | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/206 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F010` | The libraries have no recorded consumption mode, version or self-sufficient shrink rules | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/207 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F011` | The reader-api contract gate covers `:reader-library` only | Accepted | High | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/208 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F012` | There is no tracked map of the codebase for a new client, and several docs contradict the code | Accepted | High | Challenged | Ready | https://github.com/cedagova/fastReader/issues/209 | https://github.com/cedagova/fastReader/issues/211 |
+| `A197-F013` | `AccountSyncEngine.kt` is one 1,431-line file with about ten responsibilities | Accepted | Medium | Corroborated | Ready | https://github.com/cedagova/fastReader/issues/210 | https://github.com/cedagova/fastReader/issues/211 |
 
 ## A197-F001 — The Reader libraries' public API is accidental: provider and transport types leak and nothing checks the surface
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/198
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -253,14 +253,14 @@ Pending.
 
 ## A197-F002 — A host cannot substitute or test against the libraries without writing its own seams and fakes
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/199
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -358,14 +358,14 @@ Pending.
 
 ## A197-F003 — About 2,070 lines of general Reader-client logic live in `:app`, where a second client must rewrite them
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: Medium
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/200
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -468,14 +468,14 @@ Pending.
 
 ## A197-F004 — The EPUB and tokenizer engines are Android-free but trapped in `:app` behind a package cycle
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Challenged
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/201
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -571,14 +571,14 @@ Pending.
 
 ## A197-F005 — The app shell has no copyable wiring, state-holder or navigation convention
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/202
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -678,14 +678,14 @@ Pending.
 
 ## A197-F006 — Screen files are god-sized and the design system is colours only, so UI primitives are copied per screen
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/203
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -775,14 +775,14 @@ Pending.
 
 ## A197-F007 — `LibraryRepository` owns about nine unrelated concerns
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: Medium
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/204
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -852,14 +852,14 @@ Pending.
 
 ## A197-F008 — Build settings are copied into every module and static analysis is thin
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/205
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -935,14 +935,14 @@ Pending.
 
 ## A197-F009 — CI never builds what ships, and the release script runs no gates and hides a failed query
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/206
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -1033,14 +1033,14 @@ Pending.
 
 ## A197-F010 — The libraries have no recorded consumption mode, version or self-sufficient shrink rules
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/207
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -1119,14 +1119,14 @@ Pending.
 
 ## A197-F011 — The reader-api contract gate covers `:reader-library` only
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/208
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -1208,14 +1208,14 @@ Pending.
 
 ## A197-F012 — There is no tracked map of the codebase for a new client, and several docs contradict the code
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: High
 - Review: Challenged
 - Planning readiness: Ready
 - Cause status: Confirmed
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/209
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -1313,14 +1313,14 @@ Pending.
 
 ## A197-F013 — `AccountSyncEngine.kt` is one 1,431-line file with about ten responsibilities
 
-- Decision: Candidate
+- Decision: Accepted
 - Confidence: Medium
 - Review: Corroborated
 - Planning readiness: Ready
 - Cause status: Hypothesis
 - Expected implementation repositories: `cedagova/fastReader`
-- Outcome issue: Not required
-- Outcome umbrella: Not required
+- Outcome issue: https://github.com/cedagova/fastReader/issues/210
+- Outcome umbrella: https://github.com/cedagova/fastReader/issues/211
 
 ### Criterion
 
@@ -1459,19 +1459,19 @@ https://github.com/cedagova/fastReader/pull/197#pullrequestreview-5311769040
 
 ## Completion gate
 
-- [ ] The decision owner approved the charter.
+- [x] The decision owner approved the charter.
 - [x] Every target has a full baseline commit SHA.
 - [x] The coverage inventory accounts for every in-scope surface.
 - [x] Every claim has proportionate, reproducible evidence.
 - [x] The independent review is complete.
 - [x] Every review challenge and gap is reconciled or named as unresolved.
-- [ ] Every finding is accepted, rejected, or deferred.
+- [x] Every finding is accepted, rejected, or deferred.
 - [x] Every finding records the evidence-backed repositories expected to change if its recommendation is accepted.
-- [ ] Every accepted finding has `Planning readiness: Ready` from the independent reviewer.
-- [ ] Every accepted finding links a planning-ready outcome issue.
-- [ ] Every outcome issue is a native child of the audit's same-repository outcome umbrella.
+- [x] Every accepted finding has `Planning readiness: Ready` from the independent reviewer.
+- [x] Every accepted finding links a planning-ready outcome issue.
+- [x] Every outcome issue is a native child of the audit's same-repository outcome umbrella.
 - [x] `summary.md` answers the original question.
-- [ ] The Decision-ready semantic anchor has an approved independent review verdict.
-- [ ] Any post-review completion delta is limited to mechanical owner decisions and handoff fields.
-- [ ] Structural validation passes.
-- [ ] The dossier pull request is complete and ready to coordinate downstream delivery.
+- [x] The Decision-ready semantic anchor has an approved independent review verdict.
+- [x] Any post-review completion delta is limited to mechanical owner decisions and handoff fields.
+- [x] Structural validation passes.
+- [x] The dossier pull request is complete and ready to coordinate downstream delivery.

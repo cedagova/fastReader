@@ -2,9 +2,9 @@
 
 - Audit ID: `A197`
 - Audit key: `reader-android-base-readiness-20260924`
-- Status: Decision ready
+- Status: Complete
 - Prepared: 2026-09-24
-- Completed: Not complete
+- Completed: 2026-09-25
 - Dossier PR: https://github.com/cedagova/fastReader/pull/197
 
 ## Answer
@@ -37,7 +37,11 @@ throws that away, and copying them leaves two versions to keep in step.
 - **Recommended dispositions:** accept F001–F012; defer F013 (splitting the
   sync engine is a readability gain with real concurrency risk, and its tests
   are strong — revisit when the Reader client needs to change it).
-- **Owner decisions:** Pending
+- **Owner decisions:** recorded 2026-09-25 ("all accepted").
+- **Accepted:** F001 to F013, including F013 against the recommended
+  deferral. All outcome issues live in this repository under one umbrella.
+- **Rejected:** none.
+- **Deferred:** none.
 - **Planning will need from you** (not needed to accept): how the Reader
   client consumes the libraries — copy, submodule or published artifact
   (F010); whether account logic moves into a library or stays a reference
@@ -47,19 +51,21 @@ throws that away, and copying them leaves two versions to keep in step.
 
 | Outcome | Owner | Tracking issue |
 | --- | --- | --- |
-| Libraries have a deliberate, checked public API (F001) | cedagova/fastReader | Pending owner decision |
-| Libraries ship their own seams and test fixtures (F002) | cedagova/fastReader | Pending owner decision |
-| General account logic and library assembly usable outside `:app` (F003) | cedagova/fastReader | Pending owner decision |
-| EPUB and tokenizer engines in their own acyclic modules (F004) | cedagova/fastReader | Pending owner decision |
-| One documented app-shell convention: wiring, state, typed navigation (F005) | cedagova/fastReader | Pending owner decision |
-| Shared UI components and tokens; screens split by section (F006) | cedagova/fastReader | Pending owner decision |
-| `LibraryRepository` split into narrow owners (F007) | cedagova/fastReader | Pending owner decision |
-| One build convention and a static-analysis gate for every module (F008) | cedagova/fastReader | Pending owner decision |
-| CI builds the minified release; release script fails loud (F009) | cedagova/fastReader | Pending owner decision |
-| Recorded consumption mode, library versions and own keep rules (F010) | cedagova/fastReader | Pending owner decision |
-| One contract gate for both libraries (F011) | cedagova/fastReader | Pending owner decision |
-| Tracked architecture map, docs that match the code, template hygiene (F012) | cedagova/fastReader | Pending owner decision |
-| Sync engine readable in parts (F013) | cedagova/fastReader | Recommended deferral |
+| Libraries have a deliberate, checked public API (F001) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/198 |
+| Libraries ship their own seams and test fixtures (F002) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/199 |
+| General account logic and library assembly usable outside `:app` (F003) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/200 |
+| EPUB and tokenizer engines in their own acyclic modules (F004) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/201 |
+| One documented app-shell convention: wiring, state, typed navigation (F005) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/202 |
+| Shared UI components and tokens; screens split by section (F006) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/203 |
+| `LibraryRepository` split into narrow owners (F007) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/204 |
+| One build convention and a static-analysis gate for every module (F008) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/205 |
+| CI builds the minified release; release script fails loud (F009) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/206 |
+| Recorded consumption mode, library versions and own keep rules (F010) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/207 |
+| One contract gate for both libraries (F011) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/208 |
+| Tracked architecture map, docs that match the code, template hygiene (F012) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/209 |
+| Sync engine readable in parts (F013) | cedagova/fastReader | https://github.com/cedagova/fastReader/issues/210 |
+
+Outcome umbrella (all accepted findings, this repository): https://github.com/cedagova/fastReader/issues/211
 
 ## Limits and unknowns
 
