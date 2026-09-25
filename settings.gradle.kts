@@ -32,3 +32,6 @@ include(":reader-auth")
 // The Reader account-library client (#112). It depends on :reader-auth and on
 // nothing under :app; see reader-library/README.md.
 include(":reader-library")
+// The EPUB, content and RSVP timing engines (#201): Kotlin/JVM, Android-free,
+// no dependency on :app. See reader-engine/README.md.
+include(":reader-engine")

@@ -3,6 +3,7 @@ import org.gradle.api.provider.ListProperty
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.named
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -31,6 +32,24 @@ internal fun Project.configureLibraryApiSurface() {
         tasks.named("check") { dependsOn(checkAbi) }
     }
     feedReleaseClassesToAbiDump()
+}
+
+/**
+ * The same surface rules for a Kotlin/JVM library (`conventions.kotlin.library`,
+ * #201). The plugin finds a JVM module's `main` compilation itself, so no
+ * release-classes hand-off is needed; the dump covers `main` only, never test
+ * fixtures.
+ */
+@OptIn(ExperimentalAbiValidation::class)
+internal fun Project.configureJvmLibraryApiSurface() {
+    extensions.configure<KotlinJvmProjectExtension> {
+        explicitApi()
+        abiValidation {
+            referenceDumpDir.set(layout.projectDirectory.dir("api"))
+        }
+        val checkAbi = abiValidation.checkTaskProvider
+        tasks.named("check") { dependsOn(checkAbi) }
+    }
 }
 
 /**

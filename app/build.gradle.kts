@@ -128,15 +128,6 @@ android {
         // For the three Reader account values above and nothing else.
         buildConfig = true
     }
-
-    // EPUB fixtures are shared by the JVM tests and the on-device SAF test.
-    // AGP 9 compiles Kotlin through its built-in Kotlin support, which reads the
-    // source set's `kotlin` directories, not `java`: registering the shared
-    // directory on `java` alone left every fixture unresolved at test compile.
-    sourceSets {
-        getByName("test").kotlin.directories.add("src/sharedTest/java")
-        getByName("androidTest").kotlin.directories.add("src/sharedTest/java")
-    }
 }
 
 // The committed goldens are read by Roborazzi at compare time but are not part
@@ -160,6 +151,9 @@ dependencies {
     // The account-library contract module (#112). It depends on :reader-auth;
     // :app is its host, exactly as it is :reader-auth's.
     implementation(project(":reader-library"))
+    // The EPUB, content and RSVP timing engines (#201): Android-free, and they
+    // import nothing from :app.
+    implementation(project(":reader-engine"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -184,6 +178,10 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.uiautomator)
+    // The engine's EPUB and content fixtures (#201), shared by the JVM tests and
+    // the on-device SAF and pipeline tests.
+    testImplementation(testFixtures(project(":reader-engine")))
+    androidTestImplementation(testFixtures(project(":reader-engine")))
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
