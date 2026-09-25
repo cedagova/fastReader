@@ -449,19 +449,14 @@ private fun ColumnScope.WideReadingLayout(
  *   [MaxControlsWidth] hands the rest back to the stream.
  */
 private fun readerControlsWidth(available: Dp): Dp =
-    (available * ControlsWidthFraction).coerceIn(MinControlsWidth, MaxControlsWidth)
+    (available * CONTROLS_WIDTH_FRACTION).coerceIn(MinControlsWidth, MaxControlsWidth)
 
-private const val ControlsWidthFraction = 0.42f
+private const val CONTROLS_WIDTH_FRACTION = 0.42f
 
 /** Five 48 dp targets, their arrangement, and the column's own 16 dp padding. */
 private val MinControlsWidth = 280.dp
 
 private val MaxControlsWidth = 420.dp
-
-/**
- * The book-open loading state. LEAF201 parses off the main thread and reports one
- * step per spine item, so this is determinate as soon as the spine is known.
- */
 
 /**
  * The store is refusing writes, so the reader's place is not being kept.
@@ -669,6 +664,10 @@ private fun ResumeOfferNotice(offer: ResumeOffer, onAccept: () -> Unit, onDismis
     }
 }
 
+/**
+ * The book-open loading state. LEAF201 parses off the main thread and reports one
+ * step per spine item, so this is determinate as soon as the spine is known.
+ */
 @Composable
 private fun OpeningBook(state: ReaderUiState.Opening, modifier: Modifier) {
     Column(

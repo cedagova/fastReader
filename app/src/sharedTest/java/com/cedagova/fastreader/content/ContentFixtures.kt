@@ -179,11 +179,6 @@ object ContentFixtures {
     )
 
     /**
-     * A download interrupted after the first chapter: the spine declares three
-     * content documents and the archive holds one.
-     */
-
-    /**
      * EPUB 3 English book whose one chapter is a single paragraph of some 230
      * words: the paused view's token windowing and line sectioning, which no
      * paragraph in [englishNovel] is long enough to reach.
@@ -211,6 +206,10 @@ object ContentFixtures {
         "Fielding had told her never to report. So she sat again, picked up the pen, and wrote the time, " +
         "and beside the time she wrote the single word that was true, which was: quiet."
 
+    /**
+     * A download interrupted after the first chapter: the spine declares three
+     * content documents and the archive holds one.
+     */
     fun interruptedMidBook(): ByteArray = EpubFixtures.buildArchive(
         listOf(
             "META-INF/container.xml" to CONTAINER.utf8(),

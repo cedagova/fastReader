@@ -6,7 +6,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 
-/**
+/*
  * Reading the semantics tree the way a screen reader does, for the REQ-060 and
  * REQ-301 sweeps over the library's surfaces.
  *

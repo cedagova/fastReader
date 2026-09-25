@@ -4,7 +4,7 @@ import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
 
-/**
+/*
  * A deliberately small, lenient scanner over EPUB markup.
  *
  * Why not a DOM parser: the package document is well-formed XML and

@@ -615,13 +615,6 @@ private fun RemoveFromAccountDialog(book: LibraryBookItem, onConfirm: () -> Unit
 }
 
 /**
- * The way into the added-folder list (REQ-104).
- *
- * Only shown once a folder exists: with none, the list would be a dead end, and
- * "Add folder" is already on the screen right above it.
- */
-
-/**
  * The two secondary affordances that sit between the header and the list: how
  * the list is ordered (REQ-203) and the way into the added folders (REQ-104).
  *
@@ -726,6 +719,12 @@ private fun LibraryOrder.label(): String = stringResource(
     },
 )
 
+/**
+ * The way into the added-folder list (REQ-104).
+ *
+ * Only shown once a folder exists: with none, the list would be a dead end, and
+ * "Add folder" is already on the screen right above it.
+ */
 @Composable
 private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit) {
     if (count == 0) return

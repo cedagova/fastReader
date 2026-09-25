@@ -1,6 +1,6 @@
 package com.cedagova.fastreader.content
 
-/**
+/*
  * The token stream model (AD-4) — the reader's internal contract.
  *
  * The EPUB content pipeline produces it; the timing engine (LEAF202), the reader

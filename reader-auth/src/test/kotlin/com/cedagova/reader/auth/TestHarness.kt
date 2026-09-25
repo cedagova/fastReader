@@ -134,7 +134,12 @@ fun preAuthJson(
 /** `generatedAt` of [preAuthJson]; its default document is fresh for an hour after it and stale an hour later. */
 const val PRE_AUTH_GENERATED_AT = "2026-09-11T00:00:00Z"
 
-const val NO_SELECTOR_PRE_AUTH = """{"schemaVersion":"reader.pre-auth.v1","compatibility":{"status":"client_unknown","requestedVersion":"1.0.0","minimumVersion":null,"supportedMajor":null},"accountEntry":{"availability":"unavailable","reason":"client_selection_missing","retryable":false},"configuration":null}"""
+const val NO_SELECTOR_PRE_AUTH =
+    """{"schemaVersion":"reader.pre-auth.v1",""" +
+        """"compatibility":{"status":"client_unknown","requestedVersion":"1.0.0",""" +
+        """"minimumVersion":null,"supportedMajor":null},""" +
+        """"accountEntry":{"availability":"unavailable","reason":"client_selection_missing","retryable":false},""" +
+        """"configuration":null}"""
 
 fun apiError(code: String, requestId: String = "req-1", retryable: Boolean = false) =
     """{"code":"$code","message":"$code","category":"auth","retryable":$retryable,"request_id":"$requestId"}"""

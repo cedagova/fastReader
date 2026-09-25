@@ -194,6 +194,8 @@ class ReaderLibraryContractTest {
     @Test
     fun `every route the module calls is declared by the pinned document`() {
         val paths = document["paths"]!!.jsonObject
+        val importPath = "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}"
+        val assetPath = "${ReaderLibraryClient.ASSETS_PATH}/${ReaderLibraryClient.ASSET_ID_TEMPLATE}"
         listOf(
             ReaderLibraryClient.LIBRARY_PATH to "get",
             ReaderLibraryClient.PROGRESS_PATH to "get",
@@ -203,21 +205,19 @@ class ReaderLibraryContractTest {
             // The import lifecycle. Note the other prefix: `/reader/v1/...`.
             ReaderLibraryClient.IMPORT_POLICY_PATH to "get",
             ReaderLibraryClient.IMPORTS_PATH to "post",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}" to "get",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.COMPLETE_SUFFIX}" to
-                "post",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.CANCEL_SUFFIX}" to
-                "post",
+            importPath to "get",
+            "$importPath${ReaderLibraryClient.COMPLETE_SUFFIX}" to "post",
+            "$importPath${ReaderLibraryClient.CANCEL_SUFFIX}" to "post",
             // The asset download grant (#118): the one route book bytes arrive by.
-            "${ReaderLibraryClient.ASSETS_PATH}/${ReaderLibraryClient.ASSET_ID_TEMPLATE}${ReaderLibraryClient.DOWNLOAD_GRANT_SUFFIX}" to
-                "post",
+            "$assetPath${ReaderLibraryClient.DOWNLOAD_GRANT_SUFFIX}" to "post",
         ).forEach { (path, method) ->
             val declared = paths[path]?.jsonObject
             assertTrue("the document declares no $path", declared != null)
             assertTrue("the document declares no $method on $path", declared!!.containsKey(method))
         }
         // The delta query parameters, with the bounds the client enforces locally.
-        val parameters = paths[ReaderLibraryClient.DELTAS_PATH]!!.jsonObject["get"]!!.jsonObject["parameters"] as JsonArray
+        val parameters =
+            paths[ReaderLibraryClient.DELTAS_PATH]!!.jsonObject["get"]!!.jsonObject["parameters"] as JsonArray
         val byName = parameters.associate {
             it.jsonObject["name"]!!.primitive()!! to
                 it.jsonObject["schema"]!!.jsonObject
@@ -274,7 +274,8 @@ class ReaderLibraryContractTest {
             request["sha256"]!!.jsonObject["pattern"]!!.primitive(),
         )
 
-        val cancel = schemas["CancelPublicationImportRequest"]!!.jsonObject["properties"]!!.jsonObject["reason"]!!.jsonObject
+        val cancel =
+            schemas["CancelPublicationImportRequest"]!!.jsonObject["properties"]!!.jsonObject["reason"]!!.jsonObject
         assertEquals(CancelPublicationImportRequest.DEFAULT_REASON, cancel["default"]!!.primitive())
         assertEquals(CancelPublicationImportRequest.MAX_REASON_LENGTH.toString(), cancel["maxLength"].toString())
 

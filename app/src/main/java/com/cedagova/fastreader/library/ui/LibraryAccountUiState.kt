@@ -15,7 +15,7 @@ import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.reader.library.sync.wireName
 import kotlin.math.roundToInt
 
-/**
+/*
  * The account half of the shelf (LEAF703): the merge, the states, and the
  * removal offer, all as plain Kotlin values the Compose layer only lays out.
  *

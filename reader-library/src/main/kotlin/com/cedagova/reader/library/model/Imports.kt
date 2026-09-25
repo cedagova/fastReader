@@ -3,7 +3,7 @@ package com.cedagova.reader.library.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
+/*
  * The publication-import contract as reader-api publishes it (#116, LEAF801 of
  * #104), modelled the same way the rest of this module is: one Kotlin type per
  * schema, every wire name spelled out, every enum carrying the [UNKNOWN_VALUE]
