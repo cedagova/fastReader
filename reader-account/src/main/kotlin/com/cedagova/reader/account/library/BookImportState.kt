@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
 import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.ReaderCapabilityReason
@@ -23,17 +23,17 @@ import com.cedagova.reader.library.model.ReaderCapabilityReason
  * [com.cedagova.reader.library.imports.UploadConsent], which has one member and
  * no default anywhere on the way here.
  */
-sealed interface BookImportState {
+public sealed interface BookImportState {
 
     /** True while the owner could still change their mind and nothing is lost. */
-    val cancellable: Boolean get() = false
+    public val cancellable: Boolean get() = false
 
     /**
      * The action was tapped; the deployment's policy is being read.
      *
      * Nothing about this book has been sent.
      */
-    data object Checking : BookImportState
+    public data object Checking : BookImportState
 
     /**
      * The consent question: this file's bytes will be uploaded to the Reader
@@ -43,7 +43,7 @@ sealed interface BookImportState {
      * so the question states the bound it was just checked against rather than
      * a number this app believes.
      */
-    data class Consent(val sizeBytes: Long, val maxSourceBytes: Long) : BookImportState {
+    public data class Consent(val sizeBytes: Long, val maxSourceBytes: Long) : BookImportState {
         override val cancellable: Boolean get() = true
     }
 
@@ -51,7 +51,7 @@ sealed interface BookImportState {
      * The bytes are going out. [fraction] is the share the storage provider has
      * *acknowledged*, never a local count of what was written.
      */
-    data class Sending(val fraction: Float) : BookImportState {
+    public data class Sending(val fraction: Float) : BookImportState {
         override val cancellable: Boolean get() = true
     }
 
@@ -60,7 +60,7 @@ sealed interface BookImportState {
      * `verifying_upload`, `queued` or `processing`. Still the owner's to call
      * off.
      */
-    data object Finishing : BookImportState {
+    public data object Finishing : BookImportState {
         override val cancellable: Boolean get() = true
     }
 
@@ -73,7 +73,7 @@ sealed interface BookImportState {
      * server's words, carried through so a screen and a server log can be read
      * against each other — the same bargain the account notice already makes.
      */
-    data class Refused(
+    public data class Refused(
         val problem: ImportProblem,
         val code: String? = null,
         val requestId: String? = null,
@@ -87,26 +87,26 @@ sealed interface BookImportState {
 }
 
 /** Why an add did not happen. */
-sealed interface ImportProblem {
+public sealed interface ImportProblem {
 
     /**
      * The backend's own classification of a refused, failed or cancelled
      * import (REQ-507). Never re-interpreted, never replaced by a local guess.
      */
-    data class Category(val category: PublicationFailureCategory) : ImportProblem
+    public data class Category(val category: PublicationFailureCategory) : ImportProblem
 
     /**
      * There is no network. The admission is deliberately **not** queued: the
      * transfer needs a connection, and an admission without one would put a
      * pending import on the account that no byte could follow.
      */
-    data object NeedsConnection : ImportProblem
+    public data object NeedsConnection : ImportProblem
 
     /** The file the row names cannot be read right now, so there is nothing to send. */
-    data class SourceUnavailable(val problem: PublicationSourceProblem) : ImportProblem
+    public data class SourceUnavailable(val problem: PublicationSourceProblem) : ImportProblem
 
     /** Anything else the Reader API answered; [code] is its own. */
-    data class Api(val status: Int?) : ImportProblem
+    public data class Api(val status: Int?) : ImportProblem
 }
 
 /**
@@ -124,7 +124,7 @@ sealed interface ImportProblem {
  * Account-wide rather than per book: offering a control that cannot work would
  * be worse than saying so.
  */
-data class ImportsOff(val requestId: String?, val reason: ReaderCapabilityReason? = null)
+public data class ImportsOff(val requestId: String?, val reason: ReaderCapabilityReason? = null)
 
 /**
  * What the account's `reader.publication-import.v1` entry says, as the shelf
@@ -135,15 +135,15 @@ data class ImportsOff(val requestId: String?, val reason: ReaderCapabilityReason
  * failed — is therefore *not* an offer. Discovery reserves nothing: admission
  * stays authoritative and the policy still supplies every cap.
  */
-sealed interface ImportOffer {
+public sealed interface ImportOffer {
     /** Not read yet in this session, or the read did not get an answer. Not an offer. */
-    data object Unknown : ImportOffer
+    public data object Unknown : ImportOffer
 
     /** Exactly one entry, `available`. */
-    data object Available : ImportOffer
+    public data object Available : ImportOffer
 
     /** The entry said no, or there was not exactly one; [reason] is the entry's, or `UNKNOWN`. */
-    data class Unavailable(val reason: ReaderCapabilityReason) : ImportOffer
+    public data class Unavailable(val reason: ReaderCapabilityReason) : ImportOffer
 }
 
 /**
@@ -153,13 +153,13 @@ sealed interface ImportOffer {
  * which is the content identity AD-23 merges on — so a row's progress belongs
  * to the *bytes*, not to a path, a name or a position in a list.
  */
-data class AccountImportsState(
+public data class AccountImportsState(
     val disabled: ImportsOff? = null,
     val offer: ImportOffer = ImportOffer.Unknown,
     val byDeviceBookId: Map<String, BookImportState> = emptyMap(),
 ) {
-    companion object {
+    public companion object {
         /** Nothing in flight and nothing known: the state before any tap. */
-        val NONE: AccountImportsState = AccountImportsState()
+        public val NONE: AccountImportsState = AccountImportsState()
     }
 }

@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
 import com.cedagova.fastreader.library.Book
 import com.cedagova.reader.auth.ReaderAuthException
@@ -86,7 +86,7 @@ import kotlinx.coroutines.sync.withLock
  * and registers no receiver: polling happens while the app is in the foreground
  * and stops when it is not.
  */
-class AccountImports(
+public class AccountImports(
     /** Null on a build with no stage values: then nothing here can be reached. */
     private val gateway: PublicationImportGateway?,
     private val records: AccountImportRecords,
@@ -107,7 +107,7 @@ class AccountImports(
     private val _state = MutableStateFlow(AccountImportsState.NONE)
 
     /** Every add in flight and the one account-wide verdict, as the shelf reads it. */
-    val state: StateFlow<AccountImportsState> = _state.asStateFlow()
+    public val state: StateFlow<AccountImportsState> = _state.asStateFlow()
 
     /** One job per device book, so two adds never share a cancellation. */
     private val jobs = mutableMapOf<String, Job>()
@@ -163,7 +163,7 @@ class AccountImports(
     }
 
     /** The app came to the foreground: poll again, and pick up anything left in flight. */
-    fun onForeground() {
+    public fun onForeground() {
         foreground.value = true
         refreshOffer()
         resumeStoredImports()
@@ -203,7 +203,7 @@ class AccountImports(
     }
 
     /** The app went away: status reads stop until it is back. */
-    fun onBackground() {
+    public fun onBackground() {
         foreground.value = false
     }
 
@@ -214,7 +214,7 @@ class AccountImports(
      * capability's reason, or in the refusal the policy already implies — shown from the policy's own numbers, with no admission made and
      * no byte sent either way.
      */
-    fun requestAdd(deviceBookId: String) {
+    public fun requestAdd(deviceBookId: String) {
         val gateway = gateway ?: return
         launchFor(deviceBookId) {
             publish(deviceBookId, BookImportState.Checking)
@@ -267,7 +267,7 @@ class AccountImports(
      * a confirm that does not follow a question is a bug, and the answer to a
      * bug is not to upload a book.
      */
-    fun confirmAdd(deviceBookId: String) {
+    public fun confirmAdd(deviceBookId: String) {
         val gateway = gateway ?: return
         if (_state.value.byDeviceBookId[deviceBookId] !is BookImportState.Consent) return
         launchFor(deviceBookId) {
@@ -293,7 +293,7 @@ class AccountImports(
      * network before letting the owner out of a transfer would be the worse
      * failure.
      */
-    fun cancelAdd(deviceBookId: String) {
+    public fun cancelAdd(deviceBookId: String) {
         scope.launch {
             mutex.withLock { jobs.remove(deviceBookId) }?.cancel()
             val record = storedRecordFor(deviceBookId)
@@ -307,7 +307,7 @@ class AccountImports(
     }
 
     /** Puts away a finished verdict — the consent question declined, a refusal read. */
-    fun dismiss(deviceBookId: String) {
+    public fun dismiss(deviceBookId: String) {
         scope.launch { clear(deviceBookId) }
     }
 
@@ -319,7 +319,7 @@ class AccountImports(
      * than resumed: there are no bytes to send, and keeping it would retry for
      * ever.
      */
-    fun resumeStoredImports() {
+    public fun resumeStoredImports() {
         val gateway = gateway ?: return
         scope.launch {
             records.importRecords().forEach { record ->
@@ -661,7 +661,7 @@ class AccountImports(
             BookImportState.Refused(ImportProblem.Api(null), code = "unexpected_response")
     }
 
-    companion object {
+    public companion object {
 
         /** The catalog's identity prefix (v1 AD-2); the record stores the bare hex. */
         private const val SHA256_PREFIX: String = "sha256:"
@@ -672,9 +672,9 @@ class AccountImports(
          * minutes, so the early reads are close together and the tail is there
          * for a queue that is busy.
          */
-        val DEFAULT_POLL_DELAYS_MS: List<Long> = listOf(1_000, 2_000, 4_000, 8_000, 15_000, 30_000)
+        public val DEFAULT_POLL_DELAYS_MS: List<Long> = listOf(1_000, 2_000, 4_000, 8_000, 15_000, 30_000)
 
         /** Roughly a minute of reads per foreground spell, then it waits for the next. */
-        const val DEFAULT_POLL_ATTEMPTS: Int = 8
+        public const val DEFAULT_POLL_ATTEMPTS: Int = 8
     }
 }

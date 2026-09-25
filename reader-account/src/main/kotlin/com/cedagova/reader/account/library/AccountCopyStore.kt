@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
 import java.io.File
 import java.io.FileOutputStream
@@ -47,16 +47,16 @@ import kotlin.coroutines.cancellation.CancellationException
  * catalog never gained a source for one — so the next start has nothing to
  * repair.
  */
-class AccountCopyStore(private val directory: File) {
+public class AccountCopyStore(private val directory: File) {
 
     /** The verified copy of the book with this content identity, or null when there is none. */
-    fun copy(contentSha256: String): File? = placedFile(contentSha256)?.takeIf { it.isFile }
+    public fun copy(contentSha256: String): File? = placedFile(contentSha256)?.takeIf { it.isFile }
 
     /** True when this device holds a verified copy of that book. */
-    fun has(contentSha256: String): Boolean = copy(contentSha256) != null
+    public fun has(contentSha256: String): Boolean = copy(contentSha256) != null
 
     /** Every content identity this device currently holds a copy of. */
-    fun contents(): Set<String> = (directory.listFiles() ?: emptyArray())
+    public fun contents(): Set<String> = (directory.listFiles() ?: emptyArray())
         .asSequence()
         .filter { it.isFile && it.name.startsWith(PREFIX) && it.name.endsWith(SUFFIX) }
         .map { it.name.removePrefix(PREFIX).removeSuffix(SUFFIX) }
@@ -64,7 +64,7 @@ class AccountCopyStore(private val directory: File) {
         .toSet()
 
     /** The bytes this device holds for that book, or 0 when it holds none. */
-    fun sizeBytes(contentSha256: String): Long = copy(contentSha256)?.length() ?: 0
+    public fun sizeBytes(contentSha256: String): Long = copy(contentSha256)?.length() ?: 0
 
     /**
      * Frees this device's copy. Returns true when a copy was there to free.
@@ -72,7 +72,7 @@ class AccountCopyStore(private val directory: File) {
      * The account is not touched: this is D2's **Remove downloaded copy**, and
      * the book stays in the account's library exactly as it was.
      */
-    fun delete(contentSha256: String): Boolean {
+    public fun delete(contentSha256: String): Boolean {
         val file = placedFile(contentSha256) ?: return false
         return file.isFile && file.delete()
     }
@@ -85,7 +85,7 @@ class AccountCopyStore(private val directory: File) {
      * here, so the only thing that could have been using one is a process that
      * no longer exists.
      */
-    fun discardPartials(): Int = (directory.listFiles() ?: emptyArray())
+    public fun discardPartials(): Int = (directory.listFiles() ?: emptyArray())
         .count { it.isFile && it.name.endsWith(PARTIAL_SUFFIX) && it.delete() }
 
     /**
@@ -108,7 +108,7 @@ class AccountCopyStore(private val directory: File) {
      * of it: the digest is compared first and a length that agrees proves
      * nothing on its own. Pass 0 when there is no declared length to check.
      */
-    suspend fun place(
+    public suspend fun place(
         contentSha256: String,
         expectedSizeBytes: Long,
         write: suspend (OutputStream) -> Unit,
@@ -199,21 +199,21 @@ class AccountCopyStore(private val directory: File) {
         }
     }
 
-    companion object {
+    public companion object {
 
         /**
          * The directory name under `filesDir`, beside `catalog/`, `covers/` and
          * `account-library/`. Named in `AppVersionTest`, which is what ties it
          * to the backup exclusion.
          */
-        const val DIRECTORY_NAME: String = "account-copies"
+        public const val DIRECTORY_NAME: String = "account-copies"
 
         /** The name a verified copy carries: its content, and nothing about its owner. */
-        const val PREFIX: String = "copy-"
-        const val SUFFIX: String = ".epub"
+        public const val PREFIX: String = "copy-"
+        public const val SUFFIX: String = ".epub"
 
         /** A download in flight. No lookup in this class can return one. */
-        const val PARTIAL_SUFFIX: String = ".part"
+        public const val PARTIAL_SUFFIX: String = ".part"
 
         private const val SHA256_PREFIX: String = "sha256:"
         private val SHA256: Regex = Regex("^[0-9a-f]{64}$")
@@ -223,10 +223,10 @@ class AccountCopyStore(private val directory: File) {
 }
 
 /** What came of trying to put a book's bytes in private storage. */
-sealed interface CopyPlacement {
+public sealed interface CopyPlacement {
 
     /** Verified and placed. [file] is what the reader opens. */
-    data class Placed(val file: File) : CopyPlacement
+    public data class Placed(val file: File) : CopyPlacement
 
     /**
      * The bytes are not the book they claimed to be, so nothing was placed.
@@ -234,14 +234,14 @@ sealed interface CopyPlacement {
      * Both digests travel because this is the one refusal the owner is shown a
      * reason for (REQ-510's "a tampered download is refused with the reason").
      */
-    data class Mismatched(val expected: String, val actual: String) : CopyPlacement
+    public data class Mismatched(val expected: String, val actual: String) : CopyPlacement
 
     /** There is no room, or private storage would not take the file. Nothing was placed. */
-    data class NoStorage(val reason: String) : CopyPlacement
+    public data class NoStorage(val reason: String) : CopyPlacement
 
     /** The bytes did not arrive. Nothing was placed; a later attempt may work. */
-    data class Failed(val error: Throwable) : CopyPlacement
+    public data class Failed(val error: Throwable) : CopyPlacement
 
     /** The request itself was wrong — a bad identity, or a length the grant contradicts. */
-    data class Refused(val reason: String) : CopyPlacement
+    public data class Refused(val reason: String) : CopyPlacement
 }

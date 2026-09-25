@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
 import com.cedagova.reader.library.sync.AccountLibraryActions
 import com.cedagova.reader.library.sync.AccountLibraryState
@@ -16,7 +16,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** The account book whose removal can still be taken back (REQ-508). */
-data class AccountRemoval(val bookId: String, val title: String)
+public data class AccountRemoval(val bookId: String, val title: String)
 
 /**
  * The account library as the shelf uses it (LEAF703): the engine's state and
@@ -43,12 +43,12 @@ data class AccountRemoval(val bookId: String, val title: String)
  * `immediate_confirmation` is the whole of the recovery it offers — and
  * pretending otherwise would promise a reader something the backend does not.
  */
-class AccountShelf(
+public class AccountShelf(
     private val actions: AccountLibraryActions,
     /** The answered resume offers, a host record the engine stores for this app (#147). */
     private val resumeOffers: AccountResumeOffers,
     /** The account library the engine publishes; the shelf renders exactly this. */
-    val state: StateFlow<AccountLibraryState>,
+    public val state: StateFlow<AccountLibraryState>,
     private val scope: CoroutineScope,
     private val undoWindowMs: Long = DEFAULT_UNDO_WINDOW_MS,
 ) {
@@ -64,7 +64,7 @@ class AccountShelf(
     private val _undo = MutableStateFlow<AccountRemoval?>(null)
 
     /** The account removal still on offer, or null when there is none. */
-    val undo: StateFlow<AccountRemoval?> = _undo.asStateFlow()
+    public val undo: StateFlow<AccountRemoval?> = _undo.asStateFlow()
 
     init {
         // Signing out ends the offer with it: the row it named is off the shelf
@@ -76,7 +76,7 @@ class AccountShelf(
     }
 
     /** The reader asked the shelf for a refresh: sync now (AD-21's third trigger). */
-    fun refresh() = actions.refresh()
+    public fun refresh(): Unit = actions.refresh()
 
     /**
      * Removes [bookId] from the account and starts its Undo window.
@@ -87,7 +87,7 @@ class AccountShelf(
      * real — an Undo taken in that window queues a `restore` behind it, and the
      * backend admits both in order.
      */
-    fun removeFromAccount(bookId: String, title: String) {
+    public fun removeFromAccount(bookId: String, title: String) {
         actions.removeFromAccount(bookId)
         scope.launch {
             // The offer is opened under the lock but its timer is only *started*
@@ -111,7 +111,7 @@ class AccountShelf(
     }
 
     /** Takes back the removal the bar is offering, as the contract's `restore`. */
-    fun undoRemove() {
+    public fun undoRemove() {
         scope.launch {
             val taken = mutex.withLock {
                 val offer = _undo.value
@@ -125,10 +125,10 @@ class AccountShelf(
     }
 
     /** The account book was opened here: `reading`, and this device's clock as last-opened. */
-    fun recordOpened(bookId: String) = actions.recordOpened(bookId)
+    public fun recordOpened(bookId: String): Unit = actions.recordOpened(bookId)
 
     /** The account book was read to its last word. */
-    fun recordFinished(bookId: String) = actions.recordFinished(bookId)
+    public fun recordFinished(bookId: String): Unit = actions.recordFinished(bookId)
 
     /**
      * The reader reached a place worth stating portably in this account book
@@ -137,7 +137,7 @@ class AccountShelf(
      * Straight through, like the two above it: the engine owns whether this says
      * anything new, and this class owns only the Undo window.
      */
-    fun recordPosition(bookId: String, position: LocalReadingPosition) = actions.recordPosition(bookId, position)
+    public fun recordPosition(bookId: String, position: LocalReadingPosition): Unit = actions.recordPosition(bookId, position)
 
     /**
      * The reader has answered the resume offer for one remote change (REQ-511).
@@ -147,7 +147,7 @@ class AccountShelf(
      * next open of this book does not ask it again. Called for **both** answers —
      * the requirement is that the offer is *made* once.
      */
-    fun settleResumeOffer(bookId: String, changeKey: String) {
+    public fun settleResumeOffer(bookId: String, changeKey: String) {
         scope.launch { resumeOffers.settle(bookId, changeKey) }
     }
 
@@ -166,11 +166,11 @@ class AccountShelf(
         }
     }
 
-    companion object {
+    public companion object {
         /**
          * The confirmation lifetime, matching the device shelf's own undo window
          * so the two removals behave identically from the reader's side.
          */
-        const val DEFAULT_UNDO_WINDOW_MS: Long = 8_000L
+        public const val DEFAULT_UNDO_WINDOW_MS: Long = 8_000L
     }
 }

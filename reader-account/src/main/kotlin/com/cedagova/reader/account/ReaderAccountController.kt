@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account
+package com.cedagova.reader.account
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.auth.ReaderAuthOperations
@@ -17,17 +17,17 @@ import kotlinx.serialization.json.JsonObject
  * What the account surface can ask for. The controller implements it; the
  * goldens hand the screen an object that does nothing.
  */
-interface ReaderAccountActions {
-    fun requestEmailCode(email: String, newAccount: Boolean)
-    fun verifyEmailCode(email: String, code: String)
-    fun signInWithPassword(email: String, password: String)
-    fun requestRecoveryCode(email: String)
-    fun verifyRecoveryCode(email: String, code: String)
-    fun setPassword(newPassword: String)
-    fun loadCapabilities()
-    fun signOut()
-    fun signOutOtherDevices()
-    fun dismissOutcome()
+public interface ReaderAccountActions {
+    public fun requestEmailCode(email: String, newAccount: Boolean)
+    public fun verifyEmailCode(email: String, code: String)
+    public fun signInWithPassword(email: String, password: String)
+    public fun requestRecoveryCode(email: String)
+    public fun verifyRecoveryCode(email: String, code: String)
+    public fun setPassword(newPassword: String)
+    public fun loadCapabilities()
+    public fun signOut()
+    public fun signOutOtherDevices()
+    public fun dismissOutcome()
 }
 
 /**
@@ -55,7 +55,7 @@ interface ReaderAccountActions {
  * the screen, and a code request made before checking the inbox is still the
  * state on screen when the reader comes back.
  */
-class ReaderAccountController(
+public class ReaderAccountController(
     private val gateway: ReaderAuthOperations?,
     missingValues: List<String>,
     private val scope: CoroutineScope,
@@ -66,7 +66,7 @@ class ReaderAccountController(
     private val outcome = MutableStateFlow<AccountOutcome?>(null)
     private val capabilities = MutableStateFlow<LoadedCapabilities?>(null)
 
-    val state: StateFlow<ReaderAccountState> = if (gateway == null) {
+    public val state: StateFlow<ReaderAccountState> = if (gateway == null) {
         MutableStateFlow(ReaderAccountState.NotConfigured(missingValues))
     } else {
         combine(session, activity, outcome, capabilities) { session, activity, outcome, capabilities ->
@@ -98,37 +98,37 @@ class ReaderAccountController(
         }
     }
 
-    override fun requestEmailCode(email: String, newAccount: Boolean) = run(AccountActivity.REQUESTING_CODE) {
+    override fun requestEmailCode(email: String, newAccount: Boolean): Unit = run(AccountActivity.REQUESTING_CODE) {
         it.requestEmailCode(email, createUser = newAccount)
         AccountOutcome.CodeSent
     }
 
-    override fun verifyEmailCode(email: String, code: String) = run(AccountActivity.VERIFYING_CODE) {
+    override fun verifyEmailCode(email: String, code: String): Unit = run(AccountActivity.VERIFYING_CODE) {
         it.verifyEmailCode(email, code)
         null
     }
 
-    override fun signInWithPassword(email: String, password: String) = run(AccountActivity.SIGNING_IN_WITH_PASSWORD) {
+    override fun signInWithPassword(email: String, password: String): Unit = run(AccountActivity.SIGNING_IN_WITH_PASSWORD) {
         it.signInWithPassword(email, password)
         null
     }
 
-    override fun requestRecoveryCode(email: String) = run(AccountActivity.REQUESTING_RECOVERY_CODE) {
+    override fun requestRecoveryCode(email: String): Unit = run(AccountActivity.REQUESTING_RECOVERY_CODE) {
         it.requestRecoveryCode(email)
         AccountOutcome.RecoveryCodeSent
     }
 
-    override fun verifyRecoveryCode(email: String, code: String) = run(AccountActivity.VERIFYING_RECOVERY_CODE) {
+    override fun verifyRecoveryCode(email: String, code: String): Unit = run(AccountActivity.VERIFYING_RECOVERY_CODE) {
         it.verifyRecoveryCode(email, code)
         null
     }
 
-    override fun setPassword(newPassword: String) = run(AccountActivity.SETTING_PASSWORD) {
+    override fun setPassword(newPassword: String): Unit = run(AccountActivity.SETTING_PASSWORD) {
         it.setPassword(newPassword)
         AccountOutcome.PasswordSet
     }
 
-    override fun loadCapabilities() = run(AccountActivity.LOADING_CAPABILITIES, onFailure = {
+    override fun loadCapabilities(): Unit = run(AccountActivity.LOADING_CAPABILITIES, onFailure = {
         capabilities.value = null
     }) {
         val response = it.capabilitiesResponse()
@@ -139,12 +139,12 @@ class ReaderAccountController(
         null
     }
 
-    override fun signOut() = run(AccountActivity.SIGNING_OUT) {
+    override fun signOut(): Unit = run(AccountActivity.SIGNING_OUT) {
         it.signOut()
         AccountOutcome.SignedOutLocally
     }
 
-    override fun signOutOtherDevices() = run(AccountActivity.SIGNING_OUT_OTHER_DEVICES) {
+    override fun signOutOtherDevices(): Unit = run(AccountActivity.SIGNING_OUT_OTHER_DEVICES) {
         it.signOutOtherDevices()
         AccountOutcome.OtherDevicesSignedOut
     }

@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
 import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.sync.AccountLibraryActions

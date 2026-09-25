@@ -35,3 +35,7 @@ include(":reader-library")
 // The EPUB, content and RSVP timing engines (#201): Kotlin/JVM, Android-free,
 // no dependency on :app. See reader-engine/README.md.
 include(":reader-engine")
+// The Reader account pipeline (#200): session state, verified copies, downloads,
+// imports, the shelf and the one assembly call. It depends on :reader-library
+// and on nothing under :app; see reader-account/README.md.
+include(":reader-account")

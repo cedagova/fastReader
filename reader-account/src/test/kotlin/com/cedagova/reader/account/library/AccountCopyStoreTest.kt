@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account.library
+package com.cedagova.reader.account.library
 
 import com.cedagova.reader.engine.content.BookContentResult
 import com.cedagova.reader.engine.content.BookIdentity

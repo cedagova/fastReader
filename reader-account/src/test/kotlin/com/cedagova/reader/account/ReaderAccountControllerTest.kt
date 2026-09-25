@@ -1,4 +1,4 @@
-package com.cedagova.fastreader.account
+package com.cedagova.reader.account
 
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.auth.ReaderAuthOperations
