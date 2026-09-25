@@ -47,7 +47,7 @@ import org.junit.rules.TemporaryFolder
  * before it is on disk.
  *
  * The order and the lost-position proofs run the engine on
- * [Dispatchers.Default], the multi-threaded scope FastReader itself passes —
+ * [Dispatchers.Default], the multi-threaded scope a real host passes —
  * the ordering bug only exists there. The session-switch proofs that need the
  * switch to land at one exact point use the test scheduler instead, with the
  * lock held by a parked sync, so the interleaving is the one the issue names

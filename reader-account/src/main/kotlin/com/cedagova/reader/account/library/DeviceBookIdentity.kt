@@ -11,8 +11,9 @@ package com.cedagova.reader.account.library
  * the two. It must round-trip: `contentSha256(deviceBookId(hex)) == hex` for a
  * lowercase-hex digest.
  *
- * FastReader's device-book id is the digest itself under a `sha256:` prefix
- * (its catalog's identity), so its implementation adds and strips that prefix.
+ * A host whose device-book id is the digest itself under a `sha256:` prefix
+ * adds and strips that prefix; the test fixtures' `PrefixedBookIdentity` is
+ * exactly that.
  */
 public interface DeviceBookIdentity {
 

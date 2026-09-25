@@ -150,7 +150,7 @@ public sealed interface ImportOffer {
  * Every add this device is in the middle of, plus the account-wide verdicts.
  *
  * [byDeviceBookId] is keyed by the host's own device-book id
- * ([DeviceBookIdentity]; FastReader's is `sha256:<hex>`), which names the
+ * ([DeviceBookIdentity], for example `sha256:<hex>`), which names the
  * content identity AD-23 merges on — so a row's progress belongs
  * to the *bytes*, not to a path, a name or a position in a list.
  */

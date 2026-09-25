@@ -20,7 +20,7 @@ import com.cedagova.reader.library.model.ReaderSyncMutationEnvelope
  * It is an interface so a host can substitute a scripted double in its own
  * tests without a mock engine; [ReaderLibraryClient] is the one production
  * implementation. There is deliberately no generic `call(path, body)` here:
- * every request FastReader can send is one of the eleven below, and each is
+ * every request this module can send is one of the twelve below, and each is
  * declared by the pinned OpenAPI document in `reader-auth/contracts/`.
  *
  * Five of them are the publication-import lifecycle (#116) and the last is the
@@ -141,7 +141,7 @@ public interface ReaderLibraryOperations {
      *
      * This is the only way book bytes come *onto* the device (REQ-510, D2). The
      * grant carries the provider's URL, its signature headers, the object's
-     * length, its content SHA-256 and a TTL; FastReader composes none of them.
+     * length, its content SHA-256 and a TTL; this client composes none of them.
      * The bytes themselves do not come back through this route — they are
      * fetched by
      * `com.cedagova.reader.library.downloads.AssetDownloadClient`, which has no

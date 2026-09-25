@@ -34,3 +34,6 @@ changes, which had no version of their own, plus one addition:
   `AssetDownloadClient.createForTests` and
   `PublicationTransferClient.createForTests` — use the fixtures'
   `assetDownloadClientOver` and `publicationTransferClientOver`.
+- Documentation (#209): a "Host requirements" section in the README, the
+  module's three exception types listed, the operation count corrected to
+  twelve, and doc comments that name no host app. No code change.

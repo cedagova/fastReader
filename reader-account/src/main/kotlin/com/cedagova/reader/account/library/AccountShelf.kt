@@ -29,9 +29,9 @@ public data class AccountRemoval(val bookId: String, val title: String)
  * `immediate_confirmation` and no duration: the scope says the Undo belongs to
  * the confirmation the reader is looking at, and how long that confirmation
  * stays on screen is the client's. So the window is the host's: it passes
- * [undoWindowMs], and FastReader passes the *same* window its device removal
- * already offers — one "immediate confirmation" in that app, not two that
- * differ by screen.
+ * [undoWindowMs]. A host with a device removal of its own should pass the
+ * *same* window that removal offers — one "immediate confirmation" in the app,
+ * not two that differ by screen.
  *
  * Undo is a `restore` of the same book through the engine, which queues it like
  * any other mutation: offline it waits, online it goes at once, and either way
@@ -169,9 +169,9 @@ public class AccountShelf(
 
     public companion object {
         /**
-         * The confirmation lifetime when the host names none: FastReader's
-         * device shelf window, which it passes explicitly so the two removals
-         * behave identically from the reader's side.
+         * The confirmation lifetime when the host names none. A host with a
+         * device shelf of its own passes that shelf's window explicitly, so the
+         * two removals behave identically from the reader's side.
          */
         public const val DEFAULT_UNDO_WINDOW_MS: Long = 8_000L
     }

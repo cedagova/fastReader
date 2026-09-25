@@ -1,14 +1,17 @@
 # reader-auth
 
 The reusable Android library for Reader authentication. It is developed in
-this repository beside FastReader as a proving ground (#92, audit finding
-A83-F007) and is built to be lifted into the real Reader client unchanged:
+this repository beside the app that hosts it, as a proving ground (#92, audit
+finding A83-F007), and is built to be lifted into the real Reader client
+unchanged:
 
-- it depends on nothing under `:app` and on no `com.cedagova.fastreader`
-  symbol, and nothing in its name, path, namespace or resources says
-  `fastreader`;
-- its toolchain comes from the root `gradle/libs.versions.toml`, nothing is
-  pinned inline.
+- it depends on nothing under `:app` and on no symbol of the host app, and
+  nothing in its name, path, namespace or resources names that app;
+- its build file pins no dependency version and no SDK level: SDK levels,
+  the JVM target, lint and test settings come from the
+  `conventions.android.library` plugin in `build-logic/`, which reads them
+  from the root `gradle/libs.versions.toml`, and every dependency version is a
+  catalog entry.
 
 [CONTRACT.md](CONTRACT.md) is the client contract — sign-in methods in
 preference order, bootstrap, the Keystore-encrypted session store, the
@@ -35,8 +38,8 @@ shares (`src/contractTest/`).
 Every failure is one branch of the sealed `ReaderAuthException`. The
 contract's constants live in `ReaderAuthPolicy`, and the unit tests under
 `src/test/` (fake cipher, fake clock, Ktor mock engine; no network, no device)
-pin each rule; the real Keystore path and the stage flow are proven on an
-emulator from FastReader, the library's host (`docs/evidence/100/`).
+pin each rule; the real Keystore path and the stage flow were proven on an
+emulator from this repository's host app (`docs/evidence/100/`, historical).
 
 ## Substituting it in a host's tests
 
@@ -84,12 +87,12 @@ names it so a host can read the merge result back.
 
 ## What every host must declare for itself
 
-A library manifest cannot impose these; each host — FastReader's `:app` now
-(#100), the real Reader client later — owns them, and a host that omits one
-has a host defect, not a library defect. FastReader guards each with a unit
-test (`ReaderAccountManifestTest` and `ReaderAccountConfigTest` under
-`app/src/test/java/com/cedagova/fastreader/account/`), which is the pattern
-to copy.
+A library manifest cannot impose these; each host owns them, and a host that
+omits one has a host defect, not a library defect. Guard each with a unit test
+in the host; this repository's `:app` does so in `ReaderAccountManifestTest`
+and `ReaderAccountConfigTest` (`app/src/test/.../account/`), which is the
+pattern to copy. [CONTRACT.md](CONTRACT.md), "Host requirements", adds the
+configuration and the foreground hook.
 
 1. **Full exclusion from backup and device-to-device transfer.** The module
    will store tokens, and no token may leave the device in a cloud backup or
@@ -103,7 +106,7 @@ to copy.
    its `<cloud-backup>` and `<device-transfer>` sections, with no `<include>`
    anywhere. The domains are siblings, not a hierarchy: excluding `root`
    alone still hands `files/`, `databases/` and `shared_prefs/` to the
-   transport. `app/src/main/res/xml/` holds FastReader's copy to take.
+   transport. This repository's `app/src/main/res/xml/` holds a copy to take.
 2. **No cleartext allowance in a release build.** A debug build may permit
    cleartext to the emulator loopback `10.0.2.2` (and nothing else) through a
    network security configuration that lives **only in the debug source
@@ -111,4 +114,4 @@ to copy.
    sets `android:usesCleartextTraffic`. A release build therefore has no
    `networkSecurityConfig` attribute at all.
 3. **Its own application id**, distinct from any other app the module is
-   developed beside. The host here is `com.cedagova.fastreader`.
+   developed beside.

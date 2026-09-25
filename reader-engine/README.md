@@ -11,8 +11,8 @@ A197-F004) so a Reader client can reuse it instead of copying it.
   the Android SDK is not on its compile classpath. It uses only the JDK
   (`java.util.zip`, `javax.xml`, `MessageDigest`), kotlinx.coroutines and the
   kotlinx.serialization runtime.
-- **Depends on nothing under `:app`.** `:app` is its host, exactly as it is
-  `:reader-auth`'s and `:reader-library`'s.
+- **Depends on no other module.** Not on `:app`, and not on the account
+  libraries; a host depends on it.
 - **Deterministic positions.** The same bytes always yield the same tokens at
   the same indices. Any change that would move a stored position bumps
   `ContentPipelineVersion.CURRENT` (see `content/TokenStream.kt`).
@@ -29,7 +29,7 @@ Imports run one way only: `timing` → `content` → `epub`.
 | `com.cedagova.reader.engine.content` | XHTML → token stream: markup scanning, front matter, TOC titles, tokenizer and word classes; the book's identity. | `EpubContentPipeline.parse` → `BookContentResult`; `BookIdentity`, `BookDigest.of`; `Tokenizer.tokenize` for text that is already in blocks |
 | `com.cedagova.reader.engine.timing` | RSVP pacing: per-token duration, ramp-up, pause strength, and the remaining-time index that also yields a book's mean multiplier. | `RsvpTimingEngine`, `TimingSettings`, `RemainingTimeIndex.build` |
 
-In `:app` they were `com.cedagova.fastreader.{epub,content,timing}`; the move
+Before #201 they lived in the host app under that app's package; the move
 renamed them to the library naming of `:reader-auth` and `:reader-library`.
 
 ## What it is not
@@ -46,8 +46,8 @@ renamed them to the library naming of `:reader-auth` and `:reader-library`.
   repository-wide `testDebugUnitTest` runs them too).
 - `src/testFixtures` holds the EPUB and content fixtures (`EpubFixtures`,
   `ContentFixtures`, `TestByteChannel`). A host's tests use them with
-  `testImplementation(testFixtures(project(":reader-engine")))`, as `:app`'s
-  JVM and on-device tests do.
+  `testImplementation(testFixtures(project(":reader-engine")))`, as this
+  repository's `:app` does in its JVM and on-device tests.
 
 ## Taking it into another repository
 

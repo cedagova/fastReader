@@ -331,7 +331,7 @@ class ReaderAccountControllerTest {
     }
 
     /**
-     * The privacy statement's claim that FastReader never calls
+     * The host privacy statement's claim that the account surface never calls
      * `upsertProfile` (docs/privacy-statement.md, claim 3), held here rather
      * than by the controller's type: it keeps the whole `ReaderAuthOperations`
      * seam of #199. Every action the surface has, signed out and signed in,
@@ -381,7 +381,7 @@ class ReaderAccountControllerTest {
 
         assertTrue("every flow reached the library", gateway.calls.size >= 2 * (everyAction.size - 1))
         assertTrue(
-            "FastReader never calls upsertProfile: ${gateway.calls}",
+            "the account surface never calls upsertProfile: ${gateway.calls}",
             gateway.calls.none { it.startsWith("upsertProfile") },
         )
     }

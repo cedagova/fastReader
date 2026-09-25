@@ -14,8 +14,8 @@ import org.junit.Test
 /**
  * The copy references in the account document (schema 3's `copies`), a host
  * record `:reader-library`'s engine stores and never reads (#147). The answered
- * resume offers, the host's other record, are FastReader's and are tested in
- * `:app` (#200).
+ * resume offers, the host's other record, belong to the host and are tested
+ * in `:app` (#200).
  */
 class AccountCopyReferencesTest {
 

@@ -12,8 +12,7 @@ import com.cedagova.reader.library.imports.PublicationSource
  * asks for the bytes behind an id and gets a `:reader-library`
  * [PublicationSource] or the reason there are none.
  *
- * FastReader's implementation is `DeviceBookSources`, which resolves its
- * catalog book and reads its file in place. A host's tests substitute
+ * A host's tests substitute
  * `com.cedagova.reader.account.testing.FakeDevicePublicationSources` from this
  * module's test fixtures.
  */

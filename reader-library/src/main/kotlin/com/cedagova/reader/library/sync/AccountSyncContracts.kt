@@ -107,8 +107,8 @@ public class ReservedHostRecordKeyException(public val key: String, public val b
 /**
  * The host's own records in the account document (#147).
  *
- * A host keeps a little state of its own beside the account's — FastReader
- * keeps its verified-copy references and the resume offers a reader answered —
+ * A host keeps a little state of its own beside the account's — for example
+ * its verified-copy references and the resume offers a reader answered —
  * and it has to be written by the same single writer as everything else in the
  * document, because a second writer racing it would be the first way to lose a
  * queued mutation. These are that writer's host-facing half: values the engine

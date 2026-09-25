@@ -468,7 +468,7 @@ class AccountSyncEngineTest {
     }
 
     /**
-     * A host record — FastReader's answered resume offer, its copy references —
+     * A host record — an answered resume offer, the copy references —
      * is stored under the one writer and adds no envelope to the outbox and sends
      * nothing at all. Asserted beside the envelope invariant above because this
      * is the write most likely to grow a wire call by accident: it is the only
@@ -1092,7 +1092,7 @@ class AccountSyncEngineTest {
     /**
      * REQ-512, at the level where an envelope is actually built: over a long run
      * of publishes, no key of any `reading_progress` payload is one of
-     * FastReader's own values.
+     * the host's own values.
      */
     @Test
     fun `no published position payload ever carries a token index or a speed`() = runTest(dispatcher) {

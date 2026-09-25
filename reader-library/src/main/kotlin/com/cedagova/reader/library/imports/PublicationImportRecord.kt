@@ -127,7 +127,7 @@ public data class PublicationImportRecord(
         /**
          * The `client_import_id` prefix. It names the protocol and its version,
          * never the app: `:reader-library` is liftable (AD-19), and an id that
-         * said "fastreader" would make every account row carry the name of one
+         * named the host app would make every account row carry the name of one
          * client forever.
          */
         public const val CLIENT_IMPORT_ID_PREFIX: String = "reader-import-v1-"

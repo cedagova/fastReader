@@ -4,8 +4,9 @@
 
   Authentication talks to a server, so any application that depends on this
   module needs android.permission.INTERNET. Declaring it here rather than in
-  each host means manifest merging delivers it to FastReader, the host today,
-  and, later, to the real Reader client without either having to remember it.
+  each host means manifest merging delivers it to every host — the app this
+  library is developed beside, and later the real Reader client — without any
+  of them having to remember it.
   It is the only permission the library asks for. What a host must declare for
   itself — backup exclusion, cleartext policy — is listed in README.md, because
   a library manifest cannot impose those.

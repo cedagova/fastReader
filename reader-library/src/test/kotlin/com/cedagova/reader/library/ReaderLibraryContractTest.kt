@@ -113,7 +113,7 @@ class ReaderLibraryContractTest {
         ReaderBookAsset.serializer() to "ReaderBookAsset",
         ReaderProgressListResponse.serializer() to "ReaderProgressListResponse",
         ReaderProgress.serializer() to "ReaderProgress",
-        // The portable position FastReader publishes (#120).
+        // The portable position this module publishes (#120).
         PutReaderProgressRequest.serializer() to "PutReaderProgressRequest",
         ReaderEpubLocatorV1.serializer() to "ReaderEpubLocatorV1",
         // The location envelope the position travels in since the #139 re-pin.
@@ -363,7 +363,7 @@ class ReaderLibraryContractTest {
      *
      * The shape checker compares fields and types. What it cannot see is that the
      * `oneOf` locator really maps `epub` to the very schema the module builds its
-     * locator from, and that the publication values FastReader sends — `epub`,
+     * locator from, and that the publication values the module sends — `epub`,
      * `application/epub+zip`, `account` — are members of the document's enums.
      * Each of those is a 422 `invalid_payload` against stage if wrong.
      */
@@ -418,7 +418,7 @@ class ReaderLibraryContractTest {
      * The shape checker above already compares every field and enum member.
      * What this adds is the two facts the copy store *acts* on and would
      * otherwise be trusting from memory: that a grant's checksum and size come
-     * from the document as required fields (nothing in FastReader may supply
+     * from the document as required fields (nothing in a host may supply
      * either), and that the direction and method values the client gates on —
      * `download` and `GET` — are values the schema actually declares.
      */

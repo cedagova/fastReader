@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * Every enum below carries an [UNKNOWN_VALUE] member and every decoded field
  * that uses one has a default, so `ReaderLibraryJson`'s `coerceInputValues`
  * turns a value reader-api adds later into that member instead of throwing.
- * That is what "forward-compatible" means here: an older FastReader keeps
+ * That is what "forward-compatible" means here: an older client keeps
  * reading a newer server's documents and shows the rows it understands.
  *
  * `ReaderLibraryContractTest` skips this member when it compares an enum with
@@ -317,7 +317,7 @@ internal enum class ReaderCapabilityKey {
 /**
  * `ReaderAssetGrant.direction`: which way a signed transfer goes.
  *
- * FastReader asks for a download grant and reads this back rather than
+ * This module asks for a download grant and reads this back rather than
  * assuming it: a grant that came back for the other direction is a grant this
  * client must not spend, and `AssetDownloadClient` refuses one.
  */

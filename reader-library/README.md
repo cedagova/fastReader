@@ -9,7 +9,7 @@ owns. Added by [#112](https://github.com/cedagova/fastReader/issues/112)
 
 Typed operations for the Reader library API, and — since #147 — the account sync
 engine built on them (see below). The operations are exactly the ones
-`ReaderLibraryOperations` declares, and nothing else:
+`ReaderLibraryOperations` declares — twelve — and nothing else:
 
 | Operation | Route |
 | --- | --- |
@@ -45,9 +45,18 @@ sends to reader-api is one of the operations above.
 
 - It holds no session, no token, no refresh and no retry. All of that is
   `:reader-auth`'s, and tokens never leave that module.
-- It defines no exception type. Every failure is an existing
-  `ReaderAuthException` branch — `SignedOut`, `Forbidden`, `TryLater`,
-  `NetworkUnavailable`, `ApiError` — thrown through unchanged.
+- Its reader-api operations define no exception type. Every failure of a
+  `ReaderLibraryOperations` call is an existing `ReaderAuthException` branch —
+  `SignedOut`, `Forbidden`, `TryLater`, `NetworkUnavailable`, `ApiError` —
+  thrown through unchanged. The module has exactly three exception types of
+  its own, none of them for a reader-api answer:
+  - `AssetDownloadException` (`downloads/AssetDownloadClient.kt`) — why a
+    grant-signed download from the storage provider stopped;
+  - `PublicationTransferException` (`imports/PublicationTransferClient.kt`) —
+    why an upload to the storage provider stopped;
+  - `ReservedHostRecordKeyException` (`sync/AccountSyncContracts.kt`) — a host
+    record was given a key the account document reserves (a programming
+    error in the host).
 - It depends on nothing under `:app`, declares no permission and adds no
   manifest component, so it stays liftable exactly as `:reader-auth` does.
 
@@ -58,8 +67,8 @@ typed results a caller reads, not exceptions it catches.
 ## The account sync engine (`com.cedagova.reader.library.sync`)
 
 Added by [#147](https://github.com/cedagova/fastReader/issues/147): the account
-sync logic any Android Reader client can reuse, moved here from FastReader's
-`:app`. It depends on nothing under `:app` and knows no host concept — no token
+sync logic any Android Reader client can reuse, moved here from the host app
+it was first written in. It depends on nothing under `:app` and knows no host concept — no token
 index, no device catalog, no downloaded copy, no UI.
 
 | Type | What it is |
@@ -68,7 +77,7 @@ index, no device catalog, no downloaded copy, no UI.
 | `AccountSession` | What the host tells the engine about the session (`Loading`, `NotConfigured`, `SignedOut`, `SignedIn(userId)`), as a `Flow`. Signing out keeps the file; a different user discards the other accounts' held queues (D4). |
 | `AccountLibraryActions` | The mutations a shelf performs: `refresh`, `removeFromAccount`, `undoRemove`, `recordOpened`, `recordFinished`, `recordStatus`, `recordPosition`. Only `library_item` and `reading_progress` envelopes are ever built. |
 | `AccountImportRecords` | The durable publication-import records (AD-26), under the same writer. |
-| `AccountHostRecords` | The host's own records in the same document — values the engine stores verbatim and never reads, queues or sends. Document-level (`hostRecord`, `updateHostRecord`) and per book row (`updateBookHostRecord`, read back as `AccountBook.host`). FastReader keeps its copy references and answered resume offers here. |
+| `AccountHostRecords` | The host's own records in the same document — values the engine stores verbatim and never reads, queues or sends. Document-level (`hostRecord`, `updateHostRecord`) and per book row (`updateBookHostRecord`, read back as `AccountBook.host`). `:reader-account` keeps its copy references here, and a host its answered resume offers. |
 | `ReaderLibraryGateway` | The five library operations the engine calls (`library`, `progress`, `applyMutations`, `deltas`, `syncCapability`); `ReaderApiLibraryGateway` passes them to `ReaderLibraryOperations`. Tests substitute a scripted fake. |
 | `AccountLibraryStores` / `FileAccountLibraryStores` | Storage the host supplies: one atomically written JSON file per account, named after the SHA-256 of the user id. |
 | `AccountLibraryDocument`, `AccountBook`, `AccountRemotePosition`, `AccountOutboxEntry`, `AccountLibraryCodec`, `AccountLibrarySchema` | The persisted canonical state (schema 6), migrated forward step by step and refused when newer. Keys a level does not declare are host records, kept verbatim and written back at the same level. |
@@ -133,6 +142,39 @@ repair.
 **What it never does.** It resolves no conflict and prompts for none, picks no
 winner between two positions (the backend's admission order does), runs no
 scheduler, and sends no `profile`, `settings`, `note` or `bookmark` envelope.
+
+## Host requirements
+
+What a host must do that this module cannot do for it. A host that assembles
+the account pipeline with `:reader-account`'s `ReaderAccountGraph` gets the
+first three from that one call; a host wiring the engine by hand owns them all.
+
+1. **Drive the engine from the foreground.** The engine runs no scheduler,
+   holds no wake lock and registers no receiver: only a trigger makes it run.
+   Call `requestSync(AccountSyncTrigger.FOREGROUND)` when the process returns
+   to the foreground (a process lifecycle `onStart`). A sign-in and each of
+   the device's own writes start a run by themselves; a manual refresh is
+   `refresh()`.
+2. **Bridge the session.** Construct the engine with a
+   `Flow<AccountSession>` that follows `:reader-auth`'s session state —
+   `Loading` until the stored session is read, then `NotConfigured`,
+   `SignedOut` or `SignedIn(userId)`. The engine reads who is signed in from
+   that flow only; `ReaderAccountGraph` builds it from its sign-in state model
+   (`toAccountSession`).
+3. **Keep the documents private and out of backups.** `FileAccountLibraryStores`
+   writes one JSON file per account under the directory the host passes
+   (conventionally `filesDir/account-library/`,
+   `FileAccountLibraryStores.DIRECTORY_NAME`). It holds the account's shelf,
+   queued changes and host records, so the directory must be app-private and
+   excluded from cloud backup and device transfer — the same nine-domain
+   exclusion `:reader-auth` already requires of its host.
+4. **One engine per directory.** The engine is the single writer of those
+   files; two engines over one directory would overwrite each other.
+5. **Host-record transforms are pure and never call back into the engine**
+   (see "Host records" above).
+6. **Map positions yourself.** Turning the host's reading unit into a
+   `LocalReadingPosition`, and a `RemoteReadingPosition` back into it, is the
+   host's (see `PortableProgress`).
 
 ## The contract pin
 

@@ -52,8 +52,8 @@ import kotlinx.coroutines.withContext
  * every entry's name, uncompressed size and CRC-32. Those are fields the archive
  * reader already had in hand, so it adds no read to any path and REQ-110's
  * mechanism and measurement are untouched. It is what lets a stored position be
- * refused when the file changed under it — see
- * `com.cedagova.fastreader.reader.ReaderPosition`.
+ * refused when the file changed under it; storing and checking that position
+ * is the host's.
  */
 public class EpubContentPipeline(private val dispatcher: CoroutineDispatcher = Dispatchers.Default) {
 

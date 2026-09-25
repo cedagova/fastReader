@@ -445,8 +445,8 @@ class AccountLibraryStoreTest {
 
     /**
      * #147's compatibility promise, on a real document: `account-library-v6.json`
-     * is what FastReader's own codec wrote at main `ab175bc`, before the engine
-     * moved here — every schema 6 field set, including FastReader's `copies` and
+     * is what the host app's own codec wrote at main `ab175bc`, before the engine
+     * moved here — every schema 6 field set, including the host's `copies` and
      * a row's `resumeOfferSettledFor`, which are host records now.
      *
      * It loads through the file store with no migration and no recovery, every
