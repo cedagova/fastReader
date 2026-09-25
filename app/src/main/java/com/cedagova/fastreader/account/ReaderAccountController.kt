@@ -71,7 +71,9 @@ class ReaderAccountController(
         combine(session, activity, outcome, capabilities) { session, activity, outcome, capabilities ->
             when (session) {
                 ReaderSessionState.Initializing -> ReaderAccountState.Loading
+
                 ReaderSessionState.SignedOut -> ReaderAccountState.SignedOut(activity, outcome)
+
                 is ReaderSessionState.SignedIn -> ReaderAccountState.SignedIn(
                     userId = session.userId,
                     email = session.email,
@@ -125,7 +127,9 @@ class ReaderAccountController(
         AccountOutcome.PasswordSet
     }
 
-    override fun loadCapabilities() = run(AccountActivity.LOADING_CAPABILITIES, onFailure = { capabilities.value = null }) {
+    override fun loadCapabilities() = run(AccountActivity.LOADING_CAPABILITIES, onFailure = {
+        capabilities.value = null
+    }) {
         val response = it.capabilities()
         capabilities.value = LoadedCapabilities(
             document = pretty.encodeToString(JsonObject.serializer(), response.document),

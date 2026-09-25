@@ -72,9 +72,8 @@ internal fun Node.descendants(): Sequence<Element> = sequence {
 internal fun Element.hasLocalName(name: String): Boolean =
     (localName ?: tagName).substringAfterLast(':').equals(name, ignoreCase = true)
 
-internal fun Element.attr(name: String): String? =
-    getAttribute(name).takeIf { it.isNotEmpty() }
-        ?: descendantAttributeByLocalName(name)
+internal fun Element.attr(name: String): String? = getAttribute(name).takeIf { it.isNotEmpty() }
+    ?: descendantAttributeByLocalName(name)
 
 private fun Element.descendantAttributeByLocalName(name: String): String? {
     val attributes = attributes ?: return null

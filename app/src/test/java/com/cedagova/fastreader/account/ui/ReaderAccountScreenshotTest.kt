@@ -98,7 +98,12 @@ class ReaderAccountScreenshotTest {
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE_SCROLLED)
     fun theSignedOutFormsSurviveTheNarrowestScreenAtTheLargestText() {
-        capture("account_compact_large_font", ReaderAccountState.SignedOut(), fontSize = FontSize.EXTRA_LARGE, fontScale = 2f)
+        capture(
+            "account_compact_large_font",
+            ReaderAccountState.SignedOut(),
+            fontSize = FontSize.EXTRA_LARGE,
+            fontScale = 2f,
+        )
     }
 
     private fun capture(

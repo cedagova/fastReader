@@ -3,8 +3,9 @@ package com.cedagova.reader.library
 import com.cedagova.reader.library.model.CancelPublicationImportRequest
 import com.cedagova.reader.library.model.CreatePublicationImportRequest
 import com.cedagova.reader.library.model.LOCATOR_FORMAT_EPUB
+import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
 import com.cedagova.reader.library.model.PORTABLE_SEMANTICS_VERSION
-import com.cedagova.reader.library.model.PutReaderProgressRequest
+import com.cedagova.reader.library.model.PUBLICATION_SOURCE_ACCOUNT
 import com.cedagova.reader.library.model.PublicationArchivePolicy
 import com.cedagova.reader.library.model.PublicationFormatPolicy
 import com.cedagova.reader.library.model.PublicationImport
@@ -15,6 +16,7 @@ import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.PublicationOwnershipPolicy
 import com.cedagova.reader.library.model.PublicationPromotion
 import com.cedagova.reader.library.model.PublicationTransferGrant
+import com.cedagova.reader.library.model.PutReaderProgressRequest
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetGrantResponse
@@ -25,12 +27,10 @@ import com.cedagova.reader.library.model.ReaderBookAssetKind
 import com.cedagova.reader.library.model.ReaderCapabilityEntry
 import com.cedagova.reader.library.model.ReaderCapabilityQuota
 import com.cedagova.reader.library.model.ReaderEpubLocatorV1
-import com.cedagova.reader.library.model.ReaderPortableLocationV1
-import com.cedagova.reader.library.model.ReaderPortablePublicationV1
-import com.cedagova.reader.library.model.MEDIA_TYPE_EPUB
-import com.cedagova.reader.library.model.PUBLICATION_SOURCE_ACCOUNT
 import com.cedagova.reader.library.model.ReaderLibraryItem
 import com.cedagova.reader.library.model.ReaderLibraryResponse
+import com.cedagova.reader.library.model.ReaderPortableLocationV1
+import com.cedagova.reader.library.model.ReaderPortablePublicationV1
 import com.cedagova.reader.library.model.ReaderProgress
 import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderPublicationMembershipOutcome
@@ -183,7 +183,11 @@ class ReaderLibraryContractTest {
         val problems = pinned.entries.flatMap { (serializer, schema) ->
             violations(serializer.descriptor, schema)
         }
-        assertEquals("the models and the pinned contract disagree:\n" + problems.joinToString("\n"), emptyList<String>(), problems)
+        assertEquals(
+            "the models and the pinned contract disagree:\n" + problems.joinToString("\n"),
+            emptyList<String>(),
+            problems,
+        )
     }
 
     /** A route this module calls that the document does not declare would be a request nobody promised. */
@@ -200,10 +204,13 @@ class ReaderLibraryContractTest {
             ReaderLibraryClient.IMPORT_POLICY_PATH to "get",
             ReaderLibraryClient.IMPORTS_PATH to "post",
             "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}" to "get",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.COMPLETE_SUFFIX}" to "post",
-            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.CANCEL_SUFFIX}" to "post",
+            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.COMPLETE_SUFFIX}" to
+                "post",
+            "${ReaderLibraryClient.IMPORTS_PATH}/${ReaderLibraryClient.IMPORT_ID_TEMPLATE}${ReaderLibraryClient.CANCEL_SUFFIX}" to
+                "post",
             // The asset download grant (#118): the one route book bytes arrive by.
-            "${ReaderLibraryClient.ASSETS_PATH}/${ReaderLibraryClient.ASSET_ID_TEMPLATE}${ReaderLibraryClient.DOWNLOAD_GRANT_SUFFIX}" to "post",
+            "${ReaderLibraryClient.ASSETS_PATH}/${ReaderLibraryClient.ASSET_ID_TEMPLATE}${ReaderLibraryClient.DOWNLOAD_GRANT_SUFFIX}" to
+                "post",
         ).forEach { (path, method) ->
             val declared = paths[path]?.jsonObject
             assertTrue("the document declares no $path", declared != null)
@@ -211,7 +218,10 @@ class ReaderLibraryContractTest {
         }
         // The delta query parameters, with the bounds the client enforces locally.
         val parameters = paths[ReaderLibraryClient.DELTAS_PATH]!!.jsonObject["get"]!!.jsonObject["parameters"] as JsonArray
-        val byName = parameters.associate { it.jsonObject["name"]!!.primitive()!! to it.jsonObject["schema"]!!.jsonObject }
+        val byName = parameters.associate {
+            it.jsonObject["name"]!!.primitive()!! to
+                it.jsonObject["schema"]!!.jsonObject
+        }
         assertEquals("^[0-9]+$", byName["after_cursor"]!!["pattern"]!!.primitive())
         assertEquals(ReaderLibraryClient.MIN_DELTA_LIMIT.toString(), byName["limit"]!!["minimum"].toString())
         assertEquals(ReaderLibraryClient.MAX_DELTA_LIMIT.toString(), byName["limit"]!!["maximum"].toString())
@@ -392,7 +402,9 @@ class ReaderLibraryContractTest {
         assertTrue("an account book id must be a legal publication_id", pattern.matches(sent.publicationId))
         assertEquals(
             listOf("publication_id", "format", "media_type", "source"),
-            (schemas["ReaderPortablePublicationV1"]!!.jsonObject["required"] as JsonArray).mapNotNull { it.primitive() },
+            (schemas["ReaderPortablePublicationV1"]!!.jsonObject["required"] as JsonArray).mapNotNull {
+                it.primitive()
+            },
         )
     }
 
@@ -483,16 +495,39 @@ class ReaderLibraryContractTest {
     @Test
     fun `a renamed, retyped or dropped field is caught`() {
         val renamed = violations(RenamedLibraryItem.serializer().descriptor, "ReaderLibraryItem")
-        assertTrue("a renamed field went unnoticed: $renamed", renamed.any { it.contains("bookk") && it.contains("not declared") })
+        assertTrue(
+            "a renamed field went unnoticed: $renamed",
+            renamed.any {
+                it.contains("bookk") &&
+                    it.contains("not declared")
+            },
+        )
 
         val retyped = violations(RetypedProgress.serializer().descriptor, "ReaderProgress")
-        assertTrue("a retyped field went unnoticed: $retyped", retyped.any { it.contains("progress_percent") && it.contains("type") })
+        assertTrue(
+            "a retyped field went unnoticed: $retyped",
+            retyped.any {
+                it.contains("progress_percent") &&
+                    it.contains("type")
+            },
+        )
 
         val dropped = violations(DroppedRequiredChange.serializer().descriptor, "ReaderSyncChange")
-        assertTrue("a dropped required field went unnoticed: $dropped", dropped.any { it.contains("cursor") && it.contains("required") })
+        assertTrue(
+            "a dropped required field went unnoticed: $dropped",
+            dropped.any {
+                it.contains("cursor") &&
+                    it.contains("required")
+            },
+        )
 
         val shrunkEnum = violations(ShrunkEnumRejection.serializer().descriptor, "ReaderSyncRejection")
-        assertTrue("a dropped enum member went unnoticed: $shrunkEnum", shrunkEnum.any { it.contains("unsupported_mutation") })
+        assertTrue(
+            "a dropped enum member went unnoticed: $shrunkEnum",
+            shrunkEnum.any {
+                it.contains("unsupported_mutation")
+            },
+        )
 
         // And the checker is not simply always angry: the real models are clean.
         assertEquals(emptyList<String>(), violations(ReaderSyncChange.serializer().descriptor, "ReaderSyncChange"))
@@ -544,8 +579,13 @@ class ReaderLibraryContractTest {
             // A nullable class descriptor's serial name carries a trailing '?'.
             val mapped = schemaOf[element.serialName.removeSuffix("?")]
             when {
-                mapped == null -> problems += "$where: the schema is a \$ref to ${resolved.ref}, but ${element.serialName} is not pinned to any schema"
-                mapped != resolved.ref -> problems += "$where: the schema refers to ${resolved.ref}, the model to $mapped"
+                mapped == null ->
+                    problems +=
+                        "$where: the schema is a \$ref to ${resolved.ref}, but ${element.serialName} is not pinned to any schema"
+
+                mapped != resolved.ref ->
+                    problems +=
+                        "$where: the schema refers to ${resolved.ref}, the model to $mapped"
             }
             if (expected != "object") problems += "$where: the schema is an object reference, the model a $expected"
             return problems
@@ -562,8 +602,12 @@ class ReaderLibraryContractTest {
                     .map { element.getElementName(it) }
                     .filterNot { it == UNKNOWN_VALUE }
                     .toSet()
-                (members - declared).forEach { problems += "$where: the model declares '$it', which the schema does not" }
-                (declared - members).forEach { problems += "$where: the schema declares '$it', which the model does not" }
+                (members - declared).forEach {
+                    problems += "$where: the model declares '$it', which the schema does not"
+                }
+                (declared - members).forEach {
+                    problems += "$where: the schema declares '$it', which the model does not"
+                }
             }
         }
         if (element.kind == StructureKind.LIST) {
@@ -606,8 +650,7 @@ class ReaderLibraryContractTest {
         else -> null
     }
 
-    private fun kotlinx.serialization.json.JsonElement.primitive(): String? =
-        (this as? JsonPrimitive)?.contentOrNull
+    private fun kotlinx.serialization.json.JsonElement.primitive(): String? = (this as? JsonPrimitive)?.contentOrNull
 
     // ------------------------------------------------- deliberately broken copies
 
@@ -647,10 +690,17 @@ class ReaderLibraryContractTest {
 
     @Serializable
     private enum class ShrunkRejectionCode {
-        @SerialName("invalid_payload") INVALID_PAYLOAD,
-        @SerialName("invalid_resource_id") INVALID_RESOURCE_ID,
-        @SerialName("idempotency_mismatch") IDEMPOTENCY_MISMATCH,
-        @SerialName("related_resource_missing") RELATED_RESOURCE_MISSING,
+        @SerialName("invalid_payload")
+        INVALID_PAYLOAD,
+
+        @SerialName("invalid_resource_id")
+        INVALID_RESOURCE_ID,
+
+        @SerialName("idempotency_mismatch")
+        IDEMPOTENCY_MISMATCH,
+
+        @SerialName("related_resource_missing")
+        RELATED_RESOURCE_MISSING,
     }
 
     /**

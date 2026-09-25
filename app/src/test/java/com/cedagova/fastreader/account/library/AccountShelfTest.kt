@@ -1,10 +1,10 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.library.model.ReaderLibraryStatus
 import com.cedagova.reader.library.sync.AccountLibraryActions
 import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.reader.library.sync.LocalReadingPosition
-import com.cedagova.reader.library.model.ReaderLibraryStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

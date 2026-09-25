@@ -1,8 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.reader.library.sync.AccountImportRecords
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.PublicationImportGateway
 import com.cedagova.fastreader.library.Book
 import com.cedagova.reader.auth.ReaderAuthException
@@ -15,6 +12,9 @@ import com.cedagova.reader.library.imports.UploadConsent
 import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.PublicationImportStatus
+import com.cedagova.reader.library.sync.AccountImportRecords
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -253,6 +253,7 @@ class AccountImports(
                 )
 
                 is PublicationImportRefusal.ImportsDisabled -> disable(deviceBookId, refusal.requestId)
+
                 else -> publish(deviceBookId, refusal.toState(policy.requestId))
             }
         }
@@ -496,7 +497,12 @@ class AccountImports(
         val durable = record.copy(uploadedOffset = 0)
         val unchanged = mutex.withLock {
             val previous = persisted[deviceBookId]?.copy(uploadedOffset = 0)
-            if (previous == durable) true else { persisted[deviceBookId] = record; false }
+            if (previous == durable) {
+                true
+            } else {
+                persisted[deviceBookId] = record
+                false
+            }
         }
         if (!unchanged) records.putImportRecord(record)
     }
@@ -527,6 +533,7 @@ class AccountImports(
         }
         return when (val resolved = sources.of(book)) {
             is PublicationSourceResult.Ready -> resolved.source
+
             is PublicationSourceResult.Unavailable -> {
                 publish(
                     deviceBookId,
@@ -641,7 +648,8 @@ class AccountImports(
             BookImportState.Refused(ImportProblem.Api(error.status), code = error.code)
 
         is ReaderAuthException.NotConfigured, is ReaderAuthException.ConfigurationMismatch,
-        is ReaderAuthException.SignInUnavailable ->
+        is ReaderAuthException.SignInUnavailable,
+        ->
             BookImportState.Refused(ImportProblem.Api(null), retryable = false)
 
         // The session is kept in memory, so the same import succeeds when repeated (#154).

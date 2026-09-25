@@ -1,12 +1,12 @@
 package com.cedagova.fastreader.library.ui
 
-import com.cedagova.reader.library.sync.AccountBook
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.reader.library.model.ReaderLibraryStatus
+import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncPhase
 
 /**
  * The account shelf's fixtures (LEAF703).

@@ -6,8 +6,8 @@ import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.FolderStatus
 import com.cedagova.fastreader.library.IngestionState
-import com.cedagova.fastreader.library.RemovedBook
 import com.cedagova.fastreader.library.ReadingState
+import com.cedagova.fastreader.library.RemovedBook
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
@@ -116,8 +116,18 @@ class LibraryUiStateTest {
             ),
         )
 
-        assertEquals(listOf("Rayuela"), buildLibraryUiState(catalog, IngestionState.Idle, "rayue").books.map { it.title })
-        assertEquals(listOf("Ficciones"), buildLibraryUiState(catalog, IngestionState.Idle, "aleph").books.map { it.title })
+        assertEquals(
+            listOf("Rayuela"),
+            buildLibraryUiState(catalog, IngestionState.Idle, "rayue").books.map {
+                it.title
+            },
+        )
+        assertEquals(
+            listOf("Ficciones"),
+            buildLibraryUiState(catalog, IngestionState.Idle, "aleph").books.map {
+                it.title
+            },
+        )
     }
 
     @Test
@@ -232,7 +242,12 @@ class LibraryUiStateTest {
 
     @Test
     fun `a running scan becomes the loading state with determinate progress (REQ-002)`() {
-        val scanning = IngestionState.Scanning(ScanTrigger.ADD_FOLDER, processed = 3, total = 12, currentName = "x.epub")
+        val scanning = IngestionState.Scanning(
+            ScanTrigger.ADD_FOLDER,
+            processed = 3,
+            total = 12,
+            currentName = "x.epub",
+        )
 
         val state = buildLibraryUiState(Catalog(), scanning, query = "")
 

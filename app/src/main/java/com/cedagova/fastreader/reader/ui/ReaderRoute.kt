@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.reader.ui
 
-import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -12,9 +11,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
@@ -26,10 +25,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cedagova.fastreader.R
-import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.library.PortableReadingPosition
-import com.cedagova.reader.library.sync.RemoteReadingPosition
+import com.cedagova.fastreader.account.library.resumeOfferSettledFor
 import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.external.ExternalOpen
@@ -39,8 +37,8 @@ import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.saf.SafDocumentGateway
 import com.cedagova.fastreader.library.ui.PickPersistableDocuments
 import com.cedagova.fastreader.library.ui.accountBookIdForDevice
-import com.cedagova.fastreader.reader.PlaybackScheduler
 import com.cedagova.fastreader.reader.BookOpenRequest
+import com.cedagova.fastreader.reader.PlaybackScheduler
 import com.cedagova.fastreader.reader.ReaderBooks
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ReaderPosition
@@ -48,11 +46,13 @@ import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ReaderViewModel
 import com.cedagova.fastreader.reader.ResumeOffer
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.RemoteReadingPosition
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlin.math.roundToInt
 
 /**
  * The reader wired to a real book: catalog bytes in, playback out.
@@ -104,6 +104,7 @@ fun ReaderRoute(
     LaunchedEffect(reader, target.openKey) {
         when (target) {
             is ReaderTarget.Library -> reader.openLibraryBook(target.bookId)
+
             is ReaderTarget.External -> reader.open(
                 BookOpenRequest.external(
                     uri = target.open.uri,
@@ -315,11 +316,7 @@ fun ReaderRoute(
  * other's.
  */
 @Composable
-private fun ExternalIdentity(
-    graph: LibraryGraph,
-    external: ExternalOpen?,
-    reader: ReaderViewModel,
-) {
+private fun ExternalIdentity(graph: LibraryGraph, external: ExternalOpen?, reader: ReaderViewModel) {
     LaunchedEffect(reader, external?.uri) {
         val uri = external?.uri ?: return@LaunchedEffect
         // Waits for *this* book's stream, not for "a" stream. A state value read

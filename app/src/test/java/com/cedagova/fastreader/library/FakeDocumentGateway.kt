@@ -14,11 +14,7 @@ import java.io.InputStream
  */
 class FakeDocumentGateway : DocumentGateway {
 
-    class Document(
-        var bytes: ByteArray,
-        var displayName: String,
-        var lastModifiedEpochMs: Long = 1_000,
-    ) {
+    class Document(var bytes: ByteArray, var displayName: String, var lastModifiedEpochMs: Long = 1_000) {
         /** Set to -1 to model a provider that reports no size column. */
         var sizeOverride: Long? = null
 
@@ -84,6 +80,7 @@ class FakeDocumentGateway : DocumentGateway {
 
     override fun lookup(uri: String): DocumentLookup = when {
         isRevoked(uri) -> DocumentLookup.PermissionLost
+
         else -> documents[uri]?.let {
             DocumentLookup.Found(DocumentRef(uri, it.displayName, it.sizeBytes, it.lastModifiedEpochMs))
         } ?: DocumentLookup.Missing
@@ -91,7 +88,9 @@ class FakeDocumentGateway : DocumentGateway {
 
     override fun listEpubs(treeUri: String): FolderListing = when {
         isRevoked(treeUri) -> FolderListing.PermissionLost
+
         treeUri in missingFolders -> FolderListing.Missing
+
         else -> FolderListing.Listed(
             folders[treeUri]
                 .orEmpty()

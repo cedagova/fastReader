@@ -68,8 +68,7 @@ data class Catalog(
     fun folder(id: String): BookFolder? = folders.firstOrNull { it.id == id }
 
     /** Every book this folder currently provides, at any depth beneath it. */
-    fun booksIn(folderId: String): List<Book> =
-        books.filter { book -> book.sources.any { it.folderId == folderId } }
+    fun booksIn(folderId: String): List<Book> = books.filter { book -> book.sources.any { it.folderId == folderId } }
 
     /**
      * The books that would leave the library if this folder were removed — the
@@ -186,6 +185,7 @@ data class BookSource(
 
     /** True when this source is a private copy of an account book (D2, AD-24). */
     val isAccountCopy: Boolean get() = origin == SourceOrigin.ACCOUNT_COPY
+
     /**
      * True when the file looks untouched since it was last inspected, which is
      * what lets a rescan skip re-parsing it. A provider that reports neither a

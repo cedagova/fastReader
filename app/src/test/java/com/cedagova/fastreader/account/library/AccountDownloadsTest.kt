@@ -1,8 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.reader.library.sync.AccountBook
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.AssetDownloadGateway
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.CatalogIngestor
@@ -15,26 +12,29 @@ import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetMethod
+import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 import java.security.MessageDigest
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -167,7 +167,13 @@ class AccountDownloadsTest {
         assertEquals(DownloadProblem.TAMPERED, refused.problem)
         assertFalse("the same asset would arrive the same way", refused.retryable)
         assertNull("nothing may open", downloads.opened.value)
-        assertEquals("and nothing was added to the library", emptyList<String>(), library.catalog.value.books.map { it.id })
+        assertEquals(
+            "and nothing was added to the library",
+            emptyList<String>(),
+            library.catalog.value.books.map {
+                it.id
+            },
+        )
         assertEquals("nor placed in private storage", emptySet<String>(), store.contents())
     }
 
@@ -377,21 +383,18 @@ class AccountDownloadsTest {
         )
     }
 
-    private fun downloads(
-        transport: AssetDownloadGateway,
-        library: LibraryRepository,
-        scope: CoroutineScope,
-    ) = AccountDownloads(
-        copies = AccountBookCopies(
-            gateway = transport,
-            store = store,
-            references = references,
-            library = library,
-            clock = { 1_700_000_000_000 },
-        ),
-        accountState = account,
-        scope = scope,
-    )
+    private fun downloads(transport: AssetDownloadGateway, library: LibraryRepository, scope: CoroutineScope) =
+        AccountDownloads(
+            copies = AccountBookCopies(
+                gateway = transport,
+                store = store,
+                references = references,
+                library = library,
+                clock = { 1_700_000_000_000 },
+            ),
+            accountState = account,
+            scope = scope,
+        )
 
     private fun sha256(value: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(value).joinToString("") { "%02x".format(it) }

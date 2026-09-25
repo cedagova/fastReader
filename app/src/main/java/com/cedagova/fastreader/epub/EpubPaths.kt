@@ -18,7 +18,9 @@ internal object EpubPaths {
         if (cleaned.isEmpty()) return null
         if (cleaned.contains("://")) return null // remote resources are never part of the package
         val base = opfPath.substringBeforeLast('/', missingDelimiterValue = "")
-        val combined = if (cleaned.startsWith('/')) cleaned.removePrefix("/") else {
+        val combined = if (cleaned.startsWith('/')) {
+            cleaned.removePrefix("/")
+        } else {
             if (base.isEmpty()) cleaned else "$base/$cleaned"
         }
         return normalize(combined)

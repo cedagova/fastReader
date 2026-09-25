@@ -8,15 +8,15 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountSyncError
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.IngestionState
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncError
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -363,8 +363,7 @@ class AccountShelfAccessibilityTest {
      * pair of v1.6.0 — would make every assertion here a report about code this
      * leaf does not touch.
      */
-    private fun accountControls() =
-        composeRule.actionableNodes().filter { it.testTag().startsWith("library_account_") }
+    private fun accountControls() = composeRule.actionableNodes().filter { it.testTag().startsWith("library_account_") }
 
     /** What a screen reader reads out for a node whose text is in its children. */
     private fun androidx.compose.ui.semantics.SemanticsNode.spokenText(): String {

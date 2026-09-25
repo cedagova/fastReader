@@ -38,6 +38,5 @@ class FileEpubByteSource(private val file: File) : EpubByteSource {
     override fun open(): InputStream = FileInputStream(file)
 
     @Throws(IOException::class)
-    override fun openChannel(): SeekableByteChannel =
-        Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
+    override fun openChannel(): SeekableByteChannel = Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
 }

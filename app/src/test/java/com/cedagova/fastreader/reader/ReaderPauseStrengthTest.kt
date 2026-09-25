@@ -1,7 +1,7 @@
 package com.cedagova.fastreader.reader
 
-import com.cedagova.fastreader.content.Boundary
 import com.cedagova.fastreader.content.BookContent
+import com.cedagova.fastreader.content.Boundary
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.reader.ui.ReaderUiState

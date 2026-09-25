@@ -24,8 +24,10 @@ val appVersionName = requireNotNull(versionProperties.getProperty("versionName")
 val defaultKeystorePropertiesPath =
     File(System.getProperty("user.home"), ".config/fastreader/signing/keystore.properties")
 val keystorePropertiesPath: File =
-    (providers.gradleProperty("fastreader.keystoreProperties").orNull
-        ?: providers.environmentVariable("FASTREADER_KEYSTORE_PROPERTIES").orNull)
+    (
+        providers.gradleProperty("fastreader.keystoreProperties").orNull
+            ?: providers.environmentVariable("FASTREADER_KEYSTORE_PROPERTIES").orNull
+        )
         ?.let { File(it) }
         ?: defaultKeystorePropertiesPath
 val keystoreProperties: Properties? = keystorePropertiesPath
@@ -69,13 +71,21 @@ android {
         versionCode = appVersionCode
         versionName = appVersionName
 
-        buildConfigField("String", "READER_SUPABASE_URL", "\"${readerValue("reader.supabaseUrl", "READER_SUPABASE_URL")}\"")
+        buildConfigField(
+            "String",
+            "READER_SUPABASE_URL",
+            "\"${readerValue("reader.supabaseUrl", "READER_SUPABASE_URL")}\"",
+        )
         buildConfigField(
             "String",
             "READER_SUPABASE_PUBLISHABLE_KEY",
             "\"${readerValue("reader.supabasePublishableKey", "READER_SUPABASE_PUBLISHABLE_KEY")}\"",
         )
-        buildConfigField("String", "READER_API_BASE_URL", "\"${readerValue("reader.apiBaseUrl", "READER_API_BASE_URL")}\"")
+        buildConfigField(
+            "String",
+            "READER_API_BASE_URL",
+            "\"${readerValue("reader.apiBaseUrl", "READER_API_BASE_URL")}\"",
+        )
     }
 
     signingConfigs {
@@ -87,8 +97,11 @@ android {
                     "$keystorePropertiesPath is missing storeFile"
                 }.trim()
                 storeFile = File(declaredStoreFile).let { declared ->
-                    if (declared.isAbsolute) declared
-                    else File(keystorePropertiesPath.parentFile, declaredStoreFile)
+                    if (declared.isAbsolute) {
+                        declared
+                    } else {
+                        File(keystorePropertiesPath.parentFile, declaredStoreFile)
+                    }
                 }
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")

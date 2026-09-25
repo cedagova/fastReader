@@ -114,7 +114,10 @@ class ReaderAuthClient internal constructor(
         document.mismatch(config)?.let { throw ReaderAuthException.ConfigurationMismatch(it) }
         if (!document.accountEntryAvailable) {
             val entry = document.accountEntry
-            throw ReaderAuthException.SignInUnavailable(entry?.reason ?: "account_entry_${entry?.availability ?: "missing"}", entry?.retryable ?: false)
+            throw ReaderAuthException.SignInUnavailable(
+                entry?.reason ?: "account_entry_${entry?.availability ?: "missing"}",
+                entry?.retryable ?: false,
+            )
         }
         verifiedPreAuth = VerifiedPreAuth(document, document.lifetime(receivedAt))
         document
@@ -151,7 +154,11 @@ class ReaderAuthClient internal constructor(
      * automatically — a wrong or expired code is [ReaderAuthException.ProviderRejected],
      * and a provider 429 is [ReaderAuthException.TryLater].
      */
-    suspend fun verifyEmailCode(email: String, code: String, purpose: EmailCodePurpose = EmailCodePurpose.SIGN_IN): ReaderSessionState.SignedIn {
+    suspend fun verifyEmailCode(
+        email: String,
+        code: String,
+        purpose: EmailCodePurpose = EmailCodePurpose.SIGN_IN,
+    ): ReaderSessionState.SignedIn {
         ensureBootstrapped(SignInMethod.EMAIL_CODE)
         return verify(purpose.otpType, email, code)
     }
@@ -274,7 +281,11 @@ class ReaderAuthClient internal constructor(
     private suspend fun verify(type: OtpType.Email, email: String, code: String): ReaderSessionState.SignedIn {
         val result = refresher.withoutRefresh { provider { auth.verifyEmailOtp(type, email, code) } }
         if (result !is OtpVerifyResult.Authenticated) {
-            throw ReaderAuthException.ProviderRejected(200, "no_session", "the provider verified the code without issuing a session")
+            throw ReaderAuthException.ProviderRejected(
+                200,
+                "no_session",
+                "the provider verified the code without issuing a session",
+            )
         }
         return signedInOrThrow()
     }
@@ -309,15 +320,29 @@ class ReaderAuthClient internal constructor(
     } catch (e: ReaderAuthException) {
         throw e
     } catch (e: AuthWeakPasswordException) {
-        throw ReaderAuthException.ProviderRejected(e.statusCode, e.errorCode?.value ?: e.error, e.reasons.joinToString().ifBlank { e.errorDescription })
+        throw ReaderAuthException.ProviderRejected(
+            e.statusCode,
+            e.errorCode?.value ?: e.error,
+            e.reasons.joinToString().ifBlank {
+                e.errorDescription
+            },
+        )
     } catch (e: AuthRestException) {
         if (e.isTransient()) {
-            throw ReaderAuthException.TryLater(e.statusCode, e.errorCode?.value ?: e.error, ReaderAuthPolicy.retryAfter(e.response.headers[HttpHeaders.RetryAfter]))
+            throw ReaderAuthException.TryLater(
+                e.statusCode,
+                e.errorCode?.value ?: e.error,
+                ReaderAuthPolicy.retryAfter(e.response.headers[HttpHeaders.RetryAfter]),
+            )
         }
         throw ReaderAuthException.ProviderRejected(e.statusCode, e.errorCode?.value ?: e.error, e.errorDescription)
     } catch (e: RestException) {
         if (e.isTransient()) {
-            throw ReaderAuthException.TryLater(e.statusCode, e.error, ReaderAuthPolicy.retryAfter(e.response.headers[HttpHeaders.RetryAfter]))
+            throw ReaderAuthException.TryLater(
+                e.statusCode,
+                e.error,
+                ReaderAuthPolicy.retryAfter(e.response.headers[HttpHeaders.RetryAfter]),
+            )
         }
         throw ReaderAuthException.ProviderRejected(e.statusCode, e.error, e.description ?: e.error)
     } catch (e: IOException) {
@@ -329,7 +354,9 @@ class ReaderAuthClient internal constructor(
 
     private fun SessionStatus.toState(): ReaderSessionState = when (this) {
         is SessionStatus.Initializing -> ReaderSessionState.Initializing
+
         is SessionStatus.NotAuthenticated, is SessionStatus.RefreshFailure -> ReaderSessionState.SignedOut
+
         is SessionStatus.Authenticated -> ReaderSessionState.SignedIn(
             userId = session.user?.id ?: session.subject() ?: "",
             email = session.user?.email,
@@ -359,7 +386,8 @@ class ReaderAuthClient internal constructor(
          */
         fun create(context: Context, config: ReaderAuthConfig): ReaderAuthClient {
             if (!config.isConfigured) throw ReaderAuthException.NotConfigured()
-            val store = FileSessionStore(FileSessionStore.directoryIn(context.applicationContext), KeystoreSessionCipher())
+            val store =
+                FileSessionStore(FileSessionStore.directoryIn(context.applicationContext), KeystoreSessionCipher())
             return build(config, store, OkHttp.create())
         }
 

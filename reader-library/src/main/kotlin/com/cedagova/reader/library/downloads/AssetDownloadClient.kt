@@ -46,9 +46,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * fetched and blessed its own download would be one place to get wrong instead
  * of two to agree.
  */
-class AssetDownloadClient internal constructor(
-    private val http: HttpClient,
-) : Closeable {
+class AssetDownloadClient internal constructor(private val http: HttpClient) : Closeable {
 
     /** The production client: OkHttp, the same engine `:reader-auth` uses, and nothing else. */
     constructor() : this(httpClient(OkHttp.create()))
@@ -184,8 +182,7 @@ class AssetDownloadClient internal constructor(
         private const val MAX_REDIRECTS = 10
 
         /** The client tests drive: the real client over a mock engine, same code path. */
-        fun createForTests(engine: HttpClientEngine): AssetDownloadClient =
-            AssetDownloadClient(httpClient(engine))
+        fun createForTests(engine: HttpClientEngine): AssetDownloadClient = AssetDownloadClient(httpClient(engine))
 
         /**
          * The transport. Its timeouts are deliberately not `:reader-auth`'s 10 s:
@@ -222,10 +219,7 @@ class AssetDownloadClient internal constructor(
  * things about them, and none of them is "show the provider's error text": a
  * provider message can carry a signed URL, so only the status travels.
  */
-sealed class AssetDownloadException(
-    message: String,
-    cause: Throwable? = null,
-) : Exception(message, cause) {
+sealed class AssetDownloadException(message: String, cause: Throwable? = null) : Exception(message, cause) {
 
     /**
      * The grant is spent: the signature expired or the object moved
@@ -233,16 +227,13 @@ sealed class AssetDownloadException(
      * a new attempt, which is exactly what the TTL assumption in the plan says
      * a long download on a phone network will need.
      */
-    class GrantRejected(val status: Int) :
-        AssetDownloadException("the storage grant was rejected ($status)")
+    class GrantRejected(val status: Int) : AssetDownloadException("the storage grant was rejected ($status)")
 
     /** The provider refused outright (for example 416). Retrying the same grant will not help. */
-    class Refused(val status: Int) :
-        AssetDownloadException("the provider refused the download ($status)")
+    class Refused(val status: Int) : AssetDownloadException("the provider refused the download ($status)")
 
     /** The connection failed, stalled, or the provider is unwell. A later attempt may work. */
-    class Unavailable(reason: Throwable) :
-        AssetDownloadException("the download connection failed", reason)
+    class Unavailable(reason: Throwable) : AssetDownloadException("the download connection failed", reason)
 
     /** The provider answered in a way the grant does not allow — a short or over-long body. */
     class Protocol(message: String) : AssetDownloadException(message)

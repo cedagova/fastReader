@@ -200,10 +200,7 @@ data class TimingSettings(
  * - [reorientationPending] — the next token is the first one after a start,
  *   resume, rewind or jump and therefore gets the re-orientation hold.
  */
-data class TimingState(
-    val elapsedPlaybackMillis: Long = 0L,
-    val reorientationPending: Boolean = true,
-) {
+data class TimingState(val elapsedPlaybackMillis: Long = 0L, val reorientationPending: Boolean = true) {
     /**
      * The state after showing a token for [durationMillis].
      *
@@ -211,11 +208,10 @@ data class TimingState(
      * ramp the engine computes and the deadlines the scheduler runs on never
      * diverge.
      */
-    fun afterShowing(durationMillis: Long): TimingState =
-        TimingState(
-            elapsedPlaybackMillis = elapsedPlaybackMillis + durationMillis.coerceAtLeast(0L),
-            reorientationPending = false,
-        )
+    fun afterShowing(durationMillis: Long): TimingState = TimingState(
+        elapsedPlaybackMillis = elapsedPlaybackMillis + durationMillis.coerceAtLeast(0L),
+        reorientationPending = false,
+    )
 
     /**
      * Re-arm the re-orientation hold without restarting the ramp — a rewind,

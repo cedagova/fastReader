@@ -107,6 +107,5 @@ class DeviceBookSources(private val gateway: DocumentGateway) {
         return runCatching { gateway.openSeekable(uri)?.use { it.size() } }.getOrNull()?.takeIf { it > 0 }
     }
 
-    private fun unavailable(problem: PublicationSourceProblem) =
-        PublicationSourceResult.Unavailable(problem)
+    private fun unavailable(problem: PublicationSourceProblem) = PublicationSourceResult.Unavailable(problem)
 }

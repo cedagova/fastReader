@@ -1,9 +1,9 @@
 package com.cedagova.fastreader.reader
 
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
 
 /**
  * The smoothness guardrail, as arithmetic.

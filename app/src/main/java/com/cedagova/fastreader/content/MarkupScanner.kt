@@ -51,18 +51,13 @@ internal fun String.collapseSpaces(): String {
 
 internal sealed interface MarkupEvent {
 
-    data class Open(
-        val name: String,
-        val attributes: Map<String, String>,
-        val selfClosing: Boolean,
-    ) : MarkupEvent {
+    data class Open(val name: String, val attributes: Map<String, String>, val selfClosing: Boolean) : MarkupEvent {
         fun attribute(name: String): String? = attributes[name.lowercase()]
 
         /** `epub:type`, `class` and friends are space-separated token lists. */
-        fun hasToken(attribute: String, token: String): Boolean =
-            attribute(attribute)
-                ?.split(' ', '\t', '\n', '\r')
-                ?.any { it.equals(token, ignoreCase = true) } == true
+        fun hasToken(attribute: String, token: String): Boolean = attribute(attribute)
+            ?.split(' ', '\t', '\n', '\r')
+            ?.any { it.equals(token, ignoreCase = true) } == true
     }
 
     data class Close(val name: String) : MarkupEvent

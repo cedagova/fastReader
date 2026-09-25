@@ -23,7 +23,10 @@ class RefreshPolicyTest {
     private val waiter = RecordingWaiter()
     private val servers = FakeServers()
 
-    private suspend fun clientWith(session: io.github.jan.supabase.auth.user.UserSession?, store: InMemorySessionStore = InMemorySessionStore(session)): Pair<ReaderAuthClient, InMemorySessionStore> {
+    private suspend fun clientWith(
+        session: io.github.jan.supabase.auth.user.UserSession?,
+        store: InMemorySessionStore = InMemorySessionStore(session),
+    ): Pair<ReaderAuthClient, InMemorySessionStore> {
         val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter)
         client.awaitReady()
         return client to store

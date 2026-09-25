@@ -32,7 +32,6 @@ import org.robolectric.annotation.Config
  * image.
  */
 @RunWith(AndroidJUnit4::class)
-
 @Config(sdk = [35], qualifiers = "w411dp-h914dp-xxhdpi")
 class ReaderExternalNoticeTest {
 

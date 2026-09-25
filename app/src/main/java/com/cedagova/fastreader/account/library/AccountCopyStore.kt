@@ -176,8 +176,7 @@ class AccountCopyStore(private val directory: File) {
     }
 
     /** Lowercase hex without the contract's optional `sha256:` prefix. */
-    private fun normalise(contentSha256: String): String =
-        contentSha256.removePrefix(SHA256_PREFIX).lowercase()
+    private fun normalise(contentSha256: String): String = contentSha256.removePrefix(SHA256_PREFIX).lowercase()
 
     /**
      * A throwable from [write] or from the filesystem, as one of the two

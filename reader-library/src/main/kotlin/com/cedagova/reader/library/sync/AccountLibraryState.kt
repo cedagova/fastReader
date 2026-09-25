@@ -67,12 +67,8 @@ sealed interface AccountSyncError {
     data object NetworkUnavailable : AccountSyncError
 
     /** The backend asked for a retry later; [retryAfterSeconds] is its own hint when it gave one. */
-    data class TryLater(
-        val status: Int,
-        val code: String?,
-        val retryAfterSeconds: Long?,
-        val requestId: String?,
-    ) : AccountSyncError
+    data class TryLater(val status: Int, val code: String?, val retryAfterSeconds: Long?, val requestId: String?) :
+        AccountSyncError
 
     /** The session is gone; D4's signed-out state, with the backend's reason shown once. */
     data class SessionGone(val code: String?, val requestId: String?) : AccountSyncError
@@ -81,23 +77,15 @@ sealed interface AccountSyncError {
     data class Forbidden(val code: String?, val requestId: String?) : AccountSyncError
 
     /** Anything else the backend answered, including a body that does not match the pinned contract. */
-    data class ApiError(
-        val status: Int,
-        val code: String?,
-        val requestId: String?,
-        val description: String?,
-    ) : AccountSyncError
+    data class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String?) :
+        AccountSyncError
 
     /**
      * The backend refused one queued mutation outright. [code] is the
      * contract's own rejection code — surfaced, never re-interpreted.
      */
-    data class Rejected(
-        val resourceId: String,
-        val code: String,
-        val detail: String,
-        val retryable: Boolean,
-    ) : AccountSyncError
+    data class Rejected(val resourceId: String, val code: String, val detail: String, val retryable: Boolean) :
+        AccountSyncError
 
     /** The stored account document cannot be used, and must not be overwritten. */
     data class StoreBlocked(val message: String) : AccountSyncError
@@ -120,11 +108,8 @@ sealed interface AccountSyncError {
      * It is not a sign-out, not a rejection and not retryable. The position is
      * simply not adopted, and the rest of the stream is read as normal.
      */
-    data class UnrecognizedProgressRecord(
-        val resourceId: String,
-        val payloadBookId: String?,
-        val reason: String,
-    ) : AccountSyncError
+    data class UnrecognizedProgressRecord(val resourceId: String, val payloadBookId: String?, val reason: String) :
+        AccountSyncError
 
     /** The build carries no stage values, so there is nothing to call. */
     data object NotConfigured : AccountSyncError
@@ -162,6 +147,7 @@ data class AccountLibraryState(
  */
 internal fun ReaderAuthException.toSyncError(): AccountSyncError = when (this) {
     is ReaderAuthException.NotConfigured -> AccountSyncError.NotConfigured
+
     is ReaderAuthException.ConfigurationMismatch ->
         AccountSyncError.ApiError(status = 0, code = null, requestId = null, description = reason)
 
@@ -169,20 +155,34 @@ internal fun ReaderAuthException.toSyncError(): AccountSyncError = when (this) {
         AccountSyncError.ApiError(status = 0, code = reason, requestId = null, description = message.orEmpty())
 
     is ReaderAuthException.NetworkUnavailable -> AccountSyncError.NetworkUnavailable
+
     is ReaderAuthException.TryLater ->
         AccountSyncError.TryLater(status, code, retryAfter?.inWholeSeconds, requestId)
 
     is ReaderAuthException.SignedOut -> AccountSyncError.SessionGone(code, requestId)
+
     is ReaderAuthException.Forbidden -> AccountSyncError.Forbidden(code, requestId)
+
     is ReaderAuthException.ProviderRejected ->
         AccountSyncError.ApiError(status = status, code = code, requestId = null, description = description)
 
     is ReaderAuthException.ApiError -> AccountSyncError.ApiError(status, code, requestId, description)
+
     is ReaderAuthException.StorageUnavailable ->
-        AccountSyncError.ApiError(status = 0, code = STORAGE_UNAVAILABLE, requestId = null, description = message.orEmpty())
+        AccountSyncError.ApiError(
+            status = 0,
+            code = STORAGE_UNAVAILABLE,
+            requestId = null,
+            description = message.orEmpty(),
+        )
 
     is ReaderAuthException.UnexpectedResponse ->
-        AccountSyncError.ApiError(status = 0, code = UNEXPECTED_RESPONSE, requestId = null, description = message.orEmpty())
+        AccountSyncError.ApiError(
+            status = 0,
+            code = UNEXPECTED_RESPONSE,
+            requestId = null,
+            description = message.orEmpty(),
+        )
 }
 
 /** The code a sync error carries when `:reader-auth` could not save a refreshed session (#154); the next sync repeats without a new refresh. */
@@ -192,10 +192,9 @@ internal const val STORAGE_UNAVAILABLE: String = "storage_unavailable"
 internal const val UNEXPECTED_RESPONSE: String = "unexpected_response"
 
 /** The rejection the contract declares, as the error the shelf shows. */
-internal fun ReaderSyncRejection.toSyncError(resourceId: String): AccountSyncError.Rejected =
-    AccountSyncError.Rejected(
-        resourceId = resourceId,
-        code = code.wireName(),
-        detail = detail,
-        retryable = retryable,
-    )
+internal fun ReaderSyncRejection.toSyncError(resourceId: String): AccountSyncError.Rejected = AccountSyncError.Rejected(
+    resourceId = resourceId,
+    code = code.wireName(),
+    detail = detail,
+    retryable = retryable,
+)

@@ -183,10 +183,9 @@ class FileAccountLibraryStores(
 
     private fun fileName(userId: String): String = PREFIX + sha256Hex(userId) + SUFFIX
 
-    private fun sha256Hex(value: String): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString(separator = "") { byte -> "%02x".format(byte) }
+    private fun sha256Hex(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .joinToString(separator = "") { byte -> "%02x".format(byte) }
 
     companion object {
         /** The directory name under `filesDir`, beside the catalog's own. */

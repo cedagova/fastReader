@@ -136,8 +136,11 @@ fun ReaderAccountScreen(
                 // routing is blank: the stored session is one small file read,
                 // and "signed out" for a frame would be a false statement.
                 ReaderAccountState.Loading -> Unit
+
                 is ReaderAccountState.NotConfigured -> NotConfigured(state)
+
                 is ReaderAccountState.SignedOut -> SignedOut(state, actions)
+
                 is ReaderAccountState.SignedIn -> SignedIn(state, actions)
             }
             Spacer(Modifier.height(24.dp))
@@ -259,7 +262,13 @@ private fun SignedIn(state: ReaderAccountState.SignedIn, actions: ReaderAccountA
     Summary(stringResource(R.string.account_capabilities_summary))
     PrimaryAction(
         label = stringResource(
-            if (state.capabilities == null) R.string.account_capabilities_show else R.string.account_capabilities_refresh,
+            if (state.capabilities ==
+                null
+            ) {
+                R.string.account_capabilities_show
+            } else {
+                R.string.account_capabilities_refresh
+            },
         ),
         enabled = idle,
         onClick = actions::loadCapabilities,
@@ -279,7 +288,10 @@ private fun SignedIn(state: ReaderAccountState.SignedIn, actions: ReaderAccountA
     SecondaryAction(
         label = stringResource(R.string.account_set_password),
         enabled = idle && newPassword.isNotEmpty(),
-        onClick = { actions.setPassword(newPassword); newPassword = "" },
+        onClick = {
+            actions.setPassword(newPassword)
+            newPassword = ""
+        },
         tag = "account_set_password",
     )
 
@@ -381,48 +393,71 @@ private fun ActivityAndOutcome(state: ReaderAccountState, actions: ReaderAccount
 @Composable
 internal fun describe(outcome: AccountOutcome): String = when (outcome) {
     AccountOutcome.CodeSent -> stringResource(R.string.account_outcome_code_sent)
+
     AccountOutcome.RecoveryCodeSent -> stringResource(R.string.account_outcome_recovery_sent)
+
     AccountOutcome.PasswordSet -> stringResource(R.string.account_outcome_password_set)
+
     AccountOutcome.SignedOutLocally -> stringResource(R.string.account_outcome_signed_out)
+
     AccountOutcome.OtherDevicesSignedOut -> stringResource(R.string.account_outcome_others_signed_out)
+
     is AccountOutcome.ProviderRejected -> stringResource(
         R.string.account_outcome_provider_rejected,
         details(http = outcome.status, code = outcome.code),
         outcome.description,
     )
+
     is AccountOutcome.TryLater -> stringResource(
         R.string.account_outcome_try_later,
-        details(http = outcome.status, code = outcome.code, retryAfterSeconds = outcome.retryAfterSeconds, requestId = outcome.requestId),
+        details(
+            http = outcome.status,
+            code = outcome.code,
+            retryAfterSeconds = outcome.retryAfterSeconds,
+            requestId = outcome.requestId,
+        ),
     )
+
     AccountOutcome.NetworkUnavailable -> stringResource(R.string.account_outcome_network)
+
     is AccountOutcome.ConfigurationMismatch -> stringResource(R.string.account_outcome_mismatch, outcome.reason)
+
     is AccountOutcome.SignInUnavailable -> stringResource(R.string.account_outcome_sign_in_unavailable, outcome.reason)
+
     is AccountOutcome.SessionGone -> stringResource(
         R.string.account_outcome_session_gone,
         details(code = outcome.code, requestId = outcome.requestId),
     )
+
     is AccountOutcome.Forbidden -> stringResource(
         R.string.account_outcome_forbidden,
         details(code = outcome.code, requestId = outcome.requestId),
     )
+
     is AccountOutcome.ApiError -> stringResource(
         R.string.account_outcome_api_error,
         details(http = outcome.status, code = outcome.code, requestId = outcome.requestId),
         outcome.description,
     )
+
     AccountOutcome.StorageUnavailable -> stringResource(R.string.account_outcome_storage_unavailable)
+
     AccountOutcome.UnexpectedResponse -> stringResource(R.string.account_outcome_unexpected_response)
 }
 
 /** `HTTP 400 · invalid_credentials · request id …`: only the parts the library reported, in a fixed order. */
 @Composable
-private fun details(http: Int? = null, code: String? = null, retryAfterSeconds: Long? = null, requestId: String? = null): String =
-    listOfNotNull(
-        http?.let { stringResource(R.string.account_detail_http, it) },
-        code,
-        retryAfterSeconds?.let { stringResource(R.string.account_detail_retry_after, it) },
-        requestId?.let { stringResource(R.string.account_detail_request_id, it) },
-    ).joinToString(" · ").ifEmpty { "—" }
+private fun details(
+    http: Int? = null,
+    code: String? = null,
+    retryAfterSeconds: Long? = null,
+    requestId: String? = null,
+): String = listOfNotNull(
+    http?.let { stringResource(R.string.account_detail_http, it) },
+    code,
+    retryAfterSeconds?.let { stringResource(R.string.account_detail_retry_after, it) },
+    requestId?.let { stringResource(R.string.account_detail_request_id, it) },
+).joinToString(" · ").ifEmpty { "—" }
 
 private fun AccountOutcome.isFailure(): Boolean = when (this) {
     AccountOutcome.CodeSent,
@@ -431,6 +466,7 @@ private fun AccountOutcome.isFailure(): Boolean = when (this) {
     AccountOutcome.SignedOutLocally,
     AccountOutcome.OtherDevicesSignedOut,
     -> false
+
     else -> true
 }
 
@@ -502,7 +538,13 @@ private fun SecondaryAction(label: String, enabled: Boolean, onClick: () -> Unit
  * to a screen reader without a description of its own.
  */
 @Composable
-private fun PasswordField(value: String, onValueChange: (String) -> Unit, label: String, enabled: Boolean, tag: String) {
+private fun PasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    enabled: Boolean,
+    tag: String,
+) {
     var revealed by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
@@ -530,7 +572,13 @@ private fun PasswordField(value: String, onValueChange: (String) -> Unit, label:
  * state, the same treatment the settings switches get.
  */
 @Composable
-private fun CheckboxRow(label: String, checked: Boolean, enabled: Boolean, onCheckedChange: (Boolean) -> Unit, tag: String) {
+private fun CheckboxRow(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    tag: String,
+) {
     val state = stringResource(if (checked) R.string.settings_on else R.string.settings_off)
     Row(
         modifier = Modifier
@@ -544,7 +592,13 @@ private fun CheckboxRow(label: String, checked: Boolean, enabled: Boolean, onChe
             .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled, modifier = Modifier.clearAndSetSemantics {})
+        Checkbox(
+            checked = checked,
+            onCheckedChange = null,
+            enabled = enabled,
+            modifier = Modifier.clearAndSetSemantics {
+            },
+        )
         Spacer(Modifier.width(8.dp))
         Text(text = label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clearAndSetSemantics {})
     }

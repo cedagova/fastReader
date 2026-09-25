@@ -104,8 +104,7 @@ internal object EpubArchives {
         return ArchiveOpen.Opened(StreamingArchive(source))
     }
 
-    private fun Exception.readableMessage(): String =
-        message?.takeIf { it.isNotBlank() } ?: this::class.java.simpleName
+    private fun Exception.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: this::class.java.simpleName
 }
 
 private class DirectoryArchive(private val directory: ZipDirectory) : EpubArchive {

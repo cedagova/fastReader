@@ -12,9 +12,7 @@ import kotlinx.serialization.json.JsonObject
  * from a 422.
  */
 @Serializable
-data class ReaderSyncMutationBatchRequest(
-    @SerialName("mutations") val mutations: List<ReaderSyncMutationEnvelope>,
-) {
+data class ReaderSyncMutationBatchRequest(@SerialName("mutations") val mutations: List<ReaderSyncMutationEnvelope>) {
     companion object {
         const val MIN_MUTATIONS: Int = 1
         const val MAX_MUTATIONS: Int = 50
@@ -139,7 +137,9 @@ data class ReaderSyncRejection(
 data class ReaderPublicationMembershipOutcome(
     @SerialName("state") val state: ReaderMembershipState = ReaderMembershipState.UNKNOWN,
     @SerialName("action") val action: ReaderMembershipAction = ReaderMembershipAction.UNKNOWN,
-    @SerialName("open_session_behavior") val openSessionBehavior: ReaderOpenSessionBehavior = ReaderOpenSessionBehavior.UNKNOWN,
+    @SerialName(
+        "open_session_behavior",
+    ) val openSessionBehavior: ReaderOpenSessionBehavior = ReaderOpenSessionBehavior.UNKNOWN,
     @SerialName("reopen_allowed") val reopenAllowed: Boolean,
     @SerialName("identity_restored") val identityRestored: Boolean = false,
     @SerialName("undo_available") val undoAvailable: Boolean = false,

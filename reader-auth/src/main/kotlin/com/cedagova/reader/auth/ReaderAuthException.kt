@@ -35,7 +35,9 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
     /** The network was unreachable or the request timed out; nothing was cleared. */
     class NetworkUnavailable(cause: Throwable) :
         ReaderAuthException("network unavailable: ${cause.javaClass.simpleName}") {
-        init { initCause(cause) }
+        init {
+            initCause(cause)
+        }
     }
 
     /**
@@ -78,7 +80,9 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      */
     class StorageUnavailable(cause: Throwable) :
         ReaderAuthException("the session could not be saved on this device: ${cause.javaClass.simpleName}") {
-        init { initCause(cause) }
+        init {
+            initCause(cause)
+        }
     }
 
     /**
@@ -92,7 +96,9 @@ sealed class ReaderAuthException(message: String) : Exception(message) {
      */
     class UnexpectedResponse(cause: Throwable) :
         ReaderAuthException("unexpected answer from the identity provider: ${cause.javaClass.simpleName}") {
-        init { initCause(cause) }
+        init {
+            initCause(cause)
+        }
     }
 
     /** reader-api 403: the caller is authenticated but not allowed; the session is intact. */

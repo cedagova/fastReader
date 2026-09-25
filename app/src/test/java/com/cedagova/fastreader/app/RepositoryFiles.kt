@@ -21,7 +21,6 @@ internal fun repositoryRoot(): File {
     error("no version.properties above ${File("").absoluteFile}")
 }
 
-internal fun repositoryFile(path: String): File =
-    File(repositoryRoot(), path).also {
-        check(it.isFile) { "$path is missing from ${repositoryRoot()}" }
-    }
+internal fun repositoryFile(path: String): File = File(repositoryRoot(), path).also {
+    check(it.isFile) { "$path is missing from ${repositoryRoot()}" }
+}

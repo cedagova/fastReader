@@ -12,10 +12,7 @@ import org.gradle.kotlin.dsl.configure
  * spotlessApply` rewrites the files in place. The rules and their few
  * repository choices live in the root `.editorconfig`, which editors read too.
  */
-internal fun Project.configureKotlinFormatting(
-    kotlinSources: List<String>,
-    gradleScripts: List<String>,
-) {
+internal fun Project.configureKotlinFormatting(kotlinSources: List<String>, gradleScripts: List<String>) {
     apply<SpotlessPlugin>()
     val ktlintVersion = libs.version("ktlint")
     val editorConfig = rootProject.file(".editorconfig")

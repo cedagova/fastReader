@@ -138,7 +138,9 @@ fun capabilitiesBody(syncEntry: String?) = """
   "compatibility": {"status": "compatible", "requestedVersion": "1.0.0", "minimumVersion": "1.0.0", "supportedMajor": 1},
   "capabilities": [
     {"key": "reader.ai-quota.v1", "availability": "available", "reason": "available",
-     "quota": {"limit": 100, "used": 3, "remaining": 97, "resetsAt": "2026-09-15T00:00:00Z"}}${syncEntry?.let { ",\n    $it" } ?: ""}
+     "quota": {"limit": 100, "used": 3, "remaining": 97, "resetsAt": "2026-09-15T00:00:00Z"}}${syncEntry?.let {
+    ",\n    $it"
+} ?: ""}
   ]
 }
 """.trimIndent()

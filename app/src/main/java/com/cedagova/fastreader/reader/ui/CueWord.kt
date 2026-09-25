@@ -65,11 +65,7 @@ import com.cedagova.fastreader.settings.PivotColor
  * frame path.
  */
 @Composable
-fun CueWord(
-    token: ReaderWord,
-    cues: CueSettings = CueSettings(),
-    modifier: Modifier = Modifier,
-) {
+fun CueWord(token: ReaderWord, cues: CueSettings = CueSettings(), modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val markColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -195,13 +191,7 @@ fun CueWord(
  * same pixels on every frame of a running stream and add no per-word change to
  * the AD-6 static-luminance surface.
  */
-private fun DrawScope.drawGuideMarks(
-    alignX: Float,
-    railY: Float,
-    railWidth: Float,
-    color: Color,
-    density: Float,
-) {
+private fun DrawScope.drawGuideMarks(alignX: Float, railY: Float, railWidth: Float, color: Color, density: Float) {
     val railThickness = 1f * density
     val railStart = (alignX - railWidth / 2f).coerceAtLeast(0f)
     val railEnd = (alignX + railWidth / 2f).coerceAtMost(size.width)
@@ -273,18 +263,14 @@ private fun fitToSpace(
     return FittedWord(layout, anchor)
 }
 
-private fun measure(
-    measurer: TextMeasurer,
-    text: AnnotatedString,
-    style: TextStyle,
-    sizeSp: Float,
-): TextLayoutResult = measurer.measure(
-    text = text,
-    style = style.copy(fontSize = sizeSp.sp),
-    softWrap = false,
-    maxLines = 1,
-    constraints = Constraints(),
-)
+private fun measure(measurer: TextMeasurer, text: AnnotatedString, style: TextStyle, sizeSp: Float): TextLayoutResult =
+    measurer.measure(
+        text = text,
+        style = style.copy(fontSize = sizeSp.sp),
+        softWrap = false,
+        maxLines = 1,
+        constraints = Constraints(),
+    )
 
 /** Where the alignment column falls inside the drawn word: the anchor glyph's centre. */
 private fun anchorIn(layout: TextLayoutResult, pivotOffset: Int?): Float {

@@ -33,8 +33,7 @@ internal fun ComposeContentTestRule.allNodes(): List<SemanticsNode> {
     return out
 }
 
-internal fun SemanticsNode.testTag(): String =
-    config.getOrElseNullable(SemanticsProperties.TestTag) { null }.orEmpty()
+internal fun SemanticsNode.testTag(): String = config.getOrElseNullable(SemanticsProperties.TestTag) { null }.orEmpty()
 
 /** What a screen reader would say: the description if there is one, else the text. */
 internal fun SemanticsNode.label(): String {

@@ -13,11 +13,7 @@ import com.cedagova.fastreader.account.ReaderAccountController
  * where this surface was opened from and which stays underneath it.
  */
 @Composable
-fun ReaderAccountRoute(
-    controller: ReaderAccountController,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun ReaderAccountRoute(controller: ReaderAccountController, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val state by controller.state.collectAsState()
     BackHandler(onBack = onBack)
     ReaderAccountScreen(

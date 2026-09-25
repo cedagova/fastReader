@@ -18,10 +18,10 @@ import com.cedagova.reader.library.model.PublicationImportAdmissionResponse
 import com.cedagova.reader.library.model.PublicationImportPolicyResponse
 import com.cedagova.reader.library.model.PublicationImportResponse
 import com.cedagova.reader.library.model.ReaderAssetGrantResponse
-import com.cedagova.reader.library.model.ReaderLibraryResponse
-import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderCapabilityAvailability
 import com.cedagova.reader.library.model.ReaderCapabilityReason
+import com.cedagova.reader.library.model.ReaderLibraryResponse
+import com.cedagova.reader.library.model.ReaderProgressListResponse
 import com.cedagova.reader.library.model.ReaderPublicationImportCapability
 import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
@@ -194,12 +194,14 @@ private object UnusedOperations : ReaderLibraryOperations {
 
     override suspend fun library(): ReaderLibraryResponse = nope()
     override suspend fun progress(): ReaderProgressListResponse = nope()
-    override suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse = nope()
+    override suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse =
+        nope()
     override suspend fun deltas(afterCursor: String, limit: Int): ReaderSyncDeltaResponse = nope()
     override suspend fun syncCapability(): ReaderSyncCapability = nope()
     override suspend fun publicationImportCapability(): ReaderPublicationImportCapability = nope()
     override suspend fun importPolicy(): PublicationImportPolicyResponse = nope()
-    override suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse = nope()
+    override suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse =
+        nope()
     override suspend fun importRecord(importId: String): PublicationImportResponse = nope()
     override suspend fun completeImport(importId: String): PublicationImportResponse = nope()
     override suspend fun cancelImport(importId: String, reason: String): PublicationImportResponse = nope()

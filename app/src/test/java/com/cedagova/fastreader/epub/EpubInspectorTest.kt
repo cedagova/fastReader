@@ -10,8 +10,7 @@ import org.junit.Test
 
 class EpubInspectorTest {
 
-    private fun inspect(bytes: ByteArray): EpubInspection =
-        EpubInspector.inspect { ByteArrayInputStream(bytes) }
+    private fun inspect(bytes: ByteArray): EpubInspection = EpubInspector.inspect { ByteArrayInputStream(bytes) }
 
     @Test
     fun `reads English metadata and cover`() {

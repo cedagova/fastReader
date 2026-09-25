@@ -29,18 +29,41 @@ import kotlinx.serialization.Serializable
 /** `PublicationFormat`: every source format the backend routes. */
 @Serializable
 enum class PublicationFormat {
-    @SerialName("epub") EPUB,
-    @SerialName("pdf") PDF,
-    @SerialName("txt") TXT,
-    @SerialName("mobi") MOBI,
-    @SerialName("azw") AZW,
-    @SerialName("azw3") AZW3,
-    @SerialName("docx") DOCX,
-    @SerialName("fb2") FB2,
-    @SerialName("md") MD,
-    @SerialName("html") HTML,
-    @SerialName("mhtml") MHTML,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("epub")
+    EPUB,
+
+    @SerialName("pdf")
+    PDF,
+
+    @SerialName("txt")
+    TXT,
+
+    @SerialName("mobi")
+    MOBI,
+
+    @SerialName("azw")
+    AZW,
+
+    @SerialName("azw3")
+    AZW3,
+
+    @SerialName("docx")
+    DOCX,
+
+    @SerialName("fb2")
+    FB2,
+
+    @SerialName("md")
+    MD,
+
+    @SerialName("html")
+    HTML,
+
+    @SerialName("mhtml")
+    MHTML,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -51,17 +74,40 @@ enum class PublicationFormat {
  */
 @Serializable
 enum class PublicationImportStatus {
-    @SerialName("pending_upload") PENDING_UPLOAD,
-    @SerialName("verifying_upload") VERIFYING_UPLOAD,
-    @SerialName("queued") QUEUED,
-    @SerialName("processing") PROCESSING,
-    @SerialName("ready") READY,
-    @SerialName("failed") FAILED,
-    @SerialName("cancel_requested") CANCEL_REQUESTED,
-    @SerialName("cancelled") CANCELLED,
-    @SerialName("deleting") DELETING,
-    @SerialName("deleted") DELETED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN;
+    @SerialName("pending_upload")
+    PENDING_UPLOAD,
+
+    @SerialName("verifying_upload")
+    VERIFYING_UPLOAD,
+
+    @SerialName("queued")
+    QUEUED,
+
+    @SerialName("processing")
+    PROCESSING,
+
+    @SerialName("ready")
+    READY,
+
+    @SerialName("failed")
+    FAILED,
+
+    @SerialName("cancel_requested")
+    CANCEL_REQUESTED,
+
+    @SerialName("cancelled")
+    CANCELLED,
+
+    @SerialName("deleting")
+    DELETING,
+
+    @SerialName("deleted")
+    DELETED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
+
+    ;
 
     /** True once the backend will not move this import again on its own. */
     val isTerminal: Boolean
@@ -77,49 +123,90 @@ enum class PublicationImportStatus {
  */
 @Serializable
 enum class PublicationFailureCategory {
-    @SerialName("unsupported") UNSUPPORTED,
-    @SerialName("protected") PROTECTED,
-    @SerialName("unsafe") UNSAFE,
-    @SerialName("too_large") TOO_LARGE,
-    @SerialName("malformed") MALFORMED,
-    @SerialName("upload") UPLOAD,
-    @SerialName("conversion") CONVERSION,
-    @SerialName("cancelled") CANCELLED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("unsupported")
+    UNSUPPORTED,
+
+    @SerialName("protected")
+    PROTECTED,
+
+    @SerialName("unsafe")
+    UNSAFE,
+
+    @SerialName("too_large")
+    TOO_LARGE,
+
+    @SerialName("malformed")
+    MALFORMED,
+
+    @SerialName("upload")
+    UPLOAD,
+
+    @SerialName("conversion")
+    CONVERSION,
+
+    @SerialName("cancelled")
+    CANCELLED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationFormatPolicy.account_admission`: what account admission costs for a format. */
 @Serializable
 enum class PublicationAccountAdmission {
-    @SerialName("upload_only") UPLOAD_ONLY,
-    @SerialName("upload_and_conversion") UPLOAD_AND_CONVERSION,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("upload_only")
+    UPLOAD_ONLY,
+
+    @SerialName("upload_and_conversion")
+    UPLOAD_AND_CONVERSION,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationFormatPolicy.device_renderability`. */
 @Serializable
 enum class PublicationDeviceRenderability {
-    @SerialName("device_native") DEVICE_NATIVE,
-    @SerialName("reader_conversion_required") READER_CONVERSION_REQUIRED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("device_native")
+    DEVICE_NATIVE,
+
+    @SerialName("reader_conversion_required")
+    READER_CONVERSION_REQUIRED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationPromotion.account_admission`: how far the promotion has got. */
 @Serializable
 enum class PublicationPromotionAdmission {
-    @SerialName("pending") PENDING,
-    @SerialName("admitted") ADMITTED,
-    @SerialName("failed") FAILED,
-    @SerialName("cancelled") CANCELLED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("pending")
+    PENDING,
+
+    @SerialName("admitted")
+    ADMITTED,
+
+    @SerialName("failed")
+    FAILED,
+
+    @SerialName("cancelled")
+    CANCELLED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `PublicationPromotion.activity_continuity`. */
 @Serializable
 enum class PublicationActivityContinuity {
-    @SerialName("wait_for_admission") WAIT_FOR_ADMISSION,
-    @SerialName("replay_to_admitted_identity") REPLAY_TO_ADMITTED_IDENTITY,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("wait_for_admission")
+    WAIT_FOR_ADMISSION,
+
+    @SerialName("replay_to_admitted_identity")
+    REPLAY_TO_ADMITTED_IDENTITY,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -159,9 +246,7 @@ data class CreatePublicationImportRequest(
 
 /** `POST /reader/v1/imports/{id}/cancel` — the cancel body. */
 @Serializable
-data class CancelPublicationImportRequest(
-    @SerialName("reason") val reason: String = DEFAULT_REASON,
-) {
+data class CancelPublicationImportRequest(@SerialName("reason") val reason: String = DEFAULT_REASON) {
     companion object {
         /** The document's own default, and the only reason this module sends. */
         const val DEFAULT_REASON: String = "cancelled_by_actor"
@@ -297,8 +382,12 @@ data class PublicationImport(
 /** The promotion half of a record: device-only source, account-library destination. */
 @Serializable
 data class PublicationPromotion(
-    @SerialName("account_admission") val accountAdmission: PublicationPromotionAdmission = PublicationPromotionAdmission.UNKNOWN,
-    @SerialName("activity_continuity") val activityContinuity: PublicationActivityContinuity = PublicationActivityContinuity.UNKNOWN,
+    @SerialName(
+        "account_admission",
+    ) val accountAdmission: PublicationPromotionAdmission = PublicationPromotionAdmission.UNKNOWN,
+    @SerialName(
+        "activity_continuity",
+    ) val activityContinuity: PublicationActivityContinuity = PublicationActivityContinuity.UNKNOWN,
     /** Only ever present once `account_admission` is `admitted`. */
     @SerialName("account_book_id") val accountBookId: String? = null,
     @SerialName("source") val source: String = SOURCE_DEVICE_ONLY,

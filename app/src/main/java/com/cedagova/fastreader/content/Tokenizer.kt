@@ -45,11 +45,7 @@ internal object Tokenizer {
      * Splits [blocks] into tokens, continuing the counters in [state] so every
      * spine item of a book contributes to one stream.
      */
-    fun tokenize(
-        blocks: List<ContentBlock>,
-        chapterIndex: Int,
-        state: StreamState,
-    ): List<Token> {
+    fun tokenize(blocks: List<ContentBlock>, chapterIndex: Int, state: StreamState): List<Token> {
         val tokens = ArrayList<Token>()
         for (block in blocks) {
             when (block) {
@@ -254,11 +250,10 @@ internal object Tokenizer {
     }
 
     /** True for the `.` in `3.5` and the `,` in `3,5`, and for nothing else. */
-    private fun isInteriorDigitSeparator(text: String, position: Int): Boolean =
-        text[position] in DIGIT_SEPARATORS &&
-            position > 0 &&
-            text[position - 1].isDigit() &&
-            text.getOrNull(position + 1)?.isDigit() == true
+    private fun isInteriorDigitSeparator(text: String, position: Int): Boolean = text[position] in DIGIT_SEPARATORS &&
+        position > 0 &&
+        text[position - 1].isDigit() &&
+        text.getOrNull(position + 1)?.isDigit() == true
 
     private fun nextVisibleIsDigit(text: String, from: Int): Boolean {
         var index = from
@@ -288,9 +283,5 @@ internal object Tokenizer {
      * Paragraph and sentence ordinals are global, so LEAF203's "back one sentence"
      * keeps working across a chapter boundary with no extra lookup.
      */
-    class StreamState(
-        var nextIndex: Int = 0,
-        var paragraphIndex: Int = -1,
-        var sentenceIndex: Int = -1,
-    )
+    class StreamState(var nextIndex: Int = 0, var paragraphIndex: Int = -1, var sentenceIndex: Int = -1)
 }

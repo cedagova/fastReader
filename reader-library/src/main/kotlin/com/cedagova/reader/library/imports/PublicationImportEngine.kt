@@ -280,6 +280,7 @@ class PublicationImportEngine(
         cause: PublicationTransferException,
     ): PublicationImportRecord = when {
         cause.provesLocationGone() -> record.withoutTransfer()
+
         // A first attempt has no location, so this preserves nothing and the
         // next attempt creates one, exactly as it would have.
         else -> record.copy(grantExpiresAt = locationGrantExpiresAt)
@@ -310,6 +311,7 @@ class PublicationImportEngine(
                 record.copy(failureCategory = PublicationFailureCategory.UPLOAD, failureRetryable = false),
                 PublicationFailureCategory.UPLOAD,
             )
+
         else -> PublicationImportStep.Interrupted(record, cause)
     }
 
@@ -317,6 +319,7 @@ class PublicationImportEngine(
     private fun step(record: PublicationImportRecord): PublicationImportStep = when {
         record.failureCategory != null && record.isTerminal ->
             PublicationImportStep.Failed(record, record.failureCategory)
+
         else -> PublicationImportStep.Transferred(record)
     }
 }
@@ -354,14 +357,10 @@ sealed interface PublicationImportStep {
      * sends anything, so nothing already stored is re-sent and nothing is
      * skipped — that guarantee comes from the `HEAD`, not from this number.
      */
-    data class Interrupted(
-        override val record: PublicationImportRecord,
-        val cause: Throwable? = null,
-    ) : PublicationImportStep
+    data class Interrupted(override val record: PublicationImportRecord, val cause: Throwable? = null) :
+        PublicationImportStep
 
     /** The import ended badly. [category] is the backend's own classification. */
-    data class Failed(
-        override val record: PublicationImportRecord,
-        val category: PublicationFailureCategory,
-    ) : PublicationImportStep
+    data class Failed(override val record: PublicationImportRecord, val category: PublicationFailureCategory) :
+        PublicationImportStep
 }

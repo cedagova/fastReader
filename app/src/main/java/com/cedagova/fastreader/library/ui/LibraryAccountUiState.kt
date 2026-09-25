@@ -1,18 +1,18 @@
 package com.cedagova.fastreader.library.ui
 
-import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
 import com.cedagova.fastreader.account.library.BookDownloadState
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountSyncError
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.account.library.ImportsOff
-import com.cedagova.reader.library.sync.wireName
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.reader.library.model.ReaderLibraryStatus
+import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncError
+import com.cedagova.reader.library.sync.AccountSyncPhase
+import com.cedagova.reader.library.sync.wireName
 import kotlin.math.roundToInt
 
 /**
@@ -95,10 +95,7 @@ internal fun downloadFor(item: LibraryBookItem, downloads: AccountDownloadsState
  *   rather than offering a control that cannot work;
  * - [state] set — an add is somewhere between the tap and its verdict.
  */
-data class AddToAccount(
-    val state: BookImportState? = null,
-    val off: ImportsOff? = null,
-) {
+data class AddToAccount(val state: BookImportState? = null, val off: ImportsOff? = null) {
     /** True when the row simply offers the action and nothing has happened yet. */
     val offered: Boolean get() = state == null && off == null
 }
@@ -207,9 +204,10 @@ fun accountNoticeFor(account: AccountLibraryState): AccountNotice? = when (accou
 
     AccountSyncPhase.OFFLINE -> AccountNotice(AccountNoticeKind.OFFLINE, queued = account.queued)
 
-    AccountSyncPhase.DEFERRED -> account.capabilityReason
-        ?.let { AccountNotice(AccountNoticeKind.UNAVAILABLE, code = it.wireName()) }
-        ?: account.lastError.toNotice()
+    AccountSyncPhase.DEFERRED ->
+        account.capabilityReason
+            ?.let { AccountNotice(AccountNoticeKind.UNAVAILABLE, code = it.wireName()) }
+            ?: account.lastError.toNotice()
 
     AccountSyncPhase.IDLE, AccountSyncPhase.SYNCING -> account.lastError.toNotice()
 }
@@ -354,8 +352,7 @@ private fun AccountBook.toAccountOnlyItem(): LibraryBookItem = LibraryBookItem(
  * sake: one source for one displayed value, so the row cannot show the percent
  * from one read and the chapter from another.
  */
-private fun AccountBook.remotePercent(): Int? =
-    remotePosition?.percent?.roundToInt()?.coerceIn(0, MAX_PERCENT)
+private fun AccountBook.remotePercent(): Int? = remotePosition?.percent?.roundToInt()?.coerceIn(0, MAX_PERCENT)
 
 private const val MAX_PERCENT = 100
 

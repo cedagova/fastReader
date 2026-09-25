@@ -49,10 +49,7 @@ sealed interface ReaderUiState {
      * live: [com.cedagova.fastreader.reader.ui.messageRes] maps each reason to a
      * plain-language string, in the register of the library's own states.
      */
-    data class Unavailable(
-        override val bookTitle: String,
-        val reason: ContentFailureReason,
-    ) : ReaderUiState
+    data class Unavailable(override val bookTitle: String, val reason: ContentFailureReason) : ReaderUiState
 
     /** The reader proper. */
     data class Reading(
@@ -147,16 +144,10 @@ data class ReaderContext(
  * sets it — including the cases a plain space would get wrong, such as an em dash
  * with no space around it.
  */
-data class ContextWord(
-    val text: String,
-    val gapAfter: String = " ",
-)
+data class ContextWord(val text: String, val gapAfter: String = " ")
 
 /** One row of the chapter picker (REQ-014). */
-data class ChapterEntry(
-    val chapterIndex: Int,
-    val title: String,
-)
+data class ChapterEntry(val chapterIndex: Int, val title: String)
 
 /**
  * The per-book half of the screen state: everything that depends on the parsed
@@ -250,7 +241,9 @@ private fun Token.toReaderWord(): ReaderWord = when (this) {
         coreStart = coreStart,
         coreEnd = coreEnd,
     )
+
     is SkipMarkerToken -> ReaderWord(text = label, isSkipMarker = true)
+
     else -> ReaderWord(text = displayText)
 }
 

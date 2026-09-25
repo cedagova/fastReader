@@ -9,10 +9,10 @@ import com.cedagova.fastreader.content.WordClass
 import com.cedagova.fastreader.content.WordClassifier
 import com.cedagova.fastreader.content.WordToken
 import com.cedagova.fastreader.reader.RemainingTimeIndex
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
 
 /**
  * #81 measured over book-sized real prose.
@@ -62,7 +62,8 @@ class PacingCorpusTest {
             val settings = settingsFor(corpus.book, PauseStrength.NORMAL)
             val fractions = speedFractions(corpus.book.tokens, settings)
             val sentences = Stats(sentencesOf(corpus.book.tokens).filter { it.size >= 4 }.map { it.speed(fractions) })
-            val windows = Stats(corpus.book.tokens.indices.chunked(60).filter { it.size == 60 }.map { it.speed(fractions) })
+            val windows =
+                Stats(corpus.book.tokens.indices.chunked(60).filter { it.size == 60 }.map { it.speed(fractions) })
             table.append("%-22s sentences %s\n".format(corpus.name, sentences))
             table.append("%-22s windows   %s\n".format(corpus.name, windows))
 
@@ -89,10 +90,16 @@ class PacingCorpusTest {
                 run++
                 if (WordClass.BREATH in word.classes) {
                     breaths++
-                    assertTrue("${corpus.name}: hold on '${word.text}' after only $run words", run >= WordClassifier.BREATH_MIN_RUN)
+                    assertTrue(
+                        "${corpus.name}: hold on '${word.text}' after only $run words",
+                        run >= WordClassifier.BREATH_MIN_RUN,
+                    )
                     run = 0
                 }
-                assertTrue("${corpus.name}: '${word.text}' is the ${run}th word with no rest", run <= WordClassifier.BREATH_MAX_RUN)
+                assertTrue(
+                    "${corpus.name}: '${word.text}' is the ${run}th word with no rest",
+                    run <= WordClassifier.BREATH_MAX_RUN,
+                )
             }
             println("${corpus.name}: $breaths breath holds over ${corpus.book.totalWords} words")
             assertTrue("${corpus.name} must breathe", breaths > 0)
@@ -110,7 +117,13 @@ class PacingCorpusTest {
             for (strength in listOf(PauseStrength.SUBTLE, PauseStrength.NORMAL, PauseStrength.STRONG)) {
                 val mean = RemainingTimeIndex.build(corpus.book, strength).meanMultiplier
                 for (speed in listOf(100, 250, 1000)) {
-                    val settings = TimingSettings(wpm = speed, pauseStrength = strength, rampEnabled = false, meanMultiplier = mean)
+                    val settings =
+                        TimingSettings(
+                            wpm = speed,
+                            pauseStrength = strength,
+                            rampEnabled = false,
+                            meanMultiplier = mean,
+                        )
                     val actual = corpus.book.tokens.sumOf { RsvpTimingEngine.durationMillis(it, settings, steady) }
                     val budget = corpus.book.totalTokens * 60_000.0 / speed
                     val tolerance = maxOf(budget * 0.005, corpus.book.totalTokens.toDouble())
@@ -135,13 +148,12 @@ class PacingCorpusTest {
 
     // --- helpers -------------------------------------------------------------
 
-    private fun settingsFor(book: BookContent, strength: PauseStrength): TimingSettings =
-        TimingSettings(
-            wpm = wpm,
-            pauseStrength = strength,
-            rampEnabled = false,
-            meanMultiplier = RemainingTimeIndex.build(book, strength).meanMultiplier,
-        )
+    private fun settingsFor(book: BookContent, strength: PauseStrength): TimingSettings = TimingSettings(
+        wpm = wpm,
+        pauseStrength = strength,
+        rampEnabled = false,
+        meanMultiplier = RemainingTimeIndex.build(book, strength).meanMultiplier,
+    )
 
     /** Each token's cost as a multiple of what the dial promises one word. */
     private fun speedFractions(tokens: List<Token>, settings: TimingSettings): DoubleArray {
@@ -184,7 +196,14 @@ class PacingCorpusTest {
             .map { it.trim().replace(Regex("\\s+"), " ") }
             .filter { it.isNotEmpty() }
             .map { ContentBlock.Paragraph(it) }
-        val tokens = WordClassifier.classifyStream(Tokenizer.tokenize(blocks, chapterIndex = 0, state = Tokenizer.StreamState()))
-        return BookContent(bookDigest = "sha256:corpus-$language", language = language, tokens = tokens, chapters = emptyList())
+        val tokens = WordClassifier.classifyStream(
+            Tokenizer.tokenize(blocks, chapterIndex = 0, state = Tokenizer.StreamState()),
+        )
+        return BookContent(
+            bookDigest = "sha256:corpus-$language",
+            language = language,
+            tokens = tokens,
+            chapters = emptyList(),
+        )
     }
 }

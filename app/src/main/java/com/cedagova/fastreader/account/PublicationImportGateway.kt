@@ -115,9 +115,7 @@ class ReaderApiPublicationImportGateway(
         onProgress: (PublicationImportRecord) -> Unit,
     ): PublicationImportStep = engine.resume(record, source, consent, onProgress)
 
-    override suspend fun refresh(record: PublicationImportRecord): PublicationImportRecord =
-        engine.refresh(record)
+    override suspend fun refresh(record: PublicationImportRecord): PublicationImportRecord = engine.refresh(record)
 
-    override suspend fun cancel(record: PublicationImportRecord): PublicationImportRecord =
-        engine.cancel(record)
+    override suspend fun cancel(record: PublicationImportRecord): PublicationImportRecord = engine.cancel(record)
 }

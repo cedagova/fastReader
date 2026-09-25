@@ -61,7 +61,9 @@ class CatalogStoreTest {
                 lastSeenEpochMs = 2,
             ),
         ),
-        folders = listOf(BookFolder(id = "content://tree/books", treeUri = "content://tree/books", displayName = "Books")),
+        folders = listOf(
+            BookFolder(id = "content://tree/books", treeUri = "content://tree/books", displayName = "Books"),
+        ),
         readingStates = mapOf(
             "sha256:abc" to ReadingState(
                 bookDigest = "sha256:abc",
@@ -680,6 +682,7 @@ class CatalogStoreTest {
     }
 
     /** The choice, once made, survives a round trip through the store. */
+
     /**
      * Schema 10 makes the progress readouts a choice. The updating reader keeps
      * the percent and time they had: `progressShown` comes forward as `true`,

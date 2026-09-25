@@ -87,13 +87,21 @@ class PublicationImportEngineTest {
         assertTrue("no chunk exceeded the grant's size", storage.patchSizes.all { it <= CHUNK })
 
         // The admission body is the contract's, field for field.
-        val admitted = Json.parseToJsonElement(api.requestsTo(ReaderLibraryClient.IMPORTS_PATH).single().body).jsonObject
+        val admitted = Json.parseToJsonElement(
+            api.requestsTo(ReaderLibraryClient.IMPORTS_PATH).single().body,
+        ).jsonObject
         assertEquals(
             PublicationImportRecord.derive(ACCOUNT, source.sha256),
             admitted["client_import_id"]!!.jsonPrimitive.content,
         )
-        assertEquals(CreatePublicationImportRequest.PROMOTION_SOURCE_DEVICE_ONLY, admitted["promotion_source"]!!.jsonPrimitive.content)
-        assertEquals(CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY, admitted["ownership_intent"]!!.jsonPrimitive.content)
+        assertEquals(
+            CreatePublicationImportRequest.PROMOTION_SOURCE_DEVICE_ONLY,
+            admitted["promotion_source"]!!.jsonPrimitive.content,
+        )
+        assertEquals(
+            CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY,
+            admitted["ownership_intent"]!!.jsonPrimitive.content,
+        )
         assertEquals(true, admitted["upload_consent"]!!.jsonPrimitive.content.toBoolean())
         assertEquals("epub", admitted["source_format"]!!.jsonPrimitive.content)
         assertEquals(EPUB_MIME, admitted["source_mime_type"]!!.jsonPrimitive.content)
@@ -259,7 +267,9 @@ class PublicationImportEngineTest {
 
         val admissions = api.requestsTo(ReaderLibraryClient.IMPORTS_PATH)
         assertEquals("two admissions", 2, admissions.size)
-        val ids = admissions.map { Json.parseToJsonElement(it.body).jsonObject["client_import_id"]!!.jsonPrimitive.content }
+        val ids = admissions.map {
+            Json.parseToJsonElement(it.body).jsonObject["client_import_id"]!!.jsonPrimitive.content
+        }
         assertEquals("the same client_import_id both times", ids[0], ids[1])
         assertEquals("the resume re-read the provider's offset", 1, storage.countOf("HEAD"))
         assertEquals("and created only one resumable upload", 1, storage.countOf("POST"))
@@ -486,7 +496,11 @@ class PublicationImportEngineTest {
             same,
             PublicationImportRecord.derive(ACCOUNT, "sha256:${source.sha256.uppercase()}"),
         )
-        assertNotEquals("another account is another import", same, PublicationImportRecord.derive("other-account", source.sha256))
+        assertNotEquals(
+            "another account is another import",
+            same,
+            PublicationImportRecord.derive("other-account", source.sha256),
+        )
         assertNotEquals(
             "another book is another import",
             same,
@@ -502,10 +516,7 @@ class PublicationImportEngineTest {
 
     // ---- fixtures ------------------------------------------------------------------------------
 
-    private fun policyBody(
-        enabled: Boolean = true,
-        maxSourceBytes: Long = HOSTED_CAP,
-    ) = """
+    private fun policyBody(enabled: Boolean = true, maxSourceBytes: Long = HOSTED_CAP) = """
     {
       "request_id": "$REQUEST_ID",
       "enabled": $enabled,
@@ -549,11 +560,7 @@ class PublicationImportEngineTest {
     }
     """.trimIndent()
 
-    private fun importObject(
-        status: String,
-        failureCategory: String? = null,
-        canonicalBookId: String? = null,
-    ) = """
+    private fun importObject(status: String, failureCategory: String? = null, canonicalBookId: String? = null) = """
     {
       "id": "$IMPORT_ID",
       "client_import_id": "${PublicationImportRecord.derive(ACCOUNT, source.sha256)}",
@@ -580,11 +587,8 @@ class PublicationImportEngineTest {
     }
     """.trimIndent()
 
-    private fun importBody(
-        status: String,
-        failureCategory: String? = null,
-        canonicalBookId: String? = null,
-    ) = """{"request_id": "$REQUEST_ID", "import": ${importObject(status, failureCategory, canonicalBookId)}}"""
+    private fun importBody(status: String, failureCategory: String? = null, canonicalBookId: String? = null) =
+        """{"request_id": "$REQUEST_ID", "import": ${importObject(status, failureCategory, canonicalBookId)}}"""
 
     private fun admissionBody(
         created: Boolean,

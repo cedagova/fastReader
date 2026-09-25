@@ -213,7 +213,10 @@ class RsvpTimingEngineTest {
     fun pauseStrengthOffIsUniformWhateverTheSpans() {
         val off = steady.copy(pauseStrength = PauseStrength.OFF)
         for (span in listOf(null, 1, 3, 10, 40)) {
-            assertEquals(240L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, span = span), off, running))
+            assertEquals(
+                240L,
+                RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, span = span), off, running),
+            )
         }
     }
 
@@ -226,12 +229,40 @@ class RsvpTimingEngineTest {
         // max(1.4, 1.5): a long breath word is one slow word, not a compounded one.
         assertEquals(360L, RsvpTimingEngine.durationMillis(word(classes = breath + WordClass.LONG), steady, running))
         // max(1.4, 3.0): a breath word that also ends a ten-word sentence holds the sentence pause.
-        assertEquals(720L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, classes = breath, span = 10), steady, running))
+        assertEquals(
+            720L,
+            RsvpTimingEngine.durationMillis(
+                word(boundary = Boundary.SENTENCE, classes = breath, span = 10),
+                steady,
+                running,
+            ),
+        )
         // max(1.4, 1.2): ... and one that ends a one-word sentence holds the breath.
-        assertEquals(336L, RsvpTimingEngine.durationMillis(word(boundary = Boundary.SENTENCE, classes = breath, span = 1), steady, running))
+        assertEquals(
+            336L,
+            RsvpTimingEngine.durationMillis(
+                word(boundary = Boundary.SENTENCE, classes = breath, span = 1),
+                steady,
+                running,
+            ),
+        )
         // Pause strength scales it like every other pause, and OFF removes it.
-        assertEquals(240L, RsvpTimingEngine.durationMillis(word(classes = breath), steady.copy(pauseStrength = PauseStrength.OFF), running))
-        assertEquals(240L + 144L, RsvpTimingEngine.durationMillis(word(classes = breath), steady.copy(pauseStrength = PauseStrength.STRONG), running))
+        assertEquals(
+            240L,
+            RsvpTimingEngine.durationMillis(
+                word(classes = breath),
+                steady.copy(pauseStrength = PauseStrength.OFF),
+                running,
+            ),
+        )
+        assertEquals(
+            240L + 144L,
+            RsvpTimingEngine.durationMillis(
+                word(classes = breath),
+                steady.copy(pauseStrength = PauseStrength.STRONG),
+                running,
+            ),
+        )
     }
 
     // --- #81: the dial names the average ---------------------------------------
@@ -254,7 +285,11 @@ class RsvpTimingEngineTest {
         // one cannot come from a measurement; it is a bug upstream, and the safe
         // reading is "unmeasured".
         for (bad in listOf(0.0, 0.5, -3.0, Double.NaN, Double.POSITIVE_INFINITY)) {
-            assertEquals("mean=$bad", 240L, RsvpTimingEngine.plainWordMillis(steady.copy(meanMultiplier = bad), running))
+            assertEquals(
+                "mean=$bad",
+                240L,
+                RsvpTimingEngine.plainWordMillis(steady.copy(meanMultiplier = bad), running),
+            )
         }
         assertEquals(1.0, TimingSettings().effectiveMeanMultiplier, 0.0)
     }

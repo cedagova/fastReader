@@ -1,12 +1,7 @@
 package com.cedagova.fastreader.library.ui
 
-import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountRemotePosition
-import com.cedagova.reader.library.sync.AccountSyncError
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
 import com.cedagova.fastreader.account.library.BookImportState
 import com.cedagova.fastreader.account.library.DownloadProblem
@@ -18,6 +13,11 @@ import com.cedagova.fastreader.library.ReadingState
 import com.cedagova.fastreader.library.SourceAvailability
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderLibraryStatus
+import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountRemotePosition
+import com.cedagova.reader.library.sync.AccountSyncError
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

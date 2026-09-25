@@ -245,7 +245,10 @@ class AccountCopyStoreTest {
         val content = (result as BookContentResult.Parsed).content
 
         assertEquals("the position's identity is the copy's own", "sha256:$digest", content.bookDigest)
-        assertNotNull("a copy must yield the fingerprint a stored position is guarded by", content.structuralFingerprint)
+        assertNotNull(
+            "a copy must yield the fingerprint a stored position is guarded by",
+            content.structuralFingerprint,
+        )
         assertTrue(content.structuralFingerprint!!.isNotBlank())
         assertTrue("the copy really is the book", content.tokens.isNotEmpty())
     }

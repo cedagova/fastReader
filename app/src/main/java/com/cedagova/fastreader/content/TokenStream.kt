@@ -261,17 +261,11 @@ data class Chapter(
 
     val isEmpty: Boolean get() = tokenCount == 0
 
-    operator fun contains(tokenIndex: Int): Boolean =
-        tokenIndex >= startTokenIndex && tokenIndex < endTokenIndex
+    operator fun contains(tokenIndex: Int): Boolean = tokenIndex >= startTokenIndex && tokenIndex < endTokenIndex
 }
 
 /** A spine item the pipeline could not turn into words, kept so the PR-level state is honest. */
-data class ContentGap(
-    val spinePath: String,
-    val chapterIndex: Int,
-    val reason: GapReason,
-    val detail: String,
-)
+data class ContentGap(val spinePath: String, val chapterIndex: Int, val reason: GapReason, val detail: String)
 
 enum class GapReason {
     /** Declared in the spine, absent from the archive — the interrupted-download case. */
@@ -416,9 +410,6 @@ sealed interface BookContentResult {
  * Reported per spine item, which is the only unit whose cost is knowable before
  * the file is read.
  */
-data class ContentProgress(
-    val completedItems: Int,
-    val totalItems: Int,
-) {
+data class ContentProgress(val completedItems: Int, val totalItems: Int) {
     val fraction: Float get() = if (totalItems <= 0) 0f else completedItems.toFloat() / totalItems
 }

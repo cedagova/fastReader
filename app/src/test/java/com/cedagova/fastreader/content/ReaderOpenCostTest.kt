@@ -237,8 +237,7 @@ class ReaderOpenCostTest {
         return (result as BookContentResult.Parsed).content
     }
 
-    private fun BookContent.words(): List<String> =
-        tokens.filterIsInstance<WordToken>().map { it.text }
+    private fun BookContent.words(): List<String> = tokens.filterIsInstance<WordToken>().map { it.text }
 
     private companion object {
         const val CENTRAL_HEADER_BYTES = 46
