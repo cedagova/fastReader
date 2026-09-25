@@ -28,6 +28,7 @@ import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ui.CueWord
 import com.cedagova.fastreader.reader.ui.ReaderWord
 import com.cedagova.fastreader.settings.CueSettings
+import com.cedagova.fastreader.ui.theme.Spacing
 import com.cedagova.reader.engine.content.Boundary
 import com.cedagova.reader.engine.content.Token
 import com.cedagova.reader.engine.content.WordToken
@@ -124,7 +125,7 @@ fun SettingsPreview(
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp)
+                .padding(top = Spacing.XSmall)
                 .testTag("settings_preview_rhythm"),
         )
     }

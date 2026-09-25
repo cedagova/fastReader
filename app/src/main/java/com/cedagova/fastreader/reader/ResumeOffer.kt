@@ -1,5 +1,9 @@
 package com.cedagova.fastreader.reader
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /**
  * The offer to pick up where another device left off (REQ-511).
  *
@@ -61,3 +65,45 @@ data class ResumeOffer(
      */
     val percent: Int,
 )
+
+/**
+ * The open book's resume offer, and the remote changes whose offer has been
+ * answered *in this session*, by [ResumeOffer.changeKey].
+ *
+ * The answered set is the session-lived twin of the durable record on the
+ * account row, and it exists for the gap between the two: answering writes to
+ * the account document asynchronously, and the offer can be asked for again —
+ * by the very sync that carried the answer's own published position — before
+ * that write has landed. Keyed by the change rather than by the book, exactly as
+ * the durable record is, so a *newer* position from another client is still a
+ * new question after this one was declined.
+ */
+class ResumeOfferSlot {
+    private val _offer = MutableStateFlow<ResumeOffer?>(null)
+    private val settled = mutableSetOf<String>()
+
+    /** The offer on screen, or null. */
+    val offer: StateFlow<ResumeOffer?> = _offer.asStateFlow()
+
+    /** Shows [candidate] unless its change has been answered this session. */
+    fun consider(candidate: ResumeOffer?) {
+        _offer.value = candidate?.takeIf { it.changeKey !in settled }
+    }
+
+    /** Answers the offer on screen, either way; returns it, or null when there was none. */
+    fun settle(): ResumeOffer? {
+        val offer = _offer.value ?: return null
+        settled += offer.changeKey
+        _offer.value = null
+        return offer
+    }
+
+    /**
+     * Forgets the offer *and* the answered set: they are the book's, not the
+     * session's, and keeping them would carry one book's answers onto the next.
+     */
+    fun clear() {
+        _offer.value = null
+        settled.clear()
+    }
+}

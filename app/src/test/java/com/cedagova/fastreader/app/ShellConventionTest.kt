@@ -6,9 +6,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The two app-shell rules of `docs/app-shell.md` that a reviewer would otherwise
- * have to remember (A197-F005): collection is lifecycle-aware, and only the
- * composition root casts the application object.
+ * The app-shell rules of `docs/app-shell.md` that a reviewer would otherwise
+ * have to remember: collection is lifecycle-aware and only the composition root
+ * casts the application object (A197-F005); no UI file outgrows a readable size
+ * and the touch target is declared once (A197-F006).
  *
  * The third rule, "Routes never receive the graph", needs no test of its own: a
  * feature package importing `AppGraph` is a cycle with the root package, which
@@ -36,6 +37,26 @@ class ShellConventionTest {
     }
 
     @Test
+    fun `no ui file exceeds the size bound`() {
+        val offenders = sources
+            .filter { "/ui/" in it.invariantSeparatorsPath }
+            .map { it to it.readLines().size }
+            .filter { (_, lines) -> lines > MAX_UI_FILE_LINES }
+            .map { (file, lines) -> "${file.name}: $lines lines" }
+        assertEquals(
+            "UI files over $MAX_UI_FILE_LINES lines; split them by section (docs/app-shell.md)",
+            emptyList<String>(),
+            offenders,
+        )
+    }
+
+    @Test
+    fun `the touch target is declared once`() {
+        val declarations = sources.filter { file -> file.readLines().any { TOUCH_TARGET.containsMatchIn(it) } }
+        assertEquals(listOf("Dimens.kt"), declarations.map { it.name })
+    }
+
+    @Test
     fun `the scan sees the sources`() {
         assertTrue("found only ${sources.size} files", sources.size >= 50)
     }
@@ -43,5 +64,11 @@ class ShellConventionTest {
     private companion object {
         /** `collectAsState(` but not `collectAsStateWithLifecycle(`. */
         val COLLECT_AS_STATE = Regex("""\bcollectAsState\s*\(""")
+
+        /** Plan AD-7 (#211): no Kotlin file under `app/src/main/java/**/ui/` is longer. */
+        const val MAX_UI_FILE_LINES = 600
+
+        /** A declaration of the 48 dp minimum, under any visibility. */
+        val TOUCH_TARGET = Regex("""\bval TouchTarget\b""")
     }
 }

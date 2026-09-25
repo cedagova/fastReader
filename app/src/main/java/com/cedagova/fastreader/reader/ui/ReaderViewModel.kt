@@ -5,11 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.cedagova.fastreader.reader.BookOpenRequest
 import com.cedagova.fastreader.reader.FrontMatterOffer
 import com.cedagova.fastreader.reader.ReaderBooks
-import com.cedagova.fastreader.reader.ReaderMode
-import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.fastreader.reader.ReaderPositions
 import com.cedagova.fastreader.reader.ReaderSession
 import com.cedagova.fastreader.reader.ResumeOffer
+import com.cedagova.fastreader.reader.ResumeOfferSlot
 import com.cedagova.fastreader.reader.toPosition
 import com.cedagova.reader.engine.content.BookContent
 import com.cedagova.reader.engine.content.BookContentResult
@@ -124,21 +123,8 @@ class ReaderViewModel(
      */
     val frontMatterOffer: StateFlow<FrontMatterOffer?> = _frontMatterOffer.asStateFlow()
 
-    private val _resumeOffer = MutableStateFlow<ResumeOffer?>(null)
-
-    /**
-     * The remote changes whose offer has been answered *in this session*, by
-     * [ResumeOffer.changeKey].
-     *
-     * The session-lived twin of the durable record on the account row, and it
-     * exists for the gap between the two: answering writes to the account
-     * document asynchronously, and [considerResumeOffer] can be asked again — by
-     * the very sync that carried the answer's own published position — before that
-     * write has landed. Keyed by the change rather than by the book, exactly as
-     * the durable record is, so a *newer* position from another client is still a
-     * new question after this one was declined.
-     */
-    private val settledResumeOffers = mutableSetOf<String>()
+    /** REQ-511's offer, with the changes answered this session (see [ResumeOfferSlot]). */
+    private val resumeOffers = ResumeOfferSlot()
 
     /**
      * The offer to resume from the place another client left, or null (REQ-511).
@@ -158,7 +144,7 @@ class ReaderViewModel(
      * for a paragraph has not decided anything. It goes when it is answered, or
      * when [considerResumeOffer] finds the position no longer ahead of them.
      */
-    val resumeOffer: StateFlow<ResumeOffer?> = _resumeOffer.asStateFlow()
+    val resumeOffer: StateFlow<ResumeOffer?> = resumeOffers.offer
 
     init {
         // A failing store must be visible on the reading surface, not only on the
@@ -210,11 +196,8 @@ class ReaderViewModel(
         session = null
         _frontMatterOffer.value = null
         frontMatterOfferSettled = false
-        _resumeOffer.value = null
-        // The answered set is the *book*'s, not the session's: it keys on a
-        // change of one book's position, and leaving it in place would carry one
-        // book's answers onto the next book opened in the same reader.
-        settledResumeOffers.clear()
+        // The offer and its answered set are the *book*'s, not the session's.
+        resumeOffers.clear()
         val title = request.title
         _state.value = ReaderUiState.Opening(title, null)
         parse = viewModelScope.launch { parse(request) }
@@ -456,9 +439,7 @@ class ReaderViewModel(
      * *reader* said so. Nothing here adopts a position on its own.
      */
     fun acceptResumeOffer() {
-        val offer = _resumeOffer.value ?: return
-        settledResumeOffers += offer.changeKey
-        _resumeOffer.value = null
+        val offer = resumeOffers.settle() ?: return
         update { it.jumpTo(offer.targetTokenIndex) }
     }
 
@@ -471,9 +452,7 @@ class ReaderViewModel(
      * write a position or publish one.
      */
     fun dismissResumeOffer() {
-        val offer = _resumeOffer.value ?: return
-        settledResumeOffers += offer.changeKey
-        _resumeOffer.value = null
+        resumeOffers.settle()
     }
 
     /**
@@ -493,8 +472,7 @@ class ReaderViewModel(
     fun considerResumeOffer() {
         val current = session ?: return
         val positionKey = openRequest?.positionKey ?: return
-        val offer = positions.remoteOffer(positionKey, current.content, current.index)
-        _resumeOffer.value = offer?.takeIf { it.changeKey !in settledResumeOffers }
+        resumeOffers.consider(positions.remoteOffer(positionKey, current.content, current.index))
     }
 
     /**
