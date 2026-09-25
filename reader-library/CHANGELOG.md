@@ -18,7 +18,8 @@ changes, which had no version of their own, plus one addition:
   mutations and deltas, capabilities, publication import and asset download
   grants (#112, #116, #118, #139, #142).
 - The account sync engine in `com.cedagova.reader.library.sync` (#147, #148,
-  #150, #152, #164, #176, #177).
+  #150, #152, #164, #176, #177), split by responsibility into separate files
+  with its public API unchanged (#210).
 - The public surface is explicit-API and recorded in
   `api/reader-library.api` (#198).
 - Contract-tested against the one pinned reader-api document in
