@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * Read the pinned document, not this file, for the authority: these are
  * `CreatePublicationImportRequest`, `PublicationImportPolicyResponse`,
  * `PublicationTransferGrant`, `PublicationImport` and their neighbours in
- * `contracts/reader-api.openapi.json`.
+ * `reader-auth/contracts/reader-api.openapi.json`.
  *
  * Two shapes deliberately have no Kotlin equivalent:
  *

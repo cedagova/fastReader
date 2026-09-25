@@ -136,11 +136,14 @@ scheduler, and sends no `profile`, `settings`, `note` or `bookmark` envelope.
 
 ## The contract pin
 
-`contracts/reader-api.openapi.json` is the published Reader API document at a
-pinned identity, with its sha256 beside it; see
-[contracts/PINNED.md](contracts/PINNED.md). The models are hand-written on the
+`reader-auth/contracts/reader-api.openapi.json` is the published Reader API
+document at a pinned identity, with its sha256 beside it; see
+[../reader-auth/contracts/PINNED.md](../reader-auth/contracts/PINNED.md). It is
+the one document both libraries are gated against (#208): `:reader-auth` owns
+it, and this module reads it from there. The models are hand-written on the
 existing kotlinx.serialization stack (owner decision P1, 2026-09-14) and
-`ReaderLibraryContractTest` is the drift gate: it recomputes the digest and then
+`ReaderLibraryContractTest` is the drift gate: through the checker both
+libraries share (`ReaderApiContract`), it recomputes the digest and then
 compares every field name, JSON type, enum member and required flag the models
 use against the document's schemas, deriving the expectations from the models'
 own serializer descriptors. Its negative case runs the same checker over

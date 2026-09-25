@@ -37,7 +37,7 @@ import kotlinx.serialization.json.jsonObject
  * never leave that module.
  *
  * What this class adds is shape: the request bodies it sends and the response
- * documents it reads are the ones `contracts/reader-api.openapi.json` declares,
+ * documents it reads are the ones `reader-auth/contracts/reader-api.openapi.json` declares,
  * and `ReaderLibraryContractTest` fails the build when a model and that
  * document disagree.
  */

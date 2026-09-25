@@ -25,6 +25,13 @@ client.capabilities()                     // refreshes first when inside the mar
 client.signOut()
 ```
 
+[contracts/](contracts/PINNED.md) holds the one pinned reader-api contract
+document both libraries are gated against, with its identity and its update
+procedure (#208). `ReaderAuthContractTest` checks every shape this module sends
+or reads — `PreAuthDocument`, `ReaderProfileUpdate`, the error body, the three
+routes — against it, through the checker `:reader-library`'s contract test
+shares (`src/contractTest/`).
+
 Every failure is one branch of the sealed `ReaderAuthException`. The
 contract's constants live in `ReaderAuthPolicy`, and the unit tests under
 `src/test/` (fake cipher, fake clock, Ktor mock engine; no network, no device)
