@@ -22,9 +22,13 @@
 #   * its versionCode/versionName match version.properties.
 #
 # Publishing additionally refuses to reuse an existing tag, requires the new
-# versionName to be the highest published one, and re-downloads the uploaded
-# asset without any credential to prove the link works for someone who is not
-# logged in to GitHub.
+# versionName to be the highest published one, refuses a target commit whose
+# hosted checks (.github/workflows/checks.yml: unit tests, goldens, lint, the
+# R8 release minification and the instrumented-test compile) have not passed,
+# and re-downloads the uploaded asset without any credential to prove the link
+# works for someone who is not logged in to GitHub. Every GitHub query those
+# guards make fails the release when the query itself fails (auth, network):
+# an unanswered question is never read as "no such tag" or "nothing published".
 #
 # See docs/release.md.
 
@@ -104,20 +108,38 @@ if [ "$PUBLISH" -eq 1 ]; then
   step "Pre-publish guards"
   # The tag must name the exact commit the APK was built from, so the tree has
   # to be clean and the target has to be this HEAD unless told otherwise.
-  if [ "$ALLOW_DIRTY" -eq 0 ] && [ -n "$(git status --porcelain)" ]; then
-    die "worktree has uncommitted changes; commit them so the tag names the built code (or pass --allow-dirty)"
+  if [ "$ALLOW_DIRTY" -eq 0 ]; then
+    WORKTREE_STATUS="$(git status --porcelain)" || die "could not read the worktree status (git status failed)"
+    [ -z "$WORKTREE_STATUS" ] \
+      || die "worktree has uncommitted changes; commit them so the tag names the built code (or pass --allow-dirty)"
   fi
-  [ -n "$TARGET" ] || TARGET="$(git rev-parse HEAD)"
+  [ -n "$TARGET" ] || TARGET="HEAD"
+  # A full SHA: the CI lookup below matches on it, and the tag must name exactly
+  # the commit whose checks were read.
+  TARGET="$(git rev-parse --verify --quiet "$TARGET^{commit}")" \
+    || die "target $TARGET is not a commit in this repository"
   printf 'target commit: %s\n' "$TARGET"
-  if "$GH_COMMAND" release view "$TAG" --repo "$GITHUB_REPO" >/dev/null 2>&1; then
+
+  # Existing-tag check. `gh release view` exits non-zero both for "no such
+  # release" and for a failed query (auth, network, rate limit), so only its
+  # own not-found answer counts as "tag unused"; anything else stops here.
+  if VIEW_ERROR="$("$GH_COMMAND" release view "$TAG" --repo "$GITHUB_REPO" 2>&1 >/dev/null)"; then
     die "release $TAG already exists; bump version.properties instead of reusing a tag"
   fi
+  case "$VIEW_ERROR" in
+    *"release not found"*) ;;
+    *) die "could not check whether release $TAG exists (gh release view failed): ${VIEW_ERROR:-<no output>}" ;;
+  esac
+
   # Releases are forward-only (AD-3): the new versionName must sort strictly
   # above every published stable tag. Pre-releases are exempt from the ordering
-  # check but still may not reuse a tag.
+  # check but still may not reuse a tag. A failed query stops the release; an
+  # empty answer from a successful one means nothing is published yet.
   if [ "$PRERELEASE" -eq 0 ]; then
-    HIGHEST="$("$GH_COMMAND" release list --repo "$GITHUB_REPO" --exclude-pre-releases --limit 100 \
-      --json tagName --jq '.[].tagName' 2>/dev/null | sed 's/^v//' | sort -V | tail -1 || true)"
+    PUBLISHED_TAGS="$("$GH_COMMAND" release list --repo "$GITHUB_REPO" --exclude-pre-releases --limit 100 \
+      --json tagName --jq '.[].tagName')" \
+      || die "could not list the published releases (gh release list failed); the forward-only version guard cannot run"
+    HIGHEST="$(printf '%s\n' "$PUBLISHED_TAGS" | sed 's/^v//' | sed '/^$/d' | sort -V | tail -1)"
     if [ -n "$HIGHEST" ]; then
       TOP="$(printf '%s\n%s\n' "$HIGHEST" "$VERSION_NAME" | sort -V | tail -1)"
       [ "$TOP" = "$VERSION_NAME" ] && [ "$HIGHEST" != "$VERSION_NAME" ] \
@@ -125,6 +147,30 @@ if [ "$PUBLISH" -eq 1 ]; then
     fi
     printf 'highest published stable version: %s\n' "${HIGHEST:-none}"
   fi
+
+  # Gates: publish only a commit the hosted checks passed on. Every run of
+  # checks.yml for the target commit is read; at least one must have succeeded
+  # and none may be unfinished or failed (a run superseded by a newer push is
+  # cancelled, which is neither). The check covers the tests, goldens, lint, the
+  # R8 release minification and the instrumented-test compile, none of which
+  # this script repeats.
+  CHECK_RUNS="$("$GH_COMMAND" run list --repo "$GITHUB_REPO" --workflow checks.yml --commit "$TARGET" \
+    --limit 50 --json status,conclusion --jq '.[] | "\(.status) \(.conclusion)"')" \
+    || die "could not read the hosted checks for $TARGET (gh run list failed); refusing to publish ungated code"
+  [ -n "$CHECK_RUNS" ] \
+    || die "no checks run found for $TARGET; push it and let .github/workflows/checks.yml pass before publishing"
+  PASSED=0
+  while read -r RUN_STATUS RUN_CONCLUSION; do
+    [ "$RUN_STATUS" = "completed" ] \
+      || die "the checks run for $TARGET is still $RUN_STATUS; wait for it to pass before publishing"
+    case "$RUN_CONCLUSION" in
+      success) PASSED=1 ;;
+      cancelled|skipped) ;;
+      *) die "the checks run for $TARGET concluded '$RUN_CONCLUSION'; its gates have not passed" ;;
+    esac
+  done <<< "$CHECK_RUNS"
+  [ "$PASSED" -eq 1 ] || die "no successful checks run for $TARGET; its gates have not passed"
+  printf 'hosted checks passed on %s\n' "$TARGET"
 fi
 
 # --- build -----------------------------------------------------------------
