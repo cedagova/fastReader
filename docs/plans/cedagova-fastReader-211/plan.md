@@ -113,8 +113,9 @@ leaf's implementation lead.
    convention plugins in an included `build-logic` build is the expected
    shape) applies SDK levels, JVM target, lint and test settings to every
    module; one formatter plus static check joins the normal `check` task, with
-   its one-time mass reformat isolated in its own commit and listed in
-   `.git-blame-ignore-revs`. CI gains an R8 step for the release variant that
+   its one-time mass reformat isolated as a reformat-only commit inside the F008
+   PR so review can separate it (squash delivery means no stable reformat SHA
+   reaches `main`, so no `.git-blame-ignore-revs` entry is promised). CI gains an R8 step for the release variant that
    needs no signing key, `androidTest` compilation, one run per PR commit and
    SHA-pinned actions; `release.sh` fails loud on any failed state query and
    refuses a commit whose gates have not passed.
@@ -184,8 +185,9 @@ leaf's implementation lead.
   behind their own narrow type; no format change, no migration.
 - **AD-9 (planner): F009 shrink settings.** Resource shrinking stays off; the
   shipped APK is unchanged. CI proves the existing R8 code-shrinking step.
-- **AD-10 (planner): no dependency-update automation** (F008 planning input;
-  owner preference not stated; can be added later as its own change).
+- **AD-10: dependency-update automation is outside this effort.** It is in no
+  A197 acceptance; the audit records it as a small owner preference to record,
+  not assume. It stays an open owner preference, not decided here.
 - **AD-11 (planner): F012 historical content is marked or moved, never
   deleted** (removal from `main` does not shrink history).
 
@@ -205,7 +207,7 @@ collector branch in `cedagova/fastReader`. Native blocked-by edges:
 | F002 #199 | F001, F010 | Seams extend the frozen surface; fixtures ship inside the copy set. |
 | F004 #201 | F008, F010 | New engine module(s) use conventions and join the copy set. |
 | F003 #200 | F002, F010 | New module uses library-owned seams/fixtures and joins the copy set. |
-| F005 #202 | F003 | Composition root consumes F003's one assembly call (shared `FastReaderApplication` wiring). |
+| F005 #202 | F003, F004 | Composition root consumes F003's one assembly call (shared `FastReaderApplication` wiring); the mechanical acyclic-package check needs F004 to have removed the `epub`↔`content` cycle from `:app`. |
 | F007 #204 | F003, F005 | `AccountBookCopies` coupling resolved by F003; call sites touched once after F005. |
 | F006 #203 | F005 | F005 owns Route wiring; F006 reshapes screen internals after it. |
 | F012 #209 | F001–F011, F013 | Documents the delivered structure. |
@@ -250,7 +252,8 @@ Waves (a leaf starts when all its blockers are merged into the collector):
   unchanged until final delivery. Mitigation: waves keep leaves small; the
   coordinator refreshes the collector from `main` between waves.
 - **Formatter churn.** The first formatter run touches many files; it lands
-  first and in its own commit so later leaves rebase once.
+  first, as a reformat-only commit inside the F008 PR, so later leaves rebase
+  once.
 - **Concurrency (F013, F003).** The sync engine's single-writer ordering and
   account-switch guarantees (#169) and the real-threads queue test must stay
   unchanged; review both as concurrency risk.
@@ -263,6 +266,8 @@ Waves (a leaf starts when all its blockers are merged into the collector):
   dedicated fixtures module is the fallback. Do not prototype beyond choosing.
 - **R8 without signing (F009).** Prove minification through the R8 task, not
   by weakening the unsigned-packaging refusal (`app/build.gradle.kts:227-236`).
+- **Parallel wave 7 (F006, F007).** Both can touch Library and Settings call
+  sites; the coordinator may run them one after the other (no edge needed).
 - **Golden drift (F004, F006, F007).** Pure moves must not change a pixel; the
   only permitted golden change is AD-6's banner.
 - **Rabbit holes to avoid:** Kotlin Multiplatform, dependency upgrades,
@@ -291,7 +296,7 @@ Waves (a leaf starts when all its blockers are merged into the collector):
 | F002 | LEAF | ROOT | cedagova/fastReader | A197-F002 — A host cannot substitute or test against the libraries without writing its own seams and fakes | None | F001, F010 | https://github.com/cedagova/fastReader/issues/199 |
 | F003 | LEAF | ROOT | cedagova/fastReader | A197-F003 — About 2,070 lines of general Reader-client logic live in `:app`, where a second client must rewrite them | None | F002, F010 | https://github.com/cedagova/fastReader/issues/200 |
 | F004 | LEAF | ROOT | cedagova/fastReader | A197-F004 — The EPUB and tokenizer engines are Android-free but trapped in `:app` behind a package cycle | None | F008, F010 | https://github.com/cedagova/fastReader/issues/201 |
-| F005 | LEAF | ROOT | cedagova/fastReader | A197-F005 — The app shell has no copyable wiring, state-holder or navigation convention | None | F003 | https://github.com/cedagova/fastReader/issues/202 |
+| F005 | LEAF | ROOT | cedagova/fastReader | A197-F005 — The app shell has no copyable wiring, state-holder or navigation convention | None | F003, F004 | https://github.com/cedagova/fastReader/issues/202 |
 | F006 | LEAF | ROOT | cedagova/fastReader | A197-F006 — Screen files are god-sized and the design system is colours only, so UI primitives are copied per screen | None | F005 | https://github.com/cedagova/fastReader/issues/203 |
 | F007 | LEAF | ROOT | cedagova/fastReader | A197-F007 — `LibraryRepository` owns about nine unrelated concerns | None | F003, F005 | https://github.com/cedagova/fastReader/issues/204 |
 | F008 | LEAF | ROOT | cedagova/fastReader | A197-F008 — Build settings are copied into every module and static analysis is thin | None | None | https://github.com/cedagova/fastReader/issues/205 |
@@ -312,11 +317,13 @@ resolve the audit's planning inputs; they add no new outcome.
 - **F008 #205 — Build conventions and static analysis.** One convention
   source for SDK levels, JVM target, lint and test settings applied to every
   module; one formatter plus static check in the normal `check` task for every
-  module; the mass reformat in its own commit listed in
-  `.git-blame-ignore-revs`; stale catalog comment and unused `kotlin-android`
-  alias removed. No dependency-update automation (AD-10). Validation:
-  `./gradlew check` green; the release APK built before and after has identical
-  contents apart from build metadata the build already varies.
+  module; the mass reformat as a reformat-only commit inside the PR
+  (review-level isolation; no blame-ignore promise under squash delivery);
+  stale catalog comment and unused `kotlin-android` alias removed.
+  Dependency-update automation is not decided here (AD-10). Validation:
+  `./gradlew check` green; the release APK is compared before and after the
+  convention change alone (excluding the reformat commit), with identical DEX,
+  manifest and resources.
 - **F009 #206 — CI builds what ships; release fails loud.** CI runs the
   release variant's R8 step without a signing key and without loosening the
   unsigned-packaging refusal, compiles `androidTest`, runs once per PR commit
@@ -350,8 +357,8 @@ resolve the audit's planning inputs; they add no new outcome.
   rule makes it fail (shown once).
 - **F013 #210 — Sync engine split by responsibility.** Host contracts,
   outbox, canonical-state adoption and orchestration in separate files/types;
-  public API dump unchanged; all `:reader-library` tests green, including the
-  real-threads queue test. Concurrency-sensitive review.
+  public API dump unchanged; F013's diff modifies no test, and all
+  `:reader-library` tests stay green, including the real-threads queue test. Concurrency-sensitive review.
 - **F002 #199 — Library-owned seams and fixtures.** Library interfaces for the
   auth client, API client, downloads and publication transfer; one
   library-provided fixture surface (test fixtures or a fixtures module, in the
@@ -491,7 +498,9 @@ order.
   types anyway, so a different answer changes only library internals.
 - The API check uses a Kotlin binary-compatibility dump or an equivalent tool
   chosen by the F001 implementer; the requirement is the failing check.
-- Planner decisions AD-4 to AD-11 are reversible and recorded above.
+- Planner decisions AD-4 to AD-9 and AD-11 are reversible and recorded above;
+  AD-10 leaves dependency-update automation as an open owner preference outside
+  this effort.
 
 ## Satisfaction proof
 
