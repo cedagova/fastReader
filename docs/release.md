@@ -58,7 +58,9 @@ account. This page is the whole procedure.
    accurate. Read the per-sentence table in
    [docs/privacy-statement.md](privacy-statement.md) against the diff.
 
-4. Publish, from the exact commit that is on `main`:
+4. Push the release commit to `main` and let the hosted checks
+   (`.github/workflows/checks.yml`) pass on it — publishing refuses a commit
+   they have not passed on. Then publish, from that exact commit:
 
    ```bash
    ./scripts/release.sh --publish --notes-file docs/release-notes/v<versionName>.md
@@ -80,12 +82,22 @@ on the artifact itself:
 | `minSdkVersion` is 26 | REQ-040 — installs on Android 8.0+ |
 | `versionCode`/`versionName` match `version.properties` | The tag, the file, and the artifact cannot drift |
 
-Publishing adds four more gates: the worktree must be clean and the tag is
+Publishing adds five more gates: the worktree must be clean and the tag is
 created on that exact `HEAD` commit, the tag must not already exist, a stable
-release's `versionName` must be the highest published one, and the uploaded
-asset is re-downloaded with plain `curl` — no token, no cookies — and compared
-byte-for-byte against the artifact that was just verified. That last step is
-the proof that a friend with only the link can install the build.
+release's `versionName` must be the highest published one, the hosted checks
+must have passed on the target commit, and the uploaded asset is re-downloaded
+with plain `curl` — no token, no cookies — and compared byte-for-byte against
+the artifact that was just verified. That last step is the proof that a friend
+with only the link can install the build.
+
+The hosted-checks gate reads every `checks.yml` run for the target commit
+(`gh run list --commit`): at least one must have succeeded, and none may be
+unfinished or failed (a run cancelled because a newer commit superseded it
+counts as neither). Those runs are what prove the unit tests, goldens, lint,
+the R8 release minification and the instrumented-test compile on that commit;
+the script does not repeat them. Every GitHub query behind these gates fails
+the release when the query itself fails — an auth or network error is never
+read as "no such tag", "nothing published" or "checks passed" (#206).
 
 Useful variants:
 
@@ -113,7 +125,10 @@ only the pre-release one passes `--prerelease`, and — since #100 — that the
 manifest gate fails a badging with a third permission, one missing the internet
 permission, and a manifest carrying a `networkSecurityConfig` or a
 `usesCleartextTraffic` attribute (REQ-411's "fails it" half, proven without
-building a rogue APK).
+building a rogue APK). Since #206 it also runs each pre-publish guard against a
+failing `gh` (existing-tag check, release list, checks lookup) and against a
+checks run that is missing, unfinished or failed, and asserts every one stops
+the release before anything is built.
 
 Run it after any edit to `scripts/release.sh`. It exists because macOS ships
 bash 3.2, where `set -u` rejects the expansion of an *empty* array: that broke

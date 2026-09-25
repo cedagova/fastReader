@@ -21,6 +21,12 @@
 # a missing INTERNET line, a networkSecurityConfig attribute, and a
 # usesCleartextTraffic attribute — each must die before `gh release create`,
 # and no rogue APK is ever built to prove it.
+#
+# Since #206 it also proves the pre-publish guards fail loud: a `gh` that
+# fails (auth, network) on the existing-tag check, the published-version list
+# or the hosted-checks lookup stops the release before anything is built, as do
+# a target commit whose checks run is missing, unfinished or failed. A
+# successful but empty release list (the first release) still publishes.
 
 set -euo pipefail
 
@@ -46,6 +52,16 @@ PERMISSIONS_DEFAULT="android.permission.INTERNET
 com.cedagova.fastreader.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 PERMISSIONS="$PERMISSIONS_DEFAULT"
 MANIFEST_EXTRA_ATTRIBUTES=""
+
+# How the stub gh answers the three pre-publish queries. The defaults are a
+# healthy GitHub: the tag is unused, v9.0.0 is published, and the target
+# commit's one checks run passed. A negative case overrides one of them.
+#   GH_VIEW  notfound | exists | fail   (`gh release view <tag>`)
+#   GH_LIST  ok | empty | fail          (`gh release list`)
+#   GH_RUNS  "<status> <conclusion>" lines as release.sh's --jq prints them, or fail
+GH_VIEW=notfound
+GH_LIST=ok
+GH_RUNS="completed success"
 
 # Builds one disposable repository root with every external tool stubbed, then
 # runs the real release script in it. Extra arguments go to release.sh.
@@ -117,9 +133,10 @@ XMLTREE
 esac
 STUB
 
-  # Records every call one argument per line, and answers the four queries
-  # release.sh makes: tag-exists check, published-version list, create, and the
-  # asset lookup.
+  # Records every call one argument per line, and answers the five queries
+  # release.sh makes: tag-exists check, published-version list, hosted-checks
+  # lookup, create, and the asset lookup. A failing query prints what a real
+  # auth or network failure prints and exits 1.
   cat > "$ROOT/bin/gh" <<STUB
 #!/bin/bash
 calls="$CALLS"
@@ -128,12 +145,26 @@ printf '%s\n' "\$@" > "\$calls/\$(printf '%03d' \$((n + 1)))"
 case "\$1 \${2:-}" in
   "release view")
     for a in "\$@"; do
-      # Only the post-publish asset lookup passes --json; the pre-publish
-      # existence check must fail so the tag reads as unused.
+      # Only the post-publish asset lookup passes --json.
       [ "\$a" = "--json" ] && { printf 'https://example.invalid/$name.apk\n'; exit 0; }
     done
-    exit 1 ;;
-  "release list") printf '$PUBLISHED_HIGHEST\n'; exit 0 ;;
+    case "$GH_VIEW" in
+      exists) printf 'title:\tfastReader\ntag:\tv$VERSION_NAME\n'; exit 0 ;;
+      notfound) echo "release not found" >&2; exit 1 ;;
+      *) echo "HTTP 401: Bad credentials (https://api.github.com/graphql)" >&2; exit 1 ;;
+    esac ;;
+  "release list")
+    case "$GH_LIST" in
+      ok) printf '$PUBLISHED_HIGHEST\n'; exit 0 ;;
+      empty) exit 0 ;;
+      *) echo "error connecting to api.github.com" >&2; exit 1 ;;
+    esac ;;
+  "run list")
+    [ "$GH_RUNS" = "fail" ] && { echo "error connecting to api.github.com" >&2; exit 1; }
+    cat <<'RUNS'
+$GH_RUNS
+RUNS
+    exit 0 ;;
   "release create") exit 0 ;;
 esac
 exit 1
@@ -199,6 +230,23 @@ expect_gate_failure() {
   printf 'ok   %s: gate died with "%s" before any publish\n' "$name" "$reason"
 }
 
+# A pre-publish guard must additionally stop before anything is built.
+expect_guard_failure() {
+  expect_gate_failure "$@"
+  [ ! -e "$ROOT/app/build/outputs/apk/release/app-release.apk" ] \
+    || fail "$1: release.sh built the APK although a pre-publish guard failed"
+}
+
+# The call file whose first two arguments are "$1 $2", or nothing.
+find_call() {
+  local f
+  for f in "$CALLS"/*; do
+    [ -e "$f" ] || continue
+    [ "$(sed -n '1p' "$f")" = "$1" ] && [ "$(sed -n '2p' "$f")" = "$2" ] && { printf '%s' "$f"; return 0; }
+  done
+  return 0
+}
+
 has_arg() { grep -qxF -- "$1" "$CREATE_CALL"; }
 
 printf 'bash under test: %s\n' "$("$BASH32" --version | head -1)"
@@ -212,6 +260,13 @@ has_arg "--prerelease"          && fail "stable: gh release create was given --p
 has_arg "" && fail "stable: gh release create was given an empty argument"
 grep -q "Released v$VERSION_NAME" "$ROOT/stdout.log" || fail "stable: script did not finish the publish"
 printf 'ok   stable path reached gh release create: %s\n' "$(tr '\n' ' ' < "$CREATE_CALL")"
+# The hosted-checks lookup names the full SHA the tag is created on.
+HEAD_SHA="$(git -C "$ROOT" rev-parse HEAD)"
+RUNS_CALL="$(find_call run list)"
+[ -n "$RUNS_CALL" ] || fail "stable: release.sh never read the hosted checks"
+grep -qxF -- "$HEAD_SHA" "$RUNS_CALL" || fail "stable: the checks lookup did not name $HEAD_SHA"
+has_arg "$HEAD_SHA" || fail "stable: gh release create did not target $HEAD_SHA"
+printf 'ok   stable path read the checks of %s and tagged that commit\n' "$HEAD_SHA"
 
 # --- pre-release publish (the path that already worked) ---------------------
 run_release prerelease --prerelease --tag "v$VERSION_NAME-rc1"
@@ -244,4 +299,54 @@ run_release cleartext
 expect_gate_failure "cleartext" "sets usesCleartextTraffic"
 MANIFEST_EXTRA_ATTRIBUTES=""
 
-printf '\nPASS: both publish paths reach gh release create under bash 3.2, and the manifest gate fails its four negatives.\n'
+# --- #206, the pre-publish guards fail loud -----------------------------------
+
+GH_LIST=empty
+run_release first-release
+expect_success "first-release"
+grep -q "highest published stable version: none" "$ROOT/stdout.log" \
+  || fail "first-release: an empty release list was not read as 'nothing published'"
+printf 'ok   first-release: an empty (successful) release list still publishes\n'
+GH_LIST=ok
+
+GH_VIEW=exists
+run_release tag-exists
+expect_guard_failure "tag-exists" "release v$VERSION_NAME already exists"
+GH_VIEW=fail
+run_release tag-query-fails
+expect_guard_failure "tag-query-fails" "could not check whether release v$VERSION_NAME exists"
+grep -q "Bad credentials" "$ROOT/stderr.log" || fail "tag-query-fails: gh's own error was not printed"
+GH_VIEW=notfound
+
+GH_LIST=fail
+run_release list-query-fails
+expect_guard_failure "list-query-fails" "could not list the published releases"
+GH_LIST=ok
+
+GH_RUNS=fail
+run_release checks-query-fails
+expect_guard_failure "checks-query-fails" "could not read the hosted checks"
+GH_RUNS=""
+run_release checks-missing
+expect_guard_failure "checks-missing" "no checks run found"
+GH_RUNS="in_progress "
+run_release checks-running
+expect_guard_failure "checks-running" "is still in_progress"
+GH_RUNS="completed failure"
+run_release checks-failed
+expect_guard_failure "checks-failed" "concluded 'failure'"
+GH_RUNS="completed success
+completed failure"
+run_release checks-mixed
+expect_guard_failure "checks-mixed" "concluded 'failure'"
+GH_RUNS="completed cancelled"
+run_release checks-only-cancelled
+expect_guard_failure "checks-only-cancelled" "no successful checks run"
+GH_RUNS="completed cancelled
+completed success"
+run_release checks-superseded
+expect_success "checks-superseded"
+printf 'ok   checks-superseded: a cancelled run beside a passing one still publishes\n'
+GH_RUNS="completed success"
+
+printf '\nPASS: both publish paths reach gh release create under bash 3.2, the manifest gate fails its four negatives, and every pre-publish guard fails loud.\n'
