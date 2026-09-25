@@ -115,7 +115,10 @@ class TokenizerTest {
     fun `punctuation and a hold both start the run over`() {
         // Eight words, a hold before "and", then only six more before the comma:
         // no second hold, and the comma resets the count for the next clause.
-        val tokens = tokenize("One two three four five six seven eight and nine ten eleven twelve thirteen, fourteen and fifteen.")
+        val tokens =
+            tokenize(
+                "One two three four five six seven eight and nine ten eleven twelve thirteen, fourteen and fifteen.",
+            )
 
         assertEquals(listOf("eight"), tokens.filter { WordClass.BREATH in it.classes }.map { it.text })
     }
@@ -265,12 +268,11 @@ class TokenizerTest {
         assertEquals("dont", WordClassifier.normalize("don't"))
     }
 
-    private fun tokenize(paragraph: String): List<WordToken> =
-        Tokenizer.tokenize(
-            listOf(ContentBlock.Paragraph(paragraph)),
-            chapterIndex = 0,
-            state = Tokenizer.StreamState(),
-        ).filterIsInstance<WordToken>()
+    private fun tokenize(paragraph: String): List<WordToken> = Tokenizer.tokenize(
+        listOf(ContentBlock.Paragraph(paragraph)),
+        chapterIndex = 0,
+        state = Tokenizer.StreamState(),
+    ).filterIsInstance<WordToken>()
 
     private fun words(paragraph: String): List<String> = tokenize(paragraph).map { it.text }
 }

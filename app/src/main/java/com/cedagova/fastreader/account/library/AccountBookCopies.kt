@@ -1,11 +1,11 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.fastreader.account.AssetDownloadGateway
 import com.cedagova.fastreader.library.BookSource
 import com.cedagova.fastreader.library.LibraryRepository
 import com.cedagova.reader.auth.ReaderAuthException
 import com.cedagova.reader.library.downloads.AssetDownloadException
+import com.cedagova.reader.library.sync.AccountBook
 import java.io.File
 
 /**

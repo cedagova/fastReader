@@ -56,7 +56,9 @@ class LibraryRepositoryTest {
             gateway = gateway,
             covers = covers,
             scope = scope,
-            ioDispatcher = UnconfinedTestDispatcher(scope.coroutineContext[kotlinx.coroutines.test.TestCoroutineScheduler]),
+            ioDispatcher = UnconfinedTestDispatcher(
+                scope.coroutineContext[kotlinx.coroutines.test.TestCoroutineScheduler],
+            ),
             clock = { now },
         )
     }
@@ -397,7 +399,10 @@ class LibraryRepositoryTest {
         assertEquals(900, repository.readingState(bookId)?.tokenIndex)
         assertEquals(0.6f, repository.readingState(bookId)?.progressFraction)
         assertEquals(400, repository.readingState(bookId)?.wpm)
-        assertTrue("the book must be readable again", repository.catalog.value.books.single().status == BookStatus.READABLE)
+        assertTrue(
+            "the book must be readable again",
+            repository.catalog.value.books.single().status == BookStatus.READABLE,
+        )
         assertTrue(
             "a grant given back cannot be taken again without the picker, so undo must not release it",
             gateway.releasedGrants.isEmpty(),

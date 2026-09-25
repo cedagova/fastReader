@@ -23,11 +23,20 @@ const val UNKNOWN_VALUE: String = "__unknown__"
 /** `ReaderLibraryItem.status`: where a book sits in the account's library. */
 @Serializable
 enum class ReaderLibraryStatus {
-    @SerialName("queued") QUEUED,
-    @SerialName("reading") READING,
-    @SerialName("finished") FINISHED,
-    @SerialName("archived") ARCHIVED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("queued")
+    QUEUED,
+
+    @SerialName("reading")
+    READING,
+
+    @SerialName("finished")
+    FINISHED,
+
+    @SerialName("archived")
+    ARCHIVED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -37,53 +46,102 @@ enum class ReaderLibraryStatus {
  */
 @Serializable
 enum class ReaderCoverStatus {
-    @SerialName("pending") PENDING,
-    @SerialName("covered") COVERED,
-    @SerialName("coverless") COVERLESS,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("pending")
+    PENDING,
+
+    @SerialName("covered")
+    COVERED,
+
+    @SerialName("coverless")
+    COVERLESS,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderBook.source_type`: how the account acquired the book. */
 @Serializable
 enum class ReaderBookSourceType {
-    @SerialName("upload") UPLOAD,
-    @SerialName("url") URL,
-    @SerialName("catalog") CATALOG,
-    @SerialName("import") IMPORT,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("upload")
+    UPLOAD,
+
+    @SerialName("url")
+    URL,
+
+    @SerialName("catalog")
+    CATALOG,
+
+    @SerialName("import")
+    IMPORT,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderBookAsset.kind`: which file of a book an asset is. */
 @Serializable
 enum class ReaderBookAssetKind {
-    @SerialName("epub") EPUB,
-    @SerialName("cover") COVER,
-    @SerialName("extracted_text") EXTRACTED_TEXT,
-    @SerialName("audio") AUDIO,
-    @SerialName("other") OTHER,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("epub")
+    EPUB,
+
+    @SerialName("cover")
+    COVER,
+
+    @SerialName("extracted_text")
+    EXTRACTED_TEXT,
+
+    @SerialName("audio")
+    AUDIO,
+
+    @SerialName("other")
+    OTHER,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** The resource a sync envelope, result or change is about. */
 @Serializable
 enum class ReaderResourceType {
-    @SerialName("profile") PROFILE,
-    @SerialName("book") BOOK,
-    @SerialName("library_item") LIBRARY_ITEM,
-    @SerialName("reading_progress") READING_PROGRESS,
-    @SerialName("note") NOTE,
-    @SerialName("bookmark") BOOKMARK,
-    @SerialName("settings") SETTINGS,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("profile")
+    PROFILE,
+
+    @SerialName("book")
+    BOOK,
+
+    @SerialName("library_item")
+    LIBRARY_ITEM,
+
+    @SerialName("reading_progress")
+    READING_PROGRESS,
+
+    @SerialName("note")
+    NOTE,
+
+    @SerialName("bookmark")
+    BOOKMARK,
+
+    @SerialName("settings")
+    SETTINGS,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** What a sync envelope, result or change does to its resource. */
 @Serializable
 enum class ReaderMutationKind {
-    @SerialName("upsert") UPSERT,
-    @SerialName("delete") DELETE,
-    @SerialName("restore") RESTORE,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("upsert")
+    UPSERT,
+
+    @SerialName("delete")
+    DELETE,
+
+    @SerialName("restore")
+    RESTORE,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -96,68 +154,125 @@ enum class ReaderMutationKind {
  */
 @Serializable
 enum class ReaderSyncStatus {
-    @SerialName("applied") APPLIED,
-    @SerialName("replayed") REPLAYED,
-    @SerialName("superseded") SUPERSEDED,
-    @SerialName("conflict") CONFLICT,
-    @SerialName("rejected") REJECTED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("applied")
+    APPLIED,
+
+    @SerialName("replayed")
+    REPLAYED,
+
+    @SerialName("superseded")
+    SUPERSEDED,
+
+    @SerialName("conflict")
+    CONFLICT,
+
+    @SerialName("rejected")
+    REJECTED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderSyncMutationResult.server_admission`: null for a conflict or rejection. */
 @Serializable
 enum class ReaderServerAdmission {
-    @SerialName("accepted") ACCEPTED,
-    @SerialName("replayed") REPLAYED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("accepted")
+    ACCEPTED,
+
+    @SerialName("replayed")
+    REPLAYED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderSyncConflict.code`. */
 @Serializable
 enum class ReaderSyncConflictCode {
-    @SerialName("revision_conflict") REVISION_CONFLICT,
-    @SerialName("content_conflict") CONTENT_CONFLICT,
-    @SerialName("field_conflict") FIELD_CONFLICT,
-    @SerialName("tombstone_requires_restore") TOMBSTONE_REQUIRES_RESTORE,
-    @SerialName("restore_requires_tombstone") RESTORE_REQUIRES_TOMBSTONE,
-    @SerialName("resource_missing") RESOURCE_MISSING,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("revision_conflict")
+    REVISION_CONFLICT,
+
+    @SerialName("content_conflict")
+    CONTENT_CONFLICT,
+
+    @SerialName("field_conflict")
+    FIELD_CONFLICT,
+
+    @SerialName("tombstone_requires_restore")
+    TOMBSTONE_REQUIRES_RESTORE,
+
+    @SerialName("restore_requires_tombstone")
+    RESTORE_REQUIRES_TOMBSTONE,
+
+    @SerialName("resource_missing")
+    RESOURCE_MISSING,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderSyncRejection.code`: why the server refused one envelope outright. */
 @Serializable
 enum class ReaderSyncRejectionCode {
-    @SerialName("invalid_payload") INVALID_PAYLOAD,
-    @SerialName("invalid_resource_id") INVALID_RESOURCE_ID,
-    @SerialName("idempotency_mismatch") IDEMPOTENCY_MISMATCH,
-    @SerialName("related_resource_missing") RELATED_RESOURCE_MISSING,
-    @SerialName("unsupported_mutation") UNSUPPORTED_MUTATION,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("invalid_payload")
+    INVALID_PAYLOAD,
+
+    @SerialName("invalid_resource_id")
+    INVALID_RESOURCE_ID,
+
+    @SerialName("idempotency_mismatch")
+    IDEMPOTENCY_MISMATCH,
+
+    @SerialName("related_resource_missing")
+    RELATED_RESOURCE_MISSING,
+
+    @SerialName("unsupported_mutation")
+    UNSUPPORTED_MUTATION,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderPublicationMembershipOutcome.state`. */
 @Serializable
 enum class ReaderMembershipState {
-    @SerialName("present") PRESENT,
-    @SerialName("absent") ABSENT,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("present")
+    PRESENT,
+
+    @SerialName("absent")
+    ABSENT,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderPublicationMembershipOutcome.action`. */
 @Serializable
 enum class ReaderMembershipAction {
-    @SerialName("add") ADD,
-    @SerialName("remove") REMOVE,
-    @SerialName("undo") UNDO,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("add")
+    ADD,
+
+    @SerialName("remove")
+    REMOVE,
+
+    @SerialName("undo")
+    UNDO,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderPublicationMembershipOutcome.open_session_behavior`. */
 @Serializable
 enum class ReaderOpenSessionBehavior {
-    @SerialName("unchanged") UNCHANGED,
-    @SerialName("keep_readable_until_close") KEEP_READABLE_UNTIL_CLOSE,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("unchanged")
+    UNCHANGED,
+
+    @SerialName("keep_readable_until_close")
+    KEEP_READABLE_UNTIL_CLOSE,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -167,20 +282,36 @@ enum class ReaderOpenSessionBehavior {
  */
 @Serializable
 enum class ReaderDeltaStatus {
-    @SerialName("ok") OK,
-    @SerialName("cursor_expired") CURSOR_EXPIRED,
-    @SerialName("cursor_invalid") CURSOR_INVALID,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("ok")
+    OK,
+
+    @SerialName("cursor_expired")
+    CURSOR_EXPIRED,
+
+    @SerialName("cursor_invalid")
+    CURSOR_INVALID,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderCapabilityEntry.key`: the capability keys the document declares. */
 @Serializable
 enum class ReaderCapabilityKey {
-    @SerialName("reader.sync.v1") SYNC_V1,
-    @SerialName("reader.ai-quota.v1") AI_QUOTA_V1,
-    @SerialName("reader.notifications.registration.v1") NOTIFICATIONS_REGISTRATION_V1,
-    @SerialName("reader.publication-import.v1") PUBLICATION_IMPORT_V1,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("reader.sync.v1")
+    SYNC_V1,
+
+    @SerialName("reader.ai-quota.v1")
+    AI_QUOTA_V1,
+
+    @SerialName("reader.notifications.registration.v1")
+    NOTIFICATIONS_REGISTRATION_V1,
+
+    @SerialName("reader.publication-import.v1")
+    PUBLICATION_IMPORT_V1,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /**
@@ -192,38 +323,72 @@ enum class ReaderCapabilityKey {
  */
 @Serializable
 enum class ReaderAssetDirection {
-    @SerialName("upload") UPLOAD,
-    @SerialName("download") DOWNLOAD,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("upload")
+    UPLOAD,
+
+    @SerialName("download")
+    DOWNLOAD,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderAssetGrant.method`: the HTTP method the provider signed the URL for. */
 @Serializable
 enum class ReaderAssetMethod {
-    @SerialName("GET") GET,
-    @SerialName("PUT") PUT,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("GET")
+    GET,
+
+    @SerialName("PUT")
+    PUT,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderCapabilityEntry.availability`. */
 @Serializable
 enum class ReaderCapabilityAvailability {
-    @SerialName("available") AVAILABLE,
-    @SerialName("unavailable") UNAVAILABLE,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("available")
+    AVAILABLE,
+
+    @SerialName("unavailable")
+    UNAVAILABLE,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }
 
 /** `ReaderCapabilityEntry.reason`: why a capability is or is not available. */
 @Serializable
 enum class ReaderCapabilityReason {
-    @SerialName("available") AVAILABLE,
-    @SerialName("actor_dependency_unavailable") ACTOR_DEPENDENCY_UNAVAILABLE,
-    @SerialName("client_version_invalid") CLIENT_VERSION_INVALID,
-    @SerialName("client_version_missing") CLIENT_VERSION_MISSING,
-    @SerialName("client_version_too_new") CLIENT_VERSION_TOO_NEW,
-    @SerialName("client_version_too_old") CLIENT_VERSION_TOO_OLD,
-    @SerialName("quota_exhausted") QUOTA_EXHAUSTED,
-    @SerialName("service_not_configured") SERVICE_NOT_CONFIGURED,
-    @SerialName("service_not_enabled") SERVICE_NOT_ENABLED,
-    @SerialName(UNKNOWN_VALUE) UNKNOWN,
+    @SerialName("available")
+    AVAILABLE,
+
+    @SerialName("actor_dependency_unavailable")
+    ACTOR_DEPENDENCY_UNAVAILABLE,
+
+    @SerialName("client_version_invalid")
+    CLIENT_VERSION_INVALID,
+
+    @SerialName("client_version_missing")
+    CLIENT_VERSION_MISSING,
+
+    @SerialName("client_version_too_new")
+    CLIENT_VERSION_TOO_NEW,
+
+    @SerialName("client_version_too_old")
+    CLIENT_VERSION_TOO_OLD,
+
+    @SerialName("quota_exhausted")
+    QUOTA_EXHAUSTED,
+
+    @SerialName("service_not_configured")
+    SERVICE_NOT_CONFIGURED,
+
+    @SerialName("service_not_enabled")
+    SERVICE_NOT_ENABLED,
+
+    @SerialName(UNKNOWN_VALUE)
+    UNKNOWN,
 }

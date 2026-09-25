@@ -206,5 +206,4 @@ internal object XhtmlExtractor {
         }
         return false
     }
-
 }

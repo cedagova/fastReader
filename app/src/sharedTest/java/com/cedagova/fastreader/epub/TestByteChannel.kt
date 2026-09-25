@@ -15,10 +15,8 @@ import java.nio.channels.SeekableByteChannel
  *   reader must never read — a book's images — are never read *at all*, rather
  *   than merely producing the right words in spite of being read.
  */
-class TestByteChannel(
-    private val bytes: ByteArray,
-    private val poisoned: List<IntRange> = emptyList(),
-) : SeekableByteChannel {
+class TestByteChannel(private val bytes: ByteArray, private val poisoned: List<IntRange> = emptyList()) :
+    SeekableByteChannel {
 
     var bytesRead: Long = 0
         private set

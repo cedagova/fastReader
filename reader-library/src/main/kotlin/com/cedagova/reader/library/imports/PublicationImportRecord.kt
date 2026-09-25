@@ -84,16 +84,15 @@ data class PublicationImportRecord(
      * `GRANTED`, so `upload_consent = true` cannot be reached by forgetting
      * something — see [UploadConsent].
      */
-    fun admissionRequest(consent: UploadConsent): CreatePublicationImportRequest =
-        CreatePublicationImportRequest(
-            clientImportId = clientImportId,
-            sourceFormat = sourceFormat,
-            sourceMimeType = sourceMimeType,
-            sizeBytes = sizeBytes,
-            sha256 = contentSha256,
-            uploadConsent = consent == UploadConsent.GRANTED,
-            originalFileName = originalFileName,
-        )
+    fun admissionRequest(consent: UploadConsent): CreatePublicationImportRequest = CreatePublicationImportRequest(
+        clientImportId = clientImportId,
+        sourceFormat = sourceFormat,
+        sourceMimeType = sourceMimeType,
+        sizeBytes = sizeBytes,
+        sha256 = contentSha256,
+        uploadConsent = consent == UploadConsent.GRANTED,
+        originalFileName = originalFileName,
+    )
 
     /** This record with the backend's own answer folded in. */
     fun withImport(admitted: PublicationImport): PublicationImportRecord = copy(

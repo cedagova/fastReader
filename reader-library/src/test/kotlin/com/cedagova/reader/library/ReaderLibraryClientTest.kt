@@ -276,7 +276,9 @@ class ReaderLibraryClientTest {
         val operations = h.operations()
 
         val empty = runCatching { operations.applyMutations(emptyList()) }.exceptionOrNull()
-        val tooMany = runCatching { operations.applyMutations(List(51) { envelope(key = "key-$it") }) }.exceptionOrNull()
+        val tooMany = runCatching {
+            operations.applyMutations(List(51) { envelope(key = "key-$it") })
+        }.exceptionOrNull()
 
         assertTrue("$empty", empty is IllegalArgumentException)
         assertTrue("$tooMany", tooMany is IllegalArgumentException)
@@ -510,7 +512,11 @@ class ReaderLibraryClientTest {
     fun `429 waits once and then reports try later`() = runTest {
         val h = Harness()
         h.servers.on(PROGRESS) {
-            json(apiError("rate.limited", "req-429", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "7")
+            json(
+                apiError("rate.limited", "req-429", retryable = true),
+                HttpStatusCode.TooManyRequests,
+                "Retry-After" to "7",
+            )
         }
 
         val failure = runCatching { h.operations().progress() }.exceptionOrNull()
@@ -540,7 +546,12 @@ class ReaderLibraryClientTest {
     @Test
     fun `a 502 that is not retryable is an ApiError carrying the server's code and request id`() = runTest {
         val h = Harness()
-        h.servers.on(LIBRARY) { json(apiError("reader_product.asset_integrity_error", "req-502b", retryable = false), HttpStatusCode.BadGateway) }
+        h.servers.on(LIBRARY) {
+            json(
+                apiError("reader_product.asset_integrity_error", "req-502b", retryable = false),
+                HttpStatusCode.BadGateway,
+            )
+        }
 
         val failure = runCatching { h.operations().library() }.exceptionOrNull()
 

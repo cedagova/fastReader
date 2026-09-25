@@ -157,8 +157,7 @@ internal object WordClassifier {
      * The form words are counted by: case-folded, without the punctuation a word
      * can carry. "Casa", "casa" and "casa." are one word for rarity purposes.
      */
-    fun normalize(word: String): String =
-        word.filter { it.isLetterOrDigit() }.lowercase()
+    fun normalize(word: String): String = word.filter { it.isLetterOrDigit() }.lowercase()
 
     /**
      * The second pass over a finished stream: every word gets its [classify]

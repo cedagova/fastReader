@@ -56,8 +56,7 @@ class ReaderApiAssetDownloadGateway(
     private val transport: AssetDownloadClient,
 ) : AssetDownloadGateway {
 
-    override suspend fun downloadGrant(assetId: String): ReaderAssetGrant =
-        operations.assetDownloadGrant(assetId).grant
+    override suspend fun downloadGrant(assetId: String): ReaderAssetGrant = operations.assetDownloadGrant(assetId).grant
 
     override suspend fun download(
         grant: ReaderAssetGrant,

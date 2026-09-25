@@ -166,8 +166,10 @@ class MarkupTest {
     fun `the navigation document is not streamed as content`() {
         assertEquals(
             listOf("Real text."),
-            paragraphs("""<nav epub:type="toc"><ol><li><a href="c1.xhtml">Chapter One</a></li></ol></nav>
-                          <p>Real text.</p>"""),
+            paragraphs(
+                """<nav epub:type="toc"><ol><li><a href="c1.xhtml">Chapter One</a></li></ol></nav>
+                          <p>Real text.</p>""",
+            ),
         )
     }
 

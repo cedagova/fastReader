@@ -19,9 +19,7 @@ import kotlinx.serialization.json.jsonObject
  * test releases it. Sign-in operations flip [session] the way the library's
  * own state flow would.
  */
-class FakeReaderAccountGateway(
-    initial: ReaderSessionState = ReaderSessionState.SignedOut,
-) : ReaderAccountGateway {
+class FakeReaderAccountGateway(initial: ReaderSessionState = ReaderSessionState.SignedOut) : ReaderAccountGateway {
 
     val session = MutableStateFlow(initial)
     val calls = mutableListOf<String>()
@@ -81,7 +79,10 @@ class FakeReaderAccountGateway(
 
     private suspend fun record(call: String) {
         calls += call
-        gate?.let { it.await(); gate = null }
+        gate?.let {
+            it.await()
+            gate = null
+        }
         nextFailure?.let {
             nextFailure = null
             if (it is ReaderAuthException.SignedOut) session.value = ReaderSessionState.SignedOut
@@ -90,7 +91,13 @@ class FakeReaderAccountGateway(
     }
 
     private fun signIn(email: String) {
-        session.value = ReaderSessionState.SignedIn(userId = "user-1", email = email, expiresAt = Instant.fromEpochSeconds(0) + 1.hours)
+        session.value =
+            ReaderSessionState.SignedIn(
+                userId = "user-1",
+                email = email,
+                expiresAt =
+                    Instant.fromEpochSeconds(0) + 1.hours,
+            )
     }
 
     companion object {

@@ -120,19 +120,14 @@ class BookOpenRequest(
          * rotation re-enter the same open book rather than re-parse it, and what
          * makes a second "Open with" of a *different* file replace it.
          */
-        fun external(
-            uri: String,
-            title: String,
-            identity: BookIdentity?,
-            origin: BookOrigin,
-            bytes: EpubByteSource,
-        ) = BookOpenRequest(
-            bytes = bytes,
-            identity = identity,
-            origin = origin,
-            title = title,
-            openKey = uri,
-        )
+        fun external(uri: String, title: String, identity: BookIdentity?, origin: BookOrigin, bytes: EpubByteSource) =
+            BookOpenRequest(
+                bytes = bytes,
+                identity = identity,
+                origin = origin,
+                title = title,
+                openKey = uri,
+            )
     }
 
     /**

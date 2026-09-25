@@ -33,10 +33,7 @@ object ContentFixtures {
     fun streamingSource(bytes: ByteArray): EpubByteSource = EpubByteSource { ByteArrayInputStream(bytes) }
 
     /** The seekable source plus the channel it hands out, so a test can read [TestByteChannel.bytesRead]. */
-    fun watchedSource(
-        bytes: ByteArray,
-        poisoned: List<IntRange> = emptyList(),
-    ): Pair<EpubByteSource, () -> Long> {
+    fun watchedSource(bytes: ByteArray, poisoned: List<IntRange> = emptyList()): Pair<EpubByteSource, () -> Long> {
         val channels = mutableListOf<TestByteChannel>()
         val source = object : EpubByteSource {
             override fun open() = ByteArrayInputStream(bytes)
@@ -182,10 +179,6 @@ object ContentFixtures {
     )
 
     /**
-     * A download interrupted after the first chapter: the spine declares three
-     * content documents and the archive holds one.
-     */
-    /**
      * EPUB 3 English book whose one chapter is a single paragraph of some 230
      * words: the paused view's token windowing and line sectioning, which no
      * paragraph in [englishNovel] is long enough to reach.
@@ -213,6 +206,10 @@ object ContentFixtures {
         "Fielding had told her never to report. So she sat again, picked up the pen, and wrote the time, " +
         "and beside the time she wrote the single word that was true, which was: quiet."
 
+    /**
+     * A download interrupted after the first chapter: the spine declares three
+     * content documents and the archive holds one.
+     */
     fun interruptedMidBook(): ByteArray = EpubFixtures.buildArchive(
         listOf(
             "META-INF/container.xml" to CONTAINER.utf8(),
@@ -243,18 +240,26 @@ object ContentFixtures {
      * that strips it is exercised rather than assumed.
      */
     fun frontMatterBook(landmarks: Boolean = false, guide: Boolean = false): ByteArray {
-        val landmarkNav = if (!landmarks) "" else """
+        val landmarkNav = if (!landmarks) {
+            ""
+        } else {
+            """
   <nav epub:type="landmarks">
     <ol>
       <li><a epub:type="cover" href="cover.xhtml">Cover</a></li>
       <li><a epub:type="bodymatter" href="chapter1.xhtml#start">Start of content</a></li>
     </ol>
   </nav>"""
-        val guideElement = if (!guide) "" else """
+        }
+        val guideElement = if (!guide) {
+            ""
+        } else {
+            """
   <guide>
     <reference type="cover" title="Cover" href="cover.xhtml"/>
     <reference type="text" title="Beginning" href="chapter1.xhtml#start"/>
   </guide>"""
+        }
         return EpubFixtures.buildArchive(
             listOf(
                 "META-INF/container.xml" to CONTAINER.utf8(),

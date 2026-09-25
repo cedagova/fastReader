@@ -48,9 +48,7 @@ internal object ReadingStateV2Migration : CatalogMigration {
         return JsonObject(document + ("readingStates" to JsonObject(upgraded)))
     }
 
-    private fun JsonObject.float(name: String): Float =
-        this[name]?.jsonPrimitive?.floatOrNull ?: 0f
+    private fun JsonObject.float(name: String): Float = this[name]?.jsonPrimitive?.floatOrNull ?: 0f
 
-    private fun JsonObject.long(name: String): Long =
-        this[name]?.jsonPrimitive?.longOrNull ?: 0L
+    private fun JsonObject.long(name: String): Long = this[name]?.jsonPrimitive?.longOrNull ?: 0L
 }

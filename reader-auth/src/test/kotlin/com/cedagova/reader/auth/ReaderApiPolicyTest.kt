@@ -31,10 +31,20 @@ class ReaderApiPolicyTest {
     private val servers = FakeServers()
     private val store = InMemorySessionStore(session(expiresAt = clock.expiring(3600)))
     private var requestIdCounter = 0
-    private val requestIds = listOf("0f1e2d3c-4b5a-4697-8877-665544332211", "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e")
+    private val requestIds =
+        listOf(
+            "0f1e2d3c-4b5a-4697-8877-665544332211",
+            "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+            "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+        )
 
     private suspend fun client(): ReaderAuthClient {
-        val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter) { requestIds[requestIdCounter++ % requestIds.size] }
+        val client = ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter) {
+            requestIds[
+                requestIdCounter++ %
+                    requestIds.size,
+            ]
+        }
         client.awaitReady()
         return client
     }
@@ -43,7 +53,11 @@ class ReaderApiPolicyTest {
     fun `every request carries the contract's headers and clientVersion where required`() = runTest {
         servers.on(PRE_AUTH) { json(preAuthJson()) }
         servers.on(CAPABILITIES) { json(CAPABILITIES_BODY) }
-        servers.on(PROFILE) { json("""{"contract_version":"reader.v1","request_id":"r","profile":{"created_at":"2026-09-13T00:00:00Z","updated_at":"2026-09-13T00:00:00Z"}}""") }
+        servers.on(PROFILE) {
+            json(
+                """{"contract_version":"reader.v1","request_id":"r","profile":{"created_at":"2026-09-13T00:00:00Z","updated_at":"2026-09-13T00:00:00Z"}}""",
+            )
+        }
         val client = client()
 
         client.bootstrap()
@@ -56,7 +70,11 @@ class ReaderApiPolicyTest {
             assertEquals("reader-android", request.headers["X-Reader-Client"])
             assertEquals("application/json", request.headers["Accept"])
             assertEquals(requestIds[index], request.headers["X-Request-ID"])
-            assertTrue(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").matches(request.headers["X-Request-ID"]!!))
+            assertTrue(
+                Regex(
+                    "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                ).matches(request.headers["X-Request-ID"]!!),
+            )
         }
         assertNull("pre-auth is public", servers.requests[0].bearer)
         assertEquals("access-1", servers.requests[1].bearer)
@@ -78,7 +96,9 @@ class ReaderApiPolicyTest {
         servers.queue(
             CAPABILITIES,
             { json(apiError("auth.expired_token"), HttpStatusCode.Unauthorized) },
-            { request -> json(CAPABILITIES_BODY, HttpStatusCode.OK, "X-Request-ID" to request.headers["X-Request-ID"]!!) },
+            { request ->
+                json(CAPABILITIES_BODY, HttpStatusCode.OK, "X-Request-ID" to request.headers["X-Request-ID"]!!)
+            },
         )
         servers.on(REFRESH_GRANT) { json(sessionJson("access-2", "refresh-2")) }
         val client = client()
@@ -154,13 +174,24 @@ class ReaderApiPolicyTest {
 
         assertEquals(1, servers.requestsTo("/auth/v1/token").size)
         assertEquals(8, capabilitiesCalls.get())
-        assertEquals(listOf("access-1", "access-1", "access-1", "access-1", "access-2", "access-2", "access-2", "access-2"), servers.requestsTo("/v1/reader/capabilities").map { it.bearer.orEmpty() }.sorted())
+        assertEquals(
+            listOf("access-1", "access-1", "access-1", "access-1", "access-2", "access-2", "access-2", "access-2"),
+            servers.requestsTo("/v1/reader/capabilities").map {
+                it.bearer.orEmpty()
+            }.sorted(),
+        )
         client.close()
     }
 
     @Test
     fun `any other 401 auth code clears the session with no retry`() = runTest {
-        for (code in listOf("auth.invalid_token", "auth.anonymous_identity_rejected", "auth.malformed_token", "auth.missing_sub_claim", "auth.unauthorized")) {
+        for (code in listOf(
+            "auth.invalid_token",
+            "auth.anonymous_identity_rejected",
+            "auth.malformed_token",
+            "auth.missing_sub_claim",
+            "auth.unauthorized",
+        )) {
             val servers = FakeServers()
             servers.on(CAPABILITIES) { json(apiError(code, "req-$code"), HttpStatusCode.Unauthorized) }
             val store = InMemorySessionStore(session(expiresAt = clock.expiring(3600)))
@@ -199,7 +230,13 @@ class ReaderApiPolicyTest {
     fun `429 is retried once after Retry-After and then surfaced`() = runTest {
         servers.queue(
             CAPABILITIES,
-            { json(apiError("rate_limit.exceeded", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "3") },
+            {
+                json(
+                    apiError("rate_limit.exceeded", retryable = true),
+                    HttpStatusCode.TooManyRequests,
+                    "Retry-After" to "3",
+                )
+            },
             { json(CAPABILITIES_BODY) },
         )
         val client = client()
@@ -209,7 +246,9 @@ class ReaderApiPolicyTest {
         assertEquals(listOf(3.seconds), waiter.waits)
 
         val exhausted = FakeServers()
-        exhausted.on(CAPABILITIES) { json(apiError("rate_limit.exceeded", "req-429", retryable = true), HttpStatusCode.TooManyRequests) }
+        exhausted.on(CAPABILITIES) {
+            json(apiError("rate_limit.exceeded", "req-429", retryable = true), HttpStatusCode.TooManyRequests)
+        }
         val other = ReaderAuthClient.build(testConfig, store, exhausted.engine, clock, waiter)
         other.awaitReady()
         val failure = runCatching { other.capabilities() }.exceptionOrNull()
@@ -229,9 +268,21 @@ class ReaderApiPolicyTest {
     fun `a Retry-After at or below the ceiling is still waited out once`() = runTest {
         servers.queue(
             CAPABILITIES,
-            { json(apiError("rate_limit.exceeded", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "5") },
+            {
+                json(
+                    apiError("rate_limit.exceeded", retryable = true),
+                    HttpStatusCode.TooManyRequests,
+                    "Retry-After" to "5",
+                )
+            },
             { json(CAPABILITIES_BODY) },
-            { json(apiError("rate_limit.exceeded", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "30") },
+            {
+                json(
+                    apiError("rate_limit.exceeded", retryable = true),
+                    HttpStatusCode.TooManyRequests,
+                    "Retry-After" to "30",
+                )
+            },
             { json(CAPABILITIES_BODY) },
         )
         val client = client()
@@ -247,7 +298,11 @@ class ReaderApiPolicyTest {
     @Test
     fun `a Retry-After above the ceiling is surfaced at once with the server's value`() = runTest {
         servers.on(CAPABILITIES) {
-            json(apiError("publication_import.quota_exhausted", "req-quota", retryable = true), HttpStatusCode.TooManyRequests, "Retry-After" to "3600")
+            json(
+                apiError("publication_import.quota_exhausted", "req-quota", retryable = true),
+                HttpStatusCode.TooManyRequests,
+                "Retry-After" to "3600",
+            )
         }
         val client = client()
 
@@ -290,9 +345,21 @@ class ReaderApiPolicyTest {
     fun `a retryable 503 that recovers on the retry succeeds, and its long Retry-After is not waited out`() = runTest {
         servers.queue(
             CAPABILITIES,
-            { json(apiError("auth.ingress_identity_unavailable", retryable = true), HttpStatusCode.ServiceUnavailable, "Retry-After" to "2") },
+            {
+                json(
+                    apiError("auth.ingress_identity_unavailable", retryable = true),
+                    HttpStatusCode.ServiceUnavailable,
+                    "Retry-After" to "2",
+                )
+            },
             { json(CAPABILITIES_BODY) },
-            { json(apiError("reader_product.unavailable", "req-long", retryable = true), HttpStatusCode.ServiceUnavailable, "Retry-After" to "120") },
+            {
+                json(
+                    apiError("reader_product.unavailable", "req-long", retryable = true),
+                    HttpStatusCode.ServiceUnavailable,
+                    "Retry-After" to "120",
+                )
+            },
         )
         val client = client()
 
@@ -311,9 +378,24 @@ class ReaderApiPolicyTest {
     fun `a 503 that is not retryable, or does not say, is an ApiError with no retry`() = runTest {
         servers.queue(
             CAPABILITIES,
-            { json(apiError("publication_import.admissions_disabled", "req-off", retryable = false), HttpStatusCode.ServiceUnavailable) },
-            { json("""{"code":"reader_sync.unavailable","message":"x","retryable":"true","request_id":"req-str"}""", HttpStatusCode.ServiceUnavailable) },
-            { json("""{"code":"reader_sync.unavailable","message":"x","request_id":"req-none"}""", HttpStatusCode.ServiceUnavailable) },
+            {
+                json(
+                    apiError("publication_import.admissions_disabled", "req-off", retryable = false),
+                    HttpStatusCode.ServiceUnavailable,
+                )
+            },
+            {
+                json(
+                    """{"code":"reader_sync.unavailable","message":"x","retryable":"true","request_id":"req-str"}""",
+                    HttpStatusCode.ServiceUnavailable,
+                )
+            },
+            {
+                json(
+                    """{"code":"reader_sync.unavailable","message":"x","request_id":"req-none"}""",
+                    HttpStatusCode.ServiceUnavailable,
+                )
+            },
         )
         val client = client()
 
@@ -345,7 +427,9 @@ class ReaderApiPolicyTest {
         assertEquals(listOf(10.seconds), waiter.waits)
 
         val plain = FakeServers()
-        plain.on(CAPABILITIES) { json(apiError("book.integrity_error", "req-502", retryable = false), HttpStatusCode.BadGateway) }
+        plain.on(CAPABILITIES) {
+            json(apiError("book.integrity_error", "req-502", retryable = false), HttpStatusCode.BadGateway)
+        }
         val other = ReaderAuthClient.build(testConfig, store, plain.engine, clock, waiter)
         other.awaitReady()
         val failure = runCatching { other.capabilities() }.exceptionOrNull()

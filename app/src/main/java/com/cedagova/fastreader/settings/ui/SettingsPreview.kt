@@ -177,6 +177,7 @@ private fun Token.toReaderWord(): ReaderWord = when (this) {
         coreStart = coreStart,
         coreEnd = coreEnd,
     )
+
     else -> ReaderWord(text = displayText)
 }
 

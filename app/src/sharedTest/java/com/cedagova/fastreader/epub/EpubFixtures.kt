@@ -71,7 +71,9 @@ object EpubFixtures {
     /** Adobe ADEPT leaves a rights file behind. */
     fun adobeRightsEpub(): ByteArray = zip(
         baseEntries() + listOf(
-            "META-INF/rights.xml" to """<licenseToken xmlns="http://ns.adobe.com/adept"/>""".toByteArray(Charsets.UTF_8),
+            "META-INF/rights.xml" to """<licenseToken xmlns="http://ns.adobe.com/adept"/>""".toByteArray(
+                Charsets.UTF_8,
+            ),
         ),
     )
 
@@ -218,9 +220,7 @@ object EpubFixtures {
      * a channel throw on them, and any reader that touches the entry fails, while
      * a reader that seeks past it does not notice.
      */
-    fun buildArchiveWithSpans(
-        entries: List<Pair<String, ByteArray>>,
-    ): Pair<ByteArray, Map<String, IntRange>> {
+    fun buildArchiveWithSpans(entries: List<Pair<String, ByteArray>>): Pair<ByteArray, Map<String, IntRange>> {
         val (bytes, endOffsets) = zipWithEntryOffsets(entries)
         val spans = LinkedHashMap<String, IntRange>()
         var start = 0
@@ -247,13 +247,7 @@ object EpubFixtures {
   </enc:EncryptedData>
 </encryption>""".toByteArray(Charsets.UTF_8)
 
-    private fun opf(
-        title: String,
-        author: String,
-        language: String,
-        identifier: String,
-        withCover: Boolean,
-    ): String {
+    private fun opf(title: String, author: String, language: String, identifier: String, withCover: Boolean): String {
         val coverItem = if (withCover) {
             """<item id="cover" href="images/cover.png" media-type="image/png" properties="cover-image"/>"""
         } else {
@@ -294,9 +288,7 @@ object EpubFixtures {
      * Builds the archive and reports, per entry name, the byte offset just past
      * that entry — which is where a download that stopped after it would end.
      */
-    private fun zipWithEntryOffsets(
-        entries: List<Pair<String, ByteArray>>,
-    ): Pair<ByteArray, Map<String, Int>> {
+    private fun zipWithEntryOffsets(entries: List<Pair<String, ByteArray>>): Pair<ByteArray, Map<String, Int>> {
         val endOffsets = LinkedHashMap<String, Int>()
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->

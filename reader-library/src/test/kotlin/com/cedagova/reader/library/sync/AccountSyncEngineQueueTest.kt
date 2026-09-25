@@ -230,7 +230,10 @@ class AccountSyncEngineQueueTest {
         // Calls keep coming from this thread while the collector switches on
         // another one, until B is signed in and then for 500 more.
         val ids = mutableListOf<String>()
-        fun call() = "x-${ids.size}".also { ids += it; engine.removeFromAccount(it) }
+        fun call() = "x-${ids.size}".also {
+            ids += it
+            engine.removeFromAccount(it)
+        }
         repeat(500) { call() }
         session.value = AccountSession.SignedIn("user-b")
         withTimeout(20_000) {
@@ -254,7 +257,13 @@ class AccountSyncEngineQueueTest {
         if (placed == null) {
             fail(
                 "the last call never reached B's outbox; " +
-                    queueDetail(ids, document("user-a").outbox.map { it.resourceId }, document("user-b").outbox.map { it.resourceId }),
+                    queueDetail(
+                        ids,
+                        document("user-a").outbox.map {
+                            it.resourceId
+                        },
+                        document("user-b").outbox.map { it.resourceId },
+                    ),
             )
         }
 
@@ -262,7 +271,10 @@ class AccountSyncEngineQueueTest {
         val b = document("user-b").outbox.map { it.resourceId }
         val detail = queueDetail(ids, a, b)
         assertTrue("B got changes after the switch; $detail", b.isNotEmpty())
-        assertTrue("A's remainder then B's queue are one unbroken tail of the calls; $detail", ids.takeLast(a.size + b.size) == a + b)
+        assertTrue(
+            "A's remainder then B's queue are one unbroken tail of the calls; $detail",
+            ids.takeLast(a.size + b.size) == a + b,
+        )
         assertTrue("nothing asked for before the switch reached B; $detail", ids.indexOf(b.first()) >= 500)
     }
 

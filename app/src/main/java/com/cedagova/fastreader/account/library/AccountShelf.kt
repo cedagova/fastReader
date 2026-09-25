@@ -137,8 +137,7 @@ class AccountShelf(
      * Straight through, like the two above it: the engine owns whether this says
      * anything new, and this class owns only the Undo window.
      */
-    fun recordPosition(bookId: String, position: LocalReadingPosition) =
-        actions.recordPosition(bookId, position)
+    fun recordPosition(bookId: String, position: LocalReadingPosition) = actions.recordPosition(bookId, position)
 
     /**
      * The reader has answered the resume offer for one remote change (REQ-511).

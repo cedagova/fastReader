@@ -63,9 +63,8 @@ class ReaderApiLibraryGateway(private val operations: ReaderLibraryOperations) :
 
     override suspend fun progress(): ReaderProgressListResponse = operations.progress()
 
-    override suspend fun applyMutations(
-        mutations: List<ReaderSyncMutationEnvelope>,
-    ): ReaderSyncMutationBatchResponse = operations.applyMutations(mutations)
+    override suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse =
+        operations.applyMutations(mutations)
 
     override suspend fun deltas(afterCursor: String, limit: Int): ReaderSyncDeltaResponse =
         operations.deltas(afterCursor, limit)

@@ -1,0 +1,25 @@
+# Formatting conventions (#205). ktlint reads this file through Spotless
+# (`./gradlew spotlessCheck`, part of `./gradlew check`; `./gradlew
+# spotlessApply` fixes what it can), and editors read it too.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+# Android's own Kotlin style: the closest to how this code is already written.
+ktlint_code_style = android_studio
+# Composable functions are named like types (`ReaderScreen`), per the Compose
+# API guidelines.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+# 120, not ktlint's Android default of 100: the code was written to 120, and a
+# narrower limit would rewrap ~1,700 lines for no reader benefit.
+max_line_length = 120
+# Multiline argument and parameter lists end with a trailing comma, as the code
+# already does, so adding an item is a one-line diff.
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true

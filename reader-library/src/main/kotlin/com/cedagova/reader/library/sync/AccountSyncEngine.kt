@@ -94,7 +94,6 @@ interface AccountLibraryActions {
      * backend's admission order decides who wins.
      */
     fun recordPosition(bookId: String, position: LocalReadingPosition)
-
 }
 
 /**
@@ -132,13 +131,11 @@ interface AccountImportRecords {
  * is read back. Either way the record would be stored and then silently lost, so
  * the write is refused instead. [bookLevel] says which level the key was for.
  */
-class ReservedHostRecordKeyException(
-    val key: String,
-    val bookLevel: Boolean,
-) : IllegalArgumentException(
-    "\"$key\" is reserved by the account document ${if (bookLevel) "for a book row" else "at the top level"}; " +
-        "a host record under it would be lost",
-)
+class ReservedHostRecordKeyException(val key: String, val bookLevel: Boolean) :
+    IllegalArgumentException(
+        "\"$key\" is reserved by the account document ${if (bookLevel) "for a book row" else "at the top level"}; " +
+            "a host record under it would be lost",
+    )
 
 /**
  * The host's own records in the account document (#147).
@@ -264,7 +261,9 @@ class AccountSyncEngine(
     /** Minted once per queued mutation and then persisted; never re-minted for a retry. */
     private val newIdempotencyKey: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> String = { kotlin.time.Clock.System.now().toString() },
-) : AccountLibraryActions, AccountImportRecords, AccountHostRecords {
+) : AccountLibraryActions,
+    AccountImportRecords,
+    AccountHostRecords {
 
     private val mutex = Mutex()
 
@@ -395,11 +394,9 @@ class AccountSyncEngine(
 
     override fun refresh() = requestSync(AccountSyncTrigger.MANUAL_REFRESH)
 
-    override fun removeFromAccount(bookId: String) =
-        enqueue(bookId, ReaderMutationKind.DELETE, JsonObject(emptyMap()))
+    override fun removeFromAccount(bookId: String) = enqueue(bookId, ReaderMutationKind.DELETE, JsonObject(emptyMap()))
 
-    override fun undoRemove(bookId: String) =
-        enqueue(bookId, ReaderMutationKind.RESTORE, JsonObject(emptyMap()))
+    override fun undoRemove(bookId: String) = enqueue(bookId, ReaderMutationKind.RESTORE, JsonObject(emptyMap()))
 
     override fun recordOpened(bookId: String) {
         val at = now()
@@ -458,8 +455,7 @@ class AccountSyncEngine(
         return active?.userId
     }
 
-    override suspend fun importRecords(): List<PublicationImportRecord> =
-        locked { active?.document?.imports.orEmpty() }
+    override suspend fun importRecords(): List<PublicationImportRecord> = locked { active?.document?.imports.orEmpty() }
 
     /**
      * Stores [record] under the one writer of the account document.
@@ -487,11 +483,14 @@ class AccountSyncEngine(
 
     // ------------------------------------------------------------ host records
 
-    override suspend fun hostRecord(key: String): JsonElement? =
-        locked { active?.document?.host?.get(key) }
+    override suspend fun hostRecord(key: String): JsonElement? = locked { active?.document?.host?.get(key) }
 
     override suspend fun updateHostRecord(key: String, transform: (JsonElement?) -> JsonElement?) {
-        if (key in AccountLibraryCodec.RESERVED_DOCUMENT_KEYS) throw ReservedHostRecordKeyException(key, bookLevel = false)
+        if (key in
+            AccountLibraryCodec.RESERVED_DOCUMENT_KEYS
+        ) {
+            throw ReservedHostRecordKeyException(key, bookLevel = false)
+        }
         locked {
             val account = active ?: return@locked
             val host = account.document.host
@@ -501,11 +500,7 @@ class AccountSyncEngine(
         }
     }
 
-    override suspend fun updateBookHostRecord(
-        bookId: String,
-        key: String,
-        transform: (JsonElement?) -> JsonElement?,
-    ) {
+    override suspend fun updateBookHostRecord(bookId: String, key: String, transform: (JsonElement?) -> JsonElement?) {
         if (key in AccountLibraryCodec.RESERVED_BOOK_KEYS) throw ReservedHostRecordKeyException(key, bookLevel = true)
         locked {
             val account = active ?: return@locked
@@ -763,10 +758,7 @@ class AccountSyncEngine(
      * bootstraps, whatever happened in between. No schema change: a missing
      * cursor already means "read the lists".
      */
-    private suspend fun drainOutbox(
-        account: ActiveAccount,
-        gateway: ReaderLibraryGateway,
-    ): DrainOutcome {
+    private suspend fun drainOutbox(account: ActiveAccount, gateway: ReaderLibraryGateway): DrainOutcome {
         val pending = account.document.outbox
         if (pending.isEmpty()) return DrainOutcome(rejection = null)
 
@@ -889,7 +881,10 @@ class AccountSyncEngine(
                 val remote = AccountCanonicalPayload.remotePosition(
                     position = PortableProgress.positionOf(
                         buildJsonObject {
-                            put("location", Json.encodeToJsonElement(ReaderPortableLocationV1.serializer(), progress.location))
+                            put(
+                                "location",
+                                Json.encodeToJsonElement(ReaderPortableLocationV1.serializer(), progress.location),
+                            )
                             put("progress_percent", JsonPrimitive(progress.progressPercent))
                             put("updated_at", JsonPrimitive(progress.updatedAt))
                             progress.chapterTitle?.let { put("chapter_title", JsonPrimitive(it)) }
@@ -1022,7 +1017,9 @@ class AccountSyncEngine(
         throw e
     } catch (e: Exception) {
         _state.value = _state.value.copy(
-            lastError = AccountSyncError.StoreBlocked("a change could not be queued: ${e.message ?: e::class.simpleName}"),
+            lastError = AccountSyncError.StoreBlocked(
+                "a change could not be queued: ${e.message ?: e::class.simpleName}",
+            ),
         )
         false
     }
@@ -1095,6 +1092,7 @@ class AccountSyncEngine(
             withContext(ioDispatcher) {
                 when (val load = store.load()) {
                     is AccountLibraryLoad.Blocked -> load.message
+
                     is AccountLibraryLoad.Loaded -> {
                         val stored = load.document
                         if (stored.userId.isNotEmpty() && stored.userId != userId) {
@@ -1111,7 +1109,9 @@ class AccountSyncEngine(
         }
         if (refusal != null) {
             _state.value = _state.value.copy(
-                lastError = AccountSyncError.StoreBlocked("a change made before the session changed was not kept: $refusal"),
+                lastError = AccountSyncError.StoreBlocked(
+                    "a change made before the session changed was not kept: $refusal",
+                ),
             )
         }
     }
@@ -1155,7 +1155,9 @@ class AccountSyncEngine(
         if (!entry.resourceType.isLibraryItem()) return book
         return when (entry.mutationKind) {
             ReaderMutationKind.DELETE -> book.copy(removed = true)
+
             ReaderMutationKind.RESTORE -> book.copy(removed = false)
+
             ReaderMutationKind.UPSERT -> {
                 val status = (entry.payload["status"] as? JsonPrimitive)?.content
                     ?.let { wire -> ReaderLibraryStatus.entries.firstOrNull { it.wireName() == wire } }
@@ -1168,6 +1170,7 @@ class AccountSyncEngine(
                     },
                 )
             }
+
             ReaderMutationKind.UNKNOWN -> book
         }
     }
@@ -1200,10 +1203,7 @@ class AccountSyncEngine(
      * (#140). `superseded` and `conflict` carry the position that beat it —
      * somebody else's — and are adopted without that mark.
      */
-    private fun adopt(
-        document: AccountLibraryDocument,
-        result: ReaderSyncMutationResult,
-    ): AccountLibraryDocument {
+    private fun adopt(document: AccountLibraryDocument, result: ReaderSyncMutationResult): AccountLibraryDocument {
         if (result.status == ReaderSyncStatus.REJECTED) return document
         val payload = result.canonicalPayload.takeIf { it.isNotEmpty() }
             ?: result.conflict?.canonicalPayload

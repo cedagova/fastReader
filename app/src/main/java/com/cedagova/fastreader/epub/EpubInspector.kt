@@ -98,7 +98,9 @@ object EpubInspector {
         }
 
         val cover = opf.coverPath
-            ?.let { path -> ZipReader.readEntry(source, path, MAX_COVER_BYTES)?.let { EpubCover(opf.coverMediaType, it) } }
+            ?.let { path ->
+                ZipReader.readEntry(source, path, MAX_COVER_BYTES)?.let { EpubCover(opf.coverMediaType, it) }
+            }
 
         return EpubInspection.Readable(digest, opf.metadata, cover)
     }
@@ -209,10 +211,9 @@ internal class OpfDocument(
         }
 
         /** EPUB 3 marks its navigation document with `properties="nav"`. */
-        private fun resolveNav(manifestItems: Map<String, ManifestItem>): String? =
-            manifestItems.values
-                .firstOrNull { item -> item.properties.split(Regex("\\s+")).any { it == "nav" } }
-                ?.path
+        private fun resolveNav(manifestItems: Map<String, ManifestItem>): String? = manifestItems.values
+            .firstOrNull { item -> item.properties.split(Regex("\\s+")).any { it == "nav" } }
+            ?.path
 
         /**
          * EPUB 2 points at its NCX from `<spine toc="...">`. Some books omit that
@@ -292,11 +293,10 @@ internal class OpfDocument(
             }
         }
 
-        private fun List<Element>.firstText(localName: String): String? =
-            firstOrNull { it.hasLocalName(localName) }
-                ?.textContent
-                ?.trim()
-                ?.takeIf(String::isNotEmpty)
+        private fun List<Element>.firstText(localName: String): String? = firstOrNull { it.hasLocalName(localName) }
+            ?.textContent
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
     }
 }
 

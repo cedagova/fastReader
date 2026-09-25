@@ -69,11 +69,9 @@ class CrashInducerIsDebugOnlyTest {
         )
     }
 
-    private fun sourceSet(name: String): File =
-        File(repositoryRoot(), "app/src/$name").also {
-            check(it.isDirectory) { "app/src/$name is missing" }
-        }
+    private fun sourceSet(name: String): File = File(repositoryRoot(), "app/src/$name").also {
+        check(it.isDirectory) { "app/src/$name is missing" }
+    }
 
-    private fun manifest(name: String): String =
-        sourceSet(name).resolve("AndroidManifest.xml").readText()
+    private fun manifest(name: String): String = sourceSet(name).resolve("AndroidManifest.xml").readText()
 }

@@ -298,11 +298,10 @@ internal class ZipDirectory private constructor(
             return null
         }
 
-        private fun ByteArray.int(offset: Int): Int =
-            (this[offset].toInt() and 0xFF) or
-                ((this[offset + 1].toInt() and 0xFF) shl 8) or
-                ((this[offset + 2].toInt() and 0xFF) shl 16) or
-                ((this[offset + 3].toInt() and 0xFF) shl 24)
+        private fun ByteArray.int(offset: Int): Int = (this[offset].toInt() and 0xFF) or
+            ((this[offset + 1].toInt() and 0xFF) shl 8) or
+            ((this[offset + 2].toInt() and 0xFF) shl 16) or
+            ((this[offset + 3].toInt() and 0xFF) shl 24)
 
         private fun ByteArray.short(offset: Int): Int =
             (this[offset].toInt() and 0xFF) or ((this[offset + 1].toInt() and 0xFF) shl 8)

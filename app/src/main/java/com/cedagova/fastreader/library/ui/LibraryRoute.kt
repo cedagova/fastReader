@@ -168,7 +168,13 @@ fun LibraryRoute(
             // Re-granting a folder re-adds it at the same tree URI, which restores
             // every book it holds; a directly picked file has to be picked again.
             val tree = book.regrantTreeUri
-            if (tree != null) pickFolder.launch(tree.toUri()) else pickBooks.launch(SafDocumentGateway.PICKER_MIME_TYPES)
+            if (tree !=
+                null
+            ) {
+                pickFolder.launch(tree.toUri())
+            } else {
+                pickBooks.launch(SafDocumentGateway.PICKER_MIME_TYPES)
+            }
         },
         coverLoader = coverLoader,
         onDismissResumeNotice = onDismissResumeNotice,

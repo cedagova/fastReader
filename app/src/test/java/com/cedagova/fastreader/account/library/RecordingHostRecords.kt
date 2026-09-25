@@ -8,10 +8,7 @@ import kotlinx.serialization.json.JsonElement
  * records and each known book row's, with the engine's rules — nothing while
  * nobody is signed in, and a book the account has no row for is skipped.
  */
-class RecordingHostRecords(
-    var userId: String? = "user-1",
-    knownBooks: Set<String> = emptySet(),
-) : AccountHostRecords {
+class RecordingHostRecords(var userId: String? = "user-1", knownBooks: Set<String> = emptySet()) : AccountHostRecords {
 
     val document = mutableMapOf<String, JsonElement>()
     val books: MutableMap<String, MutableMap<String, JsonElement>> =
@@ -29,11 +26,7 @@ class RecordingHostRecords(
         apply(document, key, transform(document[key]), "document")
     }
 
-    override suspend fun updateBookHostRecord(
-        bookId: String,
-        key: String,
-        transform: (JsonElement?) -> JsonElement?,
-    ) {
+    override suspend fun updateBookHostRecord(bookId: String, key: String, transform: (JsonElement?) -> JsonElement?) {
         if (userId == null) return
         val row = books[bookId] ?: return
         apply(row, key, transform(row[key]), bookId)

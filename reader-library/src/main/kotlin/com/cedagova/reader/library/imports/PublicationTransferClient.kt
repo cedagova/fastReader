@@ -6,10 +6,10 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
-import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -51,9 +51,7 @@ import kotlin.math.min
  * Bytes come from the caller's [PublicationSource] one chunk at a time; nothing
  * is copied or buffered whole.
  */
-class PublicationTransferClient internal constructor(
-    private val http: HttpClient,
-) : Closeable {
+class PublicationTransferClient internal constructor(private val http: HttpClient) : Closeable {
 
     /** The production client: OkHttp, the same engine `:reader-auth` uses, and nothing else. */
     constructor() : this(httpClient(OkHttp.create()))
@@ -103,12 +101,7 @@ class PublicationTransferClient internal constructor(
      * — offset plus what was sent — because a 204 is the provider saying it
      * stored the body.
      */
-    suspend fun patch(
-        grant: PublicationTransferGrant,
-        location: String,
-        offset: Long,
-        chunk: ByteArray,
-    ): Long {
+    suspend fun patch(grant: PublicationTransferGrant, location: String, offset: Long, chunk: ByteArray): Long {
         require(chunk.isNotEmpty()) { "a PATCH carries bytes" }
         require(chunk.size <= grant.chunkSizeBytes) {
             "a chunk is at most the grant's ${grant.chunkSizeBytes} bytes, not ${chunk.size}"
@@ -222,9 +215,8 @@ class PublicationTransferClient internal constructor(
         if (!GrantOrigin.sameAs(grant.endpoint, url)) throw PublicationTransferException.ForeignLocation()
     }
 
-    private fun HttpResponse.uploadOffset(): Long =
-        headers[HEADER_UPLOAD_OFFSET]?.toLongOrNull()
-            ?: throw PublicationTransferException.Protocol("the response carried no Upload-Offset")
+    private fun HttpResponse.uploadOffset(): Long = headers[HEADER_UPLOAD_OFFSET]?.toLongOrNull()
+        ?: throw PublicationTransferException.Protocol("the response carried no Upload-Offset")
 
     companion object {
         const val TUS_VERSION: String = "1.0.0"
@@ -281,12 +273,11 @@ class PublicationTransferClient internal constructor(
             }
 
         /** An absolute `Location`, or a relative one resolved against the creation endpoint. */
-        internal fun resolve(endpoint: String, location: String): String =
-            try {
-                URI(endpoint).resolve(location).toString()
-            } catch (e: IllegalArgumentException) {
-                throw PublicationTransferException.Protocol("the creation response Location is not a URL")
-            }
+        internal fun resolve(endpoint: String, location: String): String = try {
+            URI(endpoint).resolve(location).toString()
+        } catch (e: IllegalArgumentException) {
+            throw PublicationTransferException.Protocol("the creation response Location is not a URL")
+        }
 
         /**
          * [length] bytes of [source] starting at [offset], read straight from
@@ -348,10 +339,7 @@ class PublicationTransferClient internal constructor(
  * things about them, and none of them is "show the provider's error text": a
  * provider message can carry a signed URL, so only the status travels.
  */
-sealed class PublicationTransferException(
-    message: String,
-    cause: Throwable? = null,
-) : Exception(message, cause) {
+sealed class PublicationTransferException(message: String, cause: Throwable? = null) : Exception(message, cause) {
 
     /** The provider's confirmed offset when this was thrown, once the transfer knows it. */
     open val offset: Long = 0

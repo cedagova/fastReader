@@ -61,7 +61,11 @@ class SessionLockTest {
         // Caller B: reader-api rejects the session outright — the old token, then the refreshed one.
         servers.queue(
             CAPABILITIES,
-            { json(apiError("auth.invalid_token"), HttpStatusCode.Unauthorized).also { rejectionServed.complete(Unit) } },
+            {
+                json(apiError("auth.invalid_token"), HttpStatusCode.Unauthorized).also {
+                    rejectionServed.complete(Unit)
+                }
+            },
             { json(apiError("auth.invalid_token"), HttpStatusCode.Unauthorized) },
         )
         val (client, store) = clientWith(session(expiresAt = clock.expiring(3000)))
@@ -188,13 +192,21 @@ class SessionLockTest {
         refreshing.await()
         changing.await()
 
-        assertEquals("the password change waited for the refresh", listOf("access-2"), servers.requestsTo("/auth/v1/user").map { it.bearer })
+        assertEquals(
+            "the password change waited for the refresh",
+            listOf("access-2"),
+            servers.requestsTo("/auth/v1/user").map {
+                it.bearer
+            },
+        )
         assertEquals("refresh-2", store.session?.refreshToken)
 
         // The next refresh sends the rotated token, not the spent one.
         clock.advance(3600.seconds)
         client.onForeground()
-        val grants = servers.requestsTo("/auth/v1/token").map { Json.parseToJsonElement(it.body).jsonObject["refresh_token"]?.jsonPrimitive?.content }
+        val grants = servers.requestsTo("/auth/v1/token").map {
+            Json.parseToJsonElement(it.body).jsonObject["refresh_token"]?.jsonPrimitive?.content
+        }
         assertEquals(listOf("refresh-1", "refresh-2"), grants)
         assertEquals("refresh-3", store.session?.refreshToken)
         client.close()

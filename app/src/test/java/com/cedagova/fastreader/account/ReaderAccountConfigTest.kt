@@ -69,7 +69,8 @@ class ReaderAccountConfigTest {
 
     @Test
     fun `only the blank values are named as missing`() {
-        val partial = ReaderAuthConfig(supabaseUrl = "https://x.test", publishableKey = "", readerApiBaseUrl = "https://y.test")
+        val partial =
+            ReaderAuthConfig(supabaseUrl = "https://x.test", publishableKey = "", readerApiBaseUrl = "https://y.test")
 
         assertFalse(partial.isConfigured)
         assertEquals(listOf("reader.supabasePublishableKey"), ReaderAccountConfiguration.missingValues(partial))

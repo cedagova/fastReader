@@ -235,14 +235,10 @@ class ReaderPositionTest {
         assertEquals(5, stored.resolveIndex(streamed))
     }
 
-    private fun position(
-        digest: String,
-        tokenIndex: Int,
-        pipelineVersion: Int,
-        fingerprint: String? = null,
-    ) = ReaderPosition(
-        position = TokenPosition(digest, tokenIndex, pipelineVersion),
-        progressFraction = 0f,
-        structuralFingerprint = fingerprint,
-    )
+    private fun position(digest: String, tokenIndex: Int, pipelineVersion: Int, fingerprint: String? = null) =
+        ReaderPosition(
+            position = TokenPosition(digest, tokenIndex, pipelineVersion),
+            progressFraction = 0f,
+            structuralFingerprint = fingerprint,
+        )
 }

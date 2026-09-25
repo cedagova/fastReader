@@ -23,11 +23,7 @@ import com.cedagova.fastreader.library.LibraryGraph
  * showing the folder's *current* count, not the one it opened with.
  */
 @Composable
-fun FolderListRoute(
-    graph: LibraryGraph,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun FolderListRoute(graph: LibraryGraph, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val repository = graph.repository
     val catalog by repository.catalog.collectAsState()
     var confirmingId by rememberSaveable { mutableStateOf<String?>(null) }

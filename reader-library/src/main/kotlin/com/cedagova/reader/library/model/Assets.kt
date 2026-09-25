@@ -3,7 +3,7 @@ package com.cedagova.reader.library.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
+/*
  * The asset download grant as reader-api publishes it (#118, LEAF811 of #104):
  * the one way a book's bytes may come *onto* this device.
  *

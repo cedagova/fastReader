@@ -291,8 +291,7 @@ class ReaderViewModelPersistenceTest {
 
         val recorded: List<ReaderPosition> get() = calls.map { it.second }
 
-        fun recordedFor(bookId: String): List<ReaderPosition> =
-            calls.filter { it.first == bookId }.map { it.second }
+        fun recordedFor(bookId: String): List<ReaderPosition> = calls.filter { it.first == bookId }.map { it.second }
 
         override val failure: StateFlow<String?> get() = failureState
 

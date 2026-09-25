@@ -77,7 +77,11 @@ class FileSessionStore internal constructor(
         try {
             val plaintext = cipher.decrypt(target.readBytes())
             val envelope = json.decodeFromString(Envelope.serializer(), plaintext.decodeToString())
-            if (envelope.formatVersion != FORMAT_VERSION) throw IllegalStateException("unsupported format ${envelope.formatVersion}")
+            if (envelope.formatVersion !=
+                FORMAT_VERSION
+            ) {
+                throw IllegalStateException("unsupported format ${envelope.formatVersion}")
+            }
             envelope.session
         } catch (e: Exception) {
             target.delete()
@@ -109,7 +113,10 @@ class FileSessionStore internal constructor(
 
         private const val TEMP_SUFFIX = ".tmp"
 
-        private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        private val json = Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
 
         private fun File.isTemporary(): Boolean = name.startsWith("$FILE_NAME.") && name.endsWith(TEMP_SUFFIX)
 
@@ -118,7 +125,12 @@ class FileSessionStore internal constructor(
          * (the target untouched) when the filesystem cannot do it atomically.
          */
         private fun atomicReplace(temporary: File, target: File) {
-            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
         }
 
         /** The production location: `<noBackupFilesDir>/reader-auth/session.bin`. */

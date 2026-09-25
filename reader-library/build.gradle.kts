@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 // The Reader account-library client (#112, LEAF701 of #104).
 //
 // It is the contract boundary: typed models and typed operations for the
@@ -17,28 +15,13 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // contracts/ holds the pinned OpenAPI document and its sha256;
 // ReaderLibraryContractTest is the drift gate (owner decision P1).
 plugins {
-    alias(libs.plugins.android.library)
+    // Shared SDK, JVM, lint, test and formatter settings (build-logic, #205).
+    id("conventions.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.cedagova.reader.library"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 26
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
 }
 
 // ReaderLibraryContractTest reads contracts/ from the filesystem, not from the

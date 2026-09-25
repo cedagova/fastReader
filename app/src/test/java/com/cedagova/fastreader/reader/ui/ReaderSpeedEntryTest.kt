@@ -32,6 +32,7 @@ class ReaderSpeedEntryTest {
     val composeRule = createComposeRule()
 
     private val book = ReaderFixtures.englishNovel
+
     // Paused: the readout is chrome, and the chrome is off the page while the stream runs.
     private val paused = ReaderBookView("The Quiet Machine", book)
         .present(ReaderSession(book).jumpTo(12))

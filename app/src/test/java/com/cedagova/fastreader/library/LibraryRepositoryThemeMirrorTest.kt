@@ -35,9 +35,7 @@ class LibraryRepositoryThemeMirrorTest {
     val temporaryFolder = TemporaryFolder()
 
     /** Records the sequence of mirror writes, which is what the ordering rule is about. */
-    private class RecordingThemeMirror(
-        private var stored: ThemeChoice = ReaderSettings.DEFAULTS.theme,
-    ) : ThemeMirror {
+    private class RecordingThemeMirror(private var stored: ThemeChoice = ReaderSettings.DEFAULTS.theme) : ThemeMirror {
         val writes = mutableListOf<ThemeChoice>()
 
         override fun read(): ThemeChoice = stored
@@ -50,11 +48,7 @@ class LibraryRepositoryThemeMirrorTest {
 
     private val gateway = FakeDocumentGateway()
 
-    private fun repository(
-        store: CatalogStore,
-        mirror: ThemeMirror,
-        scope: CoroutineScope,
-    ): LibraryRepository {
+    private fun repository(store: CatalogStore, mirror: ThemeMirror, scope: CoroutineScope): LibraryRepository {
         val covers = CoverStore(File(temporaryFolder.root, "covers"))
         return LibraryRepository(
             store = store,
@@ -67,8 +61,7 @@ class LibraryRepositoryThemeMirrorTest {
         )
     }
 
-    private fun fileStore() =
-        FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json"))
+    private fun fileStore() = FileCatalogStore(File(File(temporaryFolder.root, "catalog"), "catalog.json"))
 
     @Test
     fun `choosing a theme mirrors it for the next cold start`() = runTest {

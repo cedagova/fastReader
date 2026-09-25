@@ -34,7 +34,11 @@ class UnexpectedResponseTest {
         ReaderAuthClient.build(testConfig, store, servers.engine, clock, waiter).also { it.awaitReady() }
 
     private val portal: Responder = {
-        respond("<html><body>Sign in to the hotel Wi-Fi</body></html>", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/html"))
+        respond(
+            "<html><body>Sign in to the hotel Wi-Fi</body></html>",
+            HttpStatusCode.OK,
+            headersOf(HttpHeaders.ContentType, "text/html"),
+        )
     }
 
     private fun inMargin(): UserSession = session(expiresAt = clock.expiring(120))
@@ -42,40 +46,45 @@ class UnexpectedResponseTest {
     // ---- Refresh -----------------------------------------------------------------------------
 
     @Test
-    fun `return to the foreground behind a captive portal keeps the session, sends one refresh and does not throw`() = runTest {
-        servers.on(REFRESH_GRANT, portal)
-        val stored = inMargin()
-        val store = InMemorySessionStore(stored)
-        val client = client(store)
+    fun `return to the foreground behind a captive portal keeps the session, sends one refresh and does not throw`() =
+        runTest {
+            servers.on(REFRESH_GRANT, portal)
+            val stored = inMargin()
+            val store = InMemorySessionStore(stored)
+            val client = client(store)
 
-        val state = client.onForeground()
+            val state = client.onForeground()
 
-        assertTrue("$state", state is ReaderSessionState.SignedIn)
-        assertEquals(stored.expiresAt, (state as ReaderSessionState.SignedIn).expiresAt)
-        assertEquals("exactly one refresh request", listOf(REFRESH_GRANT), servers.routes())
-        assertEquals(emptyList<Any>(), waiter.waits)
-        assertEquals("access-1", store.session?.accessToken)
-        assertEquals("refresh-1", store.session?.refreshToken)
-        client.close()
-    }
+            assertTrue("$state", state is ReaderSessionState.SignedIn)
+            assertEquals(stored.expiresAt, (state as ReaderSessionState.SignedIn).expiresAt)
+            assertEquals("exactly one refresh request", listOf(REFRESH_GRANT), servers.routes())
+            assertEquals(emptyList<Any>(), waiter.waits)
+            assertEquals("access-1", store.session?.accessToken)
+            assertEquals("refresh-1", store.session?.refreshToken)
+            client.close()
+        }
 
     @Test
-    fun `a protected call behind a captive portal throws unexpected response and sends nothing to reader-api`() = runTest {
-        servers.on(REFRESH_GRANT, portal)
-        servers.on(CAPABILITIES) { json(CAPABILITIES_BODY) }
-        val store = InMemorySessionStore(inMargin())
-        val client = client(store)
+    fun `a protected call behind a captive portal throws unexpected response and sends nothing to reader-api`() =
+        runTest {
+            servers.on(REFRESH_GRANT, portal)
+            servers.on(CAPABILITIES) { json(CAPABILITIES_BODY) }
+            val store = InMemorySessionStore(inMargin())
+            val client = client(store)
 
-        val failure = runCatching { client.capabilities() }.exceptionOrNull()
+            val failure = runCatching { client.capabilities() }.exceptionOrNull()
 
-        assertTrue("$failure", failure is ReaderAuthException.UnexpectedResponse)
-        assertTrue("the SDK's decode failure is the cause: ${failure?.cause}", failure?.cause is SerializationException)
-        assertEquals(listOf(REFRESH_GRANT), servers.routes())
-        assertEquals(emptyList<Any>(), waiter.waits)
-        assertEquals("refresh-1", store.session?.refreshToken)
-        assertTrue(client.currentState() is ReaderSessionState.SignedIn)
-        client.close()
-    }
+            assertTrue("$failure", failure is ReaderAuthException.UnexpectedResponse)
+            assertTrue(
+                "the SDK's decode failure is the cause: ${failure?.cause}",
+                failure?.cause is SerializationException,
+            )
+            assertEquals(listOf(REFRESH_GRANT), servers.routes())
+            assertEquals(emptyList<Any>(), waiter.waits)
+            assertEquals("refresh-1", store.session?.refreshToken)
+            assertTrue(client.currentState() is ReaderSessionState.SignedIn)
+            client.close()
+        }
 
     @Test
     fun `after an unreadable refresh the next refresh that works replaces the session`() = runTest {
@@ -151,7 +160,9 @@ class UnexpectedResponseTest {
         val store = InMemorySessionStore()
         val client = client(store)
 
-        val failure = runCatching { client.signInWithPassword("reader@example.test", "correct horse") }.exceptionOrNull()
+        val failure = runCatching {
+            client.signInWithPassword("reader@example.test", "correct horse")
+        }.exceptionOrNull()
 
         assertTrue("$failure", failure is ReaderAuthException.UnexpectedResponse)
         assertEquals(listOf(PRE_AUTH, PASSWORD_GRANT), servers.routes())
@@ -199,9 +210,14 @@ class UnexpectedResponseTest {
 
     @Test
     fun `a pre-auth document with a wrongly typed field is an api error and is not kept`() = runTest {
-        val wrong = preAuthJson().replace(""""accountEntry":{"availability":"available","reason":"available","retryable":false}""", """"accountEntry":["available"]""")
+        val wrong = preAuthJson().replace(
+            """"accountEntry":{"availability":"available","reason":"available","retryable":false}""",
+            """"accountEntry":["available"]""",
+        )
         assertTrue("the fixture changed", wrong != preAuthJson())
-        servers.queue(PRE_AUTH, { json(wrong, HttpStatusCode.OK, "X-Request-ID" to "req-pre") }, { json(preAuthJson()) })
+        servers.queue(PRE_AUTH, {
+            json(wrong, HttpStatusCode.OK, "X-Request-ID" to "req-pre")
+        }, { json(preAuthJson()) })
         val client = client(InMemorySessionStore())
 
         val failure = runCatching { client.bootstrap() }.exceptionOrNull()

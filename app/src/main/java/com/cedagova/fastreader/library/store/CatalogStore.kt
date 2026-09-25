@@ -17,11 +17,8 @@ sealed interface CatalogLoad {
      * aside instead of being deleted; [migratedFrom] names an older schema
      * version that was upgraded on the way in.
      */
-    data class Loaded(
-        val catalog: Catalog,
-        val recoveredFrom: String? = null,
-        val migratedFrom: Int? = null,
-    ) : CatalogLoad
+    data class Loaded(val catalog: Catalog, val recoveredFrom: String? = null, val migratedFrom: Int? = null) :
+        CatalogLoad
 
     /**
      * The stored catalog must not be touched — for example it was written by a

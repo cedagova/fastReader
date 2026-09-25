@@ -55,7 +55,9 @@ class SessionSaveFailureTest {
             throw IOException("no space left on device")
         }
         override suspend fun load(): UserSession? = session
-        override suspend fun clear() { session = null }
+        override suspend fun clear() {
+            session = null
+        }
     }
 
     private suspend fun clientOver(store: SessionStore): ReaderAuthClient =
@@ -183,7 +185,9 @@ class SessionSaveFailureTest {
         launch(Dispatchers.Unconfined) {
             client.sessionState.first { it is ReaderSessionState.SignedIn && it.expiresAt > stored.expiresAt }
             otherDevices.complete(
-                this@runTest.async(start = CoroutineStart.UNDISPATCHED) { runCatching { client.signOutOtherDevices() } },
+                this@runTest.async(start = CoroutineStart.UNDISPATCHED) {
+                    runCatching { client.signOutOtherDevices() }
+                },
             )
         }
 

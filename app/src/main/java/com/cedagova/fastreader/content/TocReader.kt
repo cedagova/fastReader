@@ -83,6 +83,7 @@ internal object TocReader {
                         inLabel = true
                         label.setLength(0)
                     }
+
                     // `<content src="chapter1.xhtml#start"/>` closes the entry the
                     // preceding label opened.
                     "content" -> record(titles, ncxPath, event.attribute("src"), pendingLabel.orEmpty())
@@ -101,12 +102,7 @@ internal object TocReader {
         return titles
     }
 
-    private fun record(
-        titles: MutableMap<String, String>,
-        documentPath: String,
-        href: String?,
-        rawTitle: String,
-    ) {
+    private fun record(titles: MutableMap<String, String>, documentPath: String, href: String?, rawTitle: String) {
         val title = rawTitle.collapseSpaces()
         if (title.isEmpty()) return
         val target = href?.takeIf { it.isNotBlank() } ?: return
@@ -114,5 +110,4 @@ internal object TocReader {
         val path = EpubPaths.resolve(documentPath, target) ?: return
         titles.putIfAbsent(path, title)
     }
-
 }

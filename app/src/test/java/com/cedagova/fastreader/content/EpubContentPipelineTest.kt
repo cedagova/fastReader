@@ -283,8 +283,7 @@ class EpubContentPipelineTest {
         return (result as BookContentResult.Failed).reason
     }
 
-    private fun BookContent.words(): List<String> =
-        tokens.filterIsInstance<WordToken>().map { it.text }
+    private fun BookContent.words(): List<String> = tokens.filterIsInstance<WordToken>().map { it.text }
 
     private fun BookContent.word(text: String): WordToken =
         tokens.filterIsInstance<WordToken>().firstOrNull { it.text == text }

@@ -34,8 +34,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,7 +52,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -70,9 +70,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
@@ -89,7 +89,6 @@ import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.ImportProblem
 import com.cedagova.fastreader.account.library.ImportsOff
 import com.cedagova.fastreader.account.library.PublicationSourceProblem
-import com.cedagova.reader.library.sync.wireName
 import com.cedagova.fastreader.library.BookStatus
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.ScanTrigger
@@ -99,6 +98,7 @@ import com.cedagova.fastreader.ui.WideLayoutMinWidth
 import com.cedagova.fastreader.ui.WidthAware
 import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.ReaderCapabilityReason
+import com.cedagova.reader.library.sync.wireName
 import kotlin.math.roundToInt
 
 /** Smallest comfortable touch target; Android's accessibility minimum is 48dp (REQ-060). */
@@ -201,7 +201,10 @@ fun LibraryScreen(
     if (bookToRemove != null) {
         RemoveBookDialog(
             book = bookToRemove,
-            onConfirm = { confirmingRemoval = null; onRemove(bookToRemove) },
+            onConfirm = {
+                confirmingRemoval = null
+                onRemove(bookToRemove)
+            },
             onDismiss = { confirmingRemoval = null },
         )
     }
@@ -213,7 +216,10 @@ fun LibraryScreen(
     if (bookToRemoveFromAccount != null) {
         RemoveFromAccountDialog(
             book = bookToRemoveFromAccount,
-            onConfirm = { confirmingAccountRemoval = null; onRemoveFromAccount(bookToRemoveFromAccount) },
+            onConfirm = {
+                confirmingAccountRemoval = null
+                onRemoveFromAccount(bookToRemoveFromAccount)
+            },
             onDismiss = { confirmingAccountRemoval = null },
         )
     }
@@ -227,7 +233,10 @@ fun LibraryScreen(
         RemoveAccountCopyDialog(
             book = bookToFree,
             copy = bookToFree.accountCopy,
-            onConfirm = { confirmingCopyRemoval = null; onRemoveAccountCopy(bookToFree) },
+            onConfirm = {
+                confirmingCopyRemoval = null
+                onRemoveAccountCopy(bookToFree)
+            },
             onDismiss = { confirmingCopyRemoval = null },
         )
     }
@@ -247,102 +256,102 @@ fun LibraryScreen(
         )
     }
     WidthAware(modifier.fillMaxSize()) { layout ->
-    Scaffold(
-        modifier = Modifier.fillMaxSize().testTag("library_screen"),
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.library_title)) },
-                actions = {
-                    IconButton(onClick = onRefresh, modifier = Modifier.testTag("library_refresh")) {
-                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.library_refresh))
-                    }
-                    IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("library_settings")) {
-                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_open))
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            // Both offers can be on screen in principle, so both are laid out
-            // rather than one hiding the other: each names its own book and its
-            // own Undo, and a reader must never press the wrong one.
-            Column {
-                state.accountUndoNotice?.let { AccountUndoBar(it, onUndoAccountRemove) }
-                state.undoNotice?.let { UndoBar(it, onUndoRemove) }
-            }
-        },
-    ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            state.failureMessage?.let { FailureBanner(it) }
-            state.accountNotice?.let { AccountNoticeBanner(it, onDismissAccountNotice) }
-            state.resumeNotice?.let { ResumeNoticeBanner(it, onDismissResumeNotice) }
-            state.scan?.let { ScanBanner(it) }
-            when (state.content) {
-                LibraryContent.EMPTY_LIBRARY -> EmptyLibrary(
-                    onAddBooks = onAddBooks,
-                    onAddFolder = onAddFolder,
-                    folderCount = state.folders.size,
-                    onOpenFolders = onOpenFolders,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
-
-                LibraryContent.NO_SEARCH_RESULTS,
-                LibraryContent.BOOKS,
-                -> {
-                    if (headerFitsOneRow(layout)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().testTag("library_wide_header"),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            SearchField(
-                                query = state.query,
-                                onQueryChange = onQueryChange,
-                                modifier = Modifier.weight(1f),
-                            )
-                            // Natural width, not a weight: at the largest font
-                            // size a half-and-half split squeezes "Add folder"
-                            // onto two lines, and the search field is the one of
-                            // the three that can give room away.
-                            AddActions(
-                                onAddBooks = onAddBooks,
-                                onAddFolder = onAddFolder,
-                                weighted = false,
-                            )
+        Scaffold(
+            modifier = Modifier.fillMaxSize().testTag("library_screen"),
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.library_title)) },
+                    actions = {
+                        IconButton(onClick = onRefresh, modifier = Modifier.testTag("library_refresh")) {
+                            Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.library_refresh))
                         }
-                    } else {
-                        SearchField(query = state.query, onQueryChange = onQueryChange)
-                        AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder)
-                    }
-                    ListControls(
-                        order = state.order,
-                        onOrderChange = onOrderChange,
+                        IconButton(onClick = onOpenSettings, modifier = Modifier.testTag("library_settings")) {
+                            Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_open))
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                // Both offers can be on screen in principle, so both are laid out
+                // rather than one hiding the other: each names its own book and its
+                // own Undo, and a reader must never press the wrong one.
+                Column {
+                    state.accountUndoNotice?.let { AccountUndoBar(it, onUndoAccountRemove) }
+                    state.undoNotice?.let { UndoBar(it, onUndoRemove) }
+                }
+            },
+        ) { innerPadding ->
+            Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                state.failureMessage?.let { FailureBanner(it) }
+                state.accountNotice?.let { AccountNoticeBanner(it, onDismissAccountNotice) }
+                state.resumeNotice?.let { ResumeNoticeBanner(it, onDismissResumeNotice) }
+                state.scan?.let { ScanBanner(it) }
+                when (state.content) {
+                    LibraryContent.EMPTY_LIBRARY -> EmptyLibrary(
+                        onAddBooks = onAddBooks,
+                        onAddFolder = onAddFolder,
                         folderCount = state.folders.size,
                         onOpenFolders = onOpenFolders,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
                     )
-                    if (state.content == LibraryContent.NO_SEARCH_RESULTS) {
-                        NoSearchResults(state.query)
-                    } else {
-                        BookList(
-                            books = state.books,
-                            onRemove = { confirmingRemoval = it.id },
-                            onRemoveFromAccount = { confirmingAccountRemoval = it.id },
-                            onRemoveAccountCopy = { confirmingCopyRemoval = it.id },
-                            onAddToAccount = onAddToAccount,
-                            onCancelAddToAccount = onCancelAddToAccount,
-                            onDismissAddToAccount = onDismissAddToAccount,
-                            onDownloadAccountBook = onDownloadAccountBook,
-                            onCancelDownload = onCancelDownload,
-                            onDismissDownload = onDismissDownload,
-                            onGrantAccess = onGrantAccess,
-                            onOpen = onOpen,
-                            coverLoader = coverLoader,
-                            wide = layout.wide,
+
+                    LibraryContent.NO_SEARCH_RESULTS,
+                    LibraryContent.BOOKS,
+                    -> {
+                        if (headerFitsOneRow(layout)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().testTag("library_wide_header"),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                SearchField(
+                                    query = state.query,
+                                    onQueryChange = onQueryChange,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                // Natural width, not a weight: at the largest font
+                                // size a half-and-half split squeezes "Add folder"
+                                // onto two lines, and the search field is the one of
+                                // the three that can give room away.
+                                AddActions(
+                                    onAddBooks = onAddBooks,
+                                    onAddFolder = onAddFolder,
+                                    weighted = false,
+                                )
+                            }
+                        } else {
+                            SearchField(query = state.query, onQueryChange = onQueryChange)
+                            AddActions(onAddBooks = onAddBooks, onAddFolder = onAddFolder)
+                        }
+                        ListControls(
+                            order = state.order,
+                            onOrderChange = onOrderChange,
+                            folderCount = state.folders.size,
+                            onOpenFolders = onOpenFolders,
                         )
+                        if (state.content == LibraryContent.NO_SEARCH_RESULTS) {
+                            NoSearchResults(state.query)
+                        } else {
+                            BookList(
+                                books = state.books,
+                                onRemove = { confirmingRemoval = it.id },
+                                onRemoveFromAccount = { confirmingAccountRemoval = it.id },
+                                onRemoveAccountCopy = { confirmingCopyRemoval = it.id },
+                                onAddToAccount = onAddToAccount,
+                                onCancelAddToAccount = onCancelAddToAccount,
+                                onDismissAddToAccount = onDismissAddToAccount,
+                                onDownloadAccountBook = onDownloadAccountBook,
+                                onCancelDownload = onCancelDownload,
+                                onDismissDownload = onDismissDownload,
+                                onGrantAccess = onGrantAccess,
+                                onOpen = onOpen,
+                                coverLoader = coverLoader,
+                                wide = layout.wide,
+                            )
+                        }
                     }
                 }
             }
         }
-    }
     }
 }
 
@@ -606,12 +615,6 @@ private fun RemoveFromAccountDialog(book: LibraryBookItem, onConfirm: () -> Unit
 }
 
 /**
- * The way into the added-folder list (REQ-104).
- *
- * Only shown once a folder exists: with none, the list would be a dead end, and
- * "Add folder" is already on the screen right above it.
- */
-/**
  * The two secondary affordances that sit between the header and the list: how
  * the list is ordered (REQ-203) and the way into the added folders (REQ-104).
  *
@@ -716,6 +719,12 @@ private fun LibraryOrder.label(): String = stringResource(
     },
 )
 
+/**
+ * The way into the added-folder list (REQ-104).
+ *
+ * Only shown once a folder exists: with none, the list would be a dead end, and
+ * "Add folder" is already on the screen right above it.
+ */
 @Composable
 private fun FoldersEntry(count: Int, onOpenFolders: () -> Unit) {
     if (count == 0) return
@@ -1070,8 +1079,7 @@ private fun headerFitsOneRow(layout: LayoutWidth): Boolean =
  * (REQ-205, REQ-301).
  */
 @Composable
-private fun bookColumnMinWidth(): Dp =
-    BookRowFixedWidth + BookRowTextWidth * LocalDensity.current.fontScale
+private fun bookColumnMinWidth(): Dp = BookRowFixedWidth + BookRowTextWidth * LocalDensity.current.fontScale
 
 /** 48 dp cover + 16 dp gap + 8 dp gap + 48 dp remove button + 2 x 16 dp padding. */
 private val BookRowFixedWidth = 152.dp
@@ -1527,12 +1535,7 @@ private fun RemoveAccountCopyDialog(
 }
 
 /** One button beside an import note. */
-private data class ImportAction(
-    val label: String,
-    val description: String?,
-    val tag: String,
-    val onClick: () -> Unit,
-)
+private data class ImportAction(val label: String, val description: String?, val tag: String, val onClick: () -> Unit)
 
 /**
  * A sentence under a book's status line, with the backend's own code and
@@ -1706,12 +1709,19 @@ private fun BookImportState.Refused.message(): String = when (val reason = probl
             }
 
         PublicationFailureCategory.UNSUPPORTED -> stringResource(R.string.library_account_refused_unsupported)
+
         PublicationFailureCategory.PROTECTED -> stringResource(R.string.library_account_refused_protected)
+
         PublicationFailureCategory.UNSAFE -> stringResource(R.string.library_account_refused_unsafe)
+
         PublicationFailureCategory.MALFORMED -> stringResource(R.string.library_account_refused_malformed)
+
         PublicationFailureCategory.UPLOAD -> stringResource(R.string.library_account_refused_upload)
+
         PublicationFailureCategory.CONVERSION -> stringResource(R.string.library_account_refused_conversion)
+
         PublicationFailureCategory.CANCELLED -> stringResource(R.string.library_account_refused_cancelled)
+
         PublicationFailureCategory.UNKNOWN -> stringResource(R.string.library_account_refused_other)
     }
 }
@@ -1726,8 +1736,7 @@ private fun BookImportState.Refused.message(): String = when (val reason = probl
  * place to save a dependency.
  */
 @Composable
-private fun humanSize(bytes: Long): String =
-    Formatter.formatShortFileSize(LocalContext.current, bytes)
+private fun humanSize(bytes: Long): String = Formatter.formatShortFileSize(LocalContext.current, bytes)
 
 /** The progress value that means "working, with no measure of how far". */
 private const val INDETERMINATE = -1f
@@ -1739,6 +1748,7 @@ private fun LibraryBookItem.statusLine(): String = when {
     // The account has this book and this device does not. Said plainly; what
     // to do about it is the control under this line (REQ-510).
     isAccountOnly -> stringResource(R.string.library_account_not_on_device)
+
     else -> deviceStatusLine()
 }
 
@@ -1748,12 +1758,17 @@ private fun LibraryBookItem.deviceStatusLine(): String = when (status) {
     // account's place is shown beside this device's while it is ahead of it
     // (REQ-511). Which number is *the* position is not in question — the
     // device's is, until the reader answers the offer in the reader.
-    BookStatus.READABLE -> accountPercentAhead
-        ?.let { stringResource(R.string.library_progress_account_ahead, progressPercent, it) }
-        ?: stringResource(R.string.library_progress, progressPercent)
+    BookStatus.READABLE ->
+        accountPercentAhead
+            ?.let { stringResource(R.string.library_progress_account_ahead, progressPercent, it) }
+            ?: stringResource(R.string.library_progress, progressPercent)
+
     BookStatus.CORRUPT -> stringResource(R.string.library_state_corrupt)
+
     BookStatus.DRM_PROTECTED -> stringResource(R.string.library_state_drm)
+
     BookStatus.MISSING -> stringResource(R.string.library_state_missing)
+
     BookStatus.PERMISSION_LOST -> stringResource(R.string.library_state_permission_lost)
 }
 
@@ -1802,12 +1817,15 @@ private fun Cover(book: LibraryBookItem, coverLoader: CoverLoader) {
  */
 private fun ImportsOff.sentence(): Int = when (reason) {
     ReaderCapabilityReason.QUOTA_EXHAUSTED -> R.string.library_account_add_off_busy
+
     ReaderCapabilityReason.CLIENT_VERSION_INVALID,
     ReaderCapabilityReason.CLIENT_VERSION_MISSING,
     ReaderCapabilityReason.CLIENT_VERSION_TOO_NEW,
     ReaderCapabilityReason.CLIENT_VERSION_TOO_OLD,
     -> R.string.library_account_add_off_version
+
     ReaderCapabilityReason.ACTOR_DEPENDENCY_UNAVAILABLE -> R.string.library_account_add_off_later
+
     // `enabled: false`, not enabled, not configured, and a missing or
     // duplicated entry: the deployment is not taking books.
     else -> R.string.library_account_add_off

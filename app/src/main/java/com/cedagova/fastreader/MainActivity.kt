@@ -18,6 +18,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.cedagova.fastreader.account.ReaderAccountController
+import com.cedagova.fastreader.account.library.AccountDownloads
+import com.cedagova.fastreader.account.library.AccountImports
+import com.cedagova.fastreader.account.library.AccountShelf
 import com.cedagova.fastreader.account.ui.ReaderAccountRoute
 import com.cedagova.fastreader.crash.CrashReportStore
 import com.cedagova.fastreader.crash.ui.CrashReportOfferHost
@@ -27,11 +30,8 @@ import com.cedagova.fastreader.library.LibraryGraph
 import com.cedagova.fastreader.library.ResumeBlocked
 import com.cedagova.fastreader.library.ResumeBlockedReason
 import com.cedagova.fastreader.library.launchDestination
-import com.cedagova.fastreader.account.library.AccountDownloads
-import com.cedagova.fastreader.account.library.AccountImports
-import com.cedagova.fastreader.account.library.AccountShelf
-import com.cedagova.fastreader.library.ui.accountBookIdForDevice
 import com.cedagova.fastreader.library.ui.LibraryRoute
+import com.cedagova.fastreader.library.ui.accountBookIdForDevice
 import com.cedagova.fastreader.reader.ReaderTarget
 import com.cedagova.fastreader.reader.ui.ReaderRoute
 import com.cedagova.fastreader.settings.SharedPreferencesThemeMirror
@@ -198,6 +198,7 @@ private fun FastReaderApp(
                 openBookId = destination.bookId
                 routedIntoReader = true
             }
+
             is LaunchDestination.Library -> {
                 blockedBookId = destination.blocked?.bookId
                 blockedReason = destination.blocked?.reason?.name
@@ -254,7 +255,10 @@ private fun FastReaderApp(
         openBookId != null -> ReaderRoute(
             graph = library,
             target = ReaderTarget.Library(requireNotNull(openBookId)),
-            onBack = { openBookId = null; routedIntoReader = false },
+            onBack = {
+                openBookId = null
+                routedIntoReader = false
+            },
             // Where a portable position is published from for an account book
             // (#120). A device-only book resolves to no account id and sends
             // nothing.

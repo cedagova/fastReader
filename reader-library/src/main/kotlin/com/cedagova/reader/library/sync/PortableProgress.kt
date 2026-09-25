@@ -121,11 +121,7 @@ object PortableProgress {
      * book id after all" is *detected* on stage instead of producing a position
      * filed under a book that does not exist.
      */
-    fun recordFor(
-        resourceId: String,
-        payload: JsonObject,
-        knownBook: (String) -> Boolean,
-    ): ProgressRecord {
+    fun recordFor(resourceId: String, payload: JsonObject, knownBook: (String) -> Boolean): ProgressRecord {
         val fromPayload = payload.string("book_id")
         if (fromPayload != null && knownBook(fromPayload)) {
             return ProgressRecord.Recognized(fromPayload, positionOf(payload))
@@ -171,8 +167,7 @@ object PortableProgress {
         )
     }
 
-    private fun JsonObject.string(key: String): String? =
-        (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+    private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
     private fun JsonObject.double(key: String): Double? = (this[key] as? JsonPrimitive)?.doubleOrNull
 }
@@ -239,9 +234,5 @@ sealed interface ProgressRecord {
     data class Recognized(val bookId: String, val position: RemoteReadingPosition) : ProgressRecord
 
     /** The record cannot be placed. Surfaced, never dropped quietly. */
-    data class Unrecognized(
-        val resourceId: String,
-        val payloadBookId: String?,
-        val reason: String,
-    ) : ProgressRecord
+    data class Unrecognized(val resourceId: String, val payloadBookId: String?, val reason: String) : ProgressRecord
 }

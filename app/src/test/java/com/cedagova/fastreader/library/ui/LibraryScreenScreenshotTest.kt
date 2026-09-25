@@ -123,7 +123,6 @@ class LibraryScreenScreenshotTest {
         )
     }
 
-
     @Test
     fun populatedLibraryShowsTitleAuthorCoverAndProgress() {
         capture("library_populated", state(populatedCatalog()))

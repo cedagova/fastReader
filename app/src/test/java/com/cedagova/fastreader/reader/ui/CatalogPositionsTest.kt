@@ -1,14 +1,8 @@
 package com.cedagova.fastreader.reader.ui
 
 import com.cedagova.fastreader.account.library.AccountResumeOffers
-import com.cedagova.fastreader.account.library.RecordingHostRecords
-import com.cedagova.reader.library.sync.AccountBook
-import com.cedagova.reader.library.sync.AccountLibraryActions
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountRemotePosition
 import com.cedagova.fastreader.account.library.AccountShelf
-import com.cedagova.reader.library.sync.AccountSyncPhase
-import com.cedagova.reader.library.sync.LocalReadingPosition
+import com.cedagova.fastreader.account.library.RecordingHostRecords
 import com.cedagova.fastreader.content.TokenPosition
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.CatalogIngestor
@@ -19,10 +13,16 @@ import com.cedagova.fastreader.library.store.FileCatalogStore
 import com.cedagova.fastreader.reader.ReaderFixtures
 import com.cedagova.fastreader.reader.ReaderPosition
 import com.cedagova.reader.library.model.ReaderLibraryStatus
+import com.cedagova.reader.library.sync.AccountBook
+import com.cedagova.reader.library.sync.AccountLibraryActions
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountRemotePosition
+import com.cedagova.reader.library.sync.AccountSyncPhase
+import com.cedagova.reader.library.sync.LocalReadingPosition
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

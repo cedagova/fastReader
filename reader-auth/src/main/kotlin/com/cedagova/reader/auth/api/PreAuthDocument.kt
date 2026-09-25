@@ -43,7 +43,11 @@ data class PreAuthDocument(
     )
 
     @Serializable
-    data class AccountEntry(val availability: String? = null, val reason: String? = null, val retryable: Boolean = false)
+    data class AccountEntry(
+        val availability: String? = null,
+        val reason: String? = null,
+        val retryable: Boolean = false,
+    )
 
     @Serializable
     data class Configuration(

@@ -146,8 +146,10 @@ class PrivacyStatementTest {
             "it goes nowhere unless you share it and pick an app to send it to",
             "not added to your list and no permission to it is kept",
         ).forEach { claim ->
-            assertTrue("the statement no longer says \"$claim\": $statement",
-                statement.contains(claim, ignoreCase = true))
+            assertTrue(
+                "the statement no longer says \"$claim\": $statement",
+                statement.contains(claim, ignoreCase = true),
+            )
         }
         listOf(
             // Retired with #100: the app has the permission now.
@@ -214,8 +216,7 @@ class PrivacyStatementTest {
         assertTrue("$path does not exist", repositoryFile(path).isFile)
     }
 
-    private fun releaseNotesPath(): String =
-        "docs/release-notes/v${AppVersion.of(context).name}.md"
+    private fun releaseNotesPath(): String = "docs/release-notes/v${AppVersion.of(context).name}.md"
 
     private fun shownInApp(): String = context.getString(R.string.settings_privacy)
 

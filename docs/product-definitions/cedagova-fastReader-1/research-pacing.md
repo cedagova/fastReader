@@ -180,7 +180,7 @@ Readings:
 
 1. **Redefine WPM as the average.** Precompute the mean multiplier per book
    at open (the suffix array in
-   [RemainingTime.kt](../../../app/src/main/java/com/cedagova/fastreader/reader/RemainingTime.kt)
+   [RemainingTimeIndex.kt](../../../app/src/main/java/com/cedagova/fastreader/reader/RemainingTimeIndex.kt)
    already holds this sum at index 0) and divide the base word time by it.
    Consequences that fall out for free: time remaining becomes exactly
    `words / wpm`, the ramp still works because it multiplies the base, and

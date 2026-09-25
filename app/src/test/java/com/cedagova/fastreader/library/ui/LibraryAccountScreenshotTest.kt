@@ -11,13 +11,9 @@ import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.account.library.AccountDownloadsState
 import com.cedagova.fastreader.account.library.AccountImportsState
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountRemotePosition
-import com.cedagova.reader.library.sync.AccountSyncError
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.library.BookDownloadState
-import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.BookImportState
+import com.cedagova.fastreader.account.library.DownloadProblem
 import com.cedagova.fastreader.account.library.ImportOffer
 import com.cedagova.fastreader.account.library.ImportProblem
 import com.cedagova.fastreader.account.library.ImportsOff
@@ -26,6 +22,10 @@ import com.cedagova.fastreader.settings.FontSize
 import com.cedagova.fastreader.ui.theme.FastReaderTheme
 import com.cedagova.reader.library.model.PublicationFailureCategory
 import com.cedagova.reader.library.model.ReaderCapabilityReason
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountRemotePosition
+import com.cedagova.reader.library.sync.AccountSyncError
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import org.junit.Rule
@@ -268,7 +268,6 @@ class LibraryAccountScreenshotTest {
         )
     }
 
-
     // ---- downloading an account book, and freeing the copy (#119, REQ-510) --------------
 
     /**
@@ -361,8 +360,10 @@ class LibraryAccountScreenshotTest {
     )
 
     /** The in-flight state on Rayuela, the one device-only book in the fixtures. */
-    private fun importing(state: BookImportState): AccountImportsState =
-        AccountImportsState(offer = ImportOffer.Available, byDeviceBookId = mapOf(LibraryAccountFixtures.RAYUELA_ID to state))
+    private fun importing(state: BookImportState): AccountImportsState = AccountImportsState(
+        offer = ImportOffer.Available,
+        byDeviceBookId = mapOf(LibraryAccountFixtures.RAYUELA_ID to state),
+    )
 
     /** Both kinds of account row and both device rows, with the offline note over them. */
     private fun wholeShelf(): LibraryUiState = shelf(
@@ -434,7 +435,11 @@ class LibraryAccountScreenshotTest {
      */
     private fun captureDialog(name: String, state: LibraryUiState) {
         composeRule.setContent {
-            FastReaderTheme { LibraryScreen(state = state, onQueryChange = {}, onAddBooks = {}, onAddFolder = {}, onRefresh = {}, onRemove = {}, onGrantAccess = {}, onOpen = {}) }
+            FastReaderTheme {
+                LibraryScreen(state = state, onQueryChange = {
+                }, onAddBooks = {
+                }, onAddFolder = {}, onRefresh = {}, onRemove = {}, onGrantAccess = {}, onOpen = {})
+            }
         }
         composeRule.waitForIdle()
         captureScreenRoboImage("screenshots/$name.png")

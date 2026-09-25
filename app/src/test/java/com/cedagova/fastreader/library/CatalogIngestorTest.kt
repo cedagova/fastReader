@@ -27,7 +27,11 @@ class CatalogIngestorTest {
     fun `adding three picked books yields three entries with metadata and cover flags`() {
         gateway.putDocument("doc://a", EpubFixtures.validEpub(), "quiet-machine.epub")
         gateway.putDocument("doc://b", EpubFixtures.spanishEpub(withCover = true), "maquina.epub")
-        gateway.putDocument("doc://c", EpubFixtures.validEpub(withCover = false, title = "No Cover", identifier = "urn:uuid:3"), "no-cover.epub")
+        gateway.putDocument(
+            "doc://c",
+            EpubFixtures.validEpub(withCover = false, title = "No Cover", identifier = "urn:uuid:3"),
+            "no-cover.epub",
+        )
 
         val outcome = ingestor.addPickedBooks(Catalog(), listOf("doc://a", "doc://b", "doc://c"))
 
@@ -127,7 +131,9 @@ class CatalogIngestorTest {
         val added = ingestor.addPickedBooks(Catalog(), listOf("doc://a")).catalog
         val bookId = added.books.single().id
         val seeded = added.copy(
-            readingStates = mapOf(bookId to ReadingState(bookDigest = bookId, tokenIndex = 412, progressFraction = 0.37f)),
+            readingStates = mapOf(
+                bookId to ReadingState(bookDigest = bookId, tokenIndex = 412, progressFraction = 0.37f),
+            ),
         )
 
         val afterRemove = ingestor.removeBook(seeded, bookId)
@@ -302,7 +308,9 @@ class CatalogIngestorTest {
         gateway.putIntoFolder("tree://books", "tree://books/two.epub", EpubFixtures.spanishEpub(), "two.epub")
         val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
         val removedId = added.books.first { it.title == "The Quiet Machine" }.id
-        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(bookDigest = removedId, tokenIndex = 250)))
+        val seeded = added.copy(
+            readingStates = mapOf(removedId to ReadingState(bookDigest = removedId, tokenIndex = 250)),
+        )
 
         val afterRemove = ingestor.removeBook(seeded, removedId)
         assertEquals(1, afterRemove.books.size)
@@ -320,7 +328,9 @@ class CatalogIngestorTest {
         gateway.putIntoFolder("tree://books", "tree://books/one.epub", EpubFixtures.validEpub(), "one.epub")
         val added = ingestor.addFolder(Catalog(), "tree://books", "Books").catalog
         val removedId = added.books.single().id
-        val seeded = added.copy(readingStates = mapOf(removedId to ReadingState(bookDigest = removedId, tokenIndex = 250)))
+        val seeded = added.copy(
+            readingStates = mapOf(removedId to ReadingState(bookDigest = removedId, tokenIndex = 250)),
+        )
         val afterRemove = ingestor.removeBook(seeded, removedId)
 
         val afterReAdd = ingestor.addFolder(afterRemove, "tree://books", "Books").catalog

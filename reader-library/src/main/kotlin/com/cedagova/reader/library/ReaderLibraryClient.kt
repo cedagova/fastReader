@@ -138,8 +138,10 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
         require(request.ownershipIntent == CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY) {
             "ownership_intent must be '${CreatePublicationImportRequest.OWNERSHIP_INTENT_ACCOUNT_LIBRARY}', not '${request.ownershipIntent}'"
         }
-        require(request.clientImportId.isNotBlank() &&
-            request.clientImportId.length <= CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH) {
+        require(
+            request.clientImportId.isNotBlank() &&
+                request.clientImportId.length <= CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH,
+        ) {
             "a client_import_id is 1..${CreatePublicationImportRequest.MAX_CLIENT_IMPORT_ID_LENGTH} characters"
         }
         require(request.sizeBytes > 0) { "a source size is positive, not ${request.sizeBytes}" }
@@ -166,7 +168,10 @@ class ReaderLibraryClient(private val api: ReaderApiClient) : ReaderLibraryOpera
             "a cancel reason is 1..${CancelPublicationImportRequest.MAX_REASON_LENGTH} characters"
         }
         val path = importPath(importId) + CANCEL_SUFFIX
-        val document = api.post(path, body(CancelPublicationImportRequest.serializer(), CancelPublicationImportRequest(reason)))
+        val document = api.post(
+            path,
+            body(CancelPublicationImportRequest.serializer(), CancelPublicationImportRequest(reason)),
+        )
         return decode(document, PublicationImportResponse.serializer(), path)
     }
 

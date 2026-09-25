@@ -44,7 +44,12 @@ class FileSessionStoreTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val cipher = FakeCipher()
     private lateinit var store: FileSessionStore
-    private val stored = session(accessToken = "access-token-bytes", refreshToken = "refresh-token-bytes", expiresAt = Clock.System.now() + 3600.seconds)
+    private val stored = session(
+        accessToken = "access-token-bytes",
+        refreshToken = "refresh-token-bytes",
+        expiresAt =
+            Clock.System.now() + 3600.seconds,
+    )
 
     @Before
     fun freshStore() {
@@ -63,7 +68,10 @@ class FileSessionStoreTest {
         )
         assertEquals("session.bin", store.file.name)
         val sharedPrefs = File(context.applicationInfo.dataDir, "shared_prefs")
-        assertTrue("a shared_prefs directory appeared: ${sharedPrefs.list()?.toList()}", !sharedPrefs.exists() || sharedPrefs.list().isNullOrEmpty())
+        assertTrue(
+            "a shared_prefs directory appeared: ${sharedPrefs.list()?.toList()}",
+            !sharedPrefs.exists() || sharedPrefs.list().isNullOrEmpty(),
+        )
         val filesDir = context.filesDir.listFiles().orEmpty().map { it.name }
         assertTrue("the ordinary files directory gained $filesDir", filesDir.isEmpty())
     }
@@ -142,13 +150,24 @@ class FileSessionStoreTest {
         val temporaries = Collections.synchronizedList(mutableListOf<File>())
         // Every save has fully written its temp file before any of them renames.
         val allWritten = CyclicBarrier(saves)
-        val racing = FileSessionStore(store.file.parentFile!!, cipher, pool.asCoroutineDispatcher()) { temporary, target ->
-            temporaries += temporary
-            allWritten.await(10, TimeUnit.SECONDS)
-            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        }
+        val racing =
+            FileSessionStore(store.file.parentFile!!, cipher, pool.asCoroutineDispatcher()) { temporary, target ->
+                temporaries += temporary
+                allWritten.await(10, TimeUnit.SECONDS)
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            }
         val sessions = (1..saves).map { n ->
-            session(accessToken = "access-$n-" + "x".repeat(n * 97), refreshToken = "refresh-$n", expiresAt = Clock.System.now() + 3600.seconds)
+            session(
+                accessToken = "access-$n-" + "x".repeat(n * 97),
+                refreshToken = "refresh-$n",
+                expiresAt =
+                    Clock.System.now() + 3600.seconds,
+            )
         }
         try {
             runBlocking { sessions.map { async(pool.asCoroutineDispatcher()) { racing.save(it) } }.awaitAll() }
@@ -172,12 +191,25 @@ class FileSessionStoreTest {
         }
 
         assertThrows(IOException::class.java) {
-            runBlocking { failing.save(session(accessToken = "replacement", refreshToken = "r", expiresAt = Clock.System.now() + 60.seconds)) }
+            runBlocking {
+                failing.save(
+                    session(
+                        accessToken = "replacement",
+                        refreshToken = "r",
+                        expiresAt =
+                            Clock.System.now() + 60.seconds,
+                    ),
+                )
+            }
         }
 
         assertTrue(before.contentEquals(store.file.readBytes()))
         assertEquals(stored.accessToken, store.load()?.accessToken)
-        assertEquals("the failed save left a temp file", listOf(FileSessionStore.FILE_NAME), store.file.parentFile!!.list()!!.toList())
+        assertEquals(
+            "the failed save left a temp file",
+            listOf(FileSessionStore.FILE_NAME),
+            store.file.parentFile!!.list()!!.toList(),
+        )
     }
 
     @Test

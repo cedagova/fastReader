@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 // The reusable Reader authentication library (#92, A83-F007; contract and
 // implementation #93, A83-F008).
 //
@@ -10,40 +8,18 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // documents in README.md the host obligations a library cannot enforce through
 // manifest merging. CONTRACT.md is the client contract this module implements.
 plugins {
-    alias(libs.plugins.android.library)
+    // Shared SDK, JVM, lint, test and formatter settings (build-logic, #205).
+    id("conventions.android.library")
     alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.cedagova.reader.auth"
-    compileSdk = 37
 
     defaultConfig {
-        minSdk = 26
         // What a shrinking host must keep for this module's dependencies; see
         // the file for why.
         consumerProguardFiles("consumer-rules.pro")
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    testOptions {
-        unitTests {
-            // The manifest test reads the library's *merged* manifest back
-            // through the package manager, and the store test writes under the
-            // application's real no-backup directory; both need Android
-            // resources packaged.
-            isIncludeAndroidResources = true
-        }
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 

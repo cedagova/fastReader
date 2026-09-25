@@ -188,11 +188,7 @@ private fun FolderRow(folder: LibraryFolderItem, onRemove: () -> Unit) {
 }
 
 @Composable
-private fun RemoveFolderDialog(
-    folder: LibraryFolderItem,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun RemoveFolderDialog(folder: LibraryFolderItem, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val count = folder.removedBookCount
     AlertDialog(
         onDismissRequest = onDismiss,

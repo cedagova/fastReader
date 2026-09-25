@@ -2,9 +2,9 @@ package com.cedagova.fastreader.library.ui
 
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cedagova.fastreader.library.Catalog
 import com.cedagova.fastreader.library.FolderStatus

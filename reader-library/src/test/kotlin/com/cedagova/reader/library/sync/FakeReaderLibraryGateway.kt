@@ -63,9 +63,7 @@ class FakeReaderLibraryGateway : ReaderLibraryGateway {
         return progressResponses.take()
     }
 
-    override suspend fun applyMutations(
-        mutations: List<ReaderSyncMutationEnvelope>,
-    ): ReaderSyncMutationBatchResponse {
+    override suspend fun applyMutations(mutations: List<ReaderSyncMutationEnvelope>): ReaderSyncMutationBatchResponse {
         record("applyMutations(${mutations.size})")
         submitted += mutations
         return mutationResponses.take()
@@ -90,8 +88,14 @@ class FakeReaderLibraryGateway : ReaderLibraryGateway {
 
     private suspend fun record(call: String) {
         calls += call
-        gate?.let { gate = null; it.await() }
-        nextFailure?.let { nextFailure = null; throw it }
+        gate?.let {
+            gate = null
+            it.await()
+        }
+        nextFailure?.let {
+            nextFailure = null
+            throw it
+        }
         gatesOn.remove(call)?.await()
         failuresOn.remove(call)?.let { throw it }
     }

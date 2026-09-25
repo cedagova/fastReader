@@ -141,8 +141,7 @@ internal object ZipReader {
         return String(chars)
     }
 
-    private fun Exception.readableMessage(): String =
-        message?.takeIf { it.isNotBlank() } ?: this::class.java.simpleName
+    private fun Exception.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: this::class.java.simpleName
 }
 
 /** Keeps [ZipInputStream.close] from closing the digest stream before it is drained. */

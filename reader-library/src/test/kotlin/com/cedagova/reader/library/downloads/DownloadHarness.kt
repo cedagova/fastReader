@@ -119,6 +119,10 @@ class FakeObjectStorage(private val body: ByteArray) {
         path = url.encodedPath,
         query = url.encodedQuery,
         headers = headers.entries().associate { (k, v) -> k to v.joinToString(",") },
-        body = try { body.toByteArray().decodeToString() } catch (e: Exception) { "" },
+        body = try {
+            body.toByteArray().decodeToString()
+        } catch (e: Exception) {
+            ""
+        },
     )
 }

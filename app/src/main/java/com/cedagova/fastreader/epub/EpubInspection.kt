@@ -11,17 +11,11 @@ sealed interface EpubInspection {
     /** Content-derived identity of the inspected bytes, when they could be read at all. */
     val contentDigest: String?
 
-    data class Readable(
-        override val contentDigest: String,
-        val metadata: EpubMetadata,
-        val cover: EpubCover?,
-    ) : EpubInspection
+    data class Readable(override val contentDigest: String, val metadata: EpubMetadata, val cover: EpubCover?) :
+        EpubInspection
 
-    data class Rejected(
-        override val contentDigest: String?,
-        val reason: EpubRejectReason,
-        val detail: String,
-    ) : EpubInspection
+    data class Rejected(override val contentDigest: String?, val reason: EpubRejectReason, val detail: String) :
+        EpubInspection
 }
 
 /**
@@ -51,13 +45,9 @@ data class EpubMetadata(
 )
 
 /** Raw cover image bytes as stored in the EPUB, plus its declared media type. */
-class EpubCover(
-    val mediaType: String?,
-    val bytes: ByteArray,
-) {
-    override fun equals(other: Any?): Boolean =
-        this === other ||
-            (other is EpubCover && mediaType == other.mediaType && bytes.contentEquals(other.bytes))
+class EpubCover(val mediaType: String?, val bytes: ByteArray) {
+    override fun equals(other: Any?): Boolean = this === other ||
+        (other is EpubCover && mediaType == other.mediaType && bytes.contentEquals(other.bytes))
 
     override fun hashCode(): Int = 31 * (mediaType?.hashCode() ?: 0) + bytes.contentHashCode()
 

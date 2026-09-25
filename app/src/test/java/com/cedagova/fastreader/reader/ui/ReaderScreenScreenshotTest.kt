@@ -77,7 +77,10 @@ class ReaderScreenScreenshotTest {
      */
     @Test
     fun theParagraphStaysUnderTheRunningWordWhenAlwaysShown() {
-        capture("reader_playing_paragraph", view.present(ReaderSession(book).jumpTo(12).play(), paragraphAlwaysShown = true))
+        capture(
+            "reader_playing_paragraph",
+            view.present(ReaderSession(book).jumpTo(12).play(), paragraphAlwaysShown = true),
+        )
     }
 
     // --- REQ-206, the Spanish interface --------------------------------------
@@ -404,7 +407,11 @@ class ReaderScreenScreenshotTest {
     @Test
     @Config(sdk = [35], qualifiers = COMPACT_PHONE)
     fun theShownLinesFollowTheRunningWordDownALongParagraphAtALargeFontScale() {
-        capture("reader_playing_long_paragraph_compact_large_font", longParagraphAt(120, playing = true), fontScale = 1.3f)
+        capture(
+            "reader_playing_long_paragraph_compact_large_font",
+            longParagraphAt(120, playing = true),
+            fontScale = 1.3f,
+        )
     }
 
     private fun longParagraphAt(index: Int, playing: Boolean = false): ReaderUiState.Reading {

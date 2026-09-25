@@ -149,7 +149,11 @@ class SafIngestionTest {
     private fun writeFixtures() {
         write("english.epub", EpubFixtures.validEpub(), FIXTURE_RELATIVE_PATH)
         write("spanish.epub", EpubFixtures.spanishEpub(), FIXTURE_RELATIVE_PATH)
-        write("no-cover.epub", EpubFixtures.validEpub(withCover = false, identifier = "urn:uuid:nc"), FIXTURE_RELATIVE_PATH)
+        write(
+            "no-cover.epub",
+            EpubFixtures.validEpub(withCover = false, identifier = "urn:uuid:nc"),
+            FIXTURE_RELATIVE_PATH,
+        )
         write("locked.epub", EpubFixtures.drmProtectedEpub(), FIXTURE_RELATIVE_PATH)
         write("broken.epub", EpubFixtures.notAZip(), FIXTURE_RELATIVE_PATH)
         write("notabook.txt", "ignore me".toByteArray(), FIXTURE_RELATIVE_PATH)

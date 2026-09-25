@@ -245,8 +245,11 @@ class ReaderViewModel(
                 // wrong digest — overwriting a real stored position with nothing.
                 val identity = openRequest?.takeIf { it.openKey == request.openKey }?.identity
                 val content = result.content.let { parsed ->
-                    if (identity == null || parsed.bookDigest == identity.value) parsed
-                    else parsed.copy(bookDigest = identity.value)
+                    if (identity == null || parsed.bookDigest == identity.value) {
+                        parsed
+                    } else {
+                        parsed.copy(bookDigest = identity.value)
+                    }
                 }
                 // Building the time-remaining index is one sweep of the book; it
                 // belongs on the parsing thread, next to the parse, not on the

@@ -48,7 +48,10 @@ class PublicationTransferClientTest {
 
         assertEquals(SIZE.toLong(), end)
         assertArrayEquals("the provider holds exactly the file", bytes, storage.received)
-        assertTrue("a full transfer of $SIZE bytes in $CHUNK-byte chunks is more than one PATCH", storage.patchSizes.size >= 2)
+        assertTrue(
+            "a full transfer of $SIZE bytes in $CHUNK-byte chunks is more than one PATCH",
+            storage.patchSizes.size >= 2,
+        )
         assertEquals(listOf(CHUNK.toInt(), CHUNK.toInt(), (SIZE - 2 * CHUNK).toInt()), storage.patchSizes.toList())
         assertTrue(
             "no chunk may exceed the grant's published size",
@@ -100,7 +103,9 @@ class PublicationTransferClientTest {
             }
             assertEquals(
                 PublicationTransferClient.TUS_VERSION,
-                request.headers.entries.first { it.key.equals(PublicationTransferClient.HEADER_TUS_RESUMABLE, true) }.value,
+                request.headers.entries.first {
+                    it.key.equals(PublicationTransferClient.HEADER_TUS_RESUMABLE, true)
+                }.value,
             )
         }
     }
@@ -293,11 +298,11 @@ class PublicationTransferClientTest {
         const val CHUNK = 2_048L
 
         /**
-     * Bytes the provider keeps of the chunk it was reading when the connection
-     * died. Deliberately not a multiple of [CHUNK]: a client that resumed from
-     * "chunks I sent" rather than from the provider's offset would get this
-     * case wrong, and the byte-for-byte assertion would catch it.
-     */
+         * Bytes the provider keeps of the chunk it was reading when the connection
+         * died. Deliberately not a multiple of [CHUNK]: a client that resumed from
+         * "chunks I sent" rather than from the provider's offset would get this
+         * case wrong, and the byte-for-byte assertion would catch it.
+         */
         const val KEPT = 700
     }
 }

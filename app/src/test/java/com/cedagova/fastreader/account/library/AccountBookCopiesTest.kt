@@ -1,6 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.fastreader.account.AssetDownloadGateway
 import com.cedagova.fastreader.epub.EpubFixtures
 import com.cedagova.fastreader.library.BookSource
@@ -16,6 +15,7 @@ import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.model.ReaderAssetDirection
 import com.cedagova.reader.library.model.ReaderAssetGrant
 import com.cedagova.reader.library.model.ReaderAssetMethod
+import com.cedagova.reader.library.sync.AccountBook
 import java.io.File
 import java.io.OutputStream
 import java.security.MessageDigest

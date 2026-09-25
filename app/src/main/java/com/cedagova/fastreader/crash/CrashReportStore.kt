@@ -49,8 +49,11 @@ class CrashReportStore(private val directory: File) {
 
     /** The pending report, or null when there is none to offer. */
     fun read(): String? = try {
-        if (!report.isFile || report.length() > MAX_BYTES) null
-        else report.readText().ifBlank { null }
+        if (!report.isFile || report.length() > MAX_BYTES) {
+            null
+        } else {
+            report.readText().ifBlank { null }
+        }
     } catch (failure: Throwable) {
         null
     }

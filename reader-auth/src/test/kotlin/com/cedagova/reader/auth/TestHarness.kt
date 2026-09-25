@@ -34,7 +34,12 @@ import kotlinx.coroutines.CompletableDeferred
 
 /** XORs every byte; reversible, and guarantees no plaintext byte survives unchanged. */
 class FakeCipher(private val key: Byte = 0x5A, var failDecrypt: Boolean = false) : SessionCipher {
-    override fun encrypt(plaintext: ByteArray): ByteArray = ByteArray(plaintext.size) { (plaintext[it].toInt() xor key.toInt()).toByte() }
+    override fun encrypt(plaintext: ByteArray): ByteArray = ByteArray(plaintext.size) {
+        (
+            plaintext[it].toInt() xor
+                key.toInt()
+            ).toByte()
+    }
     override fun decrypt(blob: ByteArray): ByteArray {
         if (failDecrypt) throw java.security.GeneralSecurityException("key lost")
         return encrypt(blob)
@@ -43,38 +48,61 @@ class FakeCipher(private val key: Byte = 0x5A, var failDecrypt: Boolean = false)
 
 class FakeClock(var now: Instant = Clock.System.now()) : ReaderClock {
     override fun now(): Instant = now
-    fun advance(by: Duration) { now += by }
+    fun advance(by: Duration) {
+        now += by
+    }
 }
 
 class RecordingWaiter : RetryWaiter {
     val waits = mutableListOf<Duration>()
-    override suspend fun wait(duration: Duration) { waits += duration }
+    override suspend fun wait(duration: Duration) {
+        waits += duration
+    }
 }
 
 class InMemorySessionStore(initial: UserSession? = null) : SessionStore {
     @Volatile var session: UserSession? = initial
     val saves = mutableListOf<UserSession>()
-    override suspend fun save(session: UserSession) { this.session = session; saves += session }
+    override suspend fun save(session: UserSession) {
+        this.session = session
+        saves += session
+    }
     override suspend fun load(): UserSession? = session
-    override suspend fun clear() { session = null }
+    override suspend fun clear() {
+        session = null
+    }
 }
 
 const val SUPABASE_URL = "https://provider.test"
 const val PUBLISHABLE_KEY = "sb_publishable_test_key"
 const val API_URL = "https://api.test"
 
-val testConfig = ReaderAuthConfig(supabaseUrl = SUPABASE_URL, publishableKey = PUBLISHABLE_KEY, readerApiBaseUrl = API_URL)
+val testConfig =
+    ReaderAuthConfig(supabaseUrl = SUPABASE_URL, publishableKey = PUBLISHABLE_KEY, readerApiBaseUrl = API_URL)
 
-fun user(id: String = "user-1", email: String = "reader@example.test") = UserInfo(aud = "authenticated", id = id, email = email)
+fun user(id: String = "user-1", email: String = "reader@example.test") =
+    UserInfo(aud = "authenticated", id = id, email = email)
 
 fun session(
     accessToken: String = "access-1",
     refreshToken: String = "refresh-1",
     expiresAt: Instant,
     user: UserInfo? = user(),
-) = UserSession(accessToken = accessToken, refreshToken = refreshToken, expiresIn = 3600, tokenType = "bearer", user = user, expiresAt = expiresAt)
+) = UserSession(
+    accessToken = accessToken,
+    refreshToken = refreshToken,
+    expiresIn = 3600,
+    tokenType = "bearer",
+    user = user,
+    expiresAt = expiresAt,
+)
 
-fun sessionJson(accessToken: String, refreshToken: String, userId: String = "user-1", email: String = "reader@example.test") = """
+fun sessionJson(
+    accessToken: String,
+    refreshToken: String,
+    userId: String = "user-1",
+    email: String = "reader@example.test",
+) = """
     {"access_token":"$accessToken","refresh_token":"$refreshToken","token_type":"bearer","expires_in":3600,
      "user":{"id":"$userId","aud":"authenticated","email":"$email"}}
 """.trimIndent()
@@ -106,7 +134,12 @@ fun preAuthJson(
 /** `generatedAt` of [preAuthJson]; its default document is fresh for an hour after it and stale an hour later. */
 const val PRE_AUTH_GENERATED_AT = "2026-09-11T00:00:00Z"
 
-const val NO_SELECTOR_PRE_AUTH = """{"schemaVersion":"reader.pre-auth.v1","compatibility":{"status":"client_unknown","requestedVersion":"1.0.0","minimumVersion":null,"supportedMajor":null},"accountEntry":{"availability":"unavailable","reason":"client_selection_missing","retryable":false},"configuration":null}"""
+const val NO_SELECTOR_PRE_AUTH =
+    """{"schemaVersion":"reader.pre-auth.v1",""" +
+        """"compatibility":{"status":"client_unknown","requestedVersion":"1.0.0",""" +
+        """"minimumVersion":null,"supportedMajor":null},""" +
+        """"accountEntry":{"availability":"unavailable","reason":"client_selection_missing","retryable":false},""" +
+        """"configuration":null}"""
 
 fun apiError(code: String, requestId: String = "req-1", retryable: Boolean = false) =
     """{"code":"$code","message":"$code","category":"auth","retryable":$retryable,"request_id":"$requestId"}"""
@@ -114,7 +147,14 @@ fun apiError(code: String, requestId: String = "req-1", retryable: Boolean = fal
 fun providerError(code: String, message: String = code) = """{"error_code":"$code","msg":"$message"}"""
 
 /** One request as the fake servers saw it. */
-data class Recorded(val method: String, val host: String, val path: String, val query: String, val headers: Map<String, String>, val body: String) {
+data class Recorded(
+    val method: String,
+    val host: String,
+    val path: String,
+    val query: String,
+    val headers: Map<String, String>,
+    val body: String,
+) {
     val bearer: String? get() = headers["Authorization"]?.removePrefix("Bearer ")
     val route: String get() = "$method $path" + if (query.isEmpty()) "" else "?$query"
 }
@@ -128,6 +168,7 @@ typealias Responder = suspend MockRequestHandleScope.(Recorded) -> HttpResponseD
  */
 class FakeServers {
     val requests: MutableList<Recorded> = Collections.synchronizedList(mutableListOf())
+
     // Guarded by itself: responders are picked on engine threads.
     private val routes = mutableMapOf<String, ArrayDeque<Responder>>()
 
@@ -162,11 +203,19 @@ class FakeServers {
         query = url.encodedQuery,
         headers = headers.entries().associate { (k, v) -> k to v.joinToString(",") } +
             (body.contentType?.let { mapOf(HttpHeaders.ContentType to it.toString()) } ?: emptyMap()),
-        body = try { body.toByteArray().decodeToString() } catch (e: Exception) { "" },
+        body = try {
+            body.toByteArray().decodeToString()
+        } catch (e: Exception) {
+            ""
+        },
     )
 }
 
-fun MockRequestHandleScope.json(body: String, status: HttpStatusCode = HttpStatusCode.OK, vararg extraHeaders: Pair<String, String>): HttpResponseData {
+fun MockRequestHandleScope.json(
+    body: String,
+    status: HttpStatusCode = HttpStatusCode.OK,
+    vararg extraHeaders: Pair<String, String>,
+): HttpResponseData {
     val pairs = listOf(HttpHeaders.ContentType to "application/json") + extraHeaders
     return respond(body, status, headersOf(*pairs.map { (k, v) -> k to listOf(v) }.toTypedArray()))
 }

@@ -126,7 +126,11 @@ class SettingsScreenScreenshotTest {
     fun theLargestTextSizeAppliesToThisScreenToo() {
         capture(
             "settings_font_extra_large",
-            ReaderSettings.DEFAULTS.copy(fontSize = FontSize.EXTRA_LARGE, wordSize = FontSize.EXTRA_LARGE, theme = ThemeChoice.DARK),
+            ReaderSettings.DEFAULTS.copy(
+                fontSize = FontSize.EXTRA_LARGE,
+                wordSize = FontSize.EXTRA_LARGE,
+                theme = ThemeChoice.DARK,
+            ),
             darkTheme = true,
         )
     }

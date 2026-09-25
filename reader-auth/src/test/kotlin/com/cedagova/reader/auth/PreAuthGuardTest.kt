@@ -28,8 +28,20 @@ class PreAuthGuardTest {
             assertTrue("$failure", failure is ReaderAuthException.ConfigurationMismatch)
             assertTrue(failure!!.message!!, failure.message!!.contains(reasonFragment))
         }
-        assertTrue("a provider request was made: ${servers.routes()}", servers.requests.none { it.host == "provider.test" })
-        assertTrue("pre-auth is fetched again until it verifies", servers.requests.all { it.path == "/v1/reader/pre-auth" })
+        assertTrue(
+            "a provider request was made: ${servers.routes()}",
+            servers.requests.none {
+                it.host ==
+                    "provider.test"
+            },
+        )
+        assertTrue(
+            "pre-auth is fetched again until it verifies",
+            servers.requests.all {
+                it.path ==
+                    "/v1/reader/pre-auth"
+            },
+        )
         client.close()
     }
 
@@ -75,7 +87,11 @@ class PreAuthGuardTest {
     @Test
     fun `the mismatch reason never carries the publishable key`() {
         val document = com.cedagova.reader.auth.api.PreAuthDocument.parse(
-            kotlinx.serialization.json.Json.parseToJsonElement(preAuthJson(publicClientId = "sb_publishable_other")).let { it as kotlinx.serialization.json.JsonObject },
+            kotlinx.serialization.json.Json.parseToJsonElement(
+                preAuthJson(publicClientId = "sb_publishable_other"),
+            ).let {
+                it as kotlinx.serialization.json.JsonObject
+            },
         )
         val reason = document.mismatch(testConfig)!!
         assertTrue(reason, !reason.contains(PUBLISHABLE_KEY) && !reason.contains("sb_publishable_other"))

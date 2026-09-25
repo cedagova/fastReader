@@ -11,8 +11,8 @@ import com.cedagova.reader.library.model.ReaderDeltaStatus
 import com.cedagova.reader.library.model.ReaderLibraryResponse
 import com.cedagova.reader.library.model.ReaderMutationKind
 import com.cedagova.reader.library.model.ReaderProgressListResponse
-import com.cedagova.reader.library.model.ReaderResourceType
 import com.cedagova.reader.library.model.ReaderPublicationImportCapability
+import com.cedagova.reader.library.model.ReaderResourceType
 import com.cedagova.reader.library.model.ReaderSyncCapability
 import com.cedagova.reader.library.model.ReaderSyncDeltaResponse
 import com.cedagova.reader.library.model.ReaderSyncMutationBatchResponse
@@ -168,9 +168,7 @@ class ReaderLibraryGatewayTest {
         override suspend fun importPolicy(): PublicationImportPolicyResponse =
             error("the sync gateway does not read the import policy")
 
-        override suspend fun admitImport(
-            request: CreatePublicationImportRequest,
-        ): PublicationImportAdmissionResponse =
+        override suspend fun admitImport(request: CreatePublicationImportRequest): PublicationImportAdmissionResponse =
             error("the sync gateway does not admit imports")
 
         override suspend fun importRecord(importId: String): PublicationImportResponse =

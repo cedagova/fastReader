@@ -55,9 +55,7 @@ import kotlinx.coroutines.withContext
  * refused when the file changed under it — see
  * `com.cedagova.fastreader.reader.ReaderPosition`.
  */
-class EpubContentPipeline(
-    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
-) {
+class EpubContentPipeline(private val dispatcher: CoroutineDispatcher = Dispatchers.Default) {
 
     /**
      * Reads [source] into a token stream, identified by [identity].

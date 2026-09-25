@@ -50,11 +50,8 @@ sealed interface PublicationImportRefusal {
     }
 
     /** Above the cap this format publishes. [maxSourceBytes] is the policy's number, quoted. */
-    data class TooLarge(
-        val format: PublicationFormat,
-        val sizeBytes: Long,
-        val maxSourceBytes: Long,
-    ) : PublicationImportRefusal {
+    data class TooLarge(val format: PublicationFormat, val sizeBytes: Long, val maxSourceBytes: Long) :
+        PublicationImportRefusal {
         override val category: PublicationFailureCategory
             get() = PublicationFailureCategory.TOO_LARGE
     }

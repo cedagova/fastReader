@@ -117,7 +117,9 @@ class SettingsAccessibilityTest {
         // before the tap, and says that reading needs none.
         assertTrue(
             "the account row should announce its state, got $labels",
-            labels.any { it.startsWith("Reader account. Signed in as reader@example.test. Optional. Reading needs no account") },
+            labels.any {
+                it.startsWith("Reader account. Signed in as reader@example.test. Optional. Reading needs no account")
+            },
         )
         // The mechanism's internal vocabulary must not reach a screen reader.
         listOf("pivot", "ORP", "Spritz").forEach { word ->

@@ -46,28 +46,33 @@ class FakeClock(var now: Instant = Clock.System.now()) : ReaderClock {
 
 class RecordingWaiter : RetryWaiter {
     val waits = mutableListOf<Duration>()
-    override suspend fun wait(duration: Duration) { waits += duration }
+    override suspend fun wait(duration: Duration) {
+        waits += duration
+    }
 }
 
 class InMemorySessionStore(initial: UserSession? = null) : SessionStore {
     @Volatile var session: UserSession? = initial
-    override suspend fun save(session: UserSession) { this.session = session }
+    override suspend fun save(session: UserSession) {
+        this.session = session
+    }
     override suspend fun load(): UserSession? = session
-    override suspend fun clear() { session = null }
+    override suspend fun clear() {
+        session = null
+    }
 }
 
 fun user(id: String = "user-1", email: String = "reader@example.test") =
     UserInfo(aud = "authenticated", id = id, email = email)
 
-fun session(accessToken: String = "access-1", refreshToken: String = "refresh-1", expiresAt: Instant) =
-    UserSession(
-        accessToken = accessToken,
-        refreshToken = refreshToken,
-        expiresIn = 3600,
-        tokenType = "bearer",
-        user = user(),
-        expiresAt = expiresAt,
-    )
+fun session(accessToken: String = "access-1", refreshToken: String = "refresh-1", expiresAt: Instant) = UserSession(
+    accessToken = accessToken,
+    refreshToken = refreshToken,
+    expiresIn = 3600,
+    tokenType = "bearer",
+    user = user(),
+    expiresAt = expiresAt,
+)
 
 fun sessionJson(accessToken: String, refreshToken: String) = """
     {"access_token":"$accessToken","refresh_token":"$refreshToken","token_type":"bearer","expires_in":3600,
@@ -131,7 +136,11 @@ class FakeServers {
         query = url.encodedQuery,
         headers = headers.entries().associate { (k, v) -> k to v.joinToString(",") } +
             (body.contentType?.let { mapOf(HttpHeaders.ContentType to it.toString()) } ?: emptyMap()),
-        body = try { body.toByteArray().decodeToString() } catch (e: Exception) { "" },
+        body = try {
+            body.toByteArray().decodeToString()
+        } catch (e: Exception) {
+            ""
+        },
     )
 }
 

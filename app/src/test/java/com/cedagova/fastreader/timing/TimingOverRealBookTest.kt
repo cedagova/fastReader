@@ -1,8 +1,8 @@
 package com.cedagova.fastreader.timing
 
-import com.cedagova.fastreader.content.Boundary
 import com.cedagova.fastreader.content.BookContent
 import com.cedagova.fastreader.content.BookContentResult
+import com.cedagova.fastreader.content.Boundary
 import com.cedagova.fastreader.content.ContentFixtures
 import com.cedagova.fastreader.content.EpubContentPipeline
 import com.cedagova.fastreader.content.WordToken
@@ -152,7 +152,8 @@ class TimingOverRealBookTest {
         for (strength in listOf(PauseStrength.SUBTLE, PauseStrength.NORMAL, PauseStrength.STRONG)) {
             val mean = RemainingTimeIndex.build(book, strength).meanMultiplier
             for (wpm in listOf(100, 250, 1000)) {
-                val settings = TimingSettings(wpm = wpm, pauseStrength = strength, rampEnabled = false, meanMultiplier = mean)
+                val settings =
+                    TimingSettings(wpm = wpm, pauseStrength = strength, rampEnabled = false, meanMultiplier = mean)
                 val actual = book.tokens.sumOf { RsvpTimingEngine.durationMillis(it, settings, steady) }
                 val budget = book.totalTokens * 60_000.0 / wpm
                 val tolerance = maxOf(budget * 0.005, book.totalTokens.toDouble())

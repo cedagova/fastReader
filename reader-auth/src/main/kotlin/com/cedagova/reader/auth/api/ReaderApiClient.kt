@@ -73,8 +73,13 @@ class ReaderApiClient internal constructor(
      * sign-in. A 2xx whose object does not decode as the document is an
      * [ReaderAuthException.ApiError] (#191), like a 2xx that is not JSON.
      */
-    suspend fun preAuth(): PreAuthDocument =
-        send(HttpMethod.Get, PRE_AUTH_PATH, authenticated = false, clientVersion = true, read = PreAuthDocument::parse).value
+    suspend fun preAuth(): PreAuthDocument = send(
+        HttpMethod.Get,
+        PRE_AUTH_PATH,
+        authenticated = false,
+        clientVersion = true,
+        read = PreAuthDocument::parse,
+    ).value
 
     /** `GET /v1/reader/capabilities?clientVersion=…`: the first authenticated call after sign-in. */
     suspend fun capabilities(): JsonObject = capabilitiesResponse().document
@@ -91,8 +96,12 @@ class ReaderApiClient internal constructor(
             .let { ReaderApiResponse(it.value, it.requestId) }
 
     /** `PUT /v1/reader/profile`: the upsert that precedes any profile `GET`. */
-    suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject =
-        request(HttpMethod.Put, PROFILE_PATH, authenticated = true, body = json.encodeToString(ReaderProfileUpdate.serializer(), update))
+    suspend fun upsertProfile(update: ReaderProfileUpdate): JsonObject = request(
+        HttpMethod.Put,
+        PROFILE_PATH,
+        authenticated = true,
+        body = json.encodeToString(ReaderProfileUpdate.serializer(), update),
+    )
 
     /** Any further protected `GET` a host needs, under the same policy. */
     suspend fun get(path: String): JsonObject = request(HttpMethod.Get, path, authenticated = true)
@@ -145,7 +154,9 @@ class ReaderApiClient internal constructor(
         while (true) {
             val session = if (authenticated) {
                 refresher.sessionForRequest() ?: throw ReaderAuthException.SignedOut(code = null)
-            } else null
+            } else {
+                null
+            }
             val requestId = requestIds()
             val response = try {
                 http.request(config.readerApiOrigin + path) {
@@ -170,13 +181,17 @@ class ReaderApiClient internal constructor(
             val error = ErrorBody.of(response)
             when {
                 response.status == HttpStatusCode.Unauthorized -> {
-                    if (error.code == ReaderAuthPolicy.EXPIRED_TOKEN_CODE && session != null && refreshed < ReaderAuthPolicy.RETRY_LIMIT) {
+                    if (error.code == ReaderAuthPolicy.EXPIRED_TOKEN_CODE && session != null &&
+                        refreshed < ReaderAuthPolicy.RETRY_LIMIT
+                    ) {
                         refreshed += 1
                         refresher.refreshAfterRejection(session.accessToken)
                             ?: throw ReaderAuthException.SignedOut(error.code, error.requestId)
                         continue
                     }
-                    if (session != null && error.code != ReaderAuthPolicy.EXPIRED_TOKEN_CODE && error.code?.startsWith(AUTH_CODE_PREFIX) == true) {
+                    if (session != null && error.code != ReaderAuthPolicy.EXPIRED_TOKEN_CODE &&
+                        error.code?.startsWith(AUTH_CODE_PREFIX) == true
+                    ) {
                         if (refresher.clearAfterRejection(session.accessToken)) {
                             throw ReaderAuthException.SignedOut(error.code, error.requestId)
                         }
@@ -187,12 +202,22 @@ class ReaderApiClient internal constructor(
                             continue
                         }
                     }
-                    throw ReaderAuthException.ApiError(response.status.value, error.code, error.requestId, error.message)
+                    throw ReaderAuthException.ApiError(
+                        response.status.value,
+                        error.code,
+                        error.requestId,
+                        error.message,
+                    )
                 }
+
                 response.status == HttpStatusCode.Forbidden ->
                     throw ReaderAuthException.Forbidden(error.code, error.requestId)
+
                 response.status == HttpStatusCode.TooManyRequests ||
-                    (response.status == HttpStatusCode.BadGateway && error.code == ReaderAuthPolicy.JWKS_DEPENDENCY_FAILED_CODE) ||
+                    (
+                        response.status == HttpStatusCode.BadGateway &&
+                            error.code == ReaderAuthPolicy.JWKS_DEPENDENCY_FAILED_CODE
+                        ) ||
                     (response.status.value >= SERVER_ERROR && error.retryable) -> {
                     val retryAfter = ReaderAuthPolicy.retryAfter(response.headers[HttpHeaders.RetryAfter])
                     if (waited < ReaderAuthPolicy.RETRY_LIMIT && ReaderAuthPolicy.retriesInline(retryAfter)) {
@@ -202,7 +227,13 @@ class ReaderApiClient internal constructor(
                     }
                     throw ReaderAuthException.TryLater(response.status.value, error.code, retryAfter, error.requestId)
                 }
-                else -> throw ReaderAuthException.ApiError(response.status.value, error.code, error.requestId, error.message)
+
+                else -> throw ReaderAuthException.ApiError(
+                    response.status.value,
+                    error.code,
+                    error.requestId,
+                    error.message,
+                )
             }
         }
     }
@@ -212,13 +243,23 @@ class ReaderApiClient internal constructor(
         val document = try {
             json.parseToJsonElement(text).jsonObject
         } catch (e: Exception) {
-            throw ReaderAuthException.ApiError(status.value, null, headers[HEADER_REQUEST_ID], "response is not a JSON object")
+            throw ReaderAuthException.ApiError(
+                status.value,
+                null,
+                headers[HEADER_REQUEST_ID],
+                "response is not a JSON object",
+            )
         }
         return try {
             read(document)
         } catch (e: IllegalArgumentException) {
             // kotlinx.serialization's SerializationException is an IllegalArgumentException.
-            throw ReaderAuthException.ApiError(status.value, null, headers[HEADER_REQUEST_ID], "response is not the expected document")
+            throw ReaderAuthException.ApiError(
+                status.value,
+                null,
+                headers[HEADER_REQUEST_ID],
+                "response is not the expected document",
+            )
         }
     }
 
@@ -251,7 +292,8 @@ class ReaderApiClient internal constructor(
                     message = body.text("message") ?: text.take(MAX_MESSAGE),
                     requestId = body.text("request_id") ?: fromHeader,
                     category = (body["category"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
-                    retryable = (body["retryable"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull ?: false,
+                    retryable =
+                        (body["retryable"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull ?: false,
                 )
             }
         }

@@ -1,37 +1,39 @@
 package com.cedagova.fastreader.reader.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -42,9 +44,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -53,19 +55,22 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -79,20 +84,15 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -103,9 +103,9 @@ import com.cedagova.fastreader.R
 import com.cedagova.fastreader.reader.ReaderMode
 import com.cedagova.fastreader.reader.ResumeOffer
 import com.cedagova.fastreader.settings.CueSettings
+import com.cedagova.fastreader.timing.RsvpTiming
 import com.cedagova.fastreader.ui.LayoutWidth
 import com.cedagova.fastreader.ui.WidthAware
-import com.cedagova.fastreader.timing.RsvpTiming
 import kotlin.math.roundToInt
 
 /** Android's accessibility minimum for an interactive control (REQ-060). */
@@ -265,123 +265,125 @@ fun ReaderScreen(
     val chromeHidden = state is ReaderUiState.Reading && (focused || state.mode == ReaderMode.PLAYING)
 
     WidthAware(modifier.fillMaxSize()) { layout ->
-    Scaffold(
-        modifier = Modifier.fillMaxSize().testTag("reader_screen"),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            if (!chromeHidden) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = state.bookTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                        )
-                    },
-                    navigationIcon = {
-                        val back = stringResource(R.string.reader_back)
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier
-                                .size(TouchTarget)
-                                .semantics { contentDescription = back }
-                                .testTag("reader_back"),
-                        ) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+        Scaffold(
+            modifier = Modifier.fillMaxSize().testTag("reader_screen"),
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                if (!chromeHidden) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = state.bookTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                            )
+                        },
+                        navigationIcon = {
+                            val back = stringResource(R.string.reader_back)
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier
+                                    .size(TouchTarget)
+                                    .semantics { contentDescription = back }
+                                    .testTag("reader_back"),
+                            ) {
+                                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                            }
+                        },
+                        actions = {
+                            // Cues and pause strength are things a reader judges while
+                            // actually reading, so settings are one tap from the book
+                            // rather than only from the library (REQ-023).
+                            val settings = stringResource(R.string.settings_open)
+                            IconButton(
+                                onClick = onOpenSettings,
+                                modifier = Modifier
+                                    .size(TouchTarget)
+                                    .semantics { contentDescription = settings }
+                                    .testTag("reader_settings"),
+                            ) {
+                                Icon(imageVector = Icons.Filled.Settings, contentDescription = null)
+                            }
+                        },
+                    )
+                }
+            },
+        ) { innerPadding ->
+            // Scaffold's inset padding is what keeps the transport controls clear of
+            // the gesture navigation bar; the app draws edge to edge.
+            Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                when (state) {
+                    is ReaderUiState.Opening -> OpeningBook(state, Modifier.weight(1f))
+
+                    is ReaderUiState.Unavailable -> Unavailable(state, Modifier.weight(1f))
+
+                    is ReaderUiState.Reading -> {
+                        if (!chromeHidden) {
+                            state.persistenceFailure?.let { PersistenceFailureBanner(it) }
+                            if (externalNotice) {
+                                ExternalOpenNotice(
+                                    onAddToLibrary = onAddToLibrary,
+                                    onDismiss = onDismissExternalNotice,
+                                )
+                            }
+                            frontMatterOffer?.let { chapterTitle ->
+                                FrontMatterOfferNotice(
+                                    chapterTitle = chapterTitle,
+                                    onSkip = onSkipFrontMatter,
+                                    onDismiss = onDismissFrontMatterOffer,
+                                )
+                            }
+                            resumeOffer?.let { offer ->
+                                ResumeOfferNotice(
+                                    offer = offer,
+                                    onAccept = onAcceptResumeOffer,
+                                    onDismiss = onDismissResumeOffer,
+                                )
+                            }
                         }
-                    },
-                    actions = {
-                        // Cues and pause strength are things a reader judges while
-                        // actually reading, so settings are one tap from the book
-                        // rather than only from the library (REQ-023).
-                        val settings = stringResource(R.string.settings_open)
-                        IconButton(
-                            onClick = onOpenSettings,
-                            modifier = Modifier
-                                .size(TouchTarget)
-                                .semantics { contentDescription = settings }
-                                .testTag("reader_settings"),
-                        ) {
-                            Icon(imageVector = Icons.Filled.Settings, contentDescription = null)
-                        }
-                    },
-                )
-            }
-        },
-    ) { innerPadding ->
-        // Scaffold's inset padding is what keeps the transport controls clear of
-        // the gesture navigation bar; the app draws edge to edge.
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            when (state) {
-                is ReaderUiState.Opening -> OpeningBook(state, Modifier.weight(1f))
-                is ReaderUiState.Unavailable -> Unavailable(state, Modifier.weight(1f))
-                is ReaderUiState.Reading -> {
-                    if (!chromeHidden) {
-                        state.persistenceFailure?.let { PersistenceFailureBanner(it) }
-                        if (externalNotice) {
-                            ExternalOpenNotice(
-                                onAddToLibrary = onAddToLibrary,
-                                onDismiss = onDismissExternalNotice,
+                        // The two slots the layouts share. Hoisted so the wide branch
+                        // cannot drift from the narrow one: there is one argument list
+                        // for the stream and one for the controls, and the branches
+                        // differ only in where they put them.
+                        val surface: @Composable (Modifier) -> Unit = { slot ->
+                            ReadingSurface(
+                                state = state,
+                                onTogglePlay = onTogglePlay,
+                                onToggleFocused = onToggleFocused,
+                                focused = focused,
+                                chromeHidden = chromeHidden,
+                                speedNotice = speedNotice,
+                                onSpeedStep = onSpeedStep,
+                                word = word,
+                                modifier = slot,
                             )
                         }
-                        frontMatterOffer?.let { chapterTitle ->
-                            FrontMatterOfferNotice(
-                                chapterTitle = chapterTitle,
-                                onSkip = onSkipFrontMatter,
-                                onDismiss = onDismissFrontMatterOffer,
+                        val controls: @Composable (Modifier, Arrangement.Vertical) -> Unit = { slot, arrangement ->
+                            ReaderControls(
+                                state = state,
+                                onTogglePlay = onTogglePlay,
+                                onWpmChange = onWpmChange,
+                                onBackSentence = onBackSentence,
+                                onForwardSentence = onForwardSentence,
+                                onBackParagraph = onBackParagraph,
+                                onForwardParagraph = onForwardParagraph,
+                                onScrub = onScrub,
+                                progressShown = progressShown,
+                                onOpenChapters = { chapterPickerOpen = true },
+                                modifier = slot,
+                                verticalArrangement = arrangement,
                             )
                         }
-                        resumeOffer?.let { offer ->
-                            ResumeOfferNotice(
-                                offer = offer,
-                                onAccept = onAcceptResumeOffer,
-                                onDismiss = onDismissResumeOffer,
-                            )
+                        if (layout.wide && !chromeHidden) {
+                            WideReadingLayout(layout, surface, controls, Modifier.weight(1f))
+                        } else {
+                            surface(Modifier.weight(1f))
+                            if (!chromeHidden) controls(Modifier.fillMaxWidth(), Arrangement.Top)
                         }
-                    }
-                    // The two slots the layouts share. Hoisted so the wide branch
-                    // cannot drift from the narrow one: there is one argument list
-                    // for the stream and one for the controls, and the branches
-                    // differ only in where they put them.
-                    val surface: @Composable (Modifier) -> Unit = { slot ->
-                        ReadingSurface(
-                            state = state,
-                            onTogglePlay = onTogglePlay,
-                            onToggleFocused = onToggleFocused,
-                            focused = focused,
-                            chromeHidden = chromeHidden,
-                            speedNotice = speedNotice,
-                            onSpeedStep = onSpeedStep,
-                            word = word,
-                            modifier = slot,
-                        )
-                    }
-                    val controls: @Composable (Modifier, Arrangement.Vertical) -> Unit = { slot, arrangement ->
-                        ReaderControls(
-                            state = state,
-                            onTogglePlay = onTogglePlay,
-                            onWpmChange = onWpmChange,
-                            onBackSentence = onBackSentence,
-                            onForwardSentence = onForwardSentence,
-                            onBackParagraph = onBackParagraph,
-                            onForwardParagraph = onForwardParagraph,
-                            onScrub = onScrub,
-                            progressShown = progressShown,
-                            onOpenChapters = { chapterPickerOpen = true },
-                            modifier = slot,
-                            verticalArrangement = arrangement,
-                        )
-                    }
-                    if (layout.wide && !chromeHidden) {
-                        WideReadingLayout(layout, surface, controls, Modifier.weight(1f))
-                    } else {
-                        surface(Modifier.weight(1f))
-                        if (!chromeHidden) controls(Modifier.fillMaxWidth(), Arrangement.Top)
                     }
                 }
             }
         }
-    }
     }
 
     if (chapterPickerOpen && state is ReaderUiState.Reading) {
@@ -447,19 +449,15 @@ private fun ColumnScope.WideReadingLayout(
  *   [MaxControlsWidth] hands the rest back to the stream.
  */
 private fun readerControlsWidth(available: Dp): Dp =
-    (available * ControlsWidthFraction).coerceIn(MinControlsWidth, MaxControlsWidth)
+    (available * CONTROLS_WIDTH_FRACTION).coerceIn(MinControlsWidth, MaxControlsWidth)
 
-private const val ControlsWidthFraction = 0.42f
+private const val CONTROLS_WIDTH_FRACTION = 0.42f
 
 /** Five 48 dp targets, their arrangement, and the column's own 16 dp padding. */
 private val MinControlsWidth = 280.dp
 
 private val MaxControlsWidth = 420.dp
 
-/**
- * The book-open loading state. LEAF201 parses off the main thread and reports one
- * step per spine item, so this is determinate as soon as the spine is known.
- */
 /**
  * The store is refusing writes, so the reader's place is not being kept.
  *
@@ -666,6 +664,10 @@ private fun ResumeOfferNotice(offer: ResumeOffer, onAccept: () -> Unit, onDismis
     }
 }
 
+/**
+ * The book-open loading state. LEAF201 parses off the main thread and reports one
+ * step per spine item, so this is determinate as soon as the spine is known.
+ */
 @Composable
 private fun OpeningBook(state: ReaderUiState.Opening, modifier: Modifier) {
     Column(
@@ -842,6 +844,7 @@ private fun ReadingSurface(
                 // A stop screen has no word to keep in place, so it uses the whole
                 // surface.
                 ReaderMode.CHAPTER_PAUSE -> FullSurface { ChapterPause(state) }
+
                 ReaderMode.FINISHED -> FullSurface { Finished(state) }
             }
         }
@@ -875,8 +878,14 @@ private fun Modifier.speedGesture(onSpeedStep: (Int) -> Unit): Modifier {
     return this
         .semantics {
             customActions = listOf(
-                CustomAccessibilityAction(faster) { step(1); true },
-                CustomAccessibilityAction(slower) { step(-1); true },
+                CustomAccessibilityAction(faster) {
+                    step(1)
+                    true
+                },
+                CustomAccessibilityAction(slower) {
+                    step(-1)
+                    true
+                },
             )
         }
         .pointerInput(drag) {
@@ -976,7 +985,14 @@ private fun ParagraphContext(context: ReaderContext) {
         if (lines.layoutInput.text != paragraph) return@LaunchedEffect
         if (viewportHeight <= 0 || lines.lineCount == 0) return@LaunchedEffect
         val current = lines.getLineForOffset(currentStart)
-        val first = sectionStartLine(lines.lineCount, viewportHeight.toFloat(), current, lines::getLineTop, lines::getLineBottom)
+        val first =
+            sectionStartLine(
+                lines.lineCount,
+                viewportHeight.toFloat(),
+                current,
+                lines::getLineTop,
+                lines::getLineBottom,
+            )
         scrollState.scrollTo(lines.getLineTop(first).roundToInt())
     }
     Column(
@@ -1464,7 +1480,11 @@ private fun SpeedEntry(wpm: Int, onDone: (Int?) -> Unit) {
             .width(SpeedEntryWidth)
             .focusRequester(focusRequester)
             .onFocusChanged { focus ->
-                if (focus.isFocused) hadFocus = true else if (hadFocus) finish(parsed)
+                if (focus.isFocused) {
+                    hadFocus = true
+                } else if (hadFocus) {
+                    finish(parsed)
+                }
             }
             .testTag("reader_speed_entry"),
     )
@@ -1474,7 +1494,11 @@ private fun SpeedEntry(wpm: Int, onDone: (Int?) -> Unit) {
     val imeVisible = WindowInsets.isImeVisible
     var imeWasVisible by remember { mutableStateOf(false) }
     LaunchedEffect(imeVisible) {
-        if (imeVisible) imeWasVisible = true else if (imeWasVisible) finish(parsed)
+        if (imeVisible) {
+            imeWasVisible = true
+        } else if (imeWasVisible) {
+            finish(parsed)
+        }
     }
 }
 

@@ -71,7 +71,9 @@ internal class StructuralFingerprint private constructor() {
     /** The finished fingerprint. Not reusable: the digest is consumed. */
     fun build(): String {
         val hex = StringBuilder(PREFIX.length + 64).append(PREFIX)
-        digest.digest().forEach { byte -> hex.append(HEX[(byte.toInt() shr 4) and 0xF]).append(HEX[byte.toInt() and 0xF]) }
+        digest.digest().forEach { byte ->
+            hex.append(HEX[(byte.toInt() shr 4) and 0xF]).append(HEX[byte.toInt() and 0xF])
+        }
         return hex.toString()
     }
 

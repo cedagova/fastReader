@@ -14,10 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 sealed interface AccountLibraryDecoding {
 
     /** Decoded successfully; [migratedFrom] is set when older bytes were upgraded on the way in. */
-    data class Decoded(
-        val document: AccountLibraryDocument,
-        val migratedFrom: Int? = null,
-    ) : AccountLibraryDecoding
+    data class Decoded(val document: AccountLibraryDocument, val migratedFrom: Int? = null) : AccountLibraryDecoding
 
     /** The bytes are damaged or not an account document at all; the caller re-bootstraps. */
     data class Damaged(val message: String) : AccountLibraryDecoding

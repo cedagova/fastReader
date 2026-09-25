@@ -31,7 +31,8 @@ class ReaderAccountControllerTest {
     private fun TestScope.controller(gateway: ReaderAccountGateway? = this@ReaderAccountControllerTest.gateway) =
         ReaderAccountController(gateway, ReaderAccountConfiguration.PROPERTY_KEYS, backgroundScope)
 
-    private fun runUnconfined(block: suspend TestScope.() -> Unit) = runTest(UnconfinedTestDispatcher(), testBody = block)
+    private fun runUnconfined(block: suspend TestScope.() -> Unit) =
+        runTest(UnconfinedTestDispatcher(), testBody = block)
 
     // --- The three states -----------------------------------------------------
 
@@ -60,7 +61,10 @@ class ReaderAccountControllerTest {
 
         assertEquals(ReaderAccountState.Loading, controller.state.value)
         wait.complete(Unit)
-        assertEquals(ReaderAccountState.SignedIn(userId = "user-9", email = "kept@example.test"), controller.state.value)
+        assertEquals(
+            ReaderAccountState.SignedIn(userId = "user-9", email = "kept@example.test"),
+            controller.state.value,
+        )
     }
 
     @Test
@@ -154,12 +158,16 @@ class ReaderAccountControllerTest {
         val controller = controller()
         controller.verifyEmailCode(email, "123456")
         controller.loadCapabilities()
-        gateway.capabilitiesResponse = gateway.capabilitiesResponse.copy(requestId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d")
+        gateway.capabilitiesResponse =
+            gateway.capabilitiesResponse.copy(requestId = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d")
 
         controller.loadCapabilities()
 
         assertEquals(2, gateway.calls.count { it == "capabilities()" })
-        assertEquals("1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", (controller.state.value as ReaderAccountState.SignedIn).capabilities?.requestId)
+        assertEquals(
+            "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+            (controller.state.value as ReaderAccountState.SignedIn).capabilities?.requestId,
+        )
     }
 
     @Test
@@ -181,30 +189,66 @@ class ReaderAccountControllerTest {
     @Test
     fun `a provider rejection shows the provider's code and is not retried`() = runUnconfined {
         val controller = controller()
-        gateway.nextFailure = ReaderAuthException.ProviderRejected(400, "invalid_credentials", "Invalid login credentials")
+        gateway.nextFailure =
+            ReaderAuthException.ProviderRejected(400, "invalid_credentials", "Invalid login credentials")
 
         controller.signInWithPassword(email, "wrong")
 
         assertEquals(1, gateway.calls.size)
         assertEquals(
-            ReaderAccountState.SignedOut(outcome = AccountOutcome.ProviderRejected(400, "invalid_credentials", "Invalid login credentials")),
+            ReaderAccountState.SignedOut(
+                outcome = AccountOutcome.ProviderRejected(400, "invalid_credentials", "Invalid login credentials"),
+            ),
             controller.state.value,
         )
     }
 
     @Test
     fun `every library branch lands as its own outcome`() {
-        assertEquals(AccountOutcome.NetworkUnavailable, ReaderAuthException.NetworkUnavailable(java.io.IOException("x")).toOutcome())
-        assertEquals(AccountOutcome.ConfigurationMismatch("client.applicationId is x"), ReaderAuthException.ConfigurationMismatch("client.applicationId is x").toOutcome())
-        assertEquals(AccountOutcome.SignInUnavailable("configuration_stale"), ReaderAuthException.SignInUnavailable("configuration_stale", retryable = true).toOutcome())
-        assertEquals(AccountOutcome.TryLater(429, "over_request_rate_limit", 30, "r1"), ReaderAuthException.TryLater(429, "over_request_rate_limit", 30.seconds, "r1").toOutcome())
-        assertEquals(AccountOutcome.TryLater(503, null, null, null), ReaderAuthException.TryLater(503, null, null).toOutcome())
-        assertEquals(AccountOutcome.SessionGone("auth.invalid_token", "r2"), ReaderAuthException.SignedOut("auth.invalid_token", "r2").toOutcome())
-        assertEquals(AccountOutcome.Forbidden("forbidden", "r3"), ReaderAuthException.Forbidden("forbidden", "r3").toOutcome())
-        assertEquals(AccountOutcome.ProviderRejected(422, "weak_password", "too short"), ReaderAuthException.ProviderRejected(422, "weak_password", "too short").toOutcome())
-        assertEquals(AccountOutcome.ApiError(404, "not_found", "r4", "gone"), ReaderAuthException.ApiError(404, "not_found", "r4", "gone").toOutcome())
-        assertEquals(AccountOutcome.ConfigurationMismatch("reader-auth is not configured"), ReaderAuthException.NotConfigured().toOutcome())
-        assertEquals(AccountOutcome.UnexpectedResponse, ReaderAuthException.UnexpectedResponse(IllegalArgumentException("<html>")).toOutcome())
+        assertEquals(
+            AccountOutcome.NetworkUnavailable,
+            ReaderAuthException.NetworkUnavailable(java.io.IOException("x")).toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.ConfigurationMismatch("client.applicationId is x"),
+            ReaderAuthException.ConfigurationMismatch("client.applicationId is x").toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.SignInUnavailable("configuration_stale"),
+            ReaderAuthException.SignInUnavailable("configuration_stale", retryable = true).toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.TryLater(429, "over_request_rate_limit", 30, "r1"),
+            ReaderAuthException.TryLater(429, "over_request_rate_limit", 30.seconds, "r1").toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.TryLater(503, null, null, null),
+            ReaderAuthException.TryLater(503, null, null).toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.SessionGone("auth.invalid_token", "r2"),
+            ReaderAuthException.SignedOut("auth.invalid_token", "r2").toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.Forbidden("forbidden", "r3"),
+            ReaderAuthException.Forbidden("forbidden", "r3").toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.ProviderRejected(422, "weak_password", "too short"),
+            ReaderAuthException.ProviderRejected(422, "weak_password", "too short").toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.ApiError(404, "not_found", "r4", "gone"),
+            ReaderAuthException.ApiError(404, "not_found", "r4", "gone").toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.ConfigurationMismatch("reader-auth is not configured"),
+            ReaderAuthException.NotConfigured().toOutcome(),
+        )
+        assertEquals(
+            AccountOutcome.UnexpectedResponse,
+            ReaderAuthException.UnexpectedResponse(IllegalArgumentException("<html>")).toOutcome(),
+        )
     }
 
     @Test
@@ -221,21 +265,22 @@ class ReaderAccountControllerTest {
     }
 
     @Test
-    fun `a session the server rejected reads signed out with the reason, and the document goes with it`() = runUnconfined {
-        val controller = controller()
-        controller.verifyEmailCode(email, "123456")
-        controller.loadCapabilities()
-        gateway.nextFailure = ReaderAuthException.SignedOut("auth.invalid_token", "req-401")
+    fun `a session the server rejected reads signed out with the reason, and the document goes with it`() =
+        runUnconfined {
+            val controller = controller()
+            controller.verifyEmailCode(email, "123456")
+            controller.loadCapabilities()
+            gateway.nextFailure = ReaderAuthException.SignedOut("auth.invalid_token", "req-401")
 
-        controller.loadCapabilities()
+            controller.loadCapabilities()
 
-        assertEquals(
-            ReaderAccountState.SignedOut(outcome = AccountOutcome.SessionGone("auth.invalid_token", "req-401")),
-            controller.state.value,
-        )
-        controller.dismissOutcome()
-        assertEquals("shown once, then dismissed", ReaderAccountState.SignedOut(), controller.state.value)
-    }
+            assertEquals(
+                ReaderAccountState.SignedOut(outcome = AccountOutcome.SessionGone("auth.invalid_token", "req-401")),
+                controller.state.value,
+            )
+            controller.dismissOutcome()
+            assertEquals("shown once, then dismissed", ReaderAccountState.SignedOut(), controller.state.value)
+        }
 
     // --- REQ-406: the two sign-outs ------------------------------------------
 
@@ -277,7 +322,11 @@ class ReaderAccountControllerTest {
         controller.signInWithPassword(email, "x")
         gate.complete(Unit)
 
-        assertEquals("exactly one call reached the library", listOf("requestEmailCode($email, createUser=false)"), gateway.calls)
+        assertEquals(
+            "exactly one call reached the library",
+            listOf("requestEmailCode($email, createUser=false)"),
+            gateway.calls,
+        )
         assertEquals(ReaderAccountState.SignedOut(outcome = AccountOutcome.CodeSent), controller.state.value)
     }
 

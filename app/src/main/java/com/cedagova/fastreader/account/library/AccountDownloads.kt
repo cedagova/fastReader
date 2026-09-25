@@ -1,10 +1,10 @@
 package com.cedagova.fastreader.account.library
 
+import com.cedagova.reader.auth.ReaderAuthException
+import com.cedagova.reader.library.downloads.AssetDownloadException
 import com.cedagova.reader.library.sync.AccountBook
 import com.cedagova.reader.library.sync.AccountLibraryState
 import com.cedagova.reader.library.sync.AccountSyncPhase
-import com.cedagova.reader.auth.ReaderAuthException
-import com.cedagova.reader.library.downloads.AssetDownloadException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -167,9 +167,7 @@ class AccountDownloads(
 }
 
 /** Every download the shelf is showing, keyed by the account's own book id. */
-data class AccountDownloadsState(
-    val byAccountBookId: Map<String, BookDownloadState> = emptyMap(),
-) {
+data class AccountDownloadsState(val byAccountBookId: Map<String, BookDownloadState> = emptyMap()) {
 
     internal fun with(bookId: String, state: BookDownloadState): AccountDownloadsState =
         copy(byAccountBookId = byAccountBookId + (bookId to state))

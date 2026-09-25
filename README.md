@@ -256,7 +256,7 @@ lint and tests are unchanged and the screen reads "Not configured".
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
 ./gradlew assembleDebug
-./gradlew testDebugUnitTest verifyRoborazziDebug lint
+./gradlew testDebugUnitTest verifyRoborazziDebug lint spotlessCheck
 ```
 
 Gradle needs **JDK 21**. A debug build needs no signing material; a release

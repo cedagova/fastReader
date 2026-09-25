@@ -99,8 +99,7 @@ class FilePublication(bytes: ByteArray) : InMemoryPublication(bytes) {
         deleteOnExit()
     }
 
-    override fun openChannel(): SeekableByteChannel =
-        Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
+    override fun openChannel(): SeekableByteChannel = Files.newByteChannel(file.toPath(), StandardOpenOption.READ)
 }
 
 /**
@@ -112,9 +111,7 @@ class FilePublication(bytes: ByteArray) : InMemoryPublication(bytes) {
  * grant. [received] is everything it ever stored, in order, so a test can
  * assert byte-for-byte that nothing was re-sent and nothing was skipped.
  */
-class FakeStorage(
-    private val requiredHeaders: Map<String, String> = GRANT_HEADERS,
-) {
+class FakeStorage(private val requiredHeaders: Map<String, String> = GRANT_HEADERS) {
     val requests: MutableList<Recorded> = Collections.synchronizedList(mutableListOf())
 
     private val stored = ByteArrayOutputStream()
@@ -176,10 +173,12 @@ class FakeStorage(
                     headersOf(HttpHeaders.Location to listOf(location)),
                 )
             }
+
             "HEAD" -> {
                 rejectHeadWith?.let { return@MockEngine respond("", HttpStatusCode.fromValue(it)) }
                 respond("", HttpStatusCode.OK, uploadOffset(offset))
             }
+
             "PATCH" -> {
                 val declared = recorded.headers[PublicationTransferClient.HEADER_UPLOAD_OFFSET]?.toLong()
                 declared?.let { patchOffsets += it }
@@ -207,6 +206,7 @@ class FakeStorage(
                 offset += body.size
                 respond("", HttpStatusCode.NoContent, uploadOffset(offset))
             }
+
             else -> error("a TUS client does not send ${recorded.method}")
         }
     }
@@ -214,10 +214,9 @@ class FakeStorage(
     private fun uploadOffset(value: Long) =
         headersOf(PublicationTransferClient.HEADER_UPLOAD_OFFSET to listOf(value.toString()))
 
-    private fun missingHeader(recorded: Recorded): String? =
-        requiredHeaders.keys.firstOrNull { name ->
-            recorded.headers.none { it.key.equals(name, ignoreCase = true) }
-        }
+    private fun missingHeader(recorded: Recorded): String? = requiredHeaders.keys.firstOrNull { name ->
+        recorded.headers.none { it.key.equals(name, ignoreCase = true) }
+    }
 
     private suspend fun HttpRequestData.record(): Recorded = Recorded(
         method = method.value,

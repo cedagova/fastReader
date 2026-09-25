@@ -5,7 +5,7 @@ import androidx.compose.ui.unit.dp
 import com.cedagova.fastreader.timing.RsvpTiming
 import kotlin.math.roundToInt
 
-/**
+/*
  * REQ-108 — the focused-mode speed gesture, reduced to arithmetic.
  *
  * The gesture itself is a vertical drag on the reading surface (see

@@ -107,7 +107,8 @@ sealed interface AccountOutcome {
     data class ProviderRejected(val status: Int, val code: String?, val description: String) : AccountOutcome
 
     /** `ReaderAuthException.TryLater`: a rate limit or a server failure after the library's one retry; nothing was changed. */
-    data class TryLater(val status: Int, val code: String?, val retryAfterSeconds: Long?, val requestId: String?) : AccountOutcome
+    data class TryLater(val status: Int, val code: String?, val retryAfterSeconds: Long?, val requestId: String?) :
+        AccountOutcome
 
     /** `ReaderAuthException.NetworkUnavailable`: nothing was sent and nothing was cleared. */
     data object NetworkUnavailable : AccountOutcome
@@ -125,7 +126,8 @@ sealed interface AccountOutcome {
     data class Forbidden(val code: String?, val requestId: String?) : AccountOutcome
 
     /** `ReaderAuthException.ApiError`: any other reader-api answer, with its code and request id; the session is intact. */
-    data class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String) : AccountOutcome
+    data class ApiError(val status: Int, val code: String?, val requestId: String?, val description: String) :
+        AccountOutcome
 
     /** `ReaderAuthException.StorageUnavailable`: signed in for this run, but the device could not save the session. */
     data object StorageUnavailable : AccountOutcome

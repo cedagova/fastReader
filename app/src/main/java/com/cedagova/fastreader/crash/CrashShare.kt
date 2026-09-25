@@ -17,9 +17,8 @@ import android.content.Intent
  * to other apps is byte for byte the redacted text that was stored, rather than
  * that claim resting on a device run nobody can repeat.
  */
-fun crashShareIntent(report: String, subject: String): Intent =
-    Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, subject)
-        putExtra(Intent.EXTRA_TEXT, report)
-    }
+fun crashShareIntent(report: String, subject: String): Intent = Intent(Intent.ACTION_SEND).apply {
+    type = "text/plain"
+    putExtra(Intent.EXTRA_SUBJECT, subject)
+    putExtra(Intent.EXTRA_TEXT, report)
+}

@@ -120,12 +120,11 @@ class SafDocumentGateway(context: Context) : DocumentGateway {
         return if (rootReadable) FolderListing.Listed(found) else FolderListing.Missing
     }
 
-    override fun open(uri: String): InputStream =
-        try {
-            resolver.openInputStream(uri.toUri()) ?: throw IOException("could not open $uri")
-        } catch (error: SecurityException) {
-            throw IOException("access to the file was revoked", error)
-        }
+    override fun open(uri: String): InputStream = try {
+        resolver.openInputStream(uri.toUri()) ?: throw IOException("could not open $uri")
+    } catch (error: SecurityException) {
+        throw IOException("access to the file was revoked", error)
+    }
 
     /**
      * A seekable view of the document, when the provider is backed by a real file.

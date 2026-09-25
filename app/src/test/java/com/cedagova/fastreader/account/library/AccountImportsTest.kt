@@ -1,8 +1,5 @@
 package com.cedagova.fastreader.account.library
 
-import com.cedagova.reader.library.sync.AccountImportRecords
-import com.cedagova.reader.library.sync.AccountLibraryState
-import com.cedagova.reader.library.sync.AccountSyncPhase
 import com.cedagova.fastreader.account.FakePublicationImportGateway
 import com.cedagova.fastreader.library.Book
 import com.cedagova.fastreader.library.BookSource
@@ -18,6 +15,9 @@ import com.cedagova.reader.library.model.PublicationImportStatus
 import com.cedagova.reader.library.model.ReaderCapabilityAvailability
 import com.cedagova.reader.library.model.ReaderCapabilityReason
 import com.cedagova.reader.library.model.ReaderPublicationImportCapability
+import com.cedagova.reader.library.sync.AccountImportRecords
+import com.cedagova.reader.library.sync.AccountLibraryState
+import com.cedagova.reader.library.sync.AccountSyncPhase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -50,6 +50,7 @@ class AccountImportsTest {
     private val documents = FakeDocumentGateway()
     private val records = FakeImportRecords()
     private val account = MutableStateFlow(signedIn())
+
     /**
      * The flow is process-scoped in the app, so it gets a scope of its own here
      * too — one that shares the test's scheduler, so `advanceUntilIdle` drives
@@ -85,19 +86,18 @@ class AccountImportsTest {
     // ---- nothing leaves the device before the tap ------------------------------------------
 
     @Test
-    fun `tapping Add reads the policy, asks the question, and sends nothing about the book`() =
-        runTest(dispatcher) {
-            givenBook(sizeBytes = 1_000)
+    fun `tapping Add reads the policy, asks the question, and sends nothing about the book`() = runTest(dispatcher) {
+        givenBook(sizeBytes = 1_000)
 
-            imports.requestAdd(FICCIONES_ID)
-            advanceUntilIdle()
+        imports.requestAdd(FICCIONES_ID)
+        advanceUntilIdle()
 
-            assertEquals(listOf("importPolicy()"), gateway.calls)
-            assertTrue("no consent may have reached a sending call", gateway.consents.isEmpty())
-            assertTrue("no import record may exist yet", records.stored.isEmpty())
-            val state = imports.state.value.byDeviceBookId[FICCIONES_ID]
-            assertEquals(BookImportState.Consent(sizeBytes = 1_000, maxSourceBytes = 52_428_800), state)
-        }
+        assertEquals(listOf("importPolicy()"), gateway.calls)
+        assertTrue("no consent may have reached a sending call", gateway.consents.isEmpty())
+        assertTrue("no import record may exist yet", records.stored.isEmpty())
+        val state = imports.state.value.byDeviceBookId[FICCIONES_ID]
+        assertEquals(BookImportState.Consent(sizeBytes = 1_000, maxSourceBytes = 52_428_800), state)
+    }
 
     @Test
     fun `declining the question sends nothing, ever`() = runTest(dispatcher) {
@@ -261,21 +261,20 @@ class AccountImportsTest {
     }
 
     @Test
-    fun `a file over the deployment's cap is refused with that cap and nothing is admitted`() =
-        runTest(dispatcher) {
-            givenBook(sizeBytes = 900)
-            gateway.policy = FakePublicationImportGateway.accepting(cap = 800)
+    fun `a file over the deployment's cap is refused with that cap and nothing is admitted`() = runTest(dispatcher) {
+        givenBook(sizeBytes = 900)
+        gateway.policy = FakePublicationImportGateway.accepting(cap = 800)
 
-            imports.requestAdd(FICCIONES_ID)
-            advanceUntilIdle()
+        imports.requestAdd(FICCIONES_ID)
+        advanceUntilIdle()
 
-            val refused = imports.state.value.byDeviceBookId[FICCIONES_ID] as BookImportState.Refused
-            assertEquals(ImportProblem.Category(PublicationFailureCategory.TOO_LARGE), refused.problem)
-            assertEquals(900L, refused.sizeBytes)
-            assertEquals(800L, refused.maxSourceBytes)
-            assertEquals(listOf("importPolicy()"), gateway.calls)
-            assertTrue(records.stored.isEmpty())
-        }
+        val refused = imports.state.value.byDeviceBookId[FICCIONES_ID] as BookImportState.Refused
+        assertEquals(ImportProblem.Category(PublicationFailureCategory.TOO_LARGE), refused.problem)
+        assertEquals(900L, refused.sizeBytes)
+        assertEquals(800L, refused.maxSourceBytes)
+        assertEquals(listOf("importPolicy()"), gateway.calls)
+        assertTrue(records.stored.isEmpty())
+    }
 
     @Test
     fun `a deployment that admits nothing replaces the action with its reason`() = runTest(dispatcher) {
@@ -323,40 +322,40 @@ class AccountImportsTest {
     // ---- the lifecycle -----------------------------------------------------------------------
 
     @Test
-    fun `a ready import forgets its record and asks for the pass that brings the row`() =
-        runTest(dispatcher) {
-            givenBook(sizeBytes = 1_000)
-            gateway.steps += PublicationImportStep.Transferred(record(PublicationImportStatus.VERIFYING_UPLOAD))
-            gateway.refreshes += record(PublicationImportStatus.READY).copy(canonicalBookId = "book-1")
+    fun `a ready import forgets its record and asks for the pass that brings the row`() = runTest(dispatcher) {
+        givenBook(sizeBytes = 1_000)
+        gateway.steps += PublicationImportStep.Transferred(record(PublicationImportStatus.VERIFYING_UPLOAD))
+        gateway.refreshes += record(PublicationImportStatus.READY).copy(canonicalBookId = "book-1")
 
-            addAndConfirm()
+        addAndConfirm()
 
-            assertNull("the shelf shows no verdict for a book that simply arrived",
-                imports.state.value.byDeviceBookId[FICCIONES_ID])
-            assertTrue("the record is spent", records.stored.isEmpty())
-            assertEquals("one sync asked for, so the backend's row can arrive", 1, syncs)
-        }
+        assertNull(
+            "the shelf shows no verdict for a book that simply arrived",
+            imports.state.value.byDeviceBookId[FICCIONES_ID],
+        )
+        assertTrue("the record is spent", records.stored.isEmpty())
+        assertEquals("one sync asked for, so the backend's row can arrive", 1, syncs)
+    }
 
     @Test
-    fun `a failed import shows the backend's own category and leaves the device book alone`() =
-        runTest(dispatcher) {
-            givenBook(sizeBytes = 1_000)
-            gateway.steps += PublicationImportStep.Failed(
-                record(PublicationImportStatus.FAILED).copy(
-                    failureCategory = PublicationFailureCategory.PROTECTED,
-                    failureRetryable = false,
-                ),
-                PublicationFailureCategory.PROTECTED,
-            )
+    fun `a failed import shows the backend's own category and leaves the device book alone`() = runTest(dispatcher) {
+        givenBook(sizeBytes = 1_000)
+        gateway.steps += PublicationImportStep.Failed(
+            record(PublicationImportStatus.FAILED).copy(
+                failureCategory = PublicationFailureCategory.PROTECTED,
+                failureRetryable = false,
+            ),
+            PublicationFailureCategory.PROTECTED,
+        )
 
-            addAndConfirm()
+        addAndConfirm()
 
-            val refused = imports.state.value.byDeviceBookId[FICCIONES_ID] as BookImportState.Refused
-            assertEquals(ImportProblem.Category(PublicationFailureCategory.PROTECTED), refused.problem)
-            assertEquals(false, refused.retryable)
-            assertTrue("a terminal failure leaves nothing to resume", records.stored.isEmpty())
-            assertEquals(0, syncs)
-        }
+        val refused = imports.state.value.byDeviceBookId[FICCIONES_ID] as BookImportState.Refused
+        assertEquals(ImportProblem.Category(PublicationFailureCategory.PROTECTED), refused.problem)
+        assertEquals(false, refused.retryable)
+        assertTrue("a terminal failure leaves nothing to resume", records.stored.isEmpty())
+        assertEquals(0, syncs)
+    }
 
     @Test
     fun `an interrupted transfer keeps its record so the next pass carries on`() = runTest(dispatcher) {
@@ -388,16 +387,15 @@ class AccountImportsTest {
     }
 
     @Test
-    fun `a stored import whose book has left the catalog is dropped rather than retried`() =
-        runTest(dispatcher) {
-            records.stored += record(PublicationImportStatus.PENDING_UPLOAD)
+    fun `a stored import whose book has left the catalog is dropped rather than retried`() = runTest(dispatcher) {
+        records.stored += record(PublicationImportStatus.PENDING_UPLOAD)
 
-            imports.resumeStoredImports()
-            advanceUntilIdle()
+        imports.resumeStoredImports()
+        advanceUntilIdle()
 
-            assertTrue(records.stored.isEmpty())
-            assertTrue(gateway.calls.none { it.startsWith("resume(") })
-        }
+        assertTrue(records.stored.isEmpty())
+        assertTrue(gateway.calls.none { it.startsWith("resume(") })
+    }
 
     @Test
     fun `a terminal stored import is forgotten on the next pass`() = runTest(dispatcher) {
@@ -428,20 +426,19 @@ class AccountImportsTest {
     }
 
     @Test
-    fun `signing out ends every add and leaves the stored records for the next sign-in`() =
-        runTest(dispatcher) {
-            givenBook(sizeBytes = 1_000)
-            records.stored += record(PublicationImportStatus.PENDING_UPLOAD)
-            imports.requestAdd(FICCIONES_ID)
-            advanceUntilIdle()
+    fun `signing out ends every add and leaves the stored records for the next sign-in`() = runTest(dispatcher) {
+        givenBook(sizeBytes = 1_000)
+        records.stored += record(PublicationImportStatus.PENDING_UPLOAD)
+        imports.requestAdd(FICCIONES_ID)
+        advanceUntilIdle()
 
-            records.signedIn = null
-            account.value = AccountLibraryState.SIGNED_OUT
-            advanceUntilIdle()
+        records.signedIn = null
+        account.value = AccountLibraryState.SIGNED_OUT
+        advanceUntilIdle()
 
-            assertEquals(AccountImportsState.NONE, imports.state.value)
-            assertEquals("D4: the account's own document keeps them", 1, records.stored.size)
-        }
+        assertEquals(AccountImportsState.NONE, imports.state.value)
+        assertEquals("D4: the account's own document keeps them", 1, records.stored.size)
+    }
 
     // ---- a book whose bytes cannot be reached ------------------------------------------------
 

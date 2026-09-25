@@ -161,8 +161,7 @@ object RsvpTimingEngine {
      * The multiplier for the pause *after* [token]: the stronger of what its
      * punctuation asks for and what the word itself asks for.
      */
-    private fun pauseMultiplier(token: Token): Double =
-        maxOf(boundaryMultiplier(token), emphasisMultiplier(token))
+    private fun pauseMultiplier(token: Token): Double = maxOf(boundaryMultiplier(token), emphasisMultiplier(token))
 
     private fun boundaryMultiplier(token: Token): Double {
         // Abbreviations are exempt from the sentence pause. LEAF201's tokenizer
@@ -204,6 +203,5 @@ object RsvpTimingEngine {
         return multiplier
     }
 
-    private fun Token.hasClass(wordClass: WordClass): Boolean =
-        this is WordToken && wordClass in classes
+    private fun Token.hasClass(wordClass: WordClass): Boolean = this is WordToken && wordClass in classes
 }
