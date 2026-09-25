@@ -1,4 +1,8 @@
 pluginManagement {
+    // The shared build conventions (#205): every module applies one of
+    // build-logic's plugins instead of repeating SDK, JVM, lint, test and
+    // formatter settings.
+    includeBuild("build-logic")
     repositories {
         google {
             content {

@@ -8,9 +8,16 @@
 #   * junit stays 4.13.2 because that is the last JUnit 4 release.
 #
 # When something cannot move, pin it here with the reason on the line above it.
-# compileSdk/targetSdk live in app/build.gradle.kts and track the same policy.
+#
+# SDK levels and the JVM target are declared here too, once, and applied to
+# every module by the convention plugins in build-logic/ (#205); compileSdk and
+# targetSdk track the same newest-stable policy.
 
 [versions]
+compileSdk = "37"
+targetSdk = "37"
+minSdk = "26"
+jvmTarget = "17"
 agp = "9.4.0"
 kotlin = "2.4.20"
 coreKtx = "1.19.0"
@@ -32,6 +39,9 @@ uiautomator = "2.4.0"
 # against (3.5.1) so the engine and the mock engine share the SDK's client core.
 supabase = "3.8.0"
 ktor = "3.5.1"
+# The formatter and style check (#205): ktlint, run through Spotless.
+spotless = "8.10.2"
+ktlint = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -65,11 +75,16 @@ supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version
 supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
 ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref = "ktor" }
+# Compile-only inputs of the build-logic convention plugins (#205), at the same
+# versions the plugins below put on the build classpath.
+android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
+kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+spotless-gradlePlugin = { group = "com.diffplug.spotless", name = "spotless-plugin-gradle", version.ref = "spotless" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

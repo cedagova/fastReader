@@ -47,9 +47,9 @@ jobs:
         if: ${{ !cancelled() }}
         run: ./gradlew --no-daemon verifyRoborazziDebug
 
-      - name: Lint
+      - name: Lint and formatting
         if: ${{ !cancelled() }}
-        run: ./gradlew --no-daemon lint
+        run: ./gradlew --no-daemon lint spotlessCheck
 
       # Failure reports and the actual/diff PNGs, so a red run can be diagnosed
       # without re-running anything locally.
